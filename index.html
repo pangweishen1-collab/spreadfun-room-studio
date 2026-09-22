@@ -23,6 +23,20 @@
     .top-actions .lang-button,.top-actions #examplesButton,.top-actions #contactButton{width:132px;min-width:132px;flex:0 0 132px;height:40px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;white-space:nowrap}.top-actions .lang-button{padding:5px 12px;gap:8px}.top-actions .lang-icon{flex:0 0 26px}.top-actions .lang-label{width:42px;min-width:42px}.top-actions #examplesButton,.top-actions #contactButton{padding:5px 12px;color:var(--blue);background:#eaf3ff;cursor:pointer}
 .contact-avatar{position:relative;width:112px;height:112px;overflow:hidden;border-radius:50%;margin:0 auto 20px;background:#eaf3ff}.contact-avatar img{position:absolute;width:241.07px;max-width:none;height:auto;left:-10.67px;top:-10.67px}
     #examplesDialog{border:0;border-radius:24px;padding:24px;width:min(820px,92vw);max-height:90vh;overflow:auto;color:var(--ink);box-shadow:0 24px 70px #0004}#examplesDialog::backdrop{background:#10111480;backdrop-filter:blur(7px)}.examples-head{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:18px}.examples-head h2{margin:0;font-size:22px}.examples-hint{margin:0 0 18px;padding:12px 15px;border-radius:12px;background:#eef6ff;color:#2469b3;font-size:14px;font-weight:600;text-align:center}.examples-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.examples-grid img{display:block;width:100%;aspect-ratio:9/16;object-fit:cover;border-radius:16px;background:#eef0f3;box-shadow:0 8px 24px #17233a24}.examples-close{border:0;border-radius:99px;padding:9px 18px;background:#eef5ff;color:var(--blue);font-size:13px;font-weight:650;cursor:pointer}.examples-close:hover{background:#dcecff;transform:translateY(-1px)}
+.stage{border:1px solid #d4e4f6;background:radial-gradient(circle at 50% 28%,#f3f8ff,#e3eefb)}
+.stage.upload-ready:hover{background:radial-gradient(circle at 50% 28%,#f7fbff,#dcecff)}
+.stage.upload-ready.drag{background:#dcecff}
+.top-actions .tiny,.top-actions .tiny:hover,.top-actions .tiny:active{box-shadow:none}
+.language-switch{display:grid;grid-template-columns:1fr 1fr;width:154px;height:44px;padding:4px;border:1px solid #cfe5ff;border-radius:999px;background:#eaf3ff}
+.language-switch button{border:0;border-radius:999px;background:transparent;color:#2871c9;font-size:13px;font-weight:700;cursor:pointer;transition:background-color .18s ease,color .18s ease}
+.language-switch button:hover{background:#dcecff}
+.language-switch button.active{background:#3479df;color:#fff}
+.language-switch button:focus-visible{outline:3px solid #67aef7;outline-offset:2px}
+.exports{position:relative}
+.lifetime-stat{position:absolute;top:calc(100% + 20px);left:0;width:100%;display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border:1px solid #d8e8fa;border-radius:18px;background:linear-gradient(135deg,#f7fbff,#eaf4ff);color:#1d4f85}
+.lifetime-stat-copy{display:flex;align-items:center;gap:10px;font-size:13px;font-weight:650}
+.lifetime-stat-icon{width:34px;height:34px;border-radius:11px;display:grid;place-items:center;background:#dcecff;color:#2878d7;font-size:17px}
+.lifetime-stat-value{font-size:28px;line-height:1;font-weight:750;color:#1672dc;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -133,8 +147,16 @@ document.querySelector('#contactDialog').addEventListener('click',event=>{if(eve
 function updateExamplesLanguage(){document.querySelector('#examplesTitle').textContent=ui('案例图片','Example images');document.querySelector('#examplesHint').textContent=ui('建议上传的图片比例9:16，更容易出效果哦','For better results, we recommend uploading images in a 9:16 aspect ratio.');document.querySelector('#examplesClose').textContent=ui('关闭','Close')}
 function openExamples(){updateExamplesLanguage();document.querySelector('#examplesDialog').showModal()}
 document.querySelector('#examplesDialog').addEventListener('click',event=>{if(event.target.id==='examplesDialog'){const r=event.target.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)event.target.close()}});
-function toggleLanguage(){language=language==='zh'?'en':'zh';applyLanguage();localizeExtra();refreshJobs();if(generatedOutputs.length)renderOutputList();refreshDownloadControls();updateContactLanguage();updateExamplesLanguage()}
-applyLanguage();localizeExtra();refreshDownloadControls();
+function syncLanguageSwitch(){let control=document.querySelector('#langToggle');if(control.tagName==='BUTTON'){const group=document.createElement('div');group.id='langToggle';group.className='language-switch';group.setAttribute('role','group');group.setAttribute('aria-label',ui('语言切换','Language switch'));group.innerHTML='<span id="langLabel" hidden></span><button type="button" data-language="zh">中文</button><button type="button" data-language="en">EN</button>';control.replaceWith(group);group.querySelectorAll('button').forEach(button=>button.addEventListener('click',()=>setLanguage(button.dataset.language)));control=group}control.setAttribute('aria-label',ui('语言切换','Language switch'));control.querySelectorAll('button').forEach(button=>{const active=button.dataset.language===language;button.classList.toggle('active',active);button.setAttribute('aria-pressed',String(active))})}
+function setLanguage(nextLanguage){if(language===nextLanguage)return;language=nextLanguage;applyLanguage();localizeExtra();refreshJobs();if(generatedOutputs.length)renderOutputList();refreshDownloadControls();updateContactLanguage();updateExamplesLanguage();syncLanguageSwitch();renderLifetimeStat()}
+function toggleLanguage(){setLanguage(language==='zh'?'en':'zh')}
+const lifetimeStatKey='spreadfun-room-studio-lifetime-images';
+function readLifetimeImages(){try{return Math.max(0,Number(localStorage.getItem(lifetimeStatKey))||0)}catch(error){return 0}}
+function renderLifetimeStat(){let stat=document.querySelector('#lifetimeStat');if(!stat){stat=document.createElement('div');stat.id='lifetimeStat';stat.className='lifetime-stat';stat.innerHTML='<div class="lifetime-stat-copy"><span class="lifetime-stat-icon">✦</span><span id="lifetimeStatLabel"></span></div><strong class="lifetime-stat-value" id="lifetimeStatValue">0</strong>';document.querySelector('#exportsPanel').append(stat)}document.querySelector('#lifetimeStatLabel').textContent=ui('累计产图次数','Images generated');document.querySelector('#lifetimeStatValue').textContent=readLifetimeImages().toLocaleString(language==='zh'?'zh-CN':'en-US')}
+function addLifetimeImages(count){const next=readLifetimeImages()+count;try{localStorage.setItem(lifetimeStatKey,String(next))}catch(error){}renderLifetimeStat()}
+const generateAllOutputsBase=generateAllOutputs;
+generateAllOutputs=async function(){if(!batchJobs.length||exportBusy)return generateAllOutputsBase();await generateAllOutputsBase();if(generatedOutputs.length)addLifetimeImages(generatedOutputs.length)};
+syncLanguageSwitch();applyLanguage();localizeExtra();refreshDownloadControls();syncLanguageSwitch();renderLifetimeStat();
 const fgReady=load(fg,fgUrl);
 
   </script>
