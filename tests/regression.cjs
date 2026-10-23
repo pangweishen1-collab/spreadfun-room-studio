@@ -60,7 +60,12 @@ const run = source => vm.runInContext(source,sandbox);
   assert.equal(events.length,0,'empty downloads and initial previews must not count');
   // FileList is live: clearing the input after onchange must not truncate an async import.
   sandbox.selection=[{name:'one.webp',type:'image/webp'},{name:'broken.png',type:'image/png'},{name:'two.webp',type:'image/webp'}];
-  const pending=run('batch({[Symbol.iterator]:()=>selection[Symbol.iterator]()})');sandbox.selection.length=0;await pending;
+  const pending=run('batch({[Symbol.iterator]:()=>selection[Symbol.iterator]()})');
+  assert.equal(document.querySelector('#previewUploadButton').disabled,true,'room upload locks during import');
+  assert.equal(document.querySelector('#previewUploadButton')['aria-busy'],'true','busy upload must not show sheen');
+  sandbox.selection.length=0;await pending;
+  assert.equal(document.querySelector('#previewUploadButton').disabled,false,'room upload restores after import');
+  assert.equal(document.querySelector('#previewUploadButton')['aria-busy'],'false');
   assert.equal(run('batchJobs.length'),2);assert.equal(run('generatedOutputs.length'),4);assert.equal(run('exportBusy||importBusy'),false);
   assert.match(document.querySelector('#uploadNotice').textContent,/broken.png/);
   assert.equal(run('readLifetimeImages()'),4);

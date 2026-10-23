@@ -120,7 +120,7 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
 .ft-motion-sheen {position:relative;isolation:isolate;overflow:hidden}
 .ft-motion-sheen:is(:hover,:focus-visible):not(:disabled):not([aria-busy=true]) {background:#0062cc;color:#fff}
 .ft-motion-sheen:active:not(:disabled):not([aria-busy=true]) {background:#0055b3}
-.ft-motion-sheen::after {content:"";position:absolute;inset:-30% auto -30% 0;width:45%;background:linear-gradient(90deg,transparent,rgb(255 255 255 / 12%),transparent);pointer-events:none;transform:translateX(-160%) skewX(-20deg)}
+.ft-motion-sheen::after {content:"";position:absolute;inset:-30% auto -30% 0;width:45%;background:linear-gradient(90deg,transparent,rgb(255 255 255 / 8%),transparent);pointer-events:none;transform:translateX(-160%) skewX(-20deg)}
 @media(hover:hover) and (pointer:fine) {
   .ft-motion-sheen:hover:not(:disabled):not([aria-busy=true])::after {animation:ft-sheen var(--ft-motion-sheen) ease-out 1}
 }
@@ -400,7 +400,7 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
 </section>
 
 <section id="motion" class="section" aria-labelledby="motion-title">
-  <div class="section-title"><div><div class="section-number">14 / MOTION & GLASS</div><h2 id="motion-title">动效与玻璃遮罩</h2><p class="section-description">轻、快、有反馈。普通操作保持蓝色调；只让局部动效解释状态，不干扰素材预览。</p></div><span class="badge-note">v1.2 动效补充</span></div>
+  <div class="section-title"><div><div class="section-number">14 / MOTION & GLASS</div><h2 id="motion-title">动效与玻璃遮罩</h2><p class="section-description">轻、快、有反馈。普通操作保持蓝色调；只让局部动效解释状态，不干扰素材预览。</p></div><span class="badge-note">v1.2.1 主按钮增补</span></div>
   <div class="grid-2">
     <div class="panel"><div class="panel-header"><div><h3>弹性入场 × 毛玻璃</h3><p>点击查看真实弹窗；可用关闭按钮或 Escape 关闭。</p></div></div>
       <div class="motion-stage"><div class="motion-glass-sample" aria-hidden="true"><span></span><span></span><div>GLASS<br><small>7 px blur</small></div></div></div>
@@ -409,8 +409,8 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
     </div>
     <div class="panel"><div class="panel-header"><div><h3>蓝调 Hover 与单次扫光</h3><p>鼠标悬停或Tab聚焦；扫光只用于少量主操作。</p></div></div>
       <div class="motion-button-grid"><button class="btn ft-motion-sheen" type="button" data-toast="扫光仅为动效示例，不发起生成。">生成并导出<svg aria-hidden="true"><use href="#i-download"/></svg></button><button class="btn ghost" type="button" data-toast="次操作使用浅蓝底与蓝字。">使用说明</button><button class="btn ft-motion-sheen" type="button" disabled>上传后可用</button></div>
-      <p class="annotation">主蓝 #0071E3 → Hover #0062CC → Pressed #0055B3；次操作 Hover 为浅蓝底、蓝字。扫光480 ms，白色亮带12%透明度，单次掠过；不自动循环，禁用/处理中无扫光。</p>
-      <div class="notice info"><svg aria-hidden="true"><use href="#i-info"/></svg><div>扫光为新增规范示例；替换按钮保留绿色，危险动作保留红色，预览黑底不属于交互 Hover。</div></div>
+      <p class="annotation">主蓝 #0071E3 → Hover #0062CC → Pressed #0055B3；次操作 Hover 为浅蓝底、蓝字。扫光480 ms，白色亮带8%透明度，单次掠过；不自动循环，禁用/处理中无扫光。触屏保留即时按下反馈，不模拟Hover。</p>
+      <div class="notice info"><svg aria-hidden="true"><use href="#i-info"/></svg><div>三个工具的上传、导出/下载全部六个主要按钮已启用8%轻扫光；替换、播放、逐帧与次操作保持原有语义。</div></div>
     </div>
   </div>
   <div class="table-wrap" style="margin-top:16px"><table class="spec-table"><thead><tr><th>场景</th><th>时长与幅度</th><th>行为边界</th></tr></thead><tbody>
@@ -422,7 +422,7 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
     <tr><td>加载 / 进度 / 拖入</td><td>旋转900 ms一圈；进度颜色120 ms；拖入180 ms</td><td>不写假百分比；后台暂停装饰动画；SVGA仅用户点击播放。</td></tr>
   </tbody></table></div>
   <p class="annotation"><strong>减少动画：</strong>系统开启减少动态效果时关闭回弹、扫光、位移和平滑滚动，保留蓝色反馈、文字状态和焦点。毛玻璃不支持时使用更实的#10111499遮罩；弹窗内容保持白色，确保表单清楚。</p>
-  <p class="component-source">可复用CSS：<a href="motion-patterns.css" download>下载动效样式</a>。新组件显式使用ft-motion-dialog / ft-motion-sheen；业务状态与关闭流程仍由组件负责。</p>
+  <p class="component-source">v1.2.1在线增补：六个主按钮已落地，PDF保留v1.2基准。可复用CSS：<a href="motion-patterns.css" download>下载动效样式</a>。新组件显式使用ft-motion-dialog / ft-motion-sheen；业务状态与关闭流程仍由组件负责。</p>
 </section>
 <dialog id="motion-demo-dialog" class="ft-motion-dialog" aria-labelledby="motion-demo-title" aria-describedby="motion-demo-description">
   <div class="dialog-header"><h2 id="motion-demo-title">轻一点，刚刚好。</h2><button class="close-btn" type="button" id="motion-dialog-close" aria-label="关闭动效示例"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>

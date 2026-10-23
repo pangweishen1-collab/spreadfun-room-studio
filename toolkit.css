@@ -222,7 +222,7 @@ html:not([data-input-modality=pointer]) .dimension-input:has(input:focus-visible
 .ft-motion-sheen {position:relative;isolation:isolate;overflow:hidden}
 .ft-motion-sheen:is(:hover,:focus-visible):not(:disabled):not([aria-busy=true]) {background:#0062cc;color:#fff}
 .ft-motion-sheen:active:not(:disabled):not([aria-busy=true]) {background:#0055b3}
-.ft-motion-sheen::after {content:"";position:absolute;inset:-30% auto -30% 0;width:45%;background:linear-gradient(90deg,transparent,rgb(255 255 255 / 12%),transparent);pointer-events:none;transform:translateX(-160%) skewX(-20deg)}
+.ft-motion-sheen::after {content:"";position:absolute;inset:-30% auto -30% 0;width:45%;background:linear-gradient(90deg,transparent,rgb(255 255 255 / 8%),transparent);pointer-events:none;transform:translateX(-160%) skewX(-20deg)}
 @media(hover:hover) and (pointer:fine) {
   .ft-motion-sheen:hover:not(:disabled):not([aria-busy=true])::after {animation:ft-sheen var(--ft-motion-sheen) ease-out 1}
 }
@@ -242,3 +242,11 @@ html:not([data-input-modality=pointer]) .dimension-input:has(input:focus-visible
 @media(prefers-reduced-motion:reduce){
   :is(button,a,.pick,.drop,.stage.upload-ready):is(:hover,:active),.stage.upload-ready.drag .upload-empty{transform:none!important}
 }
+
+/* Touch keeps immediate pressed feedback; no synthetic or sticky hover sheen. */
+@media(hover:none){
+  .ft-motion-sheen:hover:not(:active):not(:focus-visible):not(:disabled):not([aria-busy=true]){background:var(--blue);box-shadow:none;transform:none;filter:none}
+}
+
+button.ft-motion-sheen:is(:disabled,[aria-busy=true]){background:#edf0f4;color:#647083;border-color:#d8dce2;opacity:1;transform:none;box-shadow:none;filter:none;cursor:not-allowed}
+button.ft-motion-sheen[aria-busy=true]{cursor:progress}

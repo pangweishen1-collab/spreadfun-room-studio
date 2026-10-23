@@ -35,6 +35,7 @@
     for(const id of ['#bannerUpload','#bannerReplace','#bannerInput'])$(id).disabled=state.busy;
     $('#bannerDownloadAll').disabled=state.busy||!state.outputs.length;
     $('#bannerDropzone').setAttribute('aria-busy',String(state.busy));
+    for(const id of ['#bannerUpload','#bannerDownloadAll'])$(id).setAttribute('aria-busy',String(state.busy));
     $('#bannerStatus').textContent=t(state.busy?'loading':state.outputs.length?'ready':'noFile');
     $('#bannerOutputCount').textContent=String(state.outputs.length);
   }

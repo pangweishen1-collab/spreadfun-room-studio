@@ -46,6 +46,7 @@
   }
   function syncControls(){
     const busy=state.loading||state.exporting,ready=!!state.video;
+    for(const id of ['#svgaUpload','#frameDownload'])$(id).setAttribute('aria-busy',String(busy));
     for(const id of ['#svgaPrevious','#svgaNext','#svgaPlay','#svgaTimeline','#svgaFrameNumber'])$(id).disabled=!ready||busy;
     for(const id of ['#svgaUpload','#svgaReplace'])$(id).disabled=busy;
     for(const id of ['#frameWidth','#frameHeight'])$(id).disabled=state.exporting;
