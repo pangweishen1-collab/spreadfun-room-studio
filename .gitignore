@@ -1,2 +1,10 @@
 .DS_Store
-*.log
+node_modules/
+.wrangler/
+dist/
+__pycache__/
+*.pyc
+*.sqlite*
+*.db
+.env*
+.dev.vars*

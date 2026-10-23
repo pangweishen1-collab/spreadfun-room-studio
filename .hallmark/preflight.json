@@ -1,0 +1,18 @@
+{
+  "date": "2026-10-23",
+  "scope": "home page only",
+  "framework": "buildless HTML/CSS/JS; Python API unchanged",
+  "fontSource": "index.html inline CSS; toolkit.css brand",
+  "fonts": "system SF Pro / PingFang SC preserved",
+  "paletteSource": "toolkit.css:2 and provided blue-yellow logo",
+  "palette": "existing blue/yellow, light paper, dark ink",
+  "motion": "native CSS hover only; reduced motion supported",
+  "files": [
+    "index.html",
+    "hub.js",
+    "home.css",
+    "tokens.css",
+    "assets/home-studio-illustration.webp"
+  ],
+  "deletedFiles": []
+}

@@ -1,0 +1,11 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Toolkit responsive check</title>
+<style>body{margin:0;padding:24px;background:#e3e6eb;font:14px system-ui}h1{font-size:16px}label{display:inline-block;margin:0 16px 16px 0}select{margin-left:12px;padding:8px}iframe{display:block;width:375px;height:850px;border:0;background:white;box-shadow:0 12px 40px #0002}</style>
+<h1>Fun Toolkit · responsive check</h1>
+<label>Viewport width<select id="width" aria-label="Viewport width"><option>320</option><option>360</option><option selected>375</option><option>390</option><option>414</option><option>430</option><option>768</option><option>844</option></select></label>
+<label>Viewport height<select id="height" aria-label="Viewport height"><option>390</option><option>568</option><option>667</option><option>740</option><option selected>850</option></select></label>
+<iframe title="Tool preview" src="../index.html#room-backgrounds"></iframe>
+<script>document.querySelector('#width').onchange=e=>document.querySelector('iframe').style.width=e.target.value+'px';document.querySelector('#height').onchange=e=>document.querySelector('iframe').style.height=e.target.value+'px'</script>
+</html>

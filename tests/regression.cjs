@@ -1,0 +1,84 @@
+// Run: node tests/regression.cjs — uses only Node's standard library.
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
+const code = html.match(/<script>([\s\S]*?)<\/script>/)[1];
+const elements = new Map(), urls = new Map(), stats = new Map();
+const events = [];
+const recorded = type => events.filter(event=>event.tool==='room'&&event.type===type).reduce((total,event)=>total+event.count,0);
+let serial = 0, clicks = 0;
+const cleanupTimers=[];
+function element() {
+  const classes = new Set(), listeners = new Map();
+  return {
+    tagName: 'DIV', textContent: '', innerHTML: '', value: '50', width: 720, height: 1560, disabled: false, children: [],
+    childNodes: [{nodeValue: ''}], previousElementSibling: {firstChild: {nodeValue: ''}}, style: {},
+    classList: {add(...xs){xs.forEach(x=>classes.add(x))}, remove(...xs){xs.forEach(x=>classes.delete(x))}, toggle(x,on){if(on)classes.add(x);else classes.delete(x)}, contains(x){return classes.has(x)}},
+    setAttribute(k,v){this[k]=v}, removeAttribute(k){delete this[k]}, addEventListener(k,fn){listeners.set(k,fn)}, append(...xs){this.children.push(...xs)}, replaceChildren(...xs){this.innerHTML='';this.children=xs}, remove(){}, click(){clicks++;listeners.get('click')?.({button:0,defaultPrevented:false,target:this})},
+    querySelectorAll(){return []}, showModal(){this.open=true}, close(){this.open=false},
+    getContext(){return {clearRect(){},drawImage(){}}},
+    toBlob(callback,type){callback(new Blob([new Uint8Array(100)],{type}))}
+  };
+}
+const document = {documentElement:{}, body:element(), querySelector(selector){if(!elements.has(selector))elements.set(selector,element());return elements.get(selector)}, querySelectorAll(){return []},createElement:element};
+class MockImage {
+  constructor(){this.width=900;this.height=1600;this.naturalWidth=900;this.naturalHeight=1600;this.complete=true}
+  set src(value){this.url=value;queueMicrotask(()=>{if(urls.get(value)?.name==='broken.png')this.onerror?.();else this.onload?.()})}
+}
+const sandbox = {window:{Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},document, Image:MockImage, Blob, TextEncoder, Uint8Array, DataView, Set, Promise, Math, Number, String, Array,
+  localStorage:{getItem:key=>stats.get(key),setItem:(key,value)=>stats.set(key,value)},
+  URL:{createObjectURL(blob){const value='blob:'+ ++serial;urls.set(value,blob);return value},revokeObjectURL(value){urls.delete(value)}},
+  setTimeout(fn,delay){if(delay<60000)queueMicrotask(fn);else cleanupTimers.push(fn)}, console};
+vm.createContext(sandbox);vm.runInContext(code,sandbox);
+const run = source => vm.runInContext(source,sandbox);
+(async()=>{
+  await run('fgReady');
+  run('downloadAll()');assert.equal(run('downloadNotice.state'),'empty');
+  assert.equal(events.length,0,'empty downloads and initial previews must not count');
+  // FileList is live: clearing the input after onchange must not truncate an async import.
+  sandbox.selection=[{name:'one.webp',type:'image/webp'},{name:'broken.png',type:'image/png'},{name:'two.webp',type:'image/webp'}];
+  const pending=run('batch({[Symbol.iterator]:()=>selection[Symbol.iterator]()})');sandbox.selection.length=0;await pending;
+  assert.equal(run('batchJobs.length'),2);assert.equal(run('generatedOutputs.length'),4);assert.equal(run('exportBusy||importBusy'),false);
+  assert.match(document.querySelector('#uploadNotice').textContent,/broken.png/);
+  assert.equal(run('readLifetimeImages()'),4);
+  assert.equal(recorded('generated'),4,'two new backgrounds produce four countable files');assert.equal(recorded('download'),0);
+  assert.deepEqual(Array.from(run('generatedOutputs.map(file=>file.name)')),['Bg01.webp','Bg01-s.webp','Bg02.webp','Bg02-s.webp']);
+  run('openCropEditor("large",1)');assert.equal(run('cropImage===batchJobs[1].image'),true);assert.match(document.querySelector('#cropTitle').textContent,/Bg02.webp/);
+  run('before=generatedOutputs.map(file=>file.blob)');
+  document.querySelector('#cropX').value='0';await run('applyCrop()');
+  assert.equal(run('generatedOutputs[0].blob===before[0]&&generatedOutputs[1].blob===before[1]&&generatedOutputs[3].blob===before[3]'),true);
+  assert.equal(run('generatedOutputs[2].blob!==before[2]'),true);assert.equal(run('batchJobs[0].crops.large.x'),.5);assert.equal(run('batchJobs[1].crops.large.x'),0);assert.equal(run('batchJobs[1].crops.small.x'),.5);
+  assert.equal(run('readLifetimeImages()'),5);
+  assert.equal(recorded('generated'),5,'a changed crop produces exactly one more file');
+  cleanupTimers.splice(0).forEach(fn=>fn());
+  assert.equal(Array.from(run('generatedOutputs.map(file=>file.downloadUrl)')).every(url=>urls.has(url)),true,'active thumbnails must survive delayed URL cleanup');
+  run('openCropEditor("large",1)');await run('applyCrop()');assert.equal(run('readLifetimeImages()'),5,'unchanged crop must not encode/count again');
+  assert.equal(recorded('generated'),5,'an unchanged crop must not reach the aggregate counter');
+  // An encoder failure preserves the previous crop, file and ZIP.
+  run('beforeFile=generatedOutputs[2];beforeZip=zipFile;originalExport=exportCanvas;exportCanvas=async()=>{throw Error("encode failed")};openCropEditor("large",1)');
+  document.querySelector('#cropX').value='100';await run('applyCrop()');
+  assert.equal(run('generatedOutputs[2]===beforeFile&&zipFile===beforeZip'),true);assert.equal(run('batchJobs[1].crops.large.x'),0);assert.equal(run('downloadNotice.state'),'cropError');run('exportCanvas=originalExport');
+  assert.equal(recorded('generated'),5,'a failed crop must not count');
+  const urlCount=run('downloadUrls.size');run('toggleLanguage();toggleLanguage()');assert.equal(run('downloadUrls.size'),urlCount,'language switch must reuse thumbnail URLs');
+  assert.equal(recorded('generated'),5,'language changes must not count');
+  run('downloadAll();downloadGenerated(0)');assert.equal(clicks,2);
+  assert.equal(recorded('download'),2,'one ZIP and one single-file download are two requests');
+  const retry=document.querySelector('#downloadNotice').children.find(child=>child.download);
+  assert.ok(retry,'a valid download exposes its retry link');retry.click();assert.equal(recorded('download'),3,'retry links are separate download requests');
+  assert.equal(recorded('generated'),5,'downloads must not generate files again');
+  await run('removeBatchJob(0)');assert.equal(recorded('generated'),5,'deleting a job must not recount the remaining output sizes');
+  await run('batch([{name:"three.webp",type:"image/webp"}])');
+  assert.equal(run('generatedOutputs.length'),4);assert.equal(recorded('generated'),7,'adding one job counts only its two sizes, not the existing job');
+  await run('removeBatchJob(0)');await run('removeBatchJob(0)');assert.equal(recorded('generated'),7,'automatic regeneration after deletion must not inflate totals');
+  assert.equal(run('batchJobs.length'),0);assert.equal(run('generatedOutputs.length'),0);assert.equal(run('zipFile'),null);assert.equal(document.querySelector('#outputCount').textContent,'0');assert.equal(document.querySelector('#jobCount').textContent,0);assert.equal(document.querySelector('#previewStage').role,'button');
+  // Invalid-only uploads leave the editor available for another attempt.
+  sandbox.selection=[{name:'broken.png',type:'image/png'},{name:'notes.txt',type:'text/plain'}];await run('batch(selection)');assert.equal(run('batchJobs.length'),0);assert.equal(run('importBusy'),false);
+  assert.equal(recorded('generated'),7);assert.equal(recorded('download'),3,'invalid files must not affect either counter');
+  run('exportCanvas=async()=>{throw Error("encode failed")}');await run('batch([{name:"failed.webp",type:"image/webp"}])');run('exportCanvas=originalExport');
+  assert.equal(recorded('generated'),7,'a failed batch must not count newly queued jobs');
+  const zip=run('zipBytes([{name:"same.webp",bytes:new Uint8Array([1,2])},{name:"same.webp",bytes:new Uint8Array([3])},{name:"背景.webp",bytes:new Uint8Array([4])}])');
+  const bytes=new Uint8Array(await zip.arrayBuffer());assert.equal(new DataView(bytes.buffer).getUint32(0,true),0x04034b50);
+  console.log('PASS: live FileList, corrupt/unsupported files, per-image and per-size crop isolation, crop failure rollback, no-op count, URL reuse, downloads, empty reset, ZIP, aggregate generation deduplication and download/retry counts.');
+})().catch(error=>{console.error(error);process.exitCode=1});
