@@ -35,6 +35,27 @@ vm.createContext(sandbox);vm.runInContext(code,sandbox);
 const run = source => vm.runInContext(source,sandbox);
 (async()=>{
   await run('fgReady');
+  // A small WebP needs one maximum-quality encode; complex images keep the full search.
+  const maxBytes=120*1024,qualities=[];
+  sandbox.limitCanvas={toBlob(callback,type,quality){qualities.push(quality);callback(new Blob([new Uint8Array(maxBytes)],{type}))}};
+  const exactLimit=await run(`encodeUnderLimit(limitCanvas,${maxBytes})`);
+  assert.equal(exactLimit.size,maxBytes,'the exact 120 KiB boundary is valid');
+  assert.deepEqual(qualities,[.92],'an already-small image must skip all 11 search encodes');
+  qualities.length=0;
+  sandbox.limitCanvas={toBlob(callback,type,quality){qualities.push(quality);callback(new Blob([new Uint8Array(Math.round(1000+quality*200000))],{type}))}};
+  const complex=await run(`encodeUnderLimit(limitCanvas,${maxBytes})`);
+  assert.equal(qualities.length,12,'an oversized maximum-quality image keeps all 11 binary-search encodes');
+  assert.equal(qualities[0],.92);
+  assert.ok(complex.size<=maxBytes,'binary-search output must satisfy the strict byte limit');
+  assert.equal(complex.size,Math.max(...qualities.map(quality=>Math.round(1000+quality*200000)).filter(size=>size<=maxBytes)),'keep the highest successful quality from the search');
+  qualities.length=0;
+  sandbox.limitCanvas={toBlob(callback,type,quality){qualities.push(quality);callback(new Blob([new Uint8Array(maxBytes+1)],{type}))}};
+  await assert.rejects(run(`encodeUnderLimit(limitCanvas,${maxBytes})`),/120 KB/,'an image that cannot fit must fail instead of exceeding the limit');
+  assert.equal(qualities.length,13);assert.equal(qualities.at(-1),.001,'retain the last-resort lowest-quality check');
+  sandbox.limitCanvas={toBlob(){throw Error('encoder unavailable')}};
+  await assert.rejects(run(`encodeUnderLimit(limitCanvas,${maxBytes})`),/encoder unavailable/);
+  sandbox.limitCanvas={toBlob(callback){callback(new Blob(['wrong format'],{type:'image/png'}))}};
+  await assert.rejects(run(`encodeUnderLimit(limitCanvas,${maxBytes})`),/WebP encoding unavailable/);
   run('downloadAll()');assert.equal(run('downloadNotice.state'),'empty');
   assert.equal(events.length,0,'empty downloads and initial previews must not count');
   // FileList is live: clearing the input after onchange must not truncate an async import.
@@ -80,5 +101,5 @@ const run = source => vm.runInContext(source,sandbox);
   assert.equal(recorded('generated'),7,'a failed batch must not count newly queued jobs');
   const zip=run('zipBytes([{name:"same.webp",bytes:new Uint8Array([1,2])},{name:"same.webp",bytes:new Uint8Array([3])},{name:"背景.webp",bytes:new Uint8Array([4])}])');
   const bytes=new Uint8Array(await zip.arrayBuffer());assert.equal(new DataView(bytes.buffer).getUint32(0,true),0x04034b50);
-  console.log('PASS: live FileList, corrupt/unsupported files, per-image and per-size crop isolation, crop failure rollback, no-op count, URL reuse, downloads, empty reset, ZIP, aggregate generation deduplication and download/retry counts.');
+  console.log('PASS: maximum-quality WebP fast path, full-search byte limit and encoding failures, live FileList, corrupt/unsupported files, per-image and per-size crop isolation, crop failure rollback, no-op count, URL reuse, downloads, empty reset, ZIP, aggregate generation deduplication and download/retry counts.');
 })().catch(error=>{console.error(error);process.exitCode=1});

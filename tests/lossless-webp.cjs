@@ -25,32 +25,48 @@ if(!process.execArgv.includes('--experimental-vm-modules')){
     importModuleDynamically:specifier=>import(specifier==='./vendor/webp/webp_enc.mjs'?nodeCodec:pathToFileURL(path.resolve(project,specifier)).href)
   });
   helper.runInContext(sandbox);
-  const width=17,height=9,pixels=new Uint8ClampedArray(width*height*4);
   const alpha=[0,1,64,127,128,200,254,255];
-  for(let i=0;i<width*height;i++)pixels.set([(i*67+13)%256,(i*37+71)%256,(i*113+23)%256,alpha[i%alpha.length]],i*4);
-  const canvas={width,height,getContext(type){
-    assert.equal(type,'2d');
-    return {getImageData(x,y,w,h){assert.deepEqual([x,y,w,h],[0,0,width,height]);return {data:pixels}}};
-  }};
-  const blob=await sandbox.encode(canvas);
-  assert.equal(blob.type,'image/webp');
-  const encoded=Buffer.from(await blob.arrayBuffer());
-  assert.equal(encoded.subarray(0,4).toString(),'RIFF');assert.equal(encoded.subarray(8,12).toString(),'WEBP');
-  fs.writeFileSync(path.join(out,'lossless-helper.webp'),encoded);
-  fs.writeFileSync(path.join(out,'lossless-source.rgba'),pixels);
+  // Include both production dimensions, opaque detail and partial/zero alpha.
+  // Test decoded pixels rather than asserting the encoder's tuning parameters.
+  const cases=[
+    {name:'lossless-helper',raw:'lossless-source.rgba',width:17,height:9,transparent:true},
+    {name:'lossless-room',raw:'lossless-room.rgba',width:772,height:200,transparent:false},
+    {name:'lossless-game',raw:'lossless-game.rgba',width:684,height:240,transparent:true}
+  ];
+  for(const test of cases){
+    const {width,height}=test,pixels=new Uint8ClampedArray(width*height*4);
+    for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+      const i=y*width+x;
+      pixels.set([(x*67+y*13)%256,(x*37+y*71)%256,(x*113+y*23)%256,test.transparent?alpha[i%alpha.length]:255],i*4);
+    }
+    const canvas={width,height,getContext(type){
+      assert.equal(type,'2d');
+      return {getImageData(x,y,w,h){assert.deepEqual([x,y,w,h],[0,0,width,height]);return {data:pixels}}};
+    }};
+    const blob=await sandbox.encode(canvas);
+    assert.equal(blob.type,'image/webp');
+    const encoded=Buffer.from(await blob.arrayBuffer());
+    assert.equal(encoded.subarray(0,4).toString(),'RIFF');assert.equal(encoded.subarray(8,12).toString(),'WEBP');
+    fs.writeFileSync(path.join(out,test.name+'.webp'),encoded);
+    fs.writeFileSync(path.join(out,test.raw),pixels);
+  }
+  fs.writeFileSync(path.join(out,'lossless-cases.json'),JSON.stringify(cases));
   const check=spawnSync(process.env.BANNER_TEST_PYTHON||'python3',['-c',`
 from PIL import Image
 from pathlib import Path
 import json, sys
 p=Path(sys.argv[1])
-im=Image.open(p/'lossless-helper.webp').convert('RGBA')
-expected=(p/'lossless-source.rgba').read_bytes()
-actual=im.tobytes()
-assert im.size==(17,9), im.size
-assert actual==expected, 'Lossless helper changed RGBA pixels'
-report={'dimensions':list(im.size),'bytes':(p/'lossless-helper.webp').stat().st_size,'exact_rgba':True,'tested_alpha_values':sorted(set(actual[3::4]))}
-(p/'lossless-roundtrip.json').write_text(json.dumps(report,indent=2))
-print('PASS: production lossless helper + pinned WASM preserve every RGBA byte, including fully transparent RGB and partial alpha.')
+reports=[]
+for test in json.loads((p/'lossless-cases.json').read_text()):
+    encoded=p/(test['name']+'.webp')
+    im=Image.open(encoded).convert('RGBA')
+    expected=(p/test['raw']).read_bytes()
+    actual=im.tobytes()
+    assert im.size==(test['width'],test['height']), (test['name'],im.size)
+    assert actual==expected, test['name']+' changed RGBA pixels'
+    reports.append({'name':test['name'],'dimensions':list(im.size),'bytes':encoded.stat().st_size,'exact_rgba':True,'tested_alpha_values':sorted(set(actual[3::4]))})
+(p/'lossless-roundtrip.json').write_text(json.dumps(reports,indent=2))
+print('PASS: production lossless helper + pinned WASM preserve every RGBA byte at 17x9, 772x200 and 684x240, including fully transparent RGB and partial alpha.')
 `,out],{encoding:'utf8'});
   if(check.stdout)process.stdout.write(check.stdout);
   if(check.stderr)process.stderr.write(check.stderr);

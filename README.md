@@ -124,6 +124,10 @@ node --check hub.js
 
 线上使用 Cloudflare Worker Static Assets + D1，提供完整工具、共享统计和私有需求提交。`server.py` 保留为本地开发服务。GitHub Pages 使用 `docs/` 中的轻量入口跳转到正式站；不再直接发布仓库根目录。部署步骤和作者查看需求的方法见 `DEPLOYMENT.md`。数据库、运行状态和账号凭据不进入仓库或静态资源目录。
 
+## 生成性能
+
+1.0.1：房间背景先尝试最高质量编码，达到 120 KiB 限制即完成；复杂图保留原有完整搜索和严格容量检查，并移除每个输出固定 70ms 的等待。Banner 调整无损编码搜索参数，保留全部 RGBA 像素与透明通道。线上同图样本及真实下载、统计核验见 `VERIFICATION.md`；速度取决于素材与设备，不以降低画质提速。
+
 ## 第三方库
 
 - [SVGAPlayer-Web 2.3.2](https://github.com/svga/SVGAPlayer-Web)：Apache-2.0，许可见 `vendor/SVGA-LICENSE`。本地副本 SHA-256：`b04d24d3a41a7a602d5ab6f917e9c0453f23709fdd08069d37e5ae41265fcbf9`。
