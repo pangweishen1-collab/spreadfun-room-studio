@@ -132,3 +132,8 @@
 模板以 `data-slot` 标记职责区，用 `ToolPageDemo.setState('empty'|'ready'|'processing'|'success'|'error')` 切换演示；其中 `empty` 对应本文的 `idle`（上传前）。`setLanguage('zh'|'en')` 切换文案，`getState()` 读取当前状态。正式接入应替换 `tool-page.js` 中的 `simulateGeneration()` 和 `previewFile()`，用真实处理结果驱动状态。
 
 主要插槽：`site-header`、`page-heading`、`workspace`、`preview-card`、`preview-stage`、`source-meta`、`parameters`、`output-card`、`results`、`primary-action`、`site-footer`。先保留框架，按任务删掉不需要的模块。成功示例的下载按钮始终禁用，只有真实文件及下载地址就绪后才启用。
+
+
+## 配套反馈与动效
+
+新增工具的空状态、加载、图片与头像占位、元素出入场和装饰视差，参见同目录 `feedback-states.html` / `feedback-states.md`；可下载 `Fun-Toolkit-Feedback-Motion-Kit.zip`，直接复用 `feedback-motion.css` / `.js` 和SVG资产。该扩展不会自动改变现有工具的业务流程。

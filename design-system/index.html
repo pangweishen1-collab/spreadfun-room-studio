@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Fun Toolkit 设计规范与交互组件示例。2026-10-23，v1.3。">
-<title>Fun Toolkit · 设计规范 v1.3</title>
+<meta name="description" content="Fun Toolkit 设计规范与交互组件示例。2026-10-23，v1.4。">
+<title>Fun Toolkit · 设计规范 v1.4</title>
 <link rel="icon" type="image/png" href="../assets/favicon.png">
 <style>
 :root{--primary:#0071e3;--primary-hover:#0062cc;--primary-active:#0055b3;--brand:#136bff;--deep:#0b45d9;--yellow:#ffc928;--ink:#202a3b;--body:#1d1d1f;--secondary:#626c7c;--muted:#6e7785;--page:#f5f5f7;--surface:#fff;--line:#e8e8ed;--input-line:#8b95a5;--soft:#eaf3ff;--green:#21834b;--green-hover:#196b3c;--error:#b42318;--error-soft:#fff1f0;--warning:#8a4b00;--warning-soft:#fff7e8;--success:#237957;--success-soft:#edf8f3;--disabled:#edf0f4;--disabled-text:#647083;--radius:12px;--ease:cubic-bezier(.16,1,.3,1);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;color:var(--body);background:var(--page);font-synthesis:none;scroll-behavior:smooth;scroll-padding-top:32px}
@@ -167,9 +167,9 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
 <aside class="rail" aria-label="规范目录">
   <div class="rail-top"><a class="brand" href="#overview"><img src="assets/spreadfun-mark.webp" alt=""><span>Fun Toolkit</span></a><p class="brand-meta">DESIGN SYSTEM · 设计规范</p></div>
   <nav class="rail-nav">
-    <a href="#overview" class="current"><span>00</span>规范概览</a><a href="#foundations"><span>01</span>品牌与颜色</a><a href="#typography"><span>02</span>字体与基础尺度</a><a href="#layout"><span>03</span>页面与导航</a><a href="#buttons"><span>04</span>按钮与状态</a><a href="#forms"><span>05</span>表单与选择</a><a href="#upload"><span>06</span>上传与预览</a><a href="#feedback"><span>07</span>反馈与弹窗</a><a href="#form-demo"><span>08</span>完整表单示例</a><a href="#responsive"><span>09</span>响应式与双语</a><a href="#ex-batch"><span>10</span>批量与恢复</a><a href="#ex-edge-forms"><span>11</span>表单边界</a><a href="#ex-media-data"><span>12</span>裁切与数据</a><a href="#ex-state-matrix"><span>13</span>场景覆盖清单</a><a href="#motion"><span>14</span>动效与玻璃遮罩</a><a href="#tool-framework"><span>15</span>工具页框架</a><a href="#handoff"><span>16</span>交付与验收</a>
+    <a href="#overview" class="current"><span>00</span>规范概览</a><a href="#foundations"><span>01</span>品牌与颜色</a><a href="#typography"><span>02</span>字体与基础尺度</a><a href="#layout"><span>03</span>页面与导航</a><a href="#buttons"><span>04</span>按钮与状态</a><a href="#forms"><span>05</span>表单与选择</a><a href="#upload"><span>06</span>上传与预览</a><a href="#feedback"><span>07</span>反馈与弹窗</a><a href="#form-demo"><span>08</span>完整表单示例</a><a href="#responsive"><span>09</span>响应式与双语</a><a href="#ex-batch"><span>10</span>批量与恢复</a><a href="#ex-edge-forms"><span>11</span>表单边界</a><a href="#ex-media-data"><span>12</span>裁切与数据</a><a href="#ex-state-matrix"><span>13</span>场景覆盖清单</a><a href="#motion"><span>14</span>动效与玻璃遮罩</a><a href="#tool-framework"><span>15</span>工具页框架</a><a href="#feedback-motion"><span>16</span>空态与加载动效</a><a href="#handoff"><span>17</span>交付与验收</a>
   </nav>
-  <div class="rail-bottom"><strong>在线规范 · 交互示例</strong>2026-10-23 / v1.3<br>当前网站提取 + 后续扩展规范<br>交互示例不会上传或提交数据。</div>
+  <div class="rail-bottom"><strong>在线规范 · 交互示例</strong>2026-10-23 / v1.4<br>当前网站提取 + 后续扩展规范<br>交互示例不会上传或提交数据。</div>
 </aside>
 <main id="main" class="content">
   <div class="document-top"><span class="eyebrow">FUN TOOLKIT / DESIGN GUIDELINES</span><span class="edition">2026-10-23 · v1.2</span></div>
@@ -435,11 +435,17 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
  <div class="section-title"><div><div class="section-number">15 / TOOL PAGE FRAMEWORK</div><h2 id="tool-framework-title">工具页框架 · 直接开始搭建</h2><p class="section-description">把分散的控件规范组合为完整页面：六区布局、五种任务状态、三种工具类型，再接自己的处理逻辑。</p></div><span class="badge-note">框架 v1.0</span></div>
  <div class="panel"><div class="grid-3"><div><h3>6个职责区</h3><p class="annotation">全站页头、标题帮助、输入预览、参数动作、输出结果、页脚。桌面双栏，手机完整纵向排列。</p></div><div><h3>5种必备状态</h3><p class="annotation">未选择、已载入、处理中、成功、失败。先补齐反馈和恢复，再接真实处理。</p></div><div><h3>1份可运行模板</h3><p class="annotation">原生HTML / CSS / JS，中英文和响应式开箱可用；示例不调用生成服务或记录统计。</p></div></div>
  <div class="button-row" style="margin-top:20px"><a class="btn" href="tool-page-framework.html">查看页面框架规范 →</a><a class="btn ghost" href="tool-page-starter/index.html" target="_blank" rel="noopener">运行基础模板 ↗</a><a class="btn secondary" href="Fun-Toolkit-Tool-Page-Starter.zip" download>下载模板 ZIP</a></div>
- <p class="component-source">在线增补 v1.3：页面框架独立维护；基础控件 PDF 保留 v1.2 基准，模板不是第四个生产工具。</p></div>
+ <p class="component-source">框架增补 v1.3：页面框架独立维护；基础控件 PDF 保留 v1.2 基准，模板不是第四个生产工具。</p></div>
+</section>
+
+<section id="feedback-motion" class="section" aria-labelledby="feedback-motion-title">
+ <div class="section-title"><div><div class="section-number">16 / FEEDBACK & MOTION</div><h2 id="feedback-motion-title">空状态、加载与轻动效</h2><p class="section-description">从空画布到结果出现，统一图形、占位和节奏。新增示例按需接入，业务处理保持真实。</p></div><span class="badge-note">v1.4 新增</span></div>
+ <div class="panel"><div class="grid-3"><div class="principle"><h3>一套缺省图</h3><p>六种空态 / 反馈插图，图片与头像占位。无字原生SVG，保留相邻标题与恢复操作。</p></div><div class="principle"><h3>一种加载语言</h3><p>16 / 24 / 32px Spinner、真实进度条与固定布局骨架，支持离屏、后台与减动降级。</p></div><div class="principle"><h3>轻出入场与视差</h3><p>180ms进入 / 120ms退出，6px指针 / 12px滚动装饰；手机静态，工具坐标保持稳定。</p></div></div>
+ <div class="button-row" style="margin-top:16px"><a class="btn" href="feedback-states.html">查看空态与动效规范 →</a><a class="btn secondary" href="Fun-Toolkit-Feedback-Motion-Kit.zip" download>下载插图与动效包</a><a class="btn secondary" href="feedback-states.md" download>下载说明 MD</a></div><p class="component-source">在线增补 v1.4，基础PDF保留v1.2。循环效果有暂停，视觉反馈不代表真实任务进度；不记录生产统计。</p></div>
 </section>
 
   <section id="handoff" class="section">
-    <div class="section-title"><div><div class="section-number">16 / HANDOFF & QA</div><h2>交付与验收</h2><p class="section-description">新增工具先复用页面壳、上传区、结果卡和表单规则；确实需要新控件时，同时补齐交互状态，再加入共用组件。</p></div></div>
+    <div class="section-title"><div><div class="section-number">17 / HANDOFF & QA</div><h2>交付与验收</h2><p class="section-description">新增工具先复用页面壳、上传区、结果卡和表单规则；确实需要新控件时，同时补齐交互状态，再加入共用组件。</p></div></div>
     <div class="panel"><div class="panel-header"><div><h3>设计交付最少覆盖</h3><p>每个组件不只画默认态；用具体规则约束后续实现。</p></div></div><div class="checklist"><div><svg aria-hidden="true"><use href="#i-check"/></svg>桌面、900 px 临界、375 px 手机、320 px 最小宽度。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>中 / 英文关键页面，长文案与 200% 缩放。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>按钮 default / hover / pressed / focus / disabled / loading。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>输入 empty / filled / error / focus / disabled / readonly。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>上传空态、拖入、读取、文件错误、生成、完成和重试。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>弹窗打开与关闭、Escape、焦点限制与返回。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>透明预览与真实导出分离；尺寸 / 格式 / 文件名正确。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>可点击区、对比度、读屏标签、键盘、减少动画。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>网络失败和部分成功有恢复路径，保留输入与成功结果。</div><div><svg aria-hidden="true"><use href="#i-check"/></svg>统计按真实成功事件累计，失败与重试不重复计数。</div></div></div>
     <div class="grid-2" style="margin-top:16px"><div class="panel"><div class="panel-header"><div><h3>建议命名</h3><p>按语义命名，避免按页面和随机数字起名。</p></div></div><pre class="code-block">Color / Action / Primary
 Color / Status / Error
@@ -451,9 +457,9 @@ Button / Replace / Hover
 Input / Number / Error
 Upload / SVGA / Dragging
 Preview / GameBanner / Transparent
-Dialog / Help / Small</pre></div><div class="panel"><div class="panel-header"><div><h3>使用边界</h3><p>交付的是规范，不是自动完成的网站改造。</p></div></div><p class="annotation" style="margin-top:0">本目录v1.3覆盖了当前三个工具从输入到下载的核心流程与边界，保留已确认的视觉方向，并为未来扩展提供统一目标。现网仍有历史颜色、圆角、间距与原生字段校验的差异；实施时应有计划地收敛，不能只替换一组 CSS 变量就视为完成。</p><p class="annotation">本文件所有操作均为组件演示，不调用正式接口，不提交需求，不读上传文件内容，不产生真实生成 / 下载统计。</p><p class="component-source">依据：当前源码 index.html、toolkit.css、hub.css、home.css、tokens.css 的只读样式审计。具体实现与上线验收以主交付文档及后续版本为准。版本：2026-10-23 / v1.3。</p></div></div>
+Dialog / Help / Small</pre></div><div class="panel"><div class="panel-header"><div><h3>使用边界</h3><p>交付的是规范，不是自动完成的网站改造。</p></div></div><p class="annotation" style="margin-top:0">本目录v1.4覆盖了当前三个工具从输入到下载的核心流程与边界，保留已确认的视觉方向，并为未来扩展提供统一目标。现网仍有历史颜色、圆角、间距与原生字段校验的差异；实施时应有计划地收敛，不能只替换一组 CSS 变量就视为完成。</p><p class="annotation">本文件所有操作均为组件演示，不调用正式接口，不提交需求，不读上传文件内容，不产生真实生成 / 下载统计。</p><p class="component-source">依据：当前源码 index.html、toolkit.css、hub.css、home.css、tokens.css 的只读样式审计。具体实现与上线验收以主交付文档及后续版本为准。版本：2026-10-23 / v1.4。</p></div></div>
   </section>
-  <footer class="doc-footer"><span>Fun Toolkit · 为乐趣运营而生</span><span>设计规范 / 组件目录 · v1.3 · 2026-10-23</span></footer>
+  <footer class="doc-footer"><span>Fun Toolkit · 为乐趣运营而生</span><span>设计规范 / 组件目录 · v1.4 · 2026-10-23</span></footer>
 </main>
 <div id="demo-toast" class="toast" role="status" aria-live="polite" hidden><svg aria-hidden="true"><use href="#i-check"/></svg><span id="toast-text"></span><button type="button" id="toast-close" aria-label="关闭轻提示"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
 <dialog id="help-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description" class="ft-motion-dialog"><div class="dialog-header"><h2 id="dialog-title">Banner 使用说明</h2><button class="close-btn" type="button" id="dialog-close" aria-label="关闭说明"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div><div class="dialog-body"><p id="dialog-description">这是规范中的说明弹窗示例，展示尺寸、文字层级和关闭行为。</p><ol style="padding-left:20px;margin:16px 0"><li>准备图片；使用 GPT 生图时，可在提示词中写明 <strong>3.3:1 图片比例</strong>。</li><li>上传素材并检查裁切；内容主体留在中心安全区域。</li><li>生成房间 Banner 与游戏 Banner，确认预览后下载。</li></ol><div class="notice info"><svg aria-hidden="true"><use href="#i-info"/></svg><div>游戏 Banner 预览可切换黑色与透明；实际导出仍保持透明背景。</div></div><p class="focus-note">键盘提示：Tab 在弹窗内切换，Escape 关闭。关闭后返回刚才的按钮。</p></div><div class="dialog-actions"><button type="button" class="btn" id="dialog-confirm">知道了</button></div></dialog>
