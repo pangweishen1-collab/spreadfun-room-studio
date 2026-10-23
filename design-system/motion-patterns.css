@@ -1,0 +1,38 @@
+/* Fun Toolkit motion patterns: CSS only; apply these opt-in classes to future components. */
+:root {
+  --ft-motion-fast:120ms;
+  --ft-motion-hover:180ms;
+  --ft-motion-dialog-enter:260ms;
+  --ft-motion-dialog-exit:160ms;
+  --ft-motion-backdrop:180ms;
+  --ft-motion-sheen:480ms;
+  --ft-motion-ease:cubic-bezier(.16,1,.3,1);
+  --ft-glass-tint:#10111480;
+  --ft-glass-blur:7px;
+}
+@keyframes ft-dialog-in {
+  0% {opacity:0;transform:translateY(12px) scale(.96)}
+  72% {opacity:1;transform:translateY(-1px) scale(1.012)}
+  100% {opacity:1;transform:translateY(0) scale(1)}
+}
+@keyframes ft-backdrop-in {from {opacity:0} to {opacity:1}}
+@keyframes ft-sheen {from {transform:translateX(-160%) skewX(-20deg)} to {transform:translateX(280%) skewX(-20deg)}}
+.ft-motion-dialog[open] {animation:ft-dialog-in var(--ft-motion-dialog-enter) var(--ft-motion-ease) both;transform-origin:center}
+.ft-motion-dialog::backdrop {background:var(--ft-glass-tint);-webkit-backdrop-filter:blur(var(--ft-glass-blur));backdrop-filter:blur(var(--ft-glass-blur))}
+.ft-motion-dialog[open]::backdrop {animation:ft-backdrop-in var(--ft-motion-backdrop) ease-out both}
+.ft-motion-sheen {position:relative;isolation:isolate;overflow:hidden}
+.ft-motion-sheen:is(:hover,:focus-visible):not(:disabled):not([aria-busy=true]) {background:#0062cc;color:#fff}
+.ft-motion-sheen:active:not(:disabled):not([aria-busy=true]) {background:#0055b3}
+.ft-motion-sheen::after {content:"";position:absolute;inset:-30% auto -30% 0;width:45%;background:linear-gradient(90deg,transparent,rgb(255 255 255 / 12%),transparent);pointer-events:none;transform:translateX(-160%) skewX(-20deg)}
+@media(hover:hover) and (pointer:fine) {
+  .ft-motion-sheen:hover:not(:disabled):not([aria-busy=true])::after {animation:ft-sheen var(--ft-motion-sheen) ease-out 1}
+}
+.ft-motion-sheen:focus-visible:not(:disabled):not([aria-busy=true])::after {animation:ft-sheen var(--ft-motion-sheen) ease-out 1}
+.ft-motion-sheen:disabled::after,.ft-motion-sheen[aria-busy=true]::after {display:none}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))) {
+  .ft-motion-dialog::backdrop {background:#10111499}
+}
+@media(prefers-reduced-motion:reduce) {
+  .ft-motion-dialog[open],.ft-motion-dialog[open]::backdrop,.ft-motion-sheen::after {animation:none!important;transition:none!important;transform:none!important}
+  .ft-motion-sheen::after {display:none}
+}

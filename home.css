@@ -16,7 +16,8 @@ body:has(#homeTool:not(.hidden)){overflow-x:clip}
 #homeTool .home-actions{display:flex;align-items:center;flex-wrap:wrap;gap:var(--space-xs);margin-top:var(--space-md)}
 #homeTool .hub-button{font-family:var(--font-home-body);min-height:44px;padding:var(--space-xs) var(--space-sm);font-size:13px;line-height:20px;border-radius:var(--radius-home-sm);white-space:nowrap;transition:background-color var(--dur-short) var(--ease-out),border-color var(--dur-short) var(--ease-out),color var(--dur-short) var(--ease-out),transform var(--dur-short) var(--ease-out)}
 #homeTool .hub-primary{background:var(--color-home-blue);color:var(--color-home-paper)}
-#homeTool .hub-primary:hover{background:var(--color-home-ink);color:var(--color-home-paper)}
+#homeTool .hub-primary:hover{background:#0062cc;color:var(--color-home-paper)}
+#homeTool .hub-primary:active{background:#0055b3}
 #homeTool .hub-secondary{background:var(--color-home-paper);border-color:var(--color-home-rule);color:var(--color-home-ink)}
 #homeTool .hub-secondary:hover{background:var(--color-home-blue-soft);border-color:var(--color-home-blue);color:var(--color-home-blue)}
 #homeTool .hub-button:active{transform:translateY(1px)}
@@ -47,8 +48,8 @@ body:has(#homeTool:not(.hidden)){overflow-x:clip}
 
 #homeTool .home-request{display:flex;align-items:center;justify-content:space-between;gap:var(--space-sm);margin-top:var(--space-lg);padding:var(--space-md);border-radius:var(--radius-home-sm);background:var(--color-home-yellow-soft)}
 #homeTool .home-request h2{font-family:var(--font-home-display);font-size:18px;line-height:1.5;font-weight:600;letter-spacing:-.3px;font-style:normal;overflow-wrap:anywhere;min-width:0}
-#homeTool .home-request .hub-button{flex-shrink:0;background:var(--color-home-ink);color:var(--color-home-paper)}
-#homeTool .home-request .hub-button:hover{background:var(--color-home-blue);color:var(--color-home-paper)}
+#homeTool .home-request .hub-button{flex-shrink:0;background:var(--color-home-blue);color:var(--color-home-paper)}
+#homeTool .home-request .hub-button:hover{background:#0062cc;color:var(--color-home-paper)}
 #homeTool .home-local-note{margin-top:var(--space-sm);color:var(--color-home-muted);font-size:11px;line-height:1.8;text-align:center;overflow-wrap:anywhere}
 #homeTool a:focus-visible,#homeTool button:focus-visible{outline:2px solid var(--color-home-focus);outline-offset:2px}
 
@@ -108,3 +109,5 @@ body:has(#homeTool:not(.hidden)){overflow-x:clip}
   #homeTool .hub-button,#homeTool .home-tool-card,#homeTool .home-tool-arrow,#homeTool .hub-text-link{transition:none}
   #homeTool .hub-button:active,#homeTool .home-tool-card:hover,#homeTool .home-tool-card:active,#homeTool .home-tool-card:hover .home-tool-arrow{transform:none}
 }
+
+@media(hover:none){#homeTool .home-tool-card:hover,#homeTool .home-tool-card:hover .home-tool-arrow{transform:none}}
