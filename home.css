@@ -50,7 +50,7 @@ body:has(#homeTool:not(.hidden)){overflow-x:clip}
 #homeTool .home-request .hub-button{flex-shrink:0;background:var(--color-home-ink);color:var(--color-home-paper)}
 #homeTool .home-request .hub-button:hover{background:var(--color-home-blue);color:var(--color-home-paper)}
 #homeTool .home-local-note{margin-top:var(--space-sm);color:var(--color-home-muted);font-size:11px;line-height:1.8;text-align:center;overflow-wrap:anywhere}
-#homeTool a:focus-visible,#homeTool button:focus-visible{outline:3px solid var(--color-home-focus);outline-offset:4px}
+#homeTool a:focus-visible,#homeTool button:focus-visible{outline:2px solid var(--color-home-focus);outline-offset:2px}
 
 @media(max-width:1100px){
   #homeTool .home-hero{gap:var(--space-md)}

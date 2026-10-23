@@ -1,6 +1,13 @@
 /* Fun Toolkit — page navigation, shared language and local SVGA workflow. */
 (() => {
   'use strict';
+  // Track navigation modality because editable fields can match :focus-visible after a mouse click.
+  const focusRoot = document.documentElement;
+  if (focusRoot) {
+    focusRoot.dataset.inputModality = 'keyboard';
+    document.addEventListener('pointerdown', () => { focusRoot.dataset.inputModality = 'pointer'; }, true);
+    document.addEventListener('keydown', event => { if (event.key === 'Tab') focusRoot.dataset.inputModality = 'keyboard'; }, true);
+  }
   const $ = selector => document.querySelector(selector);
   const strings = {
     en: {
