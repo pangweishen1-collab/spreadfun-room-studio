@@ -160,8 +160,8 @@ node --check hub.js
 生产页显式复用design-system/assets/feedback图形与feedback-motion.css/js；tool-feedback.css/js只负责空态、占位、busy提示与160ms纯透明度入场，不改变文件、Canvas、坐标、编码、下载或计数。忙碌提示120ms淡出，循环离屏/后台暂停，减少动画即时反馈；手机插图96×72、触控44px。原工具持有阶段，实际新预览/结果或工具切换才淡入，逐帧、语言与背景切换不反复入场。新共享适配检查：node tests/tool-feedback.cjs。
 
 
-## 团队 UI Skill · v1.0.0
+## 团队 UI Skill · v1.0.1
 
-规范页第17节提供完整 [团队Skill](https://fun-toolkit.pangweishen1.workers.dev/design-system/#team-skill)，源码在 `skills/fun-toolkit-ui/`，发布ZIP位于 `design-system/downloads/fun-toolkit-ui-1.0.0.zip`。包含资源规范1.4.1、可运行模板、最新空态和动效、表单与业务接入规则、团队安装与AGENTS片段、复制/完整性脚本及一次独立Agent真实试做案例。ZIP内容须解压到名为fun-toolkit-ui的目录，不能只保存SKILL.md。
+规范页第17节提供完整 [团队Skill](https://fun-toolkit.pangweishen1.workers.dev/design-system/#team-skill)，源码在 `skills/fun-toolkit-ui/`，发布ZIP位于 `design-system/downloads/fun-toolkit-ui-1.0.1.zip`。包含资源规范1.4.1、可运行模板、最新空态和动效、表单与业务接入规则、团队安装与AGENTS片段、复制/完整性脚本及一次独立Agent真实试做案例。ZIP内容须解压到名为fun-toolkit-ui的目录，不能只保存SKILL.md。
 
 包内演示不产生真实文件或统计；新工具必须接真实业务。独立试做已验证512×512 WebP下载与中英手机布局，团队真人试用与其他Agent安装兼容仍未认证，治理标记pilot。具体边界见随包references/validation.md，发布摘要见ZIP同名.sha256文件。

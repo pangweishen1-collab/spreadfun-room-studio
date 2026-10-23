@@ -46,8 +46,23 @@ def inspect(root):
                 continue
             listed.add(name)
             path = root / name
-            if not path.is_file() or hashlib.sha256(path.read_bytes()).hexdigest() != record['sha256']:
+            if not path.is_file():
                 errors.append(f'Missing or changed: {name}')
+                continue
+            data = path.read_bytes()
+            if hashlib.sha256(data).hexdigest() == record['sha256']:
+                continue
+            # FunSkill rewrites metadata key order/spacing on download. Compare
+            # parsed values for this one file; all other resources stay byte-exact.
+            if name == 'funskill.json' and record.get('semanticSha256'):
+                try:
+                    normalized = json.dumps(json.loads(data), sort_keys=True,
+                                            ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+                    if hashlib.sha256(normalized).hexdigest() == record['semanticSha256']:
+                        continue
+                except (ValueError, UnicodeError):
+                    pass
+            errors.append(f'Missing or changed: {name}')
         actual = {p.relative_to(root).as_posix() for p in files if p.name != 'asset-manifest.json'}
         if listed != actual:
             errors.append('Manifest inventory differs from actual files.')

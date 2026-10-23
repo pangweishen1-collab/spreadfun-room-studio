@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "skillVersion": "1.0.0",
+  "skillVersion": "1.0.1",
   "resourceVersion": "1.4.1",
   "files": [
     {
       "path": "SKILL.md",
-      "sha256": "f0b842777ce9f9f9574e4ae0769e2228181561af3c7b2dda07f16971bd4cafdc",
+      "sha256": "4d1646dcf709a62d0673abe710c3bdffda96043e6d260d9be42080e409cb8e95",
       "bytes": 7317
     },
     {
@@ -175,8 +175,9 @@
     },
     {
       "path": "funskill.json",
-      "sha256": "11ff885ae8a6f325e902df4fc83ae1cafae18b57fdcf46598e0d885be39cb722",
-      "bytes": 852
+      "sha256": "4702d9f29197d46c8215c27184eb27865b93f8587e65307c583f88d93fd88e0e",
+      "bytes": 852,
+      "semanticSha256": "a085884e6fdae40d422c767987f7a4a744c486467cf2fd794c99f9ace502f238"
     },
     {
       "path": "governance.json",
@@ -195,7 +196,7 @@
     },
     {
       "path": "references/feedback-states.md",
-      "sha256": "17c547d371d7d9c5aa0a87805b03ff8d648327122cbc6e54aa3989133b8334a2",
+      "sha256": "1e73df237865ee24f787bd8a5bd69a08d75154e581fa3a15aa6b2f3dace0518b",
       "bytes": 28575
     },
     {
@@ -215,23 +216,23 @@
     },
     {
       "path": "references/team-setup.md",
-      "sha256": "2649119ef218cb00e51d91422b3f1d61747672ee77e018951fb3cb609620d356",
-      "bytes": 2574
+      "sha256": "c14bbb1135c7ce1724157445d30f663ac411fb81d2d517254e18e4606f171299",
+      "bytes": 2852
     },
     {
       "path": "references/tool-page-framework.md",
-      "sha256": "5fd3045c08a5f1ab4188c634d3f51261ae3e263f995d1536fe43af5a9ac2a227",
+      "sha256": "221317c3ce8bc37adad6807d316db64aed1bc603c400806568bf00e2a32e0e91",
       "bytes": 15558
     },
     {
       "path": "references/validation.md",
-      "sha256": "2a8c4d6e3c411a004258f5e7ecf2631e27ea691655c452acec9627385e888c5a",
-      "bytes": 2070
+      "sha256": "34e60abc2b753c0883a5bbeddf94789638bbec2cfd1e2b9fd924a7980ab9474e",
+      "bytes": 2490
     },
     {
       "path": "scripts/check_package.py",
-      "sha256": "afec8bd90ff0ecc9e1731dd06609ee517e4e0a7b9aece50d0af873a476f600df",
-      "bytes": 3883
+      "sha256": "264fc92b5e17bb26b631e0813c9168351a5577c49119b01424287eea581149ec",
+      "bytes": 4666
     },
     {
       "path": "scripts/create_tool.py",
