@@ -100,6 +100,7 @@
     document.querySelectorAll('[data-i18n-alt]').forEach(element => { element.alt = t(element.dataset.i18nAlt); });
     document.querySelectorAll('[data-language]').forEach(button => { button.setAttribute('aria-pressed', String(button.dataset.language === language)); });
     render();
+    announce(t('statusPrefix') + t(stateKeys[state]));
   }
 
   function simulateGeneration() {
