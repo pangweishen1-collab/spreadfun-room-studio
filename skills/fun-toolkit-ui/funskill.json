@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "slug": "fun-toolkit-ui",
+  "title": "Fun Toolkit UI",
+  "summary": "复用最新工具页模板、表单、空状态与动效资源，为团队快速搭建中英响应式运营工具，并验证真实生成与下载。",
+  "author": "庞伟深",
+  "discipline": "设计",
+  "tags": [
+    "UI规范",
+    "工具页面",
+    "团队协作",
+    "响应式",
+    "空状态",
+    "动效"
+  ],
+  "version": "1.0.0",
+  "logo": "skill-logo.webp",
+  "examples": [
+    {
+      "path": "examples/event-cover-trial.webp",
+      "kind": "case",
+      "title": "独立 Agent 试做：活动封面工具",
+      "description": "使用随包模板与Skill创建的真实本地工具，上传品牌WebP、居中裁成512×512、修改文件名并真实下载；截图来自本轮浏览器验收。不是新增线上工具。"
+    }
+  ]
+}

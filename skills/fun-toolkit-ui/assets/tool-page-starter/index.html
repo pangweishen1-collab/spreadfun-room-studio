@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="description" content="Fun Toolkit 基础工具页框架示例，可离线使用。">
+  <title>基础工具页框架 · Fun Toolkit</title>
+  <link rel="icon" type="image/webp" href="assets/spreadfun-mark.webp">
+  <link rel="stylesheet" href="design-tokens.css">
+  <link rel="stylesheet" href="motion-patterns.css">
+  <link rel="stylesheet" href="feedback-motion.css">
+  <link rel="stylesheet" href="tool-page.css">
+  <script src="focus-modality.js" defer></script>
+  <script src="feedback-motion.js" defer></script>
+  <script src="tool-page.js" defer></script>
+</head>
+<body class="ft-ui">
+  <a class="skip-link" href="#main" data-i18n="skip">跳到工具区</a>
+  <header class="site-header" data-slot="site-header">
+    <div class="header-inner">
+      <a class="brand" href="https://fun-toolkit.pangweishen1.workers.dev/#home" aria-label="Fun Toolkit 首页" data-i18n-aria="home">
+        <img src="assets/spreadfun-mark.webp" width="30" height="30" alt="">
+        <span>Fun Toolkit</span>
+      </a>
+      <nav class="tool-nav" aria-label="工具导航" data-i18n-aria="toolNav">
+        <a href="https://fun-toolkit.pangweishen1.workers.dev/#room-backgrounds" data-i18n="navRoom">房间背景</a>
+        <a href="https://fun-toolkit.pangweishen1.workers.dev/#avatar-frames" data-i18n="navAvatar">头像框</a>
+        <a href="https://fun-toolkit.pangweishen1.workers.dev/#banners">Banner</a>
+      </nav>
+      <div class="header-actions">
+        <div class="language-switch" role="group" aria-label="界面语言" data-i18n-aria="language">
+          <button type="button" data-language="zh" aria-pressed="true" lang="zh-CN">中文</button>
+          <button type="button" data-language="en" aria-pressed="false" lang="en">EN</button>
+        </div>
+        <a class="author-link" href="https://fun-toolkit.pangweishen1.workers.dev/#home" aria-label="前往网站联系作者" data-i18n-aria="contactLink">
+          <span class="author-avatar"><img src="assets/author-profile.webp" width="52" height="52" alt=""></span>
+          <span class="author-label" data-i18n="contact">联系作者</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="page-shell" tabindex="-1" data-state="empty">
+    <div class="page-heading" data-slot="page-heading">
+      <h1 data-i18n="title">基础工具页</h1>
+      <button class="help-button" id="help-trigger" type="button" data-i18n="help">使用说明</button>
+      <span class="example-badge" data-i18n="example">框架示例</span>
+    </div>
+
+    <div class="demo-toolbar" aria-label="框架演示控制" data-i18n-aria="demoControl">
+      <label for="demo-state" data-i18n="demoState">演示状态</label>
+      <select id="demo-state">
+        <option value="empty" data-i18n="stateEmpty">未选择</option>
+        <option value="ready" data-i18n="stateReady">已载入</option>
+        <option value="processing" data-i18n="stateProcessing">处理中</option>
+        <option value="success" data-i18n="stateSuccess">成功</option>
+        <option value="error" data-i18n="stateError">失败</option>
+      </select>
+      <p data-i18n="demoHint">切换状态检查布局；此示例不上传、不计数、不生成文件。</p>
+    </div>
+
+    <div class="tool-workspace" data-slot="workspace">
+      <section class="tool-card preview-card" aria-labelledby="preview-title" data-slot="preview-card">
+        <div class="card-heading">
+          <h2 id="preview-title" data-i18n="preview">预览</h2>
+          <span id="state-badge" class="state-badge" data-state="empty">未选择</span>
+        </div>
+
+        <div class="preview-stage" id="drop-zone" data-slot="preview-stage">
+          <div class="empty-content" id="empty-content" data-ft-reveal="fade">
+            <img class="empty-art" src="assets/feedback/empty-upload.svg" width="120" height="90" alt="" aria-hidden="true">
+            <h3 data-i18n="uploadTitle">点击上传或拖入图片</h3>
+            <p data-i18n="uploadHint">PNG、JPG、WebP，仅在本地预览。</p>
+            <button class="button primary ft-motion-sheen" id="upload-button" type="button" data-i18n="upload">上传图片</button>
+          </div>
+          <div class="loaded-content" id="loaded-content" data-ft-reveal="fade" hidden>
+            <img id="source-preview" alt="已选择的本地图片预览" data-i18n-alt="sourceAlt" hidden>
+            <div id="preview-placeholder" class="preview-placeholder" aria-label="示例预览内容" data-i18n-aria="placeholderAria">
+              <img id="placeholder-art" class="placeholder-art" src="assets/feedback/placeholder-image.svg" width="160" height="90" alt="" aria-hidden="true">
+              <strong data-i18n="placeholderTitle">预览内容插槽</strong>
+              <span data-i18n="placeholderHint">替换为图片、Canvas 或播放器</span>
+            </div>
+          </div>
+          <div class="processing-overlay" id="processing-overlay" data-ft-activity data-ft-reveal="fade" hidden>
+            <span class="ft-spinner" data-size="24" aria-hidden="true"></span>
+            <strong data-i18n="processingTitle">模拟处理中</strong>
+            <span id="processing-description" data-i18n="processingHint">演示结束后显示示例结果</span>
+            <button class="button secondary" id="cancel-button" type="button" data-i18n="cancel">取消演示</button>
+          </div>
+        </div>
+
+        <input type="file" id="source-file" accept="image/png,image/jpeg,image/webp" hidden>
+        <div class="source-bar" id="source-bar" hidden data-slot="source-meta">
+          <div class="source-copy"><strong id="source-name">demo-source.webp</strong><span id="source-meta">框架占位素材</span></div>
+          <button class="button replace" id="replace-button" type="button" data-i18n="replace">替换文件</button>
+        </div>
+        <p class="inline-notice error-notice" id="error-notice" role="alert" hidden></p>
+        <div class="field-group parameter-block" data-slot="parameters">
+          <label for="output-name" data-i18n="filename">文件名称</label>
+          <input id="output-name" type="text" value="my-asset" autocomplete="off" maxlength="60" aria-describedby="filename-hint">
+          <p id="filename-hint" class="field-hint" data-i18n="filenameHint">表单插槽示例，可替换为尺寸、质量等参数。</p>
+        </div>
+        <p class="privacy-note"><span aria-hidden="true"></span><span data-i18n="privacy">本地预览，不会上传你的文件。</span></p>
+      </section>
+
+      <aside class="tool-card output-card" aria-labelledby="output-title" data-slot="output-card">
+        <div class="card-heading"><h2 id="output-title" data-i18n="output">输出文件</h2><span class="format-chip">WEBP</span></div>
+        <div class="output-result" id="output-result" data-slot="results" data-ft-activity data-ft-reveal="fade" aria-labelledby="result-title">
+          <img id="result-art" class="result-art" src="assets/feedback/empty-output.svg" width="120" height="90" alt="" aria-hidden="true">
+          <div id="result-skeleton" class="result-skeleton" hidden aria-hidden="true"><span class="ft-skeleton"></span><span class="ft-skeleton-line"></span><span class="ft-skeleton-line"></span></div>
+          <strong id="result-title" data-i18n="noResult">暂无输出</strong>
+          <span id="result-description" data-i18n="noResultHint">载入素材并点击模拟生成</span>
+          <button class="button secondary" id="download-button" type="button" disabled data-i18n="downloadDemo">示例结果，不提供真实文件</button>
+        </div>
+        <button class="button primary ft-motion-sheen generate-button" id="generate-button" type="button" disabled data-slot="primary-action" data-i18n="generate">模拟生成</button>
+        <p id="action-hint" class="action-hint" data-i18n="chooseFirst">先上传图片，或切换到“已载入”状态。</p>
+      </aside>
+    </div>
+    <p id="live-status" class="sr-only" role="status" aria-live="polite" aria-atomic="true"></p>
+  </main>
+
+  <footer class="site-footer" data-slot="site-footer"><div><span>© Fun Toolkit</span><span data-i18n="footerDemo">基础工具页框架 · 离线示例</span><a href="https://fun-toolkit.pangweishen1.workers.dev/design-system/" target="_blank" rel="noopener" data-i18n="guidelines">设计规范</a></div></footer>
+
+  <dialog id="help-dialog" class="help-dialog ft-motion-dialog" aria-labelledby="help-title">
+    <div class="dialog-heading"><h2 id="help-title" data-i18n="helpTitle">如何使用这个框架</h2><button id="close-help" class="button secondary" type="button" data-i18n="close">关闭</button></div>
+    <p data-i18n="helpBody">先切换五种演示状态，检查预览、表单、按钮和结果反馈。也可以上传一张本地图片查看真实预览。</p>
+    <p class="dialog-note" data-i18n="helpNote">这是搭建新工具的起点，不是第四个线上工具。将模拟任务替换为实际业务函数，再接入校验、生成与真实下载。</p>
+    <p class="field-hint" data-i18n="helpEscape">按 Esc 或点击关闭按钮返回。</p>
+  </dialog>
+</body>
+</html>

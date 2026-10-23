@@ -8,8 +8,10 @@
   <link rel="icon" type="image/webp" href="assets/spreadfun-mark.webp">
   <link rel="stylesheet" href="design-tokens.css">
   <link rel="stylesheet" href="motion-patterns.css">
+  <link rel="stylesheet" href="feedback-motion.css">
   <link rel="stylesheet" href="tool-page.css">
   <script src="focus-modality.js" defer></script>
+  <script src="feedback-motion.js" defer></script>
   <script src="tool-page.js" defer></script>
 </head>
 <body class="ft-ui">
@@ -65,24 +67,24 @@
         </div>
 
         <div class="preview-stage" id="drop-zone" data-slot="preview-stage">
-          <div class="empty-content" id="empty-content">
-            <svg class="upload-icon" viewBox="0 0 80 64" aria-hidden="true"><path d="M10 47V16a5 5 0 0 1 5-5h21l8 9h21a5 5 0 0 1 5 5v22a5 5 0 0 1-5 5H15a5 5 0 0 1-5-5Z"/><path d="M40 43V29m-7 7 7-7 7 7"/></svg>
+          <div class="empty-content" id="empty-content" data-ft-reveal="fade">
+            <img class="empty-art" src="assets/feedback/empty-upload.svg" width="120" height="90" alt="" aria-hidden="true">
             <h3 data-i18n="uploadTitle">点击上传或拖入图片</h3>
             <p data-i18n="uploadHint">PNG、JPG、WebP，仅在本地预览。</p>
             <button class="button primary ft-motion-sheen" id="upload-button" type="button" data-i18n="upload">上传图片</button>
           </div>
-          <div class="loaded-content" id="loaded-content" hidden>
+          <div class="loaded-content" id="loaded-content" data-ft-reveal="fade" hidden>
             <img id="source-preview" alt="已选择的本地图片预览" data-i18n-alt="sourceAlt" hidden>
             <div id="preview-placeholder" class="preview-placeholder" aria-label="示例预览内容" data-i18n-aria="placeholderAria">
-              <span class="placeholder-shape" aria-hidden="true"></span>
+              <img id="placeholder-art" class="placeholder-art" src="assets/feedback/placeholder-image.svg" width="160" height="90" alt="" aria-hidden="true">
               <strong data-i18n="placeholderTitle">预览内容插槽</strong>
               <span data-i18n="placeholderHint">替换为图片、Canvas 或播放器</span>
             </div>
           </div>
-          <div class="processing-overlay" id="processing-overlay" hidden>
-            <span class="spinner" aria-hidden="true"></span>
+          <div class="processing-overlay" id="processing-overlay" data-ft-activity data-ft-reveal="fade" hidden>
+            <span class="ft-spinner" data-size="24" aria-hidden="true"></span>
             <strong data-i18n="processingTitle">模拟处理中</strong>
-            <span data-i18n="processingHint">演示结束后显示示例结果</span>
+            <span id="processing-description" data-i18n="processingHint">演示结束后显示示例结果</span>
             <button class="button secondary" id="cancel-button" type="button" data-i18n="cancel">取消演示</button>
           </div>
         </div>
@@ -103,8 +105,9 @@
 
       <aside class="tool-card output-card" aria-labelledby="output-title" data-slot="output-card">
         <div class="card-heading"><h2 id="output-title" data-i18n="output">输出文件</h2><span class="format-chip">WEBP</span></div>
-        <div class="output-result" id="output-result" data-slot="results" aria-labelledby="result-title">
-          <div class="result-symbol" aria-hidden="true"><svg viewBox="0 0 32 32"><path d="M8 5h10l6 6v16H8Z"/><path d="M18 5v7h6M12 18h8m-8 4h6"/></svg></div>
+        <div class="output-result" id="output-result" data-slot="results" data-ft-activity data-ft-reveal="fade" aria-labelledby="result-title">
+          <img id="result-art" class="result-art" src="assets/feedback/empty-output.svg" width="120" height="90" alt="" aria-hidden="true">
+          <div id="result-skeleton" class="result-skeleton" hidden aria-hidden="true"><span class="ft-skeleton"></span><span class="ft-skeleton-line"></span><span class="ft-skeleton-line"></span></div>
           <strong id="result-title" data-i18n="noResult">暂无输出</strong>
           <span id="result-description" data-i18n="noResultHint">载入素材并点击模拟生成</span>
           <button class="button secondary" id="download-button" type="button" disabled data-i18n="downloadDemo">示例结果，不提供真实文件</button>

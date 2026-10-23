@@ -44,12 +44,14 @@
     $('source-file').value = '';
   }
 
-  function render() {
+  function render(previousState = state) {
     const busy = state === 'processing';
     const showSource = state !== 'empty';
     $('filename-hint').textContent = t($('output-name').getAttribute('aria-invalid') === 'true' ? 'emptyName' : 'filenameHint');
     $('main').dataset.state = state;
-    $('main').setAttribute('aria-busy', String(busy));
+    // Keep the live status outside a busy region so assistive technology hears updates immediately.
+    $('drop-zone').setAttribute('aria-busy', String(busy));
+    $('output-result').setAttribute('aria-busy', String(busy));
     $('demo-state').value = state;
     $('state-badge').textContent = t(stateKeys[state]);
     $('state-badge').dataset.state = state;
@@ -58,9 +60,14 @@
     $('source-bar').hidden = !showSource;
     $('source-preview').hidden = !source;
     $('preview-placeholder').hidden = Boolean(source);
+    $('placeholder-art').src = `assets/feedback/${state === 'error' ? 'empty-error' : 'placeholder-image'}.svg`;
+    $('preview-placeholder').querySelector('strong').textContent = t(state === 'error' ? 'errorTitle' : 'placeholderTitle');
+    $('preview-placeholder').querySelector('span').textContent = t(state === 'error' ? 'errorHint' : 'placeholderHint');
     $('source-name').textContent = source ? source.name : t('sourceDemoName');
     $('source-meta').textContent = source ? `${source.width} × ${source.height} px · ${(source.size / 1024).toFixed(1)} KB · ${t('sourceLocal')}` : t('sourceDemoMeta');
-    $('processing-overlay').hidden = !busy;
+    if ((previousState === 'processing') !== busy && window.FunToolkitFeedback) {
+      window.FunToolkitFeedback[busy ? 'enter' : 'exit']($('processing-overlay'));
+    } else if (!window.FunToolkitFeedback) $('processing-overlay').hidden = !busy;
     $('upload-button').disabled = busy;
     $('replace-button').disabled = busy;
     $('output-name').disabled = busy;
@@ -68,15 +75,19 @@
     $('generate-button').setAttribute('aria-busy', String(busy));
     $('generate-button').textContent = t(busy ? 'running' : state === 'error' ? 'retry' : state === 'success' ? 'generateAgain' : 'generate');
     $('processing-overlay').querySelector('strong').textContent = t(operation === 'preview' ? 'reading' : 'processingTitle');
-    $('processing-overlay').querySelector('span:not(.spinner)').textContent = t(operation === 'preview' ? 'readingHint' : 'processingHint');
+    $('processing-description').textContent = t(operation === 'preview' ? 'readingHint' : 'processingHint');
     $('cancel-button').textContent = t(operation === 'preview' ? 'readingCancel' : 'cancel');
     $('error-notice').hidden = state !== 'error';
     $('error-notice').textContent = t(noticeKey || 'errorDemo');
     const resultCopy = state === 'success' ? ['successTitle','successHint'] : state === 'error' ? ['errorTitle','errorHint'] : busy ? ['pendingTitle','pendingHint'] : ['noResult','noResultHint'];
     $('result-title').textContent = t(resultCopy[0]);
     $('result-description').textContent = t(resultCopy[1]);
+    $('result-skeleton').hidden = !busy;
+    $('result-art').hidden = busy;
+    $('result-art').src = `assets/feedback/${state === 'error' ? 'empty-error' : state === 'success' ? 'placeholder-image' : 'empty-output'}.svg`;
     const actionKey = state === 'empty' ? 'chooseFirst' : busy ? (operation === 'preview' ? 'readingActionHint' : 'processingActionHint') : state === 'success' ? 'successActionHint' : state === 'error' ? 'errorActionHint' : 'readyHint';
     $('action-hint').textContent = t(actionKey);
+    window.FunToolkitFeedback?.refresh();
   }
 
   // Stable integration entry: render every branch from one state, not scattered class changes.
@@ -86,8 +97,13 @@
     operation = options.operation || 'demo';
     noticeKey = options.noticeKey || '';
     if (nextState === 'empty') clearSource();
+    const previousState = state;
     state = nextState;
-    render();
+    render(previousState);
+    if (previousState !== state) {
+      window.FunToolkitFeedback?.replay($(state === 'empty' ? 'empty-content' : 'loaded-content'));
+      window.FunToolkitFeedback?.replay($('output-result'));
+    }
     announce(t('statusPrefix') + t(stateKeys[state]));
   }
 

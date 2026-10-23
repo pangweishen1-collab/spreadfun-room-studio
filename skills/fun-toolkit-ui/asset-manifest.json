@@ -1,0 +1,247 @@
+{
+  "schemaVersion": 1,
+  "skillVersion": "1.0.0",
+  "resourceVersion": "1.4.1",
+  "files": [
+    {
+      "path": "SKILL.md",
+      "sha256": "f0b842777ce9f9f9574e4ae0769e2228181561af3c7b2dda07f16971bd4cafdc",
+      "bytes": 7317
+    },
+    {
+      "path": "agents/openai.yaml",
+      "sha256": "ce540ea93f395f9716ca26eb068fbe2f45dddc80cba5d67c4db2e72f950841ee",
+      "bytes": 301
+    },
+    {
+      "path": "assets/brand-mark.webp",
+      "sha256": "61eb3a3246ea4d4f75bd08c3d858920db069d0f1765ca2f424729f1ea5fd314f",
+      "bytes": 8146
+    },
+    {
+      "path": "assets/production-adapter/design-system/assets/feedback/empty-data.svg",
+      "sha256": "70950eec6cc6e397a0807cc3ca75e1f6b3234de50f22be23c665ace32dbf3f9f",
+      "bytes": 786
+    },
+    {
+      "path": "assets/production-adapter/design-system/assets/feedback/empty-error.svg",
+      "sha256": "639bdad14a5e8577ecd44d292c0d3a41a616deb185d51a463aecdf545b713186",
+      "bytes": 843
+    },
+    {
+      "path": "assets/production-adapter/design-system/assets/feedback/empty-offline.svg",
+      "sha256": "d8c01b5341f1fdf9f70bbb53262fa5364baea051c2df86e396f1f66837bdfbeb",
+      "bytes": 938
+    },
+    {
+      "path": "assets/production-adapter/design-system/assets/feedback/empty-output.svg",
+      "sha256": "43f712e4fa9f161155cf64dc1bd7ec98bc440ef55163267187f4540acade0148",
+      "bytes": 897
+    },
+    {
+      "path": "assets/production-adapter/design-system/assets/feedback/empty-search.svg",
+      "sha256": "69592f35960aa5cea537f5cfab68064ddefe9fcf313359c4ec29e71ab5207039",
+      "bytes": 883
+    },
+    {
+      "path": "assets/production-adapter/design-system/assets/feedback/empty-upload.svg",
+      "sha256": "be4b3674404a5dc498668b96f4da2f74f1606487a5b796edc9d52295d68d46cd",
+      "bytes": 912
+    },
+    {
+      "path": "assets/production-adapter/design-system/assets/feedback/placeholder-avatar.svg",
+      "sha256": "9e310ecfcde1dda5921e07b51864fab70706c20c0dd3d0116855fb3fde832740",
+      "bytes": 400
+    },
+    {
+      "path": "assets/production-adapter/design-system/assets/feedback/placeholder-image.svg",
+      "sha256": "08eaf8dd49c39dd0b0213ed006b1aca3c6342cdad81da38c165461a09417beed",
+      "bytes": 440
+    },
+    {
+      "path": "assets/production-adapter/tool-feedback.css",
+      "sha256": "f75e1f6f8e33540ea6cfc6ac9cb7b0d37467e00159a1cf28f64d1e638fb54fec",
+      "bytes": 4954
+    },
+    {
+      "path": "assets/production-adapter/tool-feedback.js",
+      "sha256": "ee071f3ec357b133f6478988ccaad97febb385fd0926a9e65764c64b8fee9341",
+      "bytes": 4184
+    },
+    {
+      "path": "assets/tool-page-starter/assets/author-profile.webp",
+      "sha256": "b5ece1d4837cab7a8f6b773ec144e9722e7f4d30a13fb40ae5b32ba9cba80df2",
+      "bytes": 15464
+    },
+    {
+      "path": "assets/tool-page-starter/assets/feedback/empty-data.svg",
+      "sha256": "70950eec6cc6e397a0807cc3ca75e1f6b3234de50f22be23c665ace32dbf3f9f",
+      "bytes": 786
+    },
+    {
+      "path": "assets/tool-page-starter/assets/feedback/empty-error.svg",
+      "sha256": "639bdad14a5e8577ecd44d292c0d3a41a616deb185d51a463aecdf545b713186",
+      "bytes": 843
+    },
+    {
+      "path": "assets/tool-page-starter/assets/feedback/empty-offline.svg",
+      "sha256": "d8c01b5341f1fdf9f70bbb53262fa5364baea051c2df86e396f1f66837bdfbeb",
+      "bytes": 938
+    },
+    {
+      "path": "assets/tool-page-starter/assets/feedback/empty-output.svg",
+      "sha256": "43f712e4fa9f161155cf64dc1bd7ec98bc440ef55163267187f4540acade0148",
+      "bytes": 897
+    },
+    {
+      "path": "assets/tool-page-starter/assets/feedback/empty-search.svg",
+      "sha256": "69592f35960aa5cea537f5cfab68064ddefe9fcf313359c4ec29e71ab5207039",
+      "bytes": 883
+    },
+    {
+      "path": "assets/tool-page-starter/assets/feedback/empty-upload.svg",
+      "sha256": "be4b3674404a5dc498668b96f4da2f74f1606487a5b796edc9d52295d68d46cd",
+      "bytes": 912
+    },
+    {
+      "path": "assets/tool-page-starter/assets/feedback/placeholder-avatar.svg",
+      "sha256": "9e310ecfcde1dda5921e07b51864fab70706c20c0dd3d0116855fb3fde832740",
+      "bytes": 400
+    },
+    {
+      "path": "assets/tool-page-starter/assets/feedback/placeholder-image.svg",
+      "sha256": "08eaf8dd49c39dd0b0213ed006b1aca3c6342cdad81da38c165461a09417beed",
+      "bytes": 440
+    },
+    {
+      "path": "assets/tool-page-starter/assets/spreadfun-mark.webp",
+      "sha256": "61eb3a3246ea4d4f75bd08c3d858920db069d0f1765ca2f424729f1ea5fd314f",
+      "bytes": 8146
+    },
+    {
+      "path": "assets/tool-page-starter/design-tokens.css",
+      "sha256": "f32b420b7315c443aa263dc4c4e765b69671a7a4fd6b9f939e3d9ba254ff6b94",
+      "bytes": 5710
+    },
+    {
+      "path": "assets/tool-page-starter/design-tokens.json",
+      "sha256": "2bd5b2fa5ff7b73993b93af228d27560f2cf7e54c1b2f68e225a5532a8eca1b2",
+      "bytes": 4088
+    },
+    {
+      "path": "assets/tool-page-starter/feedback-motion.css",
+      "sha256": "b235cef7cd56bacce150dafe4179277c53824686444ae098aadf429675893c1e",
+      "bytes": 3408
+    },
+    {
+      "path": "assets/tool-page-starter/feedback-motion.js",
+      "sha256": "6fd03503f998a2a7f5e2e79c3a72424301f04da7ce499c537221cd5164193b1e",
+      "bytes": 8271
+    },
+    {
+      "path": "assets/tool-page-starter/focus-modality.js",
+      "sha256": "efb0535e01fc4a9d1ff11462fc7f7096039f3536567a097a41e8eea214cdb654",
+      "bytes": 417
+    },
+    {
+      "path": "assets/tool-page-starter/index.html",
+      "sha256": "53df777ee2c42bbd522c8c88d7599de691480b3475a466804b7cf92ca877e7cc",
+      "bytes": 9331
+    },
+    {
+      "path": "assets/tool-page-starter/motion-patterns.css",
+      "sha256": "e253c93165287a7c1d12f3d153e654ba2160bfa181dcc5903d07dd200a618e21",
+      "bytes": 2849
+    },
+    {
+      "path": "assets/tool-page-starter/tool-page.css",
+      "sha256": "b9d5ae22c65f882db7b6de94e007faacbe890668f74e983ecd155a4835e210de",
+      "bytes": 17139
+    },
+    {
+      "path": "assets/tool-page-starter/tool-page.js",
+      "sha256": "c1c51d7a0d77d3a1da438c8176cf1a05fec4c37a45447f43b6e6eccd75d53421",
+      "bytes": 16815
+    },
+    {
+      "path": "evals/cases.json",
+      "sha256": "7d0a90529e7cc665413c7eb4c50e7c927d5cafb6bef9c891662e538aab3bfabd",
+      "bytes": 1044
+    },
+    {
+      "path": "examples/event-cover-trial.webp",
+      "sha256": "038081f0cff9dfa93ce903241a837ad8ffdd38e30ebc03e9c8aa246638a5f68c",
+      "bytes": 49622
+    },
+    {
+      "path": "funskill.json",
+      "sha256": "11ff885ae8a6f325e902df4fc83ae1cafae18b57fdcf46598e0d885be39cb722",
+      "bytes": 852
+    },
+    {
+      "path": "governance.json",
+      "sha256": "b491406748c6a0c505b268904af1507bf901b97e42acc832989bfc2d74037b29",
+      "bytes": 1022
+    },
+    {
+      "path": "references/AGENTS.example.md",
+      "sha256": "8c2fbcaeedbb15eb8512bdfe9b2401e1ebb1548dcaf6c6b931b9caee9c6fc372",
+      "bytes": 767
+    },
+    {
+      "path": "references/acceptance.md",
+      "sha256": "d1ab25105c15ecaf1b3d524c7dbbca92c73748804f32d824cf958ff4ed95b71d",
+      "bytes": 2748
+    },
+    {
+      "path": "references/feedback-states.md",
+      "sha256": "17c547d371d7d9c5aa0a87805b03ff8d648327122cbc6e54aa3989133b8334a2",
+      "bytes": 28575
+    },
+    {
+      "path": "references/first-task.md",
+      "sha256": "ca49045e74f4a0a2f8fafccd277a7f78df4509e48f34ca818e75d234b3ff80d5",
+      "bytes": 1013
+    },
+    {
+      "path": "references/foundations.md",
+      "sha256": "9442fc09b3fd56d8c5f4821b3a02cbac2c97730381d4017924ed20c396865b62",
+      "bytes": 5083
+    },
+    {
+      "path": "references/production-integration.md",
+      "sha256": "60a7ca47f5fcb43e81804def61699e682dea66af6af8ccb69279687fe49aa5c2",
+      "bytes": 1427
+    },
+    {
+      "path": "references/team-setup.md",
+      "sha256": "2649119ef218cb00e51d91422b3f1d61747672ee77e018951fb3cb609620d356",
+      "bytes": 2574
+    },
+    {
+      "path": "references/tool-page-framework.md",
+      "sha256": "5fd3045c08a5f1ab4188c634d3f51261ae3e263f995d1536fe43af5a9ac2a227",
+      "bytes": 15558
+    },
+    {
+      "path": "references/validation.md",
+      "sha256": "2a8c4d6e3c411a004258f5e7ecf2631e27ea691655c452acec9627385e888c5a",
+      "bytes": 2070
+    },
+    {
+      "path": "scripts/check_package.py",
+      "sha256": "afec8bd90ff0ecc9e1731dd06609ee517e4e0a7b9aece50d0af873a476f600df",
+      "bytes": 3883
+    },
+    {
+      "path": "scripts/create_tool.py",
+      "sha256": "90fb8a0c878774972ce9b6ebd60cb37a6c194cd146a46060ad353435a5ad38ac",
+      "bytes": 1598
+    },
+    {
+      "path": "skill-logo.webp",
+      "sha256": "8b406d3b665c2f0b0745d928d2ce9aadf7ae18410e01b1ca873ad6a1a2555185",
+      "bytes": 15490
+    }
+  ]
+}

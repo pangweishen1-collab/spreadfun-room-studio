@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "cases": [
+    {
+      "id": "tool-page-positive",
+      "type": "should-trigger",
+      "prompt": "按Fun Toolkit规范新增活动封面工具，统一上传、输出、中英和手机页面。",
+      "expected": "使用本Skill，复用随包tokens与模板，接真实业务并检查相关状态。"
+    },
+    {
+      "id": "photo-compress-negative",
+      "type": "should-not-trigger",
+      "prompt": "把这张照片压缩到50KB，只交付图片文件，不做网页。",
+      "expected": "执行图片压缩任务；不套工具页面、不新增UI或要求安装Skill。"
+    },
+    {
+      "id": "event-cover-task",
+      "type": "task",
+      "prompt": "使用Fun Toolkit规范制作本地活动封面工具：上传PNG/JPG/WebP，居中裁为512×512，可改文件名，真实下载WebP；有中英、手机、错误和防重，不接统计不发布。",
+      "expected": "产生可运行页面和真实512×512 WebP，输入校验、参数有效性、移动与帮助弹窗可验证。"
+    }
+  ]
+}

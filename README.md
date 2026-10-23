@@ -1,6 +1,6 @@
 # Fun Toolkit
 
-专为乐趣运营打造的素材处理工作台，包含聚合首页、三个工具与共享统计页。图片仍在浏览器中处理，统计与工具需求由本地 Python + SQLite 服务保存；无需安装 Node 依赖或执行构建。
+专为乐趣运营打造的素材处理工作台，包含聚合首页、三个工具与共享统计页。图片在浏览器中处理，线上统计与工具需求由 Cloudflare Worker + D1 保存；本地可用 Python + SQLite 预览服务。
 
 - 房间背景工具：批量图片上传、合成预览、每图每尺寸独立裁切、720 × 1560 / 300 × 480 WebP 与 ZIP 下载。
 - 头像框生产工具：读取本地 SVGA、循环动态预览、播放/暂停、时间轴、上一帧/下一帧、帧号输入和透明 WebP 单帧导出。
@@ -39,7 +39,7 @@ python3 server.py --host 127.0.0.1 --port 8765
 
 macOS 默认数据文件为 `~/Library/Application Support/Fun Toolkit/toolkit.sqlite3`，位于网站目录之外，不进入 ZIP。可用 `FUN_TOOLKIT_DATA_DIR` 设置私有数据目录，或使用 `python3 server.py --db /absolute/private/path/toolkit.sqlite3` 指定文件；服务器拒绝将数据库放在网站目录内。
 
-接口为 `GET /api/stats`、`POST /api/events` 与 `POST /api/requests`。当前按用户要求只做本地版本；上线时需选择集中数据服务及持久化存储，单独发布静态页面不能提供跨用户累计。旧使用次数无法追溯。
+接口为 `GET /api/stats`、`POST /api/events` 与 `POST /api/requests`。正式站已由 Cloudflare Worker + D1 提供跨用户累计；单独复制静态页面不包含这项服务。旧使用次数无法追溯。
 
 ## 头像框工具用法
 
@@ -140,14 +140,14 @@ node --check hub.js
 
 ## 设计规范入口
 
-页脚“设计规范 / Design guidelines”在新标签页打开 `design-system/`，保留当前工具会话。在线规范v1.4提供32页基础PDF（v1.2）、28条可筛选场景、动效与玻璃遮罩演示、工具页框架和设计变量下载；组件交互仅演示，不提交需求或记录生成/下载统计。公开文件由构建脚本显式加入，移动端页脚分行显示。
+页脚“设计规范 / Design guidelines”在新标签页打开 `design-system/`，保留当前工具会话。在线规范v1.4.1提供32页基础PDF（v1.2）、28条可筛选场景、动效与玻璃遮罩演示、工具页框架和设计变量下载；组件交互仅演示，不提交需求或记录生成/下载统计。公开文件由构建脚本显式加入，移动端页脚分行显示。
 
 三个工具各2个上传/导出主按钮已启用8%单次轻扫光；移动端保留44px触控与按下反馈。在线v1.2.1增补和可下载动效CSS已同步，PDF仍为v1.2基础版。
 
 
 ## 工具页框架 v1.0
 
-在线规范 v1.3 的第15节提供 `design-system/tool-page-framework.html`，包含六区职责、响应式尺寸、五态流程、三种工具变体、插槽/API映射、业务接入清单和可复制搭建要求。`design-system/tool-page-starter/` 是原生 HTML/CSS/JS 可运行示例，ZIP 额外包含中文 README 与标准库自检脚本。支持中英、真实本地图片预览、取消/错误/忙碌和无障碍焦点；生成是模拟，下载明确禁用。业务编码、实际下载和统计需另行接入，示例不会调用 API 或新增统计。基础 PDF 保留 v1.2，新增框架见在线规范或框架 MD。
+在线规范 v1.3 的第15节提供 `design-system/tool-page-framework.html`，包含六区职责、响应式尺寸、五态流程、三种工具变体、插槽/API映射、业务接入清单和可复制搭建要求。`design-system/tool-page-starter/` 是原生 HTML/CSS/JS 可运行示例，ZIP 额外包含中文 README，本轮已合入最新反馈基础库与8张空态/占位SVG。支持中英、真实本地图片预览、取消/错误/忙碌和无障碍焦点；生成是模拟，下载明确禁用。业务编码、实际下载和统计需另行接入，示例不会调用 API 或新增统计。基础 PDF 保留 v1.2，新增框架见在线规范或框架 MD。
 
 
 ## 空状态与反馈动效 v1.0
@@ -158,3 +158,10 @@ node --check hub.js
 ## 三工具统一反馈
 
 生产页显式复用design-system/assets/feedback图形与feedback-motion.css/js；tool-feedback.css/js只负责空态、占位、busy提示与160ms纯透明度入场，不改变文件、Canvas、坐标、编码、下载或计数。忙碌提示120ms淡出，循环离屏/后台暂停，减少动画即时反馈；手机插图96×72、触控44px。原工具持有阶段，实际新预览/结果或工具切换才淡入，逐帧、语言与背景切换不反复入场。新共享适配检查：node tests/tool-feedback.cjs。
+
+
+## 团队 UI Skill · v1.0.0
+
+规范页第17节提供完整 [团队Skill](https://fun-toolkit.pangweishen1.workers.dev/design-system/#team-skill)，源码在 `skills/fun-toolkit-ui/`，发布ZIP位于 `design-system/downloads/fun-toolkit-ui-1.0.0.zip`。包含资源规范1.4.1、可运行模板、最新空态和动效、表单与业务接入规则、团队安装与AGENTS片段、复制/完整性脚本及一次独立Agent真实试做案例。ZIP内容须解压到名为fun-toolkit-ui的目录，不能只保存SKILL.md。
+
+包内演示不产生真实文件或统计；新工具必须接真实业务。独立试做已验证512×512 WebP下载与中英手机布局，团队真人试用与其他Agent安装兼容仍未认证，治理标记pilot。具体边界见随包references/validation.md，发布摘要见ZIP同名.sha256文件。

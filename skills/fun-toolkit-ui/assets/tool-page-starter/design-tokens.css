@@ -1,0 +1,153 @@
+/* Fun Toolkit v1.4.1 · shared reference tokens · 2026-10-23
+ * Scoped to .ft-ui: opt in per component; importing this file does not restyle the live site.
+ * Shared reference values; legacy production tools adopt them through scoped adapters.
+ */
+.ft-ui {
+  --ft-color-brand-blue: #136BFF;
+  --ft-color-brand-deep-blue: #0B45D9;
+  --ft-color-brand-yellow: #FFC928;
+  --ft-color-brand-wordmark: #111111;
+  --ft-color-action-primary: #0071E3;
+  --ft-color-action-hover: #0062CC;
+  --ft-color-action-pressed: #0055B3;
+  --ft-color-action-replace: #21834B;
+  --ft-color-action-replace-hover: #196B3C;
+  --ft-color-action-replace-pressed: #155C34;
+  --ft-color-surface-page: #F5F5F7;
+  --ft-color-surface-card: #FFFFFF;
+  --ft-color-surface-blue-soft: #EAF3FF;
+  --ft-color-surface-blue-line: #CFE5FF;
+  --ft-color-surface-divider: #E8E8ED;
+  --ft-color-surface-checker: #E4EAF2;
+  --ft-color-surface-preview-black: #000000;
+  --ft-color-text-heading: #202A3B;
+  --ft-color-text-body: #1D1D1F;
+  --ft-color-text-secondary: #626C7C;
+  --ft-color-text-muted: #6E7785;
+  --ft-color-text-on-action: #FFFFFF;
+  --ft-color-field-border: #8B95A5;
+  --ft-color-field-hover: #626C7C;
+  --ft-color-field-focus: #0071E3;
+  --ft-color-field-error: #B42318;
+  --ft-color-semantic-info: #175DA5;
+  --ft-color-semantic-info-surface: #EAF3FF;
+  --ft-color-semantic-success: #237957;
+  --ft-color-semantic-success-surface: #EDF8F3;
+  --ft-color-semantic-warning: #8A4B00;
+  --ft-color-semantic-warning-surface: #FFF7E8;
+  --ft-color-semantic-error: #B42318;
+  --ft-color-semantic-error-surface: #FFF1F0;
+  --ft-color-disabled-surface: #EDF0F4;
+  --ft-color-disabled-text: #647083;
+  --ft-color-disabled-border: #D8DCE2;
+  --ft-space-1: 4px;
+  --ft-space-2: 8px;
+  --ft-space-3: 12px;
+  --ft-space-4: 16px;
+  --ft-space-6: 24px;
+  --ft-space-8: 32px;
+  --ft-space-12: 48px;
+  --ft-space-16: 64px;
+  --ft-radius-small: 8px;
+  --ft-radius-input: 10px;
+  --ft-radius-inner: 12px;
+  --ft-radius-preview: 16px;
+  --ft-radius-dialog: 20px;
+  --ft-radius-card: 22px;
+  --ft-radius-card-mobile: 18px;
+  --ft-radius-pill: 999px;
+  --ft-size-action: 44px;
+  --ft-size-control: 36px;
+  --ft-size-small: 32px;
+  --ft-size-touch-target: 44px;
+  --ft-size-icon: 20px;
+  --ft-size-icon-small: 16px;
+  --ft-size-nav-underline-width: 20px;
+  --ft-size-nav-underline-height: 2px;
+  --ft-size-preview-desktop: 440px;
+  --ft-type-body-size: 14px;
+  --ft-type-body-line-height: 22px;
+  --ft-type-body-weight: 400;
+  --ft-type-label-size: 12px;
+  --ft-type-label-line-height: 18px;
+  --ft-type-label-weight: 600;
+  --ft-type-control-size: 14px;
+  --ft-type-control-line-height: 20px;
+  --ft-type-control-weight: 500;
+  --ft-type-caption-size: 12px;
+  --ft-type-caption-line-height: 18px;
+  --ft-type-caption-weight: 400;
+  --ft-type-nav-size: 16px;
+  --ft-type-nav-line-height: 22px;
+  --ft-type-nav-weight: 400;
+  --ft-type-nav-selected-weight: 700;
+  --ft-type-title-size: 26px;
+  --ft-type-title-line-height: 32px;
+  --ft-type-title-weight: 700;
+  --ft-type-title-mobile-size: 22px;
+  --ft-type-title-mobile-line-height: 28px;
+  --ft-type-title-mobile-weight: 700;
+  --ft-type-section-size: 16px;
+  --ft-type-section-line-height: 24px;
+  --ft-type-section-weight: 650;
+  --ft-type-input-mobile-size: 16px;
+  --ft-type-input-mobile-line-height: 24px;
+  --ft-type-input-mobile-weight: 400;
+  --ft-layout-container-including-padding: 1440px;
+  --ft-layout-padding-desktop: 42px;
+  --ft-layout-padding-tablet: 24px;
+  --ft-layout-padding-mobile: 16px;
+  --ft-layout-workspace-gap: 16px;
+  --ft-layout-card-padding-desktop: 24px;
+  --ft-layout-card-padding-mobile: 16px;
+  --ft-layout-breakpoint-single-column: 900px;
+  --ft-layout-breakpoint-mobile: 540px;
+  --ft-layout-minimum-width: 320px;
+  --ft-font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", "Microsoft YaHei", sans-serif;
+  --ft-duration: 180ms;
+  --ft-ease: cubic-bezier(.16,1,.3,1);
+  --ft-shadow-card: 0 4px 18px rgba(0,0,0,.035);
+  --ft-shadow-dialog: 0 24px 70px rgba(0,0,0,.25);
+  --ft-focus-width: 2px;
+  --ft-focus-offset: 2px;
+}
+
+.ft-ui :where(button,a,input,select,textarea,[tabindex]):focus-visible {
+  outline: var(--ft-focus-width) solid var(--ft-color-field-focus);
+  outline-offset: var(--ft-focus-offset);
+}
+@media (prefers-reduced-motion: reduce) {
+  .ft-ui *, .ft-ui *::before, .ft-ui *::after {
+    animation: none !important; transition: none !important; scroll-behavior: auto !important;
+  }
+}
+
+/* Pair with focus-modality.js. Keep these rules after the component's hover styles. */
+.ft-ui :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), textarea, select):focus {
+  border-color: var(--ft-color-field-focus);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0,113,227,.08);
+}
+.ft-ui :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), textarea, select):focus-visible {
+  outline: var(--ft-focus-width) solid var(--ft-color-field-focus);
+  outline-offset: var(--ft-focus-offset);
+  box-shadow: none;
+}
+html[data-input-modality=pointer] .ft-ui :where(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]), textarea, select):focus {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(0,113,227,.08);
+}
+.ft-ui :is(input,textarea,select)[aria-invalid=true] {
+  border-color: var(--ft-color-field-error);
+}
+.ft-ui :is(input,textarea,select)[aria-invalid=true]:focus {
+  border-color: var(--ft-color-field-error);
+  box-shadow: none;
+}
+@media (forced-colors: active) {
+  .ft-ui :is(button,a,input,select,textarea,summary,[tabindex]):focus-visible {
+    outline: 2px solid Highlight !important;
+    outline-offset: 2px;
+    box-shadow: none !important;
+  }
+}

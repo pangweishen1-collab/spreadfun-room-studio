@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 1,
+  "ownerTeam": "Fun Toolkit",
+  "maintainers": [
+    "庞伟深"
+  ],
+  "reviewers": [],
+  "status": "pilot",
+  "classification": "public",
+  "license": "UNLICENSED",
+  "compatibility": [
+    "Codex 桌面客户端：文件、终端与独立 Agent 本地试做；其他客户端未验证"
+  ],
+  "permissions": {
+    "networkDomains": [],
+    "filesystemRead": [
+      "Skill完整目录",
+      "用户指定项目与素材"
+    ],
+    "filesystemWrite": [
+      "用户明确指定的项目文件，含授权修改的既有页面",
+      "复制助手只创建不存在的新目录",
+      "用户指定的验证产物"
+    ],
+    "shell": true,
+    "externalWrites": [],
+    "secrets": []
+  },
+  "lastReviewed": "2026-10-23",
+  "source": {
+    "repository": "https://github.com/pangweishen1-collab/spreadfun-room-studio",
+    "commit": "b66f9586e6ee14aca9ff0d263411e9ec62401cf9",
+    "note": "已有模板/资源来源；本次交付由发布记录绑定新版本，不冒充公司审批"
+  }
+}

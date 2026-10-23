@@ -1,0 +1,48 @@
+/* One feedback vocabulary for the three production tools. No export pixels change. */
+.tool-empty-art{display:block;width:120px;height:90px;object-fit:contain;margin:0 auto 12px;pointer-events:none}
+:is(#roomTool,#avatarTool,#bannerTool) .upload-empty{max-width:100%;padding:24px 16px;text-align:center}
+:is(#roomTool,#avatarTool,#bannerTool) .upload-empty strong{font-size:16px;line-height:24px;font-weight:600;margin-bottom:6px}
+:is(#roomTool,#avatarTool,#bannerTool) .upload-empty>span{display:block;font-size:12px;line-height:18px;color:#626c7c}
+:is(#roomTool,#avatarTool,#bannerTool) .upload-empty .preview-upload{height:44px;min-height:44px;min-width:160px;margin-top:20px;font-size:14px}
+.tool-output-empty{position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;min-height:196px;padding:28px 20px;border:1px dashed #d8dce2;border-radius:13px;background:#f9fbfe;color:#626c7c;text-align:center;font-size:12px;line-height:20px}
+.tool-output-empty .tool-empty-art{width:96px;height:72px;margin-bottom:12px}
+.tool-output-empty .tool-placeholder-art{width:72px;height:72px}
+.frame-output>.tool-output-empty{position:absolute;inset:0;min-height:0;border:0;border-radius:inherit;background:#f8fbff;padding:18px 12px}
+.frame-output>.tool-output-empty span{position:static}
+.tool-stage-busy{position:absolute;left:16px;top:16px;z-index:3;display:flex;align-items:center;gap:9px;max-width:calc(100% - 32px);padding:9px 12px;border:1px solid #cfe5ff;border-radius:9px;background:#ffffffed;color:#175da5;font-size:12px;line-height:18px;pointer-events:none;opacity:0;transition:opacity 120ms ease-out}
+[data-feedback-phase="loading"] .tool-stage-busy,[data-feedback-phase="processing"] .tool-stage-busy{opacity:1;transition-duration:160ms}
+[data-feedback-stage][aria-busy="true"]{cursor:progress}
+[data-feedback-stage][aria-busy="true"]:hover{box-shadow:none}
+.tool-pending-visual{display:none;width:120px;height:72px;align-items:center;justify-content:center;margin-bottom:12px}
+.tool-pending-visual .ft-skeleton{width:96px;height:64px;border-radius:9px}
+.tool-pending-copy{display:none;font-size:12px;line-height:20px}
+:is([data-feedback-phase="loading"],[data-feedback-phase="processing"]) .tool-output-empty .tool-empty-art,:is([data-feedback-phase="loading"],[data-feedback-phase="processing"]) .tool-output-empty .tool-empty-copy{display:none}
+:is([data-feedback-phase="loading"],[data-feedback-phase="processing"]) .tool-output-empty .tool-pending-visual{display:flex}
+:is([data-feedback-phase="loading"],[data-feedback-phase="processing"]) .tool-output-empty .tool-pending-copy{display:block}
+.tool-feedback-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+button[data-feedback-button][aria-busy="true"]{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+button[data-feedback-button][aria-busy="true"]:disabled{background:#edf0f4;color:#647083;border-color:#d8dce2;box-shadow:none;transform:none;opacity:1;filter:none;cursor:progress}
+button[data-feedback-button][aria-busy="true"]::before{content:"";width:16px;height:16px;box-sizing:border-box;flex:none;border:2px solid #c8d7e8;border-top-color:#0071e3;border-radius:50%;animation:ft-feedback-spin 800ms linear infinite;animation-play-state:paused;pointer-events:none}
+button[data-feedback-button][aria-busy="true"][data-ft-running="true"]::before{animation-play-state:running}
+.output-img{background:#f3f7fc url('design-system/assets/feedback/placeholder-image.svg') center/64px 48px no-repeat}
+.output-img img{opacity:0;transition:opacity 160ms ease-out}
+.output-img img.is-loaded{opacity:1}
+.output-img[data-feedback-image="ready"]{background-image:none}
+.output-img[data-feedback-image="error"]{background-image:url('design-system/assets/feedback/empty-error.svg')}
+/* Room batch progress keeps its real completed-file ratio and shares the blue track. */
+.progress-track{height:6px;background:#e8edf4}.progress-bar{background:#0071e3;transition:width 160ms ease-out}
+@media(max-width:540px){
+ .tool-empty-art{width:96px;height:72px}
+ :is(#roomTool,#avatarTool,#bannerTool) .upload-empty{padding:20px 12px}
+ :is(#roomTool,#avatarTool,#bannerTool) .upload-empty strong{font-size:15px;line-height:22px}
+ :is(#roomTool,#avatarTool,#bannerTool) .upload-empty>span{font-size:12px;line-height:18px}
+ :is(#roomTool,#avatarTool,#bannerTool) .upload-empty .preview-upload{min-width:148px;margin-top:16px}
+ .tool-output-empty{padding:24px 16px;min-height:180px}
+ .tool-output-empty .tool-empty-art{width:80px;height:60px}
+ .tool-output-empty .tool-placeholder-art{width:64px;height:64px}
+ .tool-stage-busy{left:12px;top:12px;max-width:calc(100% - 24px);font-size:11px;padding:7px 9px}
+}
+@media(prefers-reduced-motion:reduce){
+ .tool-stage-busy,.output-img img,.progress-bar{transition:none!important}
+ button[data-feedback-button][aria-busy="true"]::before{animation:none!important}
+}
