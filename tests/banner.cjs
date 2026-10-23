@@ -4,7 +4,8 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const elements=new Map(),urls=new Map(),revoked=new Set(),encodes=[],zips=[],downloads=[],timers=[];
-const events=[];
+const events=[],uiStates=[],reveals=[];
+const feedback=()=>uiStates.at(-1);
 const recorded=type=>events.filter(event=>event.tool==='banner'&&event.type===type).reduce((total,event)=>total+event.count,0);
 const docListeners=new Map(),windowListeners=new Map();
 let serial=0,encodeFails=false,failEncodeAt=0,zipFails=false;
@@ -47,10 +48,10 @@ class MockZip{
   file(name,blob){this.files.push({name,blob});return this}
   async generateAsync(options){this.options=options;if(zipFails)throw Error('zip failed');return new Blob(['zip'],{type:'application/zip'})}
 }
-const sandbox={window:{addEventListener(k,fn){windowListeners.set(k,fn)},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},document,Image:MockImage,JSZip:MockZip,language:'en',Blob,TextEncoder,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,Set,console,
+const sandbox={window:{addEventListener(k,fn){windowListeners.set(k,fn)},Hub:{record(tool,type,count=1){events.push({tool,type,count})}},FunToolkitUI:{setState(tool,state){uiStates.push({tool,...state})},reveal(node){reveals.push(node)}}},document,Image:MockImage,JSZip:MockZip,language:'en',Blob,TextEncoder,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,Set,console,
   URL:{createObjectURL(blob){const url='blob:banner-'+ ++serial;urls.set(url,blob);return url},revokeObjectURL(url){revoked.add(url);urls.delete(url)}},
   setTimeout(fn,delay){if(delay<60000)queueMicrotask(fn);else timers.push(fn);return serial},clearTimeout(){},
-  canvasToLosslessWebP:async(canvas)=>{encodes.push({canvas,width:canvas.width,height:canvas.height});if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['webp-'+encodes.length],{type:'image/webp'})}};
+  canvasToLosslessWebP:async(canvas)=>{assert.equal(feedback().phase,'processing','real encoding uses processing feedback');encodes.push({canvas,width:canvas.width,height:canvas.height});if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['webp-'+encodes.length],{type:'image/webp'})}};
 sandbox.window.JSZip=MockZip;
 let source=fs.readFileSync(path.join(__dirname,'../banner.js'),'utf8');
 const marker='window.BannerTool={syncLanguage};';
@@ -74,14 +75,20 @@ function assertPreviewBackground(value){
   assert.equal(get('#bannerPreviewTransparent').getAttribute('aria-pressed'),String(value==='transparent'));
 }
 (async()=>{
+  assert.equal(feedback().tool,'banner');assert.equal(feedback().phase,'empty');assert.equal(reveals.length,0);
   assertPreviewBackground('black');
   await api.downloadAll();assert.equal(events.length,0,'empty downloads and initial previews must not count');
   assert.equal(get('#bannerResolutionNote').classList.contains('hidden'),true,'no warning before an image is uploaded');
   assert.deepEqual(crop(772,200,772,200),{sx:0,sy:0,sw:772,sh:200});
   for(const dimensions of [[1200,600,772,200],[600,1200,645,201],[100000,1,772,200],[1,100000,645,201],[800,800,645,201]])assertCover(...dimensions);
   // Snapshot the live FileList before any image or template await.
-  const first=file();const selection=[first];const pending=api.loadFiles({[Symbol.iterator]:()=>selection[Symbol.iterator]()});selection.length=0;await pending;
+  const first=file();const selection=[first],feedbackStart=uiStates.length;const pending=api.loadFiles({[Symbol.iterator]:()=>selection[Symbol.iterator]()});
+  assert.equal(feedback().phase,'loading');assert.equal(feedback().message,'Reading image…');
+  assert.equal(get('#bannerUpload').getAttribute('aria-busy'),'true');selection.length=0;await pending;
   assert.equal(api.state.file,first);assert.equal(api.state.busy,false);assert.equal(api.state.outputs.length,2);
+  assert.equal(feedback().phase,'success');assert.equal(feedback().message,'2 files ready');assert.equal(get('#bannerUpload').getAttribute('aria-busy'),'false');
+  assert.deepEqual(uiStates.slice(feedbackStart).map(state=>state.phase).filter((phase,index,phases)=>index===0||phase!==phases[index-1]),['loading','processing','success']);
+  assert.deepEqual(reveals,[get('#bannerPreviews'),get('#bannerOutputList')],'only committed preview and result surfaces reveal');
   assert.deepEqual(Array.from(api.state.outputs,o=>[o.kind,o.width,o.height]),[['room',772,200],['game',684,240]]);
   assert.deepEqual(encodes.map(e=>[e.width,e.height]),[[772,200],[684,240]]);
   assert.equal(recorded('generated'),2,'one successful upload produces two countable files');assert.equal(recorded('download'),0);
@@ -99,7 +106,7 @@ function assertPreviewBackground(value){
   assert.deepEqual(innerDraw.slice(-4),[19.5,18,645,201]);
   const firstOutputs=Array.from(api.state.outputs),firstImage=api.state.image;
   // Preview backgrounds change only CSS, preserving generated files and their URLs.
-  const previewEncodeCount=encodes.length,previewUrls=new Map(urls),previewRevoked=new Set(revoked);
+  const previewEncodeCount=encodes.length,previewUrls=new Map(urls),previewRevoked=new Set(revoked),revealCount=reveals.length;
   for(const value of ['transparent','black']){
     api.setPreviewBackground(value);assertPreviewBackground(value);
     assert.equal(encodes.length,previewEncodeCount,'changing the preview background must not encode again');
@@ -107,6 +114,7 @@ function assertPreviewBackground(value){
     assert.deepEqual(urls,previewUrls);assert.deepEqual(revoked,previewRevoked);
     for(const [index,output] of firstOutputs.entries())assert.equal(api.state.outputs[index].blob,output.blob);
     assert.equal(recorded('generated'),2);assert.equal(recorded('download'),0,'preview background changes must not count');
+    assert.equal(reveals.length,revealCount,'preview backgrounds do not replay entry animation');
   }
   const inputUrls=Array.from(revoked).filter(url=>url.startsWith('blob:banner-'));
   assert.ok(inputUrls.length>=1,'the decoded upload object URL should be released');
@@ -114,13 +122,18 @@ function assertPreviewBackground(value){
   sandbox.language='zh';sandbox.window.BannerTool.syncLanguage();
   assert.equal(api.state.outputs[0],firstOutputs[0]);assert.equal(urls.get(firstOutputs[0].url),firstOutputs[0].blob);
   assert.equal(recorded('generated'),2);assert.equal(recorded('download'),0,'language changes only rerender existing output links');
+  assert.equal(feedback().phase,'success');assert.equal(feedback().message,'已生成 2 个文件');assert.equal(reveals.length,revealCount,'language changes do not replay entry animation');
   for(const invalid of [[file(),file('other.png')],[file('notes.txt',1,1,'text/plain')],[{...file(),size:31*1024*1024}]]){
     await api.loadFiles(invalid);assert.ok(api.state.notice,'invalid input should surface a notice');
     assert.equal(api.state.image,firstImage);assert.equal(api.state.outputs[0],firstOutputs[0]);assert.equal(api.state.busy,false);
+    assert.equal(feedback().phase,'error');assert.equal(reveals.length,revealCount,'invalid replacements do not reveal old results again');
   }
+  sandbox.language='en';sandbox.window.BannerTool.syncLanguage();assert.equal(feedback().phase,'error');assert.equal(feedback().message,'Choose an image under 30 MB.','error feedback follows the selected language');
+  sandbox.language='zh';sandbox.window.BannerTool.syncLanguage();
   await api.loadFiles([file('broken.png')]);assert.ok(api.state.notice);assert.equal(api.state.image,firstImage);assert.equal(api.state.outputs[0],firstOutputs[0]);
   encodeFails=true;await api.loadFiles([file('encode-failure.png')]);encodeFails=false;
   assert.ok(api.state.notice);assert.equal(api.state.image,firstImage);assert.equal(api.state.outputs[0],firstOutputs[0]);assert.equal(api.state.busy,false);
+  assert.equal(feedback().phase,'error');assert.match(feedback().message,/生成失败/);assert.equal(reveals.length,revealCount);
   for(const output of firstOutputs)assert.equal(urls.get(output.url),output.blob,'failed replacement keeps existing download URLs');
   const urlsBeforePartialFailure=new Set(urls.keys());failEncodeAt=encodes.length+2;
   await api.loadFiles([file('partial-encode-failure.jpg',1200,600,'image/jpeg')]);failEncodeAt=0;
@@ -144,13 +157,16 @@ function assertPreviewBackground(value){
   const outputLinks=get('#bannerOutputList').children.map(row=>row.children.find(child=>child.download));
   assert.equal(outputLinks.length,2);for(const link of outputLinks){assert.ok(link);link.click()}
   assert.equal(recorded('download'),2,'each single-file link counts one download request');assert.equal(recorded('generated'),8);
-  const currentOutputs=Array.from(api.state.outputs);await api.downloadAll();
+  const currentOutputs=Array.from(api.state.outputs),beforeZipReveals=reveals.length;const zipPending=api.downloadAll();
+  assert.equal(feedback().phase,'processing');assert.equal(feedback().message,'Creating ZIP…');await zipPending;
+  assert.equal(feedback().phase,'success');assert.equal(reveals.length,beforeZipReveals,'packaging an existing result does not replay its appearance');
   const zip=zips.at(-1);assert.ok(zip,'Download all creates a ZIP');
   assert.equal(zip.files.length,2);assert.deepEqual(zip.files.map(f=>f.name),currentOutputs.map(o=>o.name));
   assert.equal(zip.files[0].blob,currentOutputs[0].blob);assert.equal(zip.files[1].blob,currentOutputs[1].blob);
   assert.ok(downloads.some(d=>/\.zip$/i.test(d.name)),'ZIP should be downloaded');
   assert.equal(recorded('download'),3,'the two-file ZIP counts one download request');assert.equal(recorded('generated'),8,'ZIP assembly does not generate images again');
   zipFails=true;await api.downloadAll();zipFails=false;assert.equal(api.state.notice,'zipError');
+  assert.equal(feedback().phase,'error');assert.equal(feedback().message,'Could not create the ZIP. Retry or download each file.');
   assert.equal(recorded('download'),3,'failed ZIP packaging does not count a download');assert.equal(recorded('generated'),8);
   timers.splice(0).forEach(fn=>fn());
   for(const output of currentOutputs)assert.equal(urls.get(output.url),output.blob,'active preview URLs survive download cleanup');
@@ -159,5 +175,5 @@ function assertPreviewBackground(value){
   windowListeners.get('pagehide')({persisted:false});
   for(const output of currentOutputs)assert.equal(urls.has(output.url),false,'a final page exit releases download URLs');
   assert.equal(recorded('generated'),8);assert.equal(recorded('download'),3,'page cleanup does not affect aggregate counters');
-  console.log('PASS: centered cover crop including extreme ratios, live FileList, two exact lossless WebP canvas sizes, game overlay/rounded inner crop, CSS-only black/transparent preview switch, source-resolution warning boundaries and language, invalid/decode/encode rollback, URL cleanup, language URL reuse, two-file ZIP, committed-only generation and single/ZIP download counts.');
+  console.log('PASS: loading/processing/committed-success/error feedback and localization; reveal only on a new committed result; centered cover crop including extreme ratios, live FileList, two exact lossless WebP canvas sizes, game overlay/rounded inner crop, CSS-only black/transparent preview switch, source-resolution warning boundaries and language, invalid/decode/encode rollback, URL cleanup, language URL reuse, two-file ZIP, committed-only generation and single/ZIP download counts.');
 })().catch(error=>{console.error(error);process.exitCode=1});

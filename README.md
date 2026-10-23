@@ -152,4 +152,9 @@ node --check hub.js
 
 ## 空状态与反馈动效 v1.0
 
-在线规范v1.4第16节链接 `design-system/feedback-states.html`：6张蓝灰线性SVG缺省图、图片/头像占位、统一Spinner/原生progress/Skeleton，以及可操作的淡入淡出与轻视差。`feedback-motion.css` / `.js`是可按需复用的原生基础实现；活动区离屏/后台暂停、支持全局暂停与系统减少动态效果，手机禁用视差，退出阶段立即inert且可取消旧退场。图片加载、任务进度和焦点路由由接入方实现。`Fun-Toolkit-Feedback-Motion-Kit.zip`包含全部本地资源、MD和可运行Node自检；基础PDF仍为v1.2。三个正式工具未自动接入本次新增效果。
+在线规范v1.4第16节链接 `design-system/feedback-states.html`：6张蓝灰线性SVG缺省图、图片/头像占位、统一Spinner/原生progress/Skeleton，以及可操作的淡入淡出与轻视差。`feedback-motion.css` / `.js`是可按需复用的原生基础实现；活动区离屏/后台暂停、支持全局暂停与系统减少动态效果，手机禁用视差，退出阶段立即inert且可取消旧退场。图片加载、任务进度和焦点路由由接入方实现。`Fun-Toolkit-Feedback-Motion-Kit.zip`包含全部本地资源、MD和可运行Node自检；基础PDF仍为v1.2。工具的生产接入方式见下方“三工具统一反馈”。
+
+
+## 三工具统一反馈
+
+生产页显式复用design-system/assets/feedback图形与feedback-motion.css/js；tool-feedback.css/js只负责空态、占位、busy提示与160ms纯透明度入场，不改变文件、Canvas、坐标、编码、下载或计数。忙碌提示120ms淡出，循环离屏/后台暂停，减少动画即时反馈；手机插图96×72、触控44px。原工具持有阶段，实际新预览/结果或工具切换才淡入，逐帧、语言与背景切换不反复入场。新共享适配检查：node tests/tool-feedback.cjs。

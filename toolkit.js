@@ -37,7 +37,12 @@
   const exportHost=document.createElement('div');exportHost.setAttribute('aria-hidden','true');exportHost.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;visibility:hidden';document.body.append(exportHost);
   const t=key=>(strings[language]||strings.en)[key]||key;
   const currentTool=()=>({'#banners':'banner','#avatar-frames':'avatar','#room-backgrounds':'room','#statistics':'statistics'}[location.hash]||'home');
-  function setNotice(key){state.notice=key;$('#svgaNotice').textContent=key?t(key):'';$('#svgaNotice').classList.toggle('hidden',!key)}
+  function syncFeedback(){
+    const phase=state.loading?'loading':state.exporting?'processing':state.notice||!state.dimensionValid?'error':state.download?'success':state.video?'ready':'empty';
+    const message=state.loading?t('loading'):state.exporting?t('exporting'):state.notice?t(state.notice):!state.dimensionValid?t('dimensionError'):state.download?t('saved'):'';
+    window.FunToolkitUI?.setState('avatar',{phase,message});
+  }
+  function setNotice(key){state.notice=key;$('#svgaNotice').textContent=key?t(key):'';$('#svgaNotice').classList.toggle('hidden',!key);syncFeedback()}
   function releaseDownload(){if(state.downloadUrl)URL.revokeObjectURL(state.downloadUrl);state.downloadUrl=null;state.download=null;$('#frameDownloadResult').replaceChildren();$('#frameDownloadResult').classList.add('hidden')}
   function syncDownloadResult(){
     if(!state.download)return;
@@ -46,7 +51,8 @@
   }
   function syncControls(){
     const busy=state.loading||state.exporting,ready=!!state.video;
-    for(const id of ['#svgaUpload','#frameDownload'])$(id).setAttribute('aria-busy',String(busy));
+    for(const id of ['#svgaUpload','#svgaReplace'])$(id).setAttribute('aria-busy',String(state.loading));
+    $('#frameDownload').setAttribute('aria-busy',String(state.exporting));
     for(const id of ['#svgaPrevious','#svgaNext','#svgaPlay','#svgaTimeline','#svgaFrameNumber'])$(id).disabled=!ready||busy;
     for(const id of ['#svgaUpload','#svgaReplace'])$(id).disabled=busy;
     for(const id of ['#frameWidth','#frameHeight'])$(id).disabled=state.exporting;
@@ -57,6 +63,7 @@
     $('#svgaPlaybackStatus').textContent=t(mode);$('#svgaPlaybackStatus').dataset.state=mode;
     $('#svgaPlayText').textContent=t(state.playing?'pause':'play');$('#svgaPlaySymbol').textContent=state.playing?'Ⅱ':'▶';
     $('#svgaPlay').setAttribute('aria-pressed',String(state.playing));$('#frameDownload').textContent=t(state.exporting?'exporting':'downloadFrame');
+    syncFeedback();
   }
   function syncFrame(){
     const video=state.video,total=video?video.frames:0,frame=video?state.frame+1:0,fps=video?video.FPS:1;
@@ -79,6 +86,7 @@
     const next=currentTool(),changed=next!==state.active;if(next!=='avatar')pause();state.active=next;
     $('#roomTool').classList.toggle('hidden',next!=='room');$('#avatarTool').classList.toggle('hidden',next!=='avatar');$('#bannerTool').classList.toggle('hidden',next!=='banner');
     $('#homeTool').classList.toggle('hidden',next!=='home');$('#statisticsTool').classList.toggle('hidden',next!=='statistics');
+    window.FunToolkitUI?.activate(next);
     document.querySelectorAll('[data-tool-link]').forEach(link=>{if(link.dataset.toolLink===next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')});
     for(const [selector,page] of [['#brandHome','home'],['#footerStatistics','statistics']]){const link=$(selector);if(next===page)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')}
     $('#examplesButton').classList.toggle('hidden',next!=='room');updateDocumentTitle();
@@ -145,6 +153,7 @@
       $('#svgaFileName').textContent=file.name;$('#svgaFileName').title=file.name;$('#svgaSourcebar').classList.remove('hidden');$('#frameOutputEmpty').classList.add('hidden');
       $('#svgaDropzone').removeAttribute('role');$('#svgaDropzone').removeAttribute('tabindex');
       state.loading=false;player.stepToFrame(0,false);drawOutputPreview();syncLanguage();
+      window.FunToolkitUI?.reveal(playerHost);window.FunToolkitUI?.reveal(output);
     }catch(error){
       state.video=previous;
       if(previous){player.setVideoItem(previous);sizeExportRenderer(240);exportPlayer.setVideoItem(previous);await Promise.all([waitForRenderer(player),waitForRenderer(exportPlayer)]).catch(()=>{});player.stepToFrame(state.frame,false);drawOutputPreview()}
@@ -171,7 +180,7 @@
       releaseDownload();const base=state.file.name.replace(/\.svga$/i,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'avatar-frame';
       state.download=`${base}-frame-${String(state.frame+1).padStart(3,'0')}-${side}x${side}.webp`;state.downloadUrl=URL.createObjectURL(blob);
       window.Hub?.record('avatar','generated');
-      const link=document.createElement('a');link.href=state.downloadUrl;link.download=state.download;link.hidden=true;document.body.append(link);link.click();window.Hub?.record('avatar','download');link.remove();syncDownloadResult();
+      const link=document.createElement('a');link.href=state.downloadUrl;link.download=state.download;link.hidden=true;document.body.append(link);link.click();window.Hub?.record('avatar','download');link.remove();syncDownloadResult();window.FunToolkitUI?.reveal($('#frameDownloadResult'));
     }catch(error){setNotice('exportError')}
     finally{sizeExportRenderer(240);drawOutputPreview();state.exporting=false;syncControls()}
   }

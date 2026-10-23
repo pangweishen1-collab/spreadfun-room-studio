@@ -287,3 +287,8 @@ node check.cjs
 - 无外链、脚本、字体、`foreignObject`、`image`、动画元素或滤镜；无 SVG ID，因此多个内联实例不会产生 ID 冲突。
 - 所有空态 alpha 边界均位于画板内部，最接近边缘的图形留有至少 12 px 外侧空白；地线最下像素在 108 px 以内，未裁切描边。
 - 通过本地 Sharp 以 3 倍倍率渲染，并检查组合图板：`work/design-spec/feedback-assets-board.png`。PNG 仅用于 QA，不替代 SVG 交付源文件。
+
+
+## 三工具生产接入记录 · 2026-10-23
+
+房间背景、头像框与Banner已接入对应的空态图、头像/缩略图占位、统一Spinner与Skeleton。实际业务区采用160ms、opacity .35→1的轻淡入，忙碌提示120ms淡出，不对Canvas、裁切或导出做transform。房间背景显示真实文件完成量，SVGA逐帧和语言切换不重播动画。共享生产适配层为站点根目录tool-feedback.css / tool-feedback.js；业务状态由各工具调用，错误提示与旧有效结果仍由原工具维护。视差、错峰和默认180ms/6px模式保留为后续可选规范，不自动用于工作画布。

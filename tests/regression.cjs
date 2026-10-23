@@ -6,7 +6,8 @@ const vm = require('node:vm');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const code = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const elements = new Map(), urls = new Map(), stats = new Map();
-const events = [];
+const events = [], feedback = [], reveals = [], preparedImages = [];
+const latestFeedback = () => feedback.at(-1);
 const recorded = type => events.filter(event=>event.tool==='room'&&event.type===type).reduce((total,event)=>total+event.count,0);
 let serial = 0, clicks = 0;
 const cleanupTimers=[];
@@ -27,7 +28,7 @@ class MockImage {
   constructor(){this.width=900;this.height=1600;this.naturalWidth=900;this.naturalHeight=1600;this.complete=true}
   set src(value){this.url=value;queueMicrotask(()=>{if(urls.get(value)?.name==='broken.png')this.onerror?.();else this.onload?.()})}
 }
-const sandbox = {window:{Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},document, Image:MockImage, Blob, TextEncoder, Uint8Array, DataView, Set, Promise, Math, Number, String, Array,
+const sandbox = {window:{FunToolkitUI:{setState(tool,value){assert.equal(tool,'room');feedback.push({...value})},reveal(target){reveals.push(target)},prepareImages(target){preparedImages.push(target)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},document, Image:MockImage, Blob, TextEncoder, Uint8Array, DataView, Set, Promise, Math, Number, String, Array,
   localStorage:{getItem:key=>stats.get(key),setItem:(key,value)=>stats.set(key,value)},
   URL:{createObjectURL(blob){const value='blob:'+ ++serial;urls.set(value,blob);return value},revokeObjectURL(value){urls.delete(value)}},
   setTimeout(fn,delay){if(delay<60000)queueMicrotask(fn);else cleanupTimers.push(fn)}, console};
@@ -35,6 +36,7 @@ vm.createContext(sandbox);vm.runInContext(code,sandbox);
 const run = source => vm.runInContext(source,sandbox);
 (async()=>{
   await run('fgReady');
+  assert.equal(latestFeedback().phase,'empty','the untouched room tool starts in the shared empty state');
   // A small WebP needs one maximum-quality encode; complex images keep the full search.
   const maxBytes=120*1024,qualities=[];
   sandbox.limitCanvas={toBlob(callback,type,quality){qualities.push(quality);callback(new Blob([new Uint8Array(maxBytes)],{type}))}};
@@ -60,10 +62,28 @@ const run = source => vm.runInContext(source,sandbox);
   assert.equal(events.length,0,'empty downloads and initial previews must not count');
   // FileList is live: clearing the input after onchange must not truncate an async import.
   sandbox.selection=[{name:'one.webp',type:'image/webp'},{name:'broken.png',type:'image/png'},{name:'two.webp',type:'image/webp'}];
+  const batchFeedbackStart=feedback.length;
   const pending=run('batch({[Symbol.iterator]:()=>selection[Symbol.iterator]()})');
+  const pickerClicks=clicks;run('pickRoomFiles()');assert.equal(clicks,pickerClicks,'all room upload entry points stay locked during import');
+  assert.equal(latestFeedback().phase,'loading','image decoding immediately exposes the shared loading stage');
+  const revealsBeforeLoadingLanguage=reveals.length;
+  run('setLanguage("zh")');
+  assert.equal(latestFeedback().phase,'loading');assert.equal(latestFeedback().message,'正在读取图片…','an in-flight label follows the selected language');
+  run('setLanguage("en")');
+  assert.equal(latestFeedback().phase,'loading');assert.equal(latestFeedback().message,'Reading images…');
+  assert.equal(reveals.length,revealsBeforeLoadingLanguage,'in-flight language changes do not animate the working preview');
   assert.equal(document.querySelector('#previewUploadButton').disabled,true,'room upload locks during import');
   assert.equal(document.querySelector('#previewUploadButton')['aria-busy'],'true','busy upload must not show sheen');
   sandbox.selection.length=0;await pending;
+  const batchPhases=feedback.slice(batchFeedbackStart).map(value=>value.phase);
+  assert.equal(batchPhases[0],'loading');
+  assert.ok(batchPhases.indexOf('processing')>0,'real encoding follows image loading');
+  assert.ok(!batchPhases.slice(0,batchPhases.indexOf('processing')).includes('ready'),'decoding and preview mounting remain loading until encoding starts');
+  assert.equal(latestFeedback().phase,'success','nested import/export finally blocks must preserve the successful phase');
+  assert.equal(run('roomFeedbackPhase'),'success');
+  assert.ok(preparedImages.includes(document.querySelector('#outputList')),'new output thumbnails use the shared image readiness helper');
+  assert.ok(reveals.includes(document.querySelector('#previewGrid')));
+  assert.ok(reveals.includes(document.querySelector('#exportContent')));
   assert.equal(document.querySelector('#previewUploadButton').disabled,false,'room upload restores after import');
   assert.equal(document.querySelector('#previewUploadButton')['aria-busy'],'false');
   assert.equal(run('batchJobs.length'),2);assert.equal(run('generatedOutputs.length'),4);assert.equal(run('exportBusy||importBusy'),false);
@@ -74,6 +94,7 @@ const run = source => vm.runInContext(source,sandbox);
   run('openCropEditor("large",1)');assert.equal(run('cropImage===batchJobs[1].image'),true);assert.match(document.querySelector('#cropTitle').textContent,/Bg02.webp/);
   run('before=generatedOutputs.map(file=>file.blob)');
   document.querySelector('#cropX').value='0';await run('applyCrop()');
+  assert.equal(latestFeedback().phase,'success','a successful changed crop settles in success');
   assert.equal(run('generatedOutputs[0].blob===before[0]&&generatedOutputs[1].blob===before[1]&&generatedOutputs[3].blob===before[3]'),true);
   assert.equal(run('generatedOutputs[2].blob!==before[2]'),true);assert.equal(run('batchJobs[0].crops.large.x'),.5);assert.equal(run('batchJobs[1].crops.large.x'),0);assert.equal(run('batchJobs[1].crops.small.x'),.5);
   assert.equal(run('readLifetimeImages()'),5);
@@ -85,9 +106,13 @@ const run = source => vm.runInContext(source,sandbox);
   // An encoder failure preserves the previous crop, file and ZIP.
   run('beforeFile=generatedOutputs[2];beforeZip=zipFile;originalExport=exportCanvas;exportCanvas=async()=>{throw Error("encode failed")};openCropEditor("large",1)');
   document.querySelector('#cropX').value='100';await run('applyCrop()');
+  assert.equal(latestFeedback().phase,'error','a failed crop stays in error after busy controls restore');
   assert.equal(run('generatedOutputs[2]===beforeFile&&zipFile===beforeZip'),true);assert.equal(run('batchJobs[1].crops.large.x'),0);assert.equal(run('downloadNotice.state'),'cropError');run('exportCanvas=originalExport');
   assert.equal(recorded('generated'),5,'a failed crop must not count');
-  const urlCount=run('downloadUrls.size');run('toggleLanguage();toggleLanguage()');assert.equal(run('downloadUrls.size'),urlCount,'language switch must reuse thumbnail URLs');
+  const urlCount=run('downloadUrls.size'),revealsBeforeLanguage=reveals.length,phaseBeforeLanguage=latestFeedback().phase;
+  run('toggleLanguage();toggleLanguage()');assert.equal(run('downloadUrls.size'),urlCount,'language switch must reuse thumbnail URLs');
+  assert.equal(latestFeedback().phase,phaseBeforeLanguage,'language changes preserve the real task phase');
+  assert.equal(reveals.length,revealsBeforeLanguage,'language changes do not replay the output reveal');
   assert.equal(recorded('generated'),5,'language changes must not count');
   run('downloadAll();downloadGenerated(0)');assert.equal(clicks,2);
   assert.equal(recorded('download'),2,'one ZIP and one single-file download are two requests');
@@ -99,12 +124,23 @@ const run = source => vm.runInContext(source,sandbox);
   assert.equal(run('generatedOutputs.length'),4);assert.equal(recorded('generated'),7,'adding one job counts only its two sizes, not the existing job');
   await run('removeBatchJob(0)');await run('removeBatchJob(0)');assert.equal(recorded('generated'),7,'automatic regeneration after deletion must not inflate totals');
   assert.equal(run('batchJobs.length'),0);assert.equal(run('generatedOutputs.length'),0);assert.equal(run('zipFile'),null);assert.equal(document.querySelector('#outputCount').textContent,'0');assert.equal(document.querySelector('#jobCount').textContent,0);assert.equal(document.querySelector('#previewStage').role,'button');
+  assert.equal(latestFeedback().phase,'empty','removing the final image restores the shared empty state');
   // Invalid-only uploads leave the editor available for another attempt.
   sandbox.selection=[{name:'broken.png',type:'image/png'},{name:'notes.txt',type:'text/plain'}];await run('batch(selection)');assert.equal(run('batchJobs.length'),0);assert.equal(run('importBusy'),false);
+  assert.equal(latestFeedback().phase,'error','invalid-only imports must not finish as a successful or empty task');
   assert.equal(recorded('generated'),7);assert.equal(recorded('download'),3,'invalid files must not affect either counter');
+  await run('batch([])');
+  assert.equal(latestFeedback().phase,'empty','an empty FileList returns to empty rather than leaving a spinner running');
+  assert.equal(recorded('generated'),7);assert.equal(recorded('download'),3,'cancelled selection must not affect either counter');
   run('exportCanvas=async()=>{throw Error("encode failed")}');await run('batch([{name:"failed.webp",type:"image/webp"}])');run('exportCanvas=originalExport');
+  assert.equal(latestFeedback().phase,'error','a batch encoding failure survives both finally blocks');
+  assert.equal(run('roomFeedbackPhase'),'error');
+  assert.equal(run('exportBusy||importBusy'),false);
+  assert.equal(run('generatedOutputs.length'),0,'a failed full batch keeps the existing no-download recovery behavior');
+  assert.equal(document.querySelector('#exportContent').classList.contains('hidden'),true);
+  assert.equal(document.querySelector('#exportEmpty').classList.contains('hidden'),false);
   assert.equal(recorded('generated'),7,'a failed batch must not count newly queued jobs');
   const zip=run('zipBytes([{name:"same.webp",bytes:new Uint8Array([1,2])},{name:"same.webp",bytes:new Uint8Array([3])},{name:"背景.webp",bytes:new Uint8Array([4])}])');
   const bytes=new Uint8Array(await zip.arrayBuffer());assert.equal(new DataView(bytes.buffer).getUint32(0,true),0x04034b50);
-  console.log('PASS: maximum-quality WebP fast path, full-search byte limit and encoding failures, live FileList, corrupt/unsupported files, per-image and per-size crop isolation, crop failure rollback, no-op count, URL reuse, downloads, empty reset, ZIP, aggregate generation deduplication and download/retry counts.');
+  console.log('PASS: WebP fast path/byte limit, live FileList, loading/processing/success and durable errors, corrupt files, crop rollback, shared thumbnail/reveal hooks, language phase retention, downloads, empty reset, ZIP and generation/download count boundaries.');
 })().catch(error=>{console.error(error);process.exitCode=1});
