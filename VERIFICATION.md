@@ -227,3 +227,7 @@
 - Actual public-site Banner downloads before and after were identical after RGBA decoding for both sizes, including transparency. Detailed sample output grew about 2.3%. Room downloads stayed at 15688 bytes for 720x1560 and 5110 for 300x480; both valid.
 - Room, toolkit, Banner and hub regressions passed; the real lossless helper passed independent round-trip checks at 17x9, 772x200 and 684x240. Optimized assets matched their published SHA-256 bytes. Worker version 07d880c8-ad9b-4055-8319-c95c3623eeb3 is live; backend/schema and D1 records were retained.
 - Reports, actual downloaded files and screenshot: ../live-qa-results/report.md and statistics-final.png. The user's original tabs were preserved.
+
+## 2026-10-23 · 页脚设计规范入口
+
+新增双语页脚资源链接与在线组件规范，PDF、设计变量和本地图标由静态构建发布。项目四组Node回归通过。生产构建预览验证新标签打开、原工具页面保持、PDF实际下载与源文件SHA256相同；1280px桌面页脚49px，320px中英页脚97px、链接触控44px且无横向溢出。规范页面320px图片正常、无整页溢出。此改动不涉及API、数据库或计数逻辑。正式发布结果另见部署回执。

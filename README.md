@@ -137,3 +137,7 @@ node --check hub.js
 ## 作者
 
 庞伟深 · Winsome · Spreadfun
+
+## 设计规范入口
+
+页脚“设计规范 / Design guidelines”在新标签页打开 `design-system/`，保留当前工具会话。在线规范提供21页PDF与设计变量下载；组件交互仅演示，不提交需求或记录生成/下载统计。公开文件由构建脚本显式加入，移动端页脚分行显示。

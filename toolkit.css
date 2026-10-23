@@ -35,16 +35,17 @@ main{padding-top:18px;padding-bottom:40px}
 main[data-tool]{padding-top:32px}
 .site-footer{padding:4px 42px;background:#fff;border-top:1px solid var(--line);color:var(--tool-muted);font-size:12px;line-height:20px}
 .footer-inner{max-width:1356px;min-height:40px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:16px}
-.footer-copyright{white-space:nowrap}
-#footerStatistics{color:var(--tool-muted);text-decoration:none;white-space:nowrap;min-height:36px;display:inline-flex;align-items:center}
-#footerStatistics:hover,#footerStatistics[aria-current="page"]{color:var(--blue)}
-#footerStatistics:focus-visible{outline:2px solid var(--tool-focus);outline-offset:2px;border-radius:4px}
+.footer-copyright{white-space:nowrap;text-align:left}
+.footer-links{display:flex;align-items:center;gap:20px;flex-wrap:wrap;justify-content:center}
+.footer-link{color:var(--tool-muted);text-decoration:none;white-space:nowrap;min-height:36px;display:inline-flex;align-items:center}
+.footer-link:hover,.footer-link[aria-current="page"]{color:var(--blue)}
+.footer-link:focus-visible{outline:2px solid var(--tool-focus);outline-offset:2px;border-radius:4px}
 .footer-author{display:inline-flex;align-items:center;gap:7px;min-height:36px;padding:0 4px;border:0;border-radius:6px;background:transparent;color:var(--tool-muted);font:inherit;white-space:nowrap;cursor:pointer;transition:color .18s ease}
 .footer-author .nav-author-avatar{width:20px;height:20px;flex-basis:20px}
 .footer-author:hover{color:var(--blue)}
 .footer-author:focus-visible{outline:2px solid var(--tool-focus);outline-offset:2px}
 @media(max-width:1100px){.site-footer{padding-inline:24px}}
-@media(max-width:540px){.site-footer{padding-inline:16px}.footer-author,#footerStatistics{min-height:44px}.footer-inner{gap:12px}}
+@media(max-width:540px){.site-footer{padding-inline:16px}.footer-author,.footer-link{min-height:44px}.footer-inner{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:0 12px}.footer-author{grid-column:2;grid-row:1;justify-self:end}.footer-links{grid-column:1/-1;grid-row:2;justify-content:flex-start;gap:24px}}
 .intro{justify-content:flex-start;text-align:left;padding:0;margin-bottom:16px}
 .intro h1,.intro h1:lang(zh-CN){margin:0;font-size:26px;line-height:1.25;font-weight:700;letter-spacing:-.5px}
 .intro.tool-intro{justify-content:flex-start;align-items:center;flex-wrap:wrap;gap:10px 16px}

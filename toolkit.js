@@ -4,7 +4,7 @@
   const $ = selector => document.querySelector(selector);
   const strings = {
     en: {
-      roomNav:'Room backgrounds',roomNavShort:'Room BG',avatarNav:'Avatar frames',avatarNavShort:'Avatar',examplesNav:'Examples',bannerNav:'Banner',navBannerTitle:'Banner maker',homeTitle:'Operations workspace',statisticsTitle:'Usage statistics',homeLink:'Fun Toolkit home',statisticsLink:'Statistics',navLabel:'Tools',roomSubtitle:'Create room backgrounds in two sizes, ready to use.',
+      roomNav:'Room backgrounds',roomNavShort:'Room BG',avatarNav:'Avatar frames',avatarNavShort:'Avatar',examplesNav:'Examples',bannerNav:'Banner',navBannerTitle:'Banner maker',homeTitle:'Operations workspace',statisticsTitle:'Usage statistics',homeLink:'Fun Toolkit home',statisticsLink:'Statistics',designGuidelines:'Design guidelines',designGuidelinesLabel:'Design guidelines (opens in a new tab)',footerResources:'Footer resources',navLabel:'Tools',roomSubtitle:'Create room backgrounds in two sizes, ready to use.',
       avatarTitle:'Avatar frame maker',avatarSubtitle:'Drop an SVGA, find your frame, export a transparent WebP.',animationPreview:'Animation preview',
       noFile:'No file selected',loading:'Loading animation…',playing:'Playing',paused:'Paused',dropSvga:'Click or drop an SVGA file',svgaHint:'Preview the animation and export the exact frame you want.',uploadSvga:'Upload SVGA',replaceSvga:'Replace file',
       play:'Play',pause:'Pause',previousFrame:'Previous frame',nextFrame:'Next frame',frameTimeline:'Frame timeline',scrubHint:'Drag to pause at a frame',currentFrame:'Current frame',localPrivacy:'Processed locally. Your files never leave this device.',
@@ -13,7 +13,7 @@
       typeError:'Choose one .svga file.',sizeError:'This file is too large. Choose an SVGA under 50 MB.',loadError:'Could not read this SVGA. The file may be damaged or unsupported. Try another file.',loadTimeout:'This SVGA took too long to load. Try another file.',unavailable:'The animation player could not load. Refresh the page and try again.',invalidAnimation:'This SVGA has invalid dimensions or no frames.',exportError:'Could not export this frame. Please try again.',saved:'Download requested. Check your browser downloads.',retry:'Download again',frame:'Frame',original:'Original',seconds:'s',fileCount:'Choose one file at a time.',footerAuthor:'Winsome',footerContact:'Contact author: Winsome',navRoomTitle:'Room backgrounds',navAvatarTitle:'Avatar frames'
     },
     zh: {
-      roomNav:'房间背景',roomNavShort:'房间背景',avatarNav:'头像框',avatarNavShort:'头像框',examplesNav:'案例图片',bannerNav:'Banner',navBannerTitle:'Banner 生产工具',homeTitle:'乐趣运营工作台',statisticsTitle:'使用统计',homeLink:'Fun Toolkit 首页',statisticsLink:'使用统计',navLabel:'工具导航',roomSubtitle:'一次上传，生成两种尺寸的房间背景。',
+      roomNav:'房间背景',roomNavShort:'房间背景',avatarNav:'头像框',avatarNavShort:'头像框',examplesNav:'案例图片',bannerNav:'Banner',navBannerTitle:'Banner 生产工具',homeTitle:'乐趣运营工作台',statisticsTitle:'使用统计',homeLink:'Fun Toolkit 首页',statisticsLink:'使用统计',designGuidelines:'设计规范',designGuidelinesLabel:'设计规范（在新标签页打开）',footerResources:'页脚资源',navLabel:'工具导航',roomSubtitle:'一次上传，生成两种尺寸的房间背景。',
       avatarTitle:'头像框生产工具',avatarSubtitle:'拖入 SVGA，停在喜欢的一帧，导出透明 WebP。',animationPreview:'动态预览',
       noFile:'尚未选择文件',loading:'正在读取动画…',playing:'播放中',paused:'已暂停',dropSvga:'点击或拖入 SVGA 文件',svgaHint:'预览动态效果，选中需要的那一帧。',uploadSvga:'上传 SVGA',replaceSvga:'替换文件',
       play:'播放',pause:'暂停',previousFrame:'上一帧',nextFrame:'下一帧',frameTimeline:'帧时间轴',scrubHint:'拖动即可停在指定帧',currentFrame:'当前帧',localPrivacy:'文件仅在本地处理，不会上传至服务器。',

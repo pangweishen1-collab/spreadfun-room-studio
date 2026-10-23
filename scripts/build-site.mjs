@@ -9,12 +9,16 @@ const entries=['index.html','Room BG Studio.html','toolkit.css','toolkit.js','ba
 await rm(target,{recursive:true,force:true});
 await mkdir(target,{recursive:true});
 for(const name of entries)await copyFile(path.join(root,name),path.join(target,name));
-for(const name of ['assets','vendor'])await cp(path.join(root,name),path.join(target,name),{recursive:true,dereference:false});
+for(const name of ['assets','vendor','design-system'])await cp(path.join(root,name),path.join(target,name),{recursive:true,dereference:false});
 await writeFile(path.join(target,'_headers'),`/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Permissions-Policy: camera=(), microphone=(), geolocation=()
+/design-system/
+  Cache-Control: no-cache
+/design-system/index.html
+  Cache-Control: no-cache
 /index.html
   Cache-Control: no-cache
 /
