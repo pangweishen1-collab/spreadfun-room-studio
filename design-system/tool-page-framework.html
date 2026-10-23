@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="description" content="Fun Toolkit 工具页框架：6个页面区域、5种任务状态、3种工具类型与可运行的双语响应式模板。"><title>工具页框架规范 · Fun Toolkit</title><link rel="icon" href="../assets/favicon.png"><link rel="stylesheet" href="design-tokens.css"><link rel="stylesheet" href="motion-patterns.css"><link rel="stylesheet" href="tool-page-framework.css"><script src="focus-modality.js" defer></script><script src="tool-page-framework.js" defer></script></head>
+<body class="ft-ui"><header class="fw-header"><div class="fw-header-inner"><a href="../index.html#home" class="fw-brand"><img src="assets/spreadfun-mark.webp" alt="" width="30" height="30">Fun Toolkit</a><nav class="fw-nav" aria-label="规范导航"><a href="./">基础UI规范</a><a href="tool-page-framework.html" aria-current="page">工具页框架</a><a href="tool-page-starter/index.html" target="_blank" rel="noopener">运行模板 ↗</a></nav></div></header>
+<main class="fw-main"><div class="fw-eyebrow">TOOL PAGE FRAMEWORK · v1.0</div><h1>工具页，先有一套好骨架。</h1><p class="fw-lead">复用已确认的版式、控件和任务状态。新工具从这套框架开始，专注自己的处理能力。</p><div class="fw-actions"><a class="fw-btn ft-motion-sheen" href="tool-page-starter/index.html" target="_blank" rel="noopener">打开可运行模板 ↗</a><a class="fw-btn secondary" href="Fun-Toolkit-Tool-Page-Starter.zip" download>下载基础模板 · ZIP</a><a class="fw-btn secondary" href="tool-page-framework.md" download>下载框架说明 · MD</a></div><p class="fw-note">模板原生HTML / CSS / JS，可双击离线运行；支持中英文、响应式、五种演示状态和本地图片预览。</p><div class="fw-callout">框架示例 ≠ 第四个生产工具。模拟处理不会生成真实文件，也不接入服务器、统计或需求提交。正式接入前替换业务处理与下载逻辑。</div>
+<section class="fw-section" aria-labelledby="anatomy-title"><div class="fw-section-heading"><div><h2 id="anatomy-title">一页六区，位置固定。</h2><p>预览与参数在左，输出在右；手机按任务顺序纵向排列。</p></div><div class="fw-mode" role="group" aria-label="线框图布局"><button type="button" data-framework-view="desktop" aria-pressed="true">桌面示意</button><button type="button" data-framework-view="mobile" aria-pressed="false">手机示意</button></div></div>
+<div class="fw-diagram-wrap"><div class="fw-diagram" id="framework-diagram" role="img" aria-label="工具页六区布局线框图" aria-describedby="diagram-description"><div class="fw-diagram-header"><strong><span class="fw-n">1</span>Fun Toolkit</strong><small>工具导航 · 中 / EN · 作者</small></div><div class="fw-diagram-body"><div class="fw-diagram-title"><strong><span class="fw-n">2</span>工具标题</strong><span class="fw-help-pill">使用说明</span></div><div class="fw-diagram-work"><div class="fw-diagram-preview"><div class="fw-block fw-stage"><strong><span class="fw-n">3</span>输入 / 预览区</strong><i class="fw-placeholder"></i><span>上传 → 预览 → 调整</span></div><div class="fw-block fw-param"><strong><span class="fw-n">4</span>参数与动作</strong><span>尺寸 · 选项 · 控制</span></div></div><div class="fw-block fw-output"><strong><span class="fw-n">5</span>输出区</strong><div class="fw-result">空态 / 任务状态 / 结果</div><i class="fw-placeholder"></i><div class="fw-faux-button">生成 / 导出 / 下载</div></div></div></div><div class="fw-diagram-footer"><span class="fw-n">6</span>页脚 · 统计 · 设计规范 · 作者</div></div><p class="fw-note" id="diagram-description">桌面顺序：全站外壳 → 标题 → 左预览与参数 / 右输出 → 页脚。示意图不是实际像素稿。</p><div class="fw-legend"><div><strong><span class="fw-n">1</span>全站外壳</strong><p>品牌、导航、语言与作者共用。</p></div><div><strong><span class="fw-n">2</span>标题区</strong><p>一个左对齐标题，帮助入口紧邻。</p></div><div><strong><span class="fw-n">3</span>工作区</strong><p>上传空态与载入后预览共用位置。</p></div><div><strong><span class="fw-n">4</span>参数区</strong><p>可选字段；无参数就省略。</p></div><div><strong><span class="fw-n">5</span>输出区</strong><p>状态、结果和最重要的主动作。</p></div><div><strong><span class="fw-n">6</span>页脚</strong><p>文档流排布，不悬浮挡住内容。</p></div></div></div></section>
+<nav class="fw-quicklinks" aria-label="框架章节"><a href="#framework-start">结构模块</a><a href="#framework-layout">尺寸与断点</a><a href="#framework-states">五种状态</a><a href="#framework-variants">三种类型</a><a href="#framework-contract">业务契约</a><a href="#framework-interaction">交互基线</a><a href="#framework-checklist">接入清单</a><a href="#prompt-title">复制要求</a></nav>
+<article class="framework-content"><!-- Content fragment only. Uses the design-system catalogue's semantic panels and tables. -->
+<section class="section framework-section" id="framework-start" aria-labelledby="framework-start-title">
+  <div class="section-title"><div><div class="section-number">01 / START WITH THE WORKBENCH</div><h2 id="framework-start-title">一套框架，按任务组合</h2><p class="section-description">先复用结构与状态，再接处理逻辑。统一流程：选择素材 → 预览与调整 → 生成 → 下载；自动处理工具可省去手动生成。</p></div></div>
+  <p class="annotation">六区是六种职责，不是六张卡。基础工具只需左侧工作卡与右侧输出卡；一两个参数放在相关内容旁边，不另开侧栏。</p>
+  <div class="table-wrap"><table class="spec-table"><thead><tr><th scope="col">六区</th><th scope="col">必选内容</th><th scope="col">按需模块</th></tr></thead><tbody>
+    <tr><th scope="row">① 全站页头</th><td>Logo 回首页、当前导航、中英切换、作者</td><td>更多工具入口</td></tr>
+    <tr><th scope="row">② 标题与帮助</th><td>一个左对齐 H1，简短工具名</td><td>灰色使用说明 / 案例按钮，详情放弹窗</td></tr>
+    <tr><th scope="row">③ 预览与输入</th><td>上传、格式约束、空态、预览、替换</td><td>拖放、批量队列、透明底与背景切换</td></tr>
+    <tr><th scope="row">④ 参数与动作</th><td>任务状态；只保留真正需要用户决定的参数</td><td>尺寸、质量、裁切、播放、时间轴、生成、进度</td></tr>
+    <tr><th scope="row">⑤ 输出结果</th><td>首次空态、有效结果、真实尺寸、下载</td><td>缩略图、体积、多规格列表、ZIP</td></tr>
+    <tr><th scope="row">⑥ 全站页脚</th><td>版权、统计、设计规范、作者</td><td>确认后的资源链接</td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="section framework-section" id="framework-layout" aria-labelledby="framework-layout-title">
+  <div class="section-title"><div><div class="section-number">02 / LAYOUT & RESPONSIVE</div><h2 id="framework-layout-title">桌面留空间，手机顺着做</h2><p class="section-description">7:3 是桌面目标比例；输出栏的最小宽度和窄屏可用性优先。</p></div></div>
+  <div class="grid-3">
+    <div class="panel"><h3>&gt; 900 px · 双栏</h3><ul class="rule-list"><li>容器最大 1440 px，默认左右各 42 px；901–1100 px 紧凑桌面为 24 px。</li><li>7:3 工作台，右栏至少 300 px；间距 16 px。</li><li>1440 px 下内容宽 1356 px，双栏约 938 / 402 px。</li></ul></div>
+    <div class="panel"><h3>541–900 px · 单列</h3><ul class="rule-list"><li>左右 24 px。</li><li>先预览与参数，再输出。</li><li>默认自然页面滚动，不强行压窄双栏。</li></ul></div>
+    <div class="panel"><h3>320–540 px · 手机</h3><ul class="rule-list"><li>左右 16 px；卡片内边距 16 px、卡片间距 14 px。</li><li>页头两行；操作命中区 ≥44×44 px。</li><li>输入内容 ≥16 px；页面无横向滚动。</li></ul></div>
+  </div>
+  <div class="table-wrap"><table class="spec-table"><thead><tr><th scope="col">模块</th><th scope="col">统一规则</th></tr></thead><tbody>
+    <tr><th scope="row">标题与卡片</th><td>H1 桌面 26/32、手机 22/28 px；标题到工作台桌面 16 / 手机 14 px。外卡桌面圆角 22、内边距 24 px；手机圆角 18 px。</td></tr>
+    <tr><th scope="row">预览高度</th><td>新模板桌面空态默认 440 px，541–900 px 为 400 px；手机可用 clamp(280px, 48svh, 360px)。载入后按内容适应，不把图片比例强制变成整张工作卡高度。</td></tr>
+    <tr><th scope="row">长内容</th><td>文件名换行或展开；英文动作不截断。需要横滑的表格与时间轴仅在自身区域滚动。</td></tr>
+    <tr><th scope="row">滚动与键盘</th><td>默认不吸附输出栏，不给两栏同时设固定满屏高度。手机键盘和弹窗出现后，关键动作仍可到达。</td></tr>
+  </tbody></table></div>
+  <p class="annotation">当前差异：头像框 / Banner 桌面空预览 440 px，房间背景保留 590 px 长画布例外。旧卡片内边距 23 / 19 / 18 px，新增模板统一 24 px；手机均用 16 px。不要复制旧隐藏 .sources 来源侧栏。</p>
+</section>
+
+<section class="section framework-section" id="framework-states" aria-labelledby="framework-states-title">
+  <div class="section-title"><div><div class="section-number">03 / FIVE REQUIRED STATES</div><h2 id="framework-states-title">五个状态，先搭齐再接业务</h2><p class="section-description">状态占用稳定区域；重要反馈留在页面上。下面是新工具标准，不代表现有工具已经具备全部恢复能力。</p></div></div>
+  <div class="table-wrap"><table class="spec-table"><thead><tr><th scope="col">状态</th><th scope="col">界面与动作</th><th scope="col">文案示例</th></tr></thead><tbody>
+    <tr><th scope="row">idle · 上传前</th><td>上传入口、支持格式、空结果；导出禁用并说明条件。</td><td>点击或拖入图片<br>上传素材后可生成文件</td></tr>
+    <tr><th scope="row">ready · 已载入</th><td>预览、文件名、替换、参数；手动生成或明确转入自动处理。</td><td>已载入，可以调整后生成</td></tr>
+    <tr><th scope="row">processing · 处理中</th><td>保留素材，锁定会改变当前任务的操作；按钮保宽防重；只显示真实进度。</td><td>正在读取… / 正在生成… / 正在打包…</td></tr>
+    <tr><th scope="row">success · 成功</th><td>结果可检查；展示规格与下载，保留再次调整入口。</td><td>已生成 2 个文件<br>下载全部 · ZIP</td></tr>
+    <tr><th scope="row">error · 错误</th><td>保留输入，在失败位置解释原因并给出恢复操作。</td><td>文件读取失败，请替换文件或重试</td></tr>
+  </tbody></table></div>
+  <p class="annotation">读取、校验、编码、下载失败分别反馈；“已发起下载”不能写“已保存成功”。批量部分成功、单项重试、取消与保留旧结果需要实际实现，模板不能仅显示一个可点击入口。</p>
+</section>
+
+<section class="section framework-section" id="framework-variants" aria-labelledby="framework-variants-title">
+  <div class="section-title"><div><div class="section-number">04 / THREE TOOL VARIANTS</div><h2 id="framework-variants-title">选一种变体，删掉多余模块</h2><p class="section-description">差异只在业务模块。页头、标题、卡片、反馈与输出继续使用同一套语言。</p></div></div>
+  <div class="grid-3">
+    <article class="panel"><span class="chip">单文件 → 多规格</span><h3>Banner</h3><p>一处上传，工作卡内展示多个预览；右侧按规格列结果，提供单个下载与 ZIP。</p><ul class="rule-list"><li>上传后自动生成。</li><li>房间 772×200；游戏 684×240，内图 645×201。</li><li>黑色 / 透明只切换预览，导出仍透明。</li></ul></article>
+    <article class="panel"><span class="chip">多文件 → 批量结果</span><h3>房间背景</h3><p>左侧批量预览；裁切、错误定位到具体文件；右侧按源文件与规格组织输出。</p><ul class="rule-list"><li>720×1560 与 300×480。</li><li>不同规格有独立裁切位置。</li><li>预览 UI 图层不混入背景导出。</li></ul></article>
+    <article class="panel"><span class="chip">动画 → 选帧导出</span><h3>头像框</h3><p>预览下方放播放、前后帧、时间轴；右侧放选定帧、尺寸与导出。</p><ul class="rule-list"><li>载入停在第 1 帧，点击播放才播放。</li><li>默认 240×240，1:1 锁定；16–2048 整数。</li><li>输出静态透明 WebP。</li></ul></article>
+  </div>
+  <p class="annotation">单文件不硬塞批量操作；动画不自动播放；没有真实质量调节能力时，不展示无效质量滑杆。未来文字 / 表单工具采用左输入、右结果，移除上传与画布槽，不造空画布填位置。</p>
+</section>
+
+<section class="section framework-section" id="framework-contract" aria-labelledby="framework-contract-title">
+  <div class="section-title"><div><div class="section-number">05 / STATE & INTEGRATION CONTRACT</div><h2 id="framework-contract-title">让页面可复用，也让结果可信</h2><p class="section-description">结构由模板复用，业务由工具实现。内部标识稳定，显示名称可以中英切换。</p></div></div>
+  <div class="grid-2">
+    <div class="panel"><h3>状态持有</h3><ul class="rule-list"><li>语言、视口、预览背景不改变导出内容，保留素材、参数与帧位置。</li><li>源文件、处理参数、选定帧改变时，旧结果应标记失效；新结果成功后再释放旧资源。</li><li>任务版本拦截过期回调，旧文件不能覆盖新文件。</li><li>切工具或刷新后的恢复能力需单独定义；不要承诺刷新后恢复内存文件。</li></ul></div>
+    <div class="panel"><h3>真实能力边界</h3><ul class="rule-list"><li>模板不自动提供编码、SVGA 解码、上传服务、取消、持久化或共享统计。</li><li>失败不计生成；ZIP 不重复计生成；下载计有效发起操作。</li><li>当前统计只登记 room / avatar / banner；新工具需补前后端登记。</li><li>文件类型、字节、像素、数量限制按工具明确并真实校验。</li></ul></div>
+  </div>
+  <div class="table-wrap"><table class="spec-table"><thead><tr><th scope="col">契约</th><th scope="col">要求</th></tr></thead><tbody>
+    <tr><th scope="row">工具标识与路由</th><td>当前 data-tool 为 room / avatar / banner；地址为 #room-backgrounds / #avatar-frames / #banners。新工具使用稳定英文小写标识与可读短横线路由。</td></tr>
+    <tr><th scope="row">结构与字段</th><td>旧页沿用 .workspace / .preview / .exports；新模板隔离样式，按职责插槽接入，不要求旧页重命名。字段 ID 带工具前缀，label for 对应唯一 ID。</td></tr>
+    <tr><th scope="row">状态与输出</th><td>建议 data-state=&quot;idle|ready|processing|success|error&quot;；输出记录持有源文件、规格、尺寸、格式、体积、文件名、下载地址和任务版本。</td></tr>
+    <tr><th scope="row">双语</th><td>文案按工具分组；标题、参数、错误、空态、辅助说明、ARIA 名称一起翻译。文件名、px、格式与尺寸不翻译。</td></tr>
+  </tbody></table></div>
+  <p class="annotation">旧结果失效、部分成功保留与任务版本是新增接入目标；现有三工具仍有差异。Banner 的 30 MiB / 4000 万像素上限不代表全站限制。当前没有自动注册 API，首页、hash、词条、导航与计数需要明确接入。</p>
+  <p class="annotation">独立 Starter 用于复制页面骨架，不是第 4 个生产工具；状态控制器属于示例，不发起真实生成或统计。</p><p class="annotation">模板实际使用<code>empty / ready / processing / success / error</code>，empty对应这里的idle。入口为<code>ToolPageDemo.setState()</code>；结构以<code>data-slot</code>标记。替换<code>tool-page.js</code>中的<code>simulateGeneration()</code>与<code>previewFile()</code>接入业务，完整插槽清单见模板README。</p>
+</section>
+
+<section class="section framework-section" id="framework-interaction" aria-labelledby="framework-interaction-title">
+  <div class="section-title"><div><div class="section-number">06 / INTERACTION BASELINE</div><h2 id="framework-interaction-title">同样的动作，同样的反馈</h2><p class="section-description">沿用主规范的控件和动效参数，不在每个新工具里重新设计一套。</p></div></div>
+  <div class="panel"><ul class="rule-list"><li>主动作蓝底白字，普通 hover 保持蓝调；替换用绿色，删除用危险色。每个区域只突出当前阶段最重要的动作。</li><li>鼠标输入焦点为 1 px 细蓝边和极淡光晕；键盘为 2 px 外环；错误边框不能被 hover 覆盖。</li><li>主按钮复用轻扫光；禁用与处理中停用，只对精确指针 hover 触发，触屏不残留、不循环。</li><li>帮助弹窗沿用轻弹性与玻璃遮罩；明确关闭按钮、Escape、焦点进入与返回；支持减少动画。</li><li>导航用链接、操作用按钮、字段有标签；状态用 role=status / aria-live=polite。避免上传区与内部按钮相互重复触发。</li><li>手机保持纵向滚动，操作区至少 44 px；200% 缩放与长英文仍能完成流程。</li></ul></div>
+</section>
+
+<section class="section framework-section" id="framework-checklist" aria-labelledby="framework-checklist-title">
+  <div class="section-title"><div><div class="section-number">07 / BUILD & VERIFY</div><h2 id="framework-checklist-title">新工具接入清单</h2><p class="section-description">模板节省页面搭建时间，验收仍以真实文件与真实任务为准。</p></div></div>
+  <div class="panel"><ol class="rule-list"><li>选择单文件 / 批量 / 动画变体，删除不用的模块。</li><li>确认输入限制、自动或手动流程、默认参数、输出规格、压缩与命名。</li><li>复用全站壳、标题与两张工作卡；补帮助、导航选中与首页入口。</li><li>接真实读取、校验、处理、编码和下载；不把模拟计时器当作正式成功。</li><li>补五态、替换、校验、失败恢复、旧结果失效与并发任务规则。</li><li>补中英、标签、键盘、弹窗焦点和减少动画。</li><li>验证 1440 / 1024 / 900 / 768 / 390 / 320 px、长英文和 200% 缩放。</li><li>用真实素材核对尺寸、透明度、画质、命名、单个 / 批量下载；统计在真实成功后接入。</li></ol></div>
+</section>
+
+
+</article>
+<section class="fw-section" aria-labelledby="prompt-title"><div class="fw-section-heading"><div><h2 id="prompt-title">复制这段，开始下一个工具。</h2><p>把方括号里的内容换成业务要求，再交给开发或AI。</p></div></div><label for="framework-prompt" class="fw-note">工具页搭建要求</label><textarea id="framework-prompt" class="fw-prompt" readonly>基于 Fun Toolkit 工具页框架搭建「[工具名称]」。先复用下载包的全站外壳、标题帮助、输入预览、参数、输出和页脚结构，保持现有蓝调UI，不重新设计一套风格。
+类型：[单图处理 / 批量处理 / 动画帧处理]；输入：[文件格式、体积/数量限制]；参数：[默认值、范围、必选/选填]；输出：[尺寸、格式、透明度、文件命名]。
+桌面使用7:3工作台、输出栏最小300px；900px及以下单栏，手机保留完整输出区、16px边距、44px触控目标和16px输入字号。
+实现未选择、已载入、处理中、成功、失败五态，提供清楚错误和重试方式，保留有效输入；支持中英文、键盘、玻璃帮助弹窗和减少动画。生成/导出主动作按真实状态启用；不循环扫光。
+示例状态控制器只用于开发预览。接入真实处理、预览和下载后再显示成功，不把模拟按钮当成已完成业务，也不假报统计。最后检查桌面、375px和320px、中英文、错误恢复与真实输出文件。</textarea><div class="fw-copy-row"><button class="fw-btn" type="button" id="copy-framework-prompt">复制搭建要求</button><p id="copy-framework-status" role="status" aria-live="polite"></p></div></section>
+<footer class="fw-footer"><span>© 2026 Fun Toolkit · 工具页框架 v1.0</span><a href="./#tool-framework">返回组件规范</a></footer></main></body></html>
