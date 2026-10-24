@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {createHash} = require('node:crypto');
 const html = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const code = html.match(/<script>([\s\S]*?)<\/script>/)[1];
 const elements = new Map(), urls = new Map(), stats = new Map();
@@ -162,7 +163,14 @@ const run = source => vm.runInContext(source,sandbox);
   assert.deepEqual(Array.from(run('generatedOutputs.map(file=>file.job.image.id)')),[0,0,1,1,2,2],'output order follows upload order, not completion order');
   assert.deepEqual(Array.from(run('generatedOutputs.map(file=>file.name)')),['Bg01.webp','Bg01-s.webp','Bg02.webp','Bg02-s.webp','Bg03.webp','Bg03-s.webp']);
   assert.equal(recorded('generated'),13);assert.equal(run('readLifetimeImages()'),13,'first successful commit counts cached partial work too');run('exportCanvas=originalExport');
-  const zip=run('zipBytes([{name:"same.webp",bytes:new Uint8Array([1,2])},{name:"same.webp",bytes:new Uint8Array([3])},{name:"背景.webp",bytes:new Uint8Array([4])}])');
+  const zip=run('zipBytes([{name:"same.webp",bytes:new Uint8Array([1,2])},{name:"same.webp",bytes:new Uint8Array([3])},{name:"背景.webp",bytes:new Uint8Array([4])},{name:"empty.webp",bytes:new Uint8Array()},{name:"../bad:name.webp",bytes:Uint8Array.from({length:256},(_,i)=>i)},{name:"SAME.webp",bytes:new TextEncoder().encode("123456789")}])');
   const bytes=new Uint8Array(await zip.arrayBuffer());assert.equal(new DataView(bytes.buffer).getUint32(0,true),0x04034b50);
+  // Golden hash captured from the original bit-at-a-time serializer. It covers
+  // empty/binary payloads, Unicode, sanitized names and case-insensitive clashes.
+  assert.equal(createHash('sha256').update(bytes).digest('hex'),'0b1c0d0440792e77ec23b699e29bae8d7136973b5ca13159429db49713cadf0c','the faster CRC must leave every ZIP byte unchanged');
+  const crcVector=new Uint8Array(await run('zipBytes([{name:"vector.webp",bytes:new TextEncoder().encode("123456789")}])').arrayBuffer());
+  assert.equal(new DataView(crcVector.buffer).getUint32(14,true),0xcbf43926,'CRC32 must match the standard 123456789 check vector');
+  const emptyVector=new Uint8Array(await run('zipBytes([{name:"empty.webp",bytes:new Uint8Array()}])').arrayBuffer());
+  assert.equal(new DataView(emptyVector.buffer).getUint32(14,true),0,'an empty payload has CRC32 zero');
   console.log('PASS: bounded parallel workers/drain on failure, ordered commits and retry counts, unchanged-output/crop cache reuse, WebP fast path/byte limit, live FileList, loading/processing/success and durable errors, corrupt files, crop rollback, shared thumbnail/reveal hooks, language phase retention, downloads, empty reset, ZIP and generation/download count boundaries.');
 })().catch(error=>{console.error(error);process.exitCode=1});

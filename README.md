@@ -130,6 +130,16 @@ node --check hub.js
 
 2026-10-24：房间队列最多同时编码两张图，保留上传顺序；追加/删除复用未修改的两尺寸结果，修改裁切仅失效对应尺寸。失败时等待所有在途编码结束再解锁，首次成功提交后才累计统计。头像框复用已暂停的当前帧，尺寸和素材变化会重新绘制。Banner 并行准备图片/外框/编码器，并使用更快的无损搜索；解码像素与原版一致，测试样例体积增加约 4%–5%。本地三轮中位数：复杂双图 1775→936ms，追加第二张 1711→871ms，头像框导出 17→13ms，Banner 246→135ms。单张房间图原有质量搜索保持不变；实际耗时取决于设备和素材。
 
+## 资源库（本地开发版）
+
+主导航 Banner 后新增“资源库 / Assets”，直接入口为 `#resources`。内置用户提供的 Yari、Hapi、中东 Hapi、4Fun、Maza、Hapi Ludo 六个项目 Logo，保留原图背景。
+
+默认 512×512，提供 128 / 256 / 512 / 1024 快捷尺寸，也可输入 16–4096 的整数；宽高始终 1:1 联动。可选择 PNG、JPG、WebP；PNG / WebP 保留透明通道，JPG 的透明区域填白。原图不足目标尺寸时提示放大可能变模糊。
+
+展示使用轻量 WebP 预览；导出按需读取合适规格，复用原有异步 Canvas 编码器，避免对大尺寸 Logo 使用同步主线程 WASM 压缩。更改项目、尺寸、格式会失效旧回执，语言和工具切换保留选择；忙碌时防重，错误可重试。
+
+`resource-library.css/js` 管理此页面，素材位于 `assets/resources/`。`node tests/resources.cjs` 覆盖业务状态、并发与格式；浏览器已实际核验五项目三格式以及 4096px 导出。资源库暂不接入共享计数，避免将素材下载误记到原有三个工具。此节不表示已发布到正式站。
+
 ## 第三方库
 
 - [SVGAPlayer-Web 2.3.2](https://github.com/svga/SVGAPlayer-Web)：Apache-2.0，许可见 `vendor/SVGA-LICENSE`。本地副本 SHA-256：`b04d24d3a41a7a602d5ab6f917e9c0453f23709fdd08069d37e5ae41265fcbf9`。
@@ -162,9 +172,9 @@ node --check hub.js
 生产页显式复用design-system/assets/feedback图形与feedback-motion.css/js；tool-feedback.css/js只负责空态、占位、busy提示与160ms纯透明度入场，不改变文件、Canvas、坐标、编码、下载或计数。忙碌提示120ms淡出，循环离屏/后台暂停，减少动画即时反馈；手机插图96×72、触控44px。原工具持有阶段，实际新预览/结果或工具切换才淡入，逐帧、语言与背景切换不反复入场。新共享适配检查：node tests/tool-feedback.cjs。
 
 
-## 团队 UI Skill · v1.0.1
+## 团队 UI Skill · v1.0.2
 
-规范页第17节提供完整 [团队Skill](https://fun-toolkit.pangweishen1.workers.dev/design-system/#team-skill)，源码在 `skills/fun-toolkit-ui/`，发布ZIP位于 `design-system/downloads/fun-toolkit-ui-1.0.1.zip`。包含资源规范1.4.1、可运行模板、最新空态和动效、表单与业务接入规则、团队安装与AGENTS片段、复制/完整性脚本及一次独立Agent真实试做案例。ZIP内容须解压到名为fun-toolkit-ui的目录，不能只保存SKILL.md。
+规范页第17节提供完整 [团队Skill](https://fun-toolkit.pages.dev/design-system/#team-skill)，源码在 `skills/fun-toolkit-ui/`，发布ZIP位于 `design-system/downloads/fun-toolkit-ui-1.0.2.zip`。包含资源规范1.4.2、可运行模板、最新空态和动效、表单与业务接入规则、团队安装与AGENTS片段、复制/完整性脚本及一次独立Agent真实试做案例。ZIP内容须解压到名为fun-toolkit-ui的目录，不能只保存SKILL.md。
 
 包内演示不产生真实文件或统计；新工具必须接真实业务。独立试做已验证512×512 WebP下载与中英手机布局，团队真人试用与其他Agent安装兼容仍未认证，治理标记pilot。具体边界见随包references/validation.md，发布摘要见ZIP同名.sha256文件。
 
@@ -185,3 +195,33 @@ Pages 与原站绑定同一个 `fun-toolkit-production` D1 数据库，无需迁
 `npm run deploy` 或 `npm run deploy:pages` 默认发布正式 Pages 项目 `fun-toolkit`；`npm run deploy:pages:test` 单独发布测试项目。旧 Workers 的发布方式保留为 `npm run deploy:worker`，不再作为默认发布入口。
 
 正式站、测试站与旧 Workers 继续使用同一个 D1 统计库；本次晋级不改业务代码、不执行数据库迁移、不清零计数。正式静态资源和 API Worker 与刚完成真实上传、生成、下载验收的测试构建逐字节一致。
+
+### 商店图标预设
+
+资源库提供 iOS App Store（1024 × 1024、RGB PNG，无 Alpha）和 Google Play（512 × 512、RGBA PNG、sRGB、最大 1024 KB）预设，固定平台尺寸与 PNG；切回自定义可恢复原有尺寸和格式。按用途选择后逐个平台下载。iOS 透明区域填白，两种文件均保持完整正方形，不增加圆角或外部阴影。
+
+这是平面商店图标输出，不生成 Android Adaptive 前景/背景或 Apple Icon Composer 工程。小于 1024px 的原图导出 iOS 时会放大并提示。平台预设使用原生 CompressionStream 无损 PNG 编码，缺少该能力会明确提示，不降级生成错误通道文件。
+
+规范来源：[Apple Xcode](https://developer.apple.com/documentation/xcode/configuring-your-app-icon)、[Apple App icons](https://developer.apple.com/design/human-interface-guidelines/app-icons)、[Google Play](https://developer.android.com/distribute/google-play/resources/icon-design-specifications)。核验日期：2026-10-24。随网站 1.1.0 纳入发布。
+
+### 直角与自定义圆角
+
+资源库默认以 0% 直角预览和导出。自定义尺寸提供 0–50% 圆角滑杆与整数输入框，圆角按输出边长等比计算；50% 为圆形。PNG/WebP 裁切区域外透明，JPG 填白，预览同步显示。参数变化使旧下载失效，切换项目/语言保留设置；商店预设强制输出直角，切回自定义恢复原圆角。
+
+### 主导航交互
+
+主导航选中态保留蓝色加粗，不显示下划线；精细指针 Hover 使用蓝色柔光与最多1px轻微上浮，触屏保留按下反馈，减少动态效果时不位移。
+
+### 输出速度复验（本地 · 2026-10-24）
+
+本地预览：http://127.0.0.1:8792/#room-backgrounds 。以下为本机性能测量，相关修改随网站 1.1.0 纳入发布。
+
+- Banner 保留完全无损、exact alpha 与 method 1，将无损编码搜索力度降至 0；此参数只影响搜索耗时和文件体积，不降低像素质量。同素材三次生成中位数 146.7 → 84.2ms；实际下载的两张 WebP 解码 RGBA 与原版完全相同，样例文件增加约 3.8%–4.7%。
+- 房间 ZIP 使用 CRC32 查表，文件内容和 ZIP 字节保持一致。40 个真实 WebP 的独立打包 CPU 基准中位数 140.0 → 29.2ms；不等于整批图片生成提速 79%。
+- 资源库同项目、用途、尺寸、格式与圆角的再次下载复用当前 Blob，不新增多份缓存。2048px WebP 重复三次下载处理的中位数 212.5 → 2.1ms；首次导出未改变。参数变化后重新生成，语言切换保留有效文件。
+
+已在本地生产构建完成 18 次真实下载，覆盖三工具、六个项目 Logo、PNG/JPG/WebP、iOS/Android 预设与圆角；375px 中英窄屏和 1280px 桌面布局已检查。独立本地 D1 按预期新增生成 8、下载 6；资源库不混入原三工具计数。头像框首帧暂停、指定帧、尺寸锁定与损坏文件后重试通过，原画质设置不变。完整证据在项目工作区 `outputs/local-speed-verification/`，性能数字仅代表本机样例。
+
+### 资源库默认状态 · 1.1.0
+
+首次打开或刷新资源库，默认 PNG、0% 圆角；自定义选项支持调整圆角并实时预览。页面切换保留当前调整，刷新恢复默认。资源库标题仅保留“资源库”，中英文均不显示标题下说明，与其他工具页保持一致。

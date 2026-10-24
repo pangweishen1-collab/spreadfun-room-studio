@@ -57,7 +57,7 @@ function toolRoot(){
   return {root,stage,message,status,art,outputArt,empty,result,canvas,fileInput};
 }
 
-const tools={room:toolRoot(),avatar:toolRoot(),banner:toolRoot()};
+const tools={room:toolRoot(),avatar:toolRoot(),banner:toolRoot(),resource:toolRoot()};
 const documentListeners=new Map(),motionListeners=new Map();
 const document={hidden:false,documentElement:{lang:'en'},getElementById:id=>tools[id.replace('Tool','')]?.root||null,addEventListener(type,handler){documentListeners.set(type,handler)}};
 const reduced={matches:false,addEventListener(type,handler){motionListeners.set(type,handler)}};
@@ -70,6 +70,7 @@ const api=sandbox.window.FunToolkitUI;
 (async()=>{
   assert.deepEqual(Object.keys(api).sort(),['activate','prepareImages','reveal','setState']);
   for(const tool of Object.values(tools))assert.equal(tool.root.dataset.feedbackPhase,'empty');
+  api.setState('resources',{phase:'loading',message:'Loading logo…'});assert.equal(tools.resource.root.dataset.feedbackPhase,'loading');assert.equal(tools.resource.stage.getAttribute('aria-busy'),'true');api.setState('resources',{phase:'ready'});
   const room=tools.room;
   const beforeFiles=room.fileInput.files,beforeResult=room.result.textContent;
   const beforeCanvas=[room.canvas.width,room.canvas.height,room.canvas.pixels];

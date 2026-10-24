@@ -5,15 +5,13 @@
 .topbar .brand{gap:8px;font-size:15px;line-height:20px;letter-spacing:-.25px;white-space:nowrap}
 .topbar a.brand{text-decoration:none;color:inherit;border-radius:6px}
 .topbar a.brand:focus-visible{outline:2px solid var(--tool-focus);outline-offset:4px}
-.topbar .mark{width:30px;height:30px;border-radius:0;flex:0 0 30px;overflow:visible;box-shadow:none}
+.topbar .mark{width:40px;height:40px;border-radius:0;flex:0 0 40px;overflow:visible;box-shadow:none}
 .topbar .mark img{object-fit:contain}
 .topbar .brand-copy{display:block;white-space:nowrap;padding:0;border:0}
 .brand-name{color:#111;font-size:16px;line-height:20px;font-weight:750;letter-spacing:-.35px;white-space:nowrap}
 .tool-navigation{display:flex;align-items:center;gap:24px;margin-right:auto;padding:0;background:none;border-radius:0}
 .tool-navigation a,.topbar .top-actions>.tiny,.topbar .language-switch button{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:36px;border:0;border-radius:0;background:transparent;box-shadow:none;color:#626c7c;text-decoration:none;font-size:var(--toolbar-font-size);line-height:22px;font-weight:600;white-space:nowrap;cursor:pointer;transition:color .18s ease}
 .tool-navigation a{padding:7px 0;font-weight:400}.tool-navigation a[aria-current="page"]{font-weight:700}
-.tool-navigation a::after{content:"";position:absolute;left:50%;bottom:1px;width:20px;height:2px;border-radius:999px;background:currentColor;pointer-events:none;opacity:0;transform:translateX(-50%) scaleX(.6);transition:opacity .18s ease,transform .18s ease}
-.tool-navigation a[aria-current="page"]::after{opacity:1;transform:translateX(-50%) scaleX(1)}
 .nav-label-short{display:none}
 .topbar .top-actions>.tiny::after{content:"";position:absolute;left:0;right:0;bottom:1px;height:2px;background:var(--blue);transform:scaleX(0);transform-origin:left;transition:transform .2s cubic-bezier(.2,.65,.3,1)}
 .tool-navigation a:hover,.tool-navigation a:focus-visible,.tool-navigation a[aria-current="page"],.topbar .top-actions>.tiny:hover,.topbar .language-switch button:hover,.topbar .language-switch button.active{background:transparent;color:var(--blue);box-shadow:none}
@@ -118,7 +116,7 @@ main[data-tool]{padding-top:32px}
   #contactButtonText{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
   .topbar .top-actions #contactButton::after{display:none}
   .topbar .top-actions #examplesButton{display:none}
-  .topbar .tool-navigation{grid-row:2;grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .topbar .tool-navigation{grid-row:2;grid-column:1/-1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
   .tool-navigation a{min-height:44px;padding:10px 0}
   .nav-label-full{display:none}.nav-label-short{display:inline}
   .intro h1,.intro h1:lang(zh-CN){font-size:22px}
@@ -250,3 +248,14 @@ html:not([data-input-modality=pointer]) .dimension-input:has(input:focus-visible
 
 button.ft-motion-sheen:is(:disabled,[aria-busy=true]){background:#edf0f4;color:#647083;border-color:#d8dce2;opacity:1;transform:none;box-shadow:none;filter:none;cursor:not-allowed}
 button.ft-motion-sheen[aria-busy=true]{cursor:progress}
+
+/* Text navigation: color and a soft blue glow, with no underline. */
+.tool-navigation a{isolation:isolate;transition:color 180ms ease,text-shadow 180ms ease,transform 180ms ease}
+.tool-navigation a::before{content:"";position:absolute;inset:4px -10px;z-index:-1;border-radius:50%;background:radial-gradient(ellipse,#0071e329 0%,#0071e300 74%);opacity:0;transform:scale(.9);pointer-events:none;transition:opacity 180ms ease,transform 180ms ease}
+@media(hover:hover) and (pointer:fine){
+ .tool-navigation a:hover{color:#0062cc;text-shadow:0 1px 12px #0071e32b;transform:translateY(-1px)}
+ .tool-navigation a:hover::before{opacity:1;transform:scale(1)}
+ .tool-navigation a:active{transform:translateY(0)}
+}
+@media(hover:none){.tool-navigation a:active{color:#0055b3}.tool-navigation a:active::before{opacity:1;transform:none}}
+@media(prefers-reduced-motion:reduce){.tool-navigation a,.tool-navigation a::before{transition:none;transform:none}.tool-navigation a:hover,.tool-navigation a:hover::before{transform:none}}

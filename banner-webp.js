@@ -13,9 +13,9 @@ async function canvasToLosslessWebP(canvas){
   const codec=await prepareBannerWebP();
   const pixels=canvas.getContext('2d').getImageData(0,0,canvas.width,canvas.height);
   const encoded=codec.encoder.encode(pixels.data,canvas.width,canvas.height,{
-    // In lossless mode, quality controls compression search effort, not pixel
-    // fidelity. This faster search retains every RGBA byte, including alpha.
-    ...codec.options,lossless:1,near_lossless:100,quality:75,method:1,exact:1,alpha_quality:100
+    // In lossless mode, quality controls search effort, not pixel fidelity.
+    // Use the lightest search while retaining every RGBA byte, including alpha.
+    ...codec.options,lossless:1,near_lossless:100,quality:0,method:1,exact:1,alpha_quality:100
   });
   if(!encoded)throw new Error('exportError');
   return new Blob([encoded],{type:'image/webp'});

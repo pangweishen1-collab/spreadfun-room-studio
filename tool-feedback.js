@@ -1,7 +1,7 @@
 /* Shared presentation only. Tool code owns files, canvases, task state and counters. */
 (() => {
   'use strict';
-  const roots = {room:document.getElementById('roomTool'),avatar:document.getElementById('avatarTool'),banner:document.getElementById('bannerTool')};
+  const roots = {room:document.getElementById('roomTool'),avatar:document.getElementById('avatarTool'),banner:document.getElementById('bannerTool'),resources:document.getElementById('resourceTool')};
   const phases = new Set(['empty','loading','ready','processing','success','error']);
   const records = new Map();
   const animations = new Map();

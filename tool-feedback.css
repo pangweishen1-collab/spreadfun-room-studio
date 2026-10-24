@@ -1,4 +1,4 @@
-/* One feedback vocabulary for the three production tools. No export pixels change. */
+/* Shared feedback for the production tools and resource library. No export pixels change. */
 .tool-empty-art{display:block;width:120px;height:90px;object-fit:contain;margin:0 auto 12px;pointer-events:none}
 :is(#roomTool,#avatarTool,#bannerTool) .upload-empty{max-width:100%;padding:24px 16px;text-align:center}
 :is(#roomTool,#avatarTool,#bannerTool) .upload-empty strong{font-size:16px;line-height:24px;font-weight:600;margin-bottom:6px}

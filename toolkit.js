@@ -11,6 +11,7 @@
   const $ = selector => document.querySelector(selector);
   const strings = {
     en: {
+      resourcesNav:'Assets',navResourcesTitle:'Asset library',
       roomNav:'Room backgrounds',roomNavShort:'Room BG',avatarNav:'Avatar frames',avatarNavShort:'Avatar',examplesNav:'Examples',bannerNav:'Banner',navBannerTitle:'Banner maker',homeTitle:'Operations workspace',statisticsTitle:'Usage statistics',homeLink:'Fun Toolkit home',statisticsLink:'Statistics',designGuidelines:'Design guidelines',designGuidelinesLabel:'Design guidelines (opens in a new tab)',footerResources:'Footer resources',navLabel:'Tools',roomSubtitle:'Create room backgrounds in two sizes, ready to use.',
       avatarTitle:'Avatar frame maker',avatarSubtitle:'Drop an SVGA, find your frame, export a transparent WebP.',animationPreview:'Animation preview',
       noFile:'No file selected',loading:'Loading animation…',playing:'Playing',paused:'Paused',dropSvga:'Click or drop an SVGA file',svgaHint:'Preview the animation and export the exact frame you want.',uploadSvga:'Upload SVGA',replaceSvga:'Replace file',
@@ -20,6 +21,7 @@
       typeError:'Choose one .svga file.',sizeError:'This file is too large. Choose an SVGA under 50 MB.',loadError:'Could not read this SVGA. The file may be damaged or unsupported. Try another file.',loadTimeout:'This SVGA took too long to load. Try another file.',unavailable:'The animation player could not load. Refresh the page and try again.',invalidAnimation:'This SVGA has invalid dimensions or no frames.',exportError:'Could not export this frame. Please try again.',saved:'Download requested. Check your browser downloads.',retry:'Download again',frame:'Frame',original:'Original',seconds:'s',fileCount:'Choose one file at a time.',footerAuthor:'Winsome',footerContact:'Contact author: Winsome',navRoomTitle:'Room backgrounds',navAvatarTitle:'Avatar frames'
     },
     zh: {
+      resourcesNav:'资源库',navResourcesTitle:'资源库',
       roomNav:'房间背景',roomNavShort:'房间背景',avatarNav:'头像框',avatarNavShort:'头像框',examplesNav:'案例图片',bannerNav:'Banner',navBannerTitle:'Banner 生产工具',homeTitle:'乐趣运营工作台',statisticsTitle:'使用统计',homeLink:'Fun Toolkit 首页',statisticsLink:'使用统计',designGuidelines:'设计规范',designGuidelinesLabel:'设计规范（在新标签页打开）',footerResources:'页脚资源',navLabel:'工具导航',roomSubtitle:'一次上传，生成两种尺寸的房间背景。',
       avatarTitle:'头像框生产工具',avatarSubtitle:'拖入 SVGA，停在喜欢的一帧，导出透明 WebP。',animationPreview:'动态预览',
       noFile:'尚未选择文件',loading:'正在读取动画…',playing:'播放中',paused:'已暂停',dropSvga:'点击或拖入 SVGA 文件',svgaHint:'预览动态效果，选中需要的那一帧。',uploadSvga:'上传 SVGA',replaceSvga:'替换文件',
@@ -40,7 +42,7 @@
   window.JSZipUtils=window.JSZipUtils||{};
   const exportHost=document.createElement('div');exportHost.setAttribute('aria-hidden','true');exportHost.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;visibility:hidden';document.body.append(exportHost);
   const t=key=>(strings[language]||strings.en)[key]||key;
-  const currentTool=()=>({'#banners':'banner','#avatar-frames':'avatar','#room-backgrounds':'room','#statistics':'statistics'}[location.hash]||'home');
+  const currentTool=()=>({'#banners':'banner','#avatar-frames':'avatar','#room-backgrounds':'room','#statistics':'statistics','#resources':'resources'}[location.hash]||'home');
   function syncFeedback(){
     const phase=state.loading?'loading':state.exporting?'processing':state.notice||!state.dimensionValid?'error':state.download?'success':state.video?'ready':'empty';
     const message=state.loading?t('loading'):state.exporting?t('exporting'):state.notice?t(state.notice):!state.dimensionValid?t('dimensionError'):state.download?t('saved'):'';
@@ -83,18 +85,20 @@
     $('#frameSizeError').classList.toggle('hidden',state.dimensionValid);
     if(state.notice)setNotice(state.notice);
     if(state.video)$('#svgaFileMeta').textContent=`${t('original')} ${state.video.videoSize.width} × ${state.video.videoSize.height} · ${state.video.frames} ${language==='zh'?'帧':'frames'} · ${state.video.FPS} FPS`;
-    syncControls();syncFrame();syncDownloadResult();if(window.BannerTool)window.BannerTool.syncLanguage();if(window.Hub)window.Hub.syncLanguage();updateDocumentTitle();
+    syncControls();syncFrame();syncDownloadResult();if(window.BannerTool)window.BannerTool.syncLanguage();if(window.Hub)window.Hub.syncLanguage();window.ResourceLibrary?.syncLanguage();updateDocumentTitle();
   }
-  function updateDocumentTitle(){document.title=t(({banner:'navBannerTitle',avatar:'navAvatarTitle',room:'navRoomTitle',home:'homeTitle',statistics:'statisticsTitle'})[state.active])+' · Fun Toolkit'}
+  function updateDocumentTitle(){document.title=t(({banner:'navBannerTitle',avatar:'navAvatarTitle',room:'navRoomTitle',home:'homeTitle',statistics:'statisticsTitle',resources:'navResourcesTitle'})[state.active])+' · Fun Toolkit'}
   function activateTool(){
     const next=currentTool(),changed=next!==state.active;if(next!=='avatar')pause();state.active=next;
     $('#roomTool').classList.toggle('hidden',next!=='room');$('#avatarTool').classList.toggle('hidden',next!=='avatar');$('#bannerTool').classList.toggle('hidden',next!=='banner');
+    $('#resourceTool').classList.toggle('hidden',next!=='resources');
     $('#homeTool').classList.toggle('hidden',next!=='home');$('#statisticsTool').classList.toggle('hidden',next!=='statistics');
     window.FunToolkitUI?.activate(next);
     document.querySelectorAll('[data-tool-link]').forEach(link=>{if(link.dataset.toolLink===next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')});
     for(const [selector,page] of [['#brandHome','home'],['#footerStatistics','statistics']]){const link=$(selector);if(next===page)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')}
     $('#examplesButton').classList.toggle('hidden',next!=='room');updateDocumentTitle();
     if(window.Hub)window.Hub.activate(next);
+    if(next==='resources')window.ResourceLibrary?.activate();
     if(changed)window.scrollTo?.({top:0,behavior:'auto'});
     if(next==='avatar'&&state.video)seek(state.frame);
   }
