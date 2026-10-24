@@ -32,6 +32,10 @@
   const state={video:null,file:null,frame:0,playing:false,loading:false,exporting:false,dimension:240,dimensionValid:true,active:'room',notice:null,download:null,downloadUrl:null,lastPreview:0};
   const playerHost=$('#svgaPlayer'),output=$('#frameOutputCanvas'),input=$('#svgaInput');
   let player=null,exportPlayer=null;
+  // Pausing and exporting reuse the selected frame; replacement/size changes
+  // invalidate the hidden render independently of the fixed 240px preview.
+  let renderedVideo=null,renderedFrame=-1,renderedSize=0,previewVideo=null,previewFrame=-1;
+  function invalidateFrameRender(){renderedVideo=previewVideo=null;renderedFrame=previewFrame=-1;renderedSize=0}
   // SVGA 2.3.2's local File path also needs this optional namespace present.
   window.JSZipUtils=window.JSZipUtils||{};
   const exportHost=document.createElement('div');exportHost.setAttribute('aria-hidden','true');exportHost.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;visibility:hidden';document.body.append(exportHost);
@@ -106,11 +110,18 @@
   function waitForRenderer(target){
     return new Promise((resolve,reject)=>{const start=performance.now();function check(){if(target._renderer&&target._renderer._prepared){resolve();return}if(performance.now()-start>15000){reject(new Error('loadTimeout'));return}setTimeout(check,20)}check()});
   }
-  function sizeExportRenderer(side){const size=Math.ceil(Math.max(side,state.video.videoSize.width,state.video.videoSize.height));exportHost.style.width=size+'px';exportHost.style.height=size+'px'}
+  function sizeExportRenderer(side){const size=Math.ceil(Math.max(side,state.video.videoSize.width,state.video.videoSize.height));exportHost.style.width=size+'px';exportHost.style.height=size+'px';return size}
+  function renderExportFrame(side){
+    const size=sizeExportRenderer(side);
+    if(renderedVideo!==state.video||renderedFrame!==state.frame||renderedSize!==size){
+      exportPlayer.stepToFrame(state.frame,false);renderedVideo=state.video;renderedFrame=state.frame;renderedSize=size;
+    }
+    return exportHost.querySelector('canvas');
+  }
   function drawOutputPreview(){
-    if(!state.video||!exportPlayer)return;
-    exportPlayer.stepToFrame(state.frame,false);const source=exportHost.querySelector('canvas');if(!source)return;
-    const ctx=output.getContext('2d');ctx.clearRect(0,0,240,240);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,0,0,240,240);
+    if(!state.video||!exportPlayer||previewVideo===state.video&&previewFrame===state.frame)return;
+    const source=renderExportFrame(240);if(!source)return;
+    const ctx=output.getContext('2d');ctx.clearRect(0,0,240,240);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,0,0,240,240);previewVideo=state.video;previewFrame=state.frame;
   }
   function pause(){if(player&&state.video)player.pauseAnimation();state.playing=false;syncControls();if(state.video){syncFrame();drawOutputPreview()}}
   function seek(frame){if(!state.video||state.loading||state.exporting)return;pause();state.frame=Math.max(0,Math.min(state.video.frames-1,Math.round(Number(frame)||0)));player.stepToFrame(state.frame,false);syncFrame();drawOutputPreview()}
@@ -146,7 +157,7 @@
       ensurePlayers();await validateFile(file);const video=await parseFile(file);validateVideo(video);
       // Mount while visible so the SDK can calculate its preview transform.
       playerHost.classList.remove('hidden');$('#svgaEmpty').classList.add('hidden');
-      player.setVideoItem(video);
+      invalidateFrameRender();player.setVideoItem(video);
       const renderSize=Math.ceil(Math.max(240,video.videoSize.width,video.videoSize.height));exportHost.style.width=renderSize+'px';exportHost.style.height=renderSize+'px';exportPlayer.setVideoItem(video);
       await Promise.all([waitForRenderer(player),waitForRenderer(exportPlayer)]);
       state.video=video;state.file=file;state.frame=0;releaseDownload();
@@ -156,7 +167,7 @@
       window.FunToolkitUI?.reveal(playerHost);window.FunToolkitUI?.reveal(output);
     }catch(error){
       state.video=previous;
-      if(previous){player.setVideoItem(previous);sizeExportRenderer(240);exportPlayer.setVideoItem(previous);await Promise.all([waitForRenderer(player),waitForRenderer(exportPlayer)]).catch(()=>{});player.stepToFrame(state.frame,false);drawOutputPreview()}
+      if(previous){invalidateFrameRender();player.setVideoItem(previous);sizeExportRenderer(240);exportPlayer.setVideoItem(previous);await Promise.all([waitForRenderer(player),waitForRenderer(exportPlayer)]).catch(()=>{});player.stepToFrame(state.frame,false);drawOutputPreview()}
       else{playerHost.classList.add('hidden');$('#svgaEmpty').classList.remove('hidden')}
       setNotice(strings.en[error.message]?error.message:'loadError');
     }finally{state.loading=false;syncControls();syncFrame()}
@@ -172,9 +183,11 @@
     if(!state.video||state.loading||state.exporting||!state.dimensionValid)return;
     pause();state.exporting=true;setNotice(null);syncControls();
     try{
-      const side=state.dimension;sizeExportRenderer(side);exportPlayer.stepToFrame(state.frame,false);
-      const source=exportHost.querySelector('canvas'),canvas=document.createElement('canvas');canvas.width=side;canvas.height=side;
-      const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,0,0,side,side);
+      const side=state.dimension;let canvas=output;
+      if(side!==240){
+        const source=renderExportFrame(side);canvas=document.createElement('canvas');canvas.width=side;canvas.height=side;
+        const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,0,0,side,side);
+      }
       // Encode once at a balanced quality while retaining alpha and the selected size.
       const blob=await canvasToWebP(canvas,.85);
       releaseDownload();const base=state.file.name.replace(/\.svga$/i,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'avatar-frame';
@@ -182,7 +195,7 @@
       window.Hub?.record('avatar','generated');
       const link=document.createElement('a');link.href=state.downloadUrl;link.download=state.download;link.hidden=true;document.body.append(link);link.click();window.Hub?.record('avatar','download');link.remove();syncDownloadResult();window.FunToolkitUI?.reveal($('#frameDownloadResult'));
     }catch(error){setNotice('exportError')}
-    finally{sizeExportRenderer(240);drawOutputPreview();state.exporting=false;syncControls()}
+    finally{if(renderedSize>Math.max(240,state.video.videoSize.width,state.video.videoSize.height))renderExportFrame(240);state.exporting=false;syncControls()}
   }
   for(const id of ['#svgaUpload','#svgaReplace'])$(id).addEventListener('click',event=>{event.stopPropagation();input.click()});
   input.addEventListener('change',event=>{loadSvga(event.target.files);event.target.value=''});

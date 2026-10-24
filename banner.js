@@ -84,10 +84,12 @@
     state.busy=true;state.phase='loading';state.busyMessage='importing';setNotice(null);syncControls();let sourceUrl;const fresh=[];
     try{
       sourceUrl=URL.createObjectURL(file);
-      const image=await readImage(sourceUrl,'loadError');
+      // Decode the source and prepare the local codec/frame together.
+      const [image]=await Promise.all([readImage(sourceUrl,'loadError'),
+        template?Promise.resolve():readImage('assets/game-banner-frame.webp','frameError').then(frame=>{template=frame}),
+        prepareBannerWebP()]);
       if(!image.naturalWidth||!image.naturalHeight)throw new Error('loadError');
       if(image.naturalWidth*image.naturalHeight>40000000)throw new Error('pixelError');
-      if(!template)template=await readImage('assets/game-banner-frame.webp','frameError');
       state.phase='processing';state.busyMessage='processing';syncControls();
       const renders=drawBanners(image,template),base=file.name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'banner';
       for(const render of renders){

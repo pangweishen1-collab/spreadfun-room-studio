@@ -22,8 +22,8 @@ const get=selector=>{if(!elements.has(selector))elements.set(selector,element())
 links.push(get('roomLink'),get('avatarLink'),get('bannerLink'));links[0].dataset.toolLink='room';links[1].dataset.toolLink='avatar';links[2].dataset.toolLink='banner';
 const doc={hidden:false,body:element(),title:'',querySelector:get,querySelectorAll:s=>s==='[data-tool-link]'?links:[],createElement:tag=>Object.assign(element(),{isCanvas:tag==='canvas'}),addEventListener(k,fn){docListeners.set(k,fn)}};
 class MockPlayer {
-  constructor(host){this.host=host;this._renderer={_prepared:true};players.push(this);host.append(Object.assign(element(),{isCanvas:true}))}
-  setContentMode(){}onFrame(fn){this.callback=fn}setVideoItem(video){this.video=video;this._renderer._prepared=!holdRenderers}pauseAnimation(){this.paused=true}stepToFrame(frame,andPlay){this.lastFrame=frame;this.paused=!andPlay}
+  constructor(host){this.host=host;this.steps=[];this._renderer={_prepared:true};players.push(this);host.append(Object.assign(element(),{isCanvas:true}))}
+  setContentMode(){}onFrame(fn){this.callback=fn}setVideoItem(video){this.video=video;this._renderer._prepared=!holdRenderers}pauseAnimation(){this.paused=true}stepToFrame(frame,andPlay){this.steps.push({frame,andPlay});this.lastFrame=frame;this.paused=!andPlay}
 }
 const video=()=>({videoSize:{width:320,height:320},frames:60,FPS:30});
 const sandbox={document:doc,window:{addEventListener(){},FunToolkitUI:{setState(tool,value){assert.equal(tool,'avatar');feedback.push({...value})},reveal(target){reveals.push(target)},activate(tool){activations.push(tool)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},location:{hash:'#avatar-frames'},language:'en',localStorage:{getItem:k=>storage.get(k)},SVGA:{Player:MockPlayer,Parser:class{load(file,success,failure){const complete=()=>parseFails?failure(Error('bad')):success(nextVideo||video());if(holdParser)pendingParser=complete;else queueMicrotask(complete)}}},JSZip:{},ResizeObserver:class{observe(){}},IntersectionObserver:class{observe(){}},performance,URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},Blob,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,setTimeout,clearTimeout,matchMedia:()=>({matches:false,addEventListener(){}}),canvasToWebP:async()=>{if(encodeFails)throw Error('encode failed');return new Blob(['test'],{type:'image/webp'})},setLanguage(value){sandbox.language=value}};
@@ -53,15 +53,18 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   // With ordinary motion preferences, initial and replacement uploads still wait for Play.
   assert.equal(api.state.frame,0);assert.equal(get('#svgaFrameNumber').value,1);assert.equal(api.state.playing,false);
   assert.equal(events.length,0,'upload and first-frame preview must not count');
+  const hiddenStepsBeforeExport=players[1].steps.length;
   const firstExport=api.exportFrame();assert.equal(latestFeedback().phase,'processing');assert.equal(get('#frameDownload')['aria-busy'],'true');assert.equal(get('#svgaUpload')['aria-busy'],'false');
   await firstExport;assert.equal(latestFeedback().phase,'success');assert.equal(reveals.length,3,'only a new export result reveals');assert.equal(api.state.download,'ring-frame-001-240x240.webp');assert.equal(downloadClicks,1);assert.equal(api.state.playing,false);
   assert.equal(recorded('generated'),1);assert.equal(recorded('download'),1,'successful export encodes and requests one download');
+  assert.equal(players[1].steps.length,hiddenStepsBeforeExport,'240px export reuses the exact paused preview rather than re-rendering its hidden canvas');
   get('#svgaPlay').fire('click');assert.equal(api.state.playing,true);
   await api.loadSvga([{...file,name:'replacement.svga'}]);
   assert.equal(api.state.frame,0);assert.equal(get('#svgaFrameNumber').value,1);assert.equal(api.state.playing,false);assert.equal(get('#frameDownload').disabled,false);
   const revealsAfterReplacement=reveals.length;
   get('#svgaPlay').fire('click');assert.equal(api.state.playing,true);
-  api.seek(27);assert.equal(reveals.length,revealsAfterReplacement,'playing and scrubbing frames never restart reveal motion');assert.equal(api.state.frame,27);assert.equal(get('#svgaFrameNumber').value,28);assert.equal(api.state.playing,false);
+  const hiddenStepsBeforeSeek=players[1].steps.length;
+  api.seek(27);assert.equal(players[1].steps.length,hiddenStepsBeforeSeek+1,'seeking renders only the new frame');assert.equal(reveals.length,revealsAfterReplacement,'playing and scrubbing frames never restart reveal motion');assert.equal(api.state.frame,27);assert.equal(get('#svgaFrameNumber').value,28);assert.equal(api.state.playing,false);
   api.togglePlayback();assert.equal(api.state.playing,true);get('#svgaFrameNumber').fire('focus');assert.equal(api.state.playing,false);
   get('#svgaFrameNumber').value='40';get('#svgaFrameNumber').fire('keydown',{key:'Enter',preventDefault(){},target:get('#svgaFrameNumber')});assert.equal(api.state.frame,39);
   api.seek(1000);assert.equal(api.state.frame,59);api.seek(-8);assert.equal(api.state.frame,0);
@@ -92,5 +95,6 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   await docListeners.get('drop')({target:get('#frameDownload'),dataTransfer:{files:[file]},preventDefault(){}});assert.equal(api.state.file,file);assert.equal(api.state.frame,0);assert.equal(api.state.playing,false);
   assert.throws(()=>api.validateVideo({videoSize:{width:NaN,height:320},frames:0,FPS:30}));
   assert.equal(recorded('generated'),2);assert.equal(recorded('download'),3,'file failures, route and language changes, and page-wide drops must not count');
+  get('#frameWidth').value='2048';api.changeDimension(get('#frameWidth'));const resizedStart=players[1].steps.length;await api.exportFrame();assert.equal(players[1].steps.length,resizedStart+2,'larger exports render at full size, then release the enlarged canvas');assert.equal(api.state.download.endsWith('-2048x2048.webp'),true);
   console.log('PASS: shared empty/loading/processing/ready/success/error feedback, translated async labels, busy controls, one-time preview/result reveals, no scrub reveal, failed-export preservation; navigation/state retention, live FileList, paused first-frame uploads and export, explicit playback, exact frame/Enter, pause-on-edit, bounded seeking, locked dimensions, invalid input, export naming, corrupt-file preservation, language, page-wide drop, successful-only generation/download and retry counts.');
 })().catch(error=>{console.error(error);process.exitCode=1});

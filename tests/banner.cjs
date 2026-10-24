@@ -51,7 +51,7 @@ class MockZip{
 const sandbox={window:{addEventListener(k,fn){windowListeners.set(k,fn)},Hub:{record(tool,type,count=1){events.push({tool,type,count})}},FunToolkitUI:{setState(tool,state){uiStates.push({tool,...state})},reveal(node){reveals.push(node)}}},document,Image:MockImage,JSZip:MockZip,language:'en',Blob,TextEncoder,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,Set,console,
   URL:{createObjectURL(blob){const url='blob:banner-'+ ++serial;urls.set(url,blob);return url},revokeObjectURL(url){revoked.add(url);urls.delete(url)}},
   setTimeout(fn,delay){if(delay<60000)queueMicrotask(fn);else timers.push(fn);return serial},clearTimeout(){},
-  canvasToLosslessWebP:async(canvas)=>{assert.equal(feedback().phase,'processing','real encoding uses processing feedback');encodes.push({canvas,width:canvas.width,height:canvas.height});if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['webp-'+encodes.length],{type:'image/webp'})}};
+  prepareBannerWebP:async()=>{},canvasToLosslessWebP:async(canvas)=>{assert.equal(feedback().phase,'processing','real encoding uses processing feedback');encodes.push({canvas,width:canvas.width,height:canvas.height});if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['webp-'+encodes.length],{type:'image/webp'})}};
 sandbox.window.JSZip=MockZip;
 let source=fs.readFileSync(path.join(__dirname,'../banner.js'),'utf8');
 const marker='window.BannerTool={syncLanguage};';
