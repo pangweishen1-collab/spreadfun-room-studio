@@ -2,7 +2,7 @@
 
 适用范围：新工具页面、列表与结果区的统一反馈。作为设计规范目录 v1.4.1 的增补，配合工具页框架使用。当前三个生产工具已通过 `tool-feedback.css` / `tool-feedback.js` 接入共用空态、占位、加载与轻淡入；装饰视差等扩展保留为可选示例。
 
-[团队 Skill v1.0.1](downloads/fun-toolkit-ui-1.0.1.zip) 已合并最新模板、8 个 SVG、反馈动效资源、接入说明与验收清单；解压添加并确认 Agent 识别 `SKILL.md` 后，用 `$fun-toolkit-ui` 调用。ZIP 是自包含交付包，下载不等于安装。在线规范及团队包为当前交付；PDF v1.2 是历史快照。
+[团队 Skill v1.0.2](downloads/fun-toolkit-ui-1.0.2.zip) 已合并最新模板、8 个 SVG、反馈动效资源、接入说明与验收清单；解压添加并确认 Agent 识别 `SKILL.md` 后，用 `$fun-toolkit-ui` 调用。ZIP 是自包含交付包，下载不等于安装。在线规范及团队包为当前交付；PDF v1.2 是历史快照。
 
 ## 1. 先判断状态，再选图
 

@@ -1,0 +1,13 @@
+/* Native select interaction, with a consistently inset decorative chevron. */
+.ft-select{--ft-select-arrow-size:16px;--ft-select-arrow-inset:16px;--ft-select-content-inset:44px;position:relative;display:block;min-width:0;max-width:100%}
+.ft-select>select{display:block;box-sizing:border-box;width:100%;min-width:0;min-height:44px;appearance:none;-webkit-appearance:none;padding-inline-end:var(--ft-select-content-inset);text-overflow:ellipsis;cursor:pointer}
+.ft-select>.ft-select-arrow{position:absolute;right:var(--ft-select-arrow-inset);top:50%;width:var(--ft-select-arrow-size);height:var(--ft-select-arrow-size);transform:translateY(-50%);display:block;pointer-events:none;color:#626c7c;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.ft-select:has(>select:is(:hover,:focus):not(:disabled))>.ft-select-arrow{color:#0071e3}
+.ft-select>select:focus{border-color:#0071e3;outline:none;box-shadow:0 0 0 2px rgb(0 113 227 / 8%)}
+.ft-select>select:focus-visible{outline:2px solid #0071e3;outline-offset:2px;box-shadow:none}
+.ft-select>select:disabled{cursor:not-allowed;background-color:#edf0f4;color:#647083;border-color:#d8dce2;opacity:1}
+.ft-select:has(>select:disabled)>.ft-select-arrow{color:#647083}
+.ft-select>select[aria-invalid=true],.ft-select>select[aria-invalid=true]:focus{border-color:#b42318;box-shadow:none}
+.ft-select:has(>select[aria-invalid=true])>.ft-select-arrow{color:#b42318}
+@media(max-width:540px){.ft-select>select{min-height:44px;font-size:16px}}
+@media(forced-colors:active){.ft-select>select{appearance:auto;-webkit-appearance:auto;padding-inline-end:12px}.ft-select>.ft-select-arrow{display:none}.ft-select>select:focus-visible{outline:2px solid Highlight;outline-offset:2px;box-shadow:none}}

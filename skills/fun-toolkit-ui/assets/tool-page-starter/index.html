@@ -10,6 +10,7 @@
   <link rel="stylesheet" href="motion-patterns.css">
   <link rel="stylesheet" href="feedback-motion.css">
   <link rel="stylesheet" href="tool-page.css">
+  <link rel="stylesheet" href="select.css">
   <script src="focus-modality.js" defer></script>
   <script src="feedback-motion.js" defer></script>
   <script src="tool-page.js" defer></script>
@@ -49,13 +50,13 @@
 
     <div class="demo-toolbar" aria-label="框架演示控制" data-i18n-aria="demoControl">
       <label for="demo-state" data-i18n="demoState">演示状态</label>
-      <select id="demo-state">
+      <div class="ft-select"><select id="demo-state">
         <option value="empty" data-i18n="stateEmpty">未选择</option>
         <option value="ready" data-i18n="stateReady">已载入</option>
         <option value="processing" data-i18n="stateProcessing">处理中</option>
         <option value="success" data-i18n="stateSuccess">成功</option>
         <option value="error" data-i18n="stateError">失败</option>
-      </select>
+      </select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4"/></svg></div>
       <p data-i18n="demoHint">切换状态检查布局；此示例不上传、不计数、不生成文件。</p>
     </div>
 

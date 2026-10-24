@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "skillVersion": "1.0.1",
-  "resourceVersion": "1.4.1",
+  "skillVersion": "1.0.2",
+  "resourceVersion": "1.4.2",
   "files": [
     {
       "path": "SKILL.md",
-      "sha256": "4d1646dcf709a62d0673abe710c3bdffda96043e6d260d9be42080e409cb8e95",
-      "bytes": 7317
+      "sha256": "358bed5ffef4c704a7fdfedd338932121616a64dd9ec372780276467ff30cd0d",
+      "bytes": 7459
     },
     {
       "path": "agents/openai.yaml",
@@ -69,6 +69,11 @@
       "bytes": 4184
     },
     {
+      "path": "assets/tool-page-starter/README.md",
+      "sha256": "f7cb5f43a8f66e0db71ee7260f49540032b07948cc3cba01b8cbe55cf4169630",
+      "bytes": 901
+    },
+    {
       "path": "assets/tool-page-starter/assets/author-profile.webp",
       "sha256": "b5ece1d4837cab7a8f6b773ec144e9722e7f4d30a13fb40ae5b32ba9cba80df2",
       "bytes": 15464
@@ -125,8 +130,8 @@
     },
     {
       "path": "assets/tool-page-starter/design-tokens.json",
-      "sha256": "2bd5b2fa5ff7b73993b93af228d27560f2cf7e54c1b2f68e225a5532a8eca1b2",
-      "bytes": 4088
+      "sha256": "11df0f5e55d81dfb11ba106216f534fe6ffad2952f4a1e6307d48fe4013ed347",
+      "bytes": 4299
     },
     {
       "path": "assets/tool-page-starter/feedback-motion.css",
@@ -145,8 +150,8 @@
     },
     {
       "path": "assets/tool-page-starter/index.html",
-      "sha256": "53df777ee2c42bbd522c8c88d7599de691480b3475a466804b7cf92ca877e7cc",
-      "bytes": 9331
+      "sha256": "b785f796e1cd1e6cd1d94180b8f06bd350d030f0980ba9e219fce7546412c83f",
+      "bytes": 9520
     },
     {
       "path": "assets/tool-page-starter/motion-patterns.css",
@@ -154,9 +159,14 @@
       "bytes": 2849
     },
     {
+      "path": "assets/tool-page-starter/select.css",
+      "sha256": "4afd53991dd8d0379a29467e13be225785bf5d15c4be308245b5ffc5a59b26f2",
+      "bytes": 1766
+    },
+    {
       "path": "assets/tool-page-starter/tool-page.css",
-      "sha256": "b9d5ae22c65f882db7b6de94e007faacbe890668f74e983ecd155a4835e210de",
-      "bytes": 17139
+      "sha256": "8064e92999ab38c896356caef7bc7e9a3751e2d02f42b7226356aa3c9c9cb6a9",
+      "bytes": 17193
     },
     {
       "path": "assets/tool-page-starter/tool-page.js",
@@ -175,13 +185,13 @@
     },
     {
       "path": "funskill.json",
-      "sha256": "4702d9f29197d46c8215c27184eb27865b93f8587e65307c583f88d93fd88e0e",
+      "sha256": "d81986b69bf3883bb2ced4b4fbc6c3159767f8bfb4bb848f39da3293ff860963",
       "bytes": 852,
-      "semanticSha256": "a085884e6fdae40d422c767987f7a4a744c486467cf2fd794c99f9ace502f238"
+      "semanticSha256": "624b80b0d6837fc6617d4ba6a32bec50c04e27cf3f40150e31b8ed956413334a"
     },
     {
       "path": "governance.json",
-      "sha256": "b491406748c6a0c505b268904af1507bf901b97e42acc832989bfc2d74037b29",
+      "sha256": "1c2106b1e47b846c84ae5f212221cee0367ac29739627a3a51c08915df55bf5b",
       "bytes": 1022
     },
     {
@@ -191,12 +201,12 @@
     },
     {
       "path": "references/acceptance.md",
-      "sha256": "d1ab25105c15ecaf1b3d524c7dbbca92c73748804f32d824cf958ff4ed95b71d",
-      "bytes": 2748
+      "sha256": "0a97c8907478a31caca161d1e57ea1fc495b5136a5663ed4fa2f7b076248df42",
+      "bytes": 3418
     },
     {
       "path": "references/feedback-states.md",
-      "sha256": "1e73df237865ee24f787bd8a5bd69a08d75154e581fa3a15aa6b2f3dace0518b",
+      "sha256": "26e5b3dac31764127b4fc94d74d1567622da599140753c86bffb5f2c9082cb9b",
       "bytes": 28575
     },
     {
@@ -206,8 +216,8 @@
     },
     {
       "path": "references/foundations.md",
-      "sha256": "9442fc09b3fd56d8c5f4821b3a02cbac2c97730381d4017924ed20c396865b62",
-      "bytes": 5083
+      "sha256": "33e619ed8aa4c7e187434627999c03859a6c5dfbb36b679625d586ac1d9a1fab",
+      "bytes": 6869
     },
     {
       "path": "references/production-integration.md",
@@ -216,18 +226,18 @@
     },
     {
       "path": "references/team-setup.md",
-      "sha256": "c14bbb1135c7ce1724157445d30f663ac411fb81d2d517254e18e4606f171299",
+      "sha256": "cc5516083c4bbdbb8cb6b959f66e353c5e2831d785f28133cb8044b4e08dfdd5",
       "bytes": 2852
     },
     {
       "path": "references/tool-page-framework.md",
-      "sha256": "221317c3ce8bc37adad6807d316db64aed1bc603c400806568bf00e2a32e0e91",
+      "sha256": "cc78721874c79e94d9d3aab617c3c2151a52377bdb1839b8e96c9b370d271f0d",
       "bytes": 15558
     },
     {
       "path": "references/validation.md",
-      "sha256": "34e60abc2b753c0883a5bbeddf94789638bbec2cfd1e2b9fd924a7980ab9474e",
-      "bytes": 2490
+      "sha256": "f6241e9cc011dd029cda6ce744088f01c227d66d911f28cbbc3332c447e3cabe",
+      "bytes": 3395
     },
     {
       "path": "scripts/check_package.py",

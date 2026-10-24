@@ -1,8 +1,8 @@
 {
   "meta": {
     "name": "Fun Toolkit",
-    "version": "1.4.1",
-    "date": "2026-10-23",
+    "version": "1.4.2",
+    "date": "2026-10-24",
     "status": "Current reference library and starter; production tools use scoped adapters",
     "units": "CSS px; motion ms"
   },
@@ -186,5 +186,14 @@
     "card": "0 4px 18px rgba(0,0,0,.035)",
     "action": "0 7px 18px rgba(0,113,227,.18)",
     "dialog": "0 24px 70px rgba(0,0,0,.25)"
+  },
+  "select": {
+    "arrowSize": 16,
+    "arrowInsetRight": 16,
+    "contentPaddingRight": 44,
+    "minHeight": 44,
+    "mobileFontSize": 16,
+    "nativeInteraction": true,
+    "forcedColors": "native arrow"
   }
 }
