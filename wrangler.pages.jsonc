@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "fun-toolkit-pages-test",
+  "pages_build_output_dir": "./public",
+  "compatibility_date": "2026-10-23",
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "fun-toolkit-production",
+    "database_id": "632b90b1-b9d7-4d72-8d3d-7b138f11c6c5"
+  }]
+}

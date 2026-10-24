@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "node scripts/build-site.mjs",
+    "build:pages": "node scripts/build-pages.mjs",
+    "deploy:pages": "npm run build:pages && wrangler pages deploy public --cwd dist-pages --project-name fun-toolkit-pages-test --branch main",
     "dev": "node scripts/build-site.mjs && wrangler dev --ip 127.0.0.1 --port 8787",
     "deploy": "node scripts/build-site.mjs && wrangler deploy",
     "test": "node tests/regression.cjs && node tests/toolkit.cjs && node tests/banner.cjs && node tests/hub.cjs"

@@ -165,3 +165,13 @@ node --check hub.js
 规范页第17节提供完整 [团队Skill](https://fun-toolkit.pangweishen1.workers.dev/design-system/#team-skill)，源码在 `skills/fun-toolkit-ui/`，发布ZIP位于 `design-system/downloads/fun-toolkit-ui-1.0.1.zip`。包含资源规范1.4.1、可运行模板、最新空态和动效、表单与业务接入规则、团队安装与AGENTS片段、复制/完整性脚本及一次独立Agent真实试做案例。ZIP内容须解压到名为fun-toolkit-ui的目录，不能只保存SKILL.md。
 
 包内演示不产生真实文件或统计；新工具必须接真实业务。独立试做已验证512×512 WebP下载与中英手机布局，团队真人试用与其他Agent安装兼容仍未认证，治理标记pilot。具体边界见随包references/validation.md，发布摘要见ZIP同名.sha256文件。
+
+## Pages 测试站 · 2026-10-24
+
+测试地址：https://fun-toolkit-pages-test.pages.dev/ 。原 Workers 地址继续保留。
+
+运行 `npm run deploy:pages` 构建并发布 Pages 测试站。构建脚本将原静态构建复制到 `dist-pages/public`，使用相同 API Worker 和仅覆盖 `/api`、`/api/*` 的 `_routes.json`。Pages 配置放在公开资产目录之外，避免误读原 Workers 配置。`wrangler.pages.jsonc` 为此独立构建目录的配置模板。
+
+Pages 与原站绑定同一个 `fun-toolkit-production` D1 数据库，无需迁移、初始化或清零。测试和真实使用均累计到共享生成/下载次数；不要对共享库执行重置或重新导入。
+
+此测试站与 FunSkill 一样使用 Pages 入口；大陆三网的长期可用性仍须实测，浏览器功能验收不等于大陆网络稳定性证明。
