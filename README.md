@@ -170,8 +170,16 @@ node --check hub.js
 
 测试地址：https://fun-toolkit-pages-test.pages.dev/ 。原 Workers 地址继续保留。
 
-运行 `npm run deploy:pages` 构建并发布 Pages 测试站。构建脚本将原静态构建复制到 `dist-pages/public`，使用相同 API Worker 和仅覆盖 `/api`、`/api/*` 的 `_routes.json`。Pages 配置放在公开资产目录之外，避免误读原 Workers 配置。`wrangler.pages.jsonc` 为此独立构建目录的配置模板。
+运行 `npm run deploy:pages:test` 构建并发布 Pages 测试站。构建脚本将原静态构建复制到 `dist-pages/public`，使用相同 API Worker 和仅覆盖 `/api`、`/api/*` 的 `_routes.json`。Pages 配置放在公开资产目录之外，避免误读原 Workers 配置。`wrangler.pages.jsonc` 为此独立构建目录的配置模板。
 
 Pages 与原站绑定同一个 `fun-toolkit-production` D1 数据库，无需迁移、初始化或清零。测试和真实使用均累计到共享生成/下载次数；不要对共享库执行重置或重新导入。
 
 此测试站与 FunSkill 一样使用 Pages 入口；大陆三网的长期可用性仍须实测，浏览器功能验收不等于大陆网络稳定性证明。
+
+## Pages 正式环境 · 2026-10-24
+
+正式地址：https://fun-toolkit.pages.dev/ 。测试地址继续为 https://fun-toolkit-pages-test.pages.dev/ 。
+
+`npm run deploy` 或 `npm run deploy:pages` 默认发布正式 Pages 项目 `fun-toolkit`；`npm run deploy:pages:test` 单独发布测试项目。旧 Workers 的发布方式保留为 `npm run deploy:worker`，不再作为默认发布入口。
+
+正式站、测试站与旧 Workers 继续使用同一个 D1 统计库；本次晋级不改业务代码、不执行数据库迁移、不清零计数。正式静态资源和 API Worker 与刚完成真实上传、生成、下载验收的测试构建逐字节一致。
