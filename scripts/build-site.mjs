@@ -5,7 +5,7 @@ import {createHash} from 'node:crypto';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const target=path.join(root,'dist');
-const entries=['index.html','Room BG Studio.html','toolkit.css','toolkit.js','banner.js','banner-webp.js','hub.css','hub.js','home.css','tokens.css','tool-feedback.css','tool-feedback.js','resource-library.css','resource-library.js','market-icon-png.js'];
+const entries=['index.html','Room BG Studio.html','toolkit.css','toolkit.js','banner.js','banner-webp.js','hub.css','hub.js','home.css','tokens.css','tool-feedback.css','tool-feedback.js','gift-preview.css','gift-preview.js','gift-preview-render.js','gift-preview-history.js','gift-background.js','gift-background-worker.js','gift-background-ai.mjs','gift-background-matte.mjs','resource-library.css','resource-library.js','market-icon-png.js'];
 await rm(target,{recursive:true,force:true});
 await mkdir(target,{recursive:true});
 for(const name of entries)await copyFile(path.join(root,name),path.join(target,name));

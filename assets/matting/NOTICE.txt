@@ -1,0 +1,9 @@
+BiRefNet_lite 512x512 ONNX re-export, FP16 weights.
+Copyright (c) 2024 ZhengPeng; Copyright (c) 2026 Studio Ludens V.O.F.
+MIT License; see LICENSE.
+Model source: https://huggingface.co/studioludens/birefnet-lite-512/tree/962e67969ec6acec9c19fab76acee4f5e22e990c
+Upstream: https://huggingface.co/ZhengPeng7/BiRefNet_lite
+README and input/output description: https://huggingface.co/studioludens/birefnet-lite-512/blob/962e67969ec6acec9c19fab76acee4f5e22e990c/README.md
+Original model SHA-256: eff9216bb2f9d3f023d9c2b7196845a7485739ab1f231593633e4d2344ffc516
+The original bytes are split into ordered chunks of at most 20 MiB for static hosting.
+The user's picture is processed on-device; it is never sent to the model host.

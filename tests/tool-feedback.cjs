@@ -57,7 +57,7 @@ function toolRoot(){
   return {root,stage,message,status,art,outputArt,empty,result,canvas,fileInput};
 }
 
-const tools={room:toolRoot(),avatar:toolRoot(),banner:toolRoot(),resource:toolRoot()};
+const tools={room:toolRoot(),avatar:toolRoot(),banner:toolRoot(),giftPreview:toolRoot(),resource:toolRoot()};
 const documentListeners=new Map(),motionListeners=new Map();
 const document={hidden:false,documentElement:{lang:'en'},getElementById:id=>tools[id.replace('Tool','')]?.root||null,addEventListener(type,handler){documentListeners.set(type,handler)}};
 const reduced={matches:false,addEventListener(type,handler){motionListeners.set(type,handler)}};
@@ -71,6 +71,10 @@ const api=sandbox.window.FunToolkitUI;
   assert.deepEqual(Object.keys(api).sort(),['activate','prepareImages','reveal','setState']);
   for(const tool of Object.values(tools))assert.equal(tool.root.dataset.feedbackPhase,'empty');
   api.setState('resources',{phase:'loading',message:'Loading logo…'});assert.equal(tools.resource.root.dataset.feedbackPhase,'loading');assert.equal(tools.resource.stage.getAttribute('aria-busy'),'true');api.setState('resources',{phase:'ready'});
+  const gift=tools.giftPreview,giftFile=gift.fileInput.files,giftPixels=gift.canvas.pixels;
+  api.setState('gift-preview',{phase:'loading',message:'Reading gift…'});assert.equal(gift.root.dataset.feedbackPhase,'loading');assert.equal(gift.stage.getAttribute('aria-busy'),'true');assert.equal(gift.status.textContent,'Reading gift…');
+  api.setState('gift-preview',{phase:'error'});assert.match(gift.art.src,/empty-error\.svg$/);assert.equal(gift.stage.getAttribute('aria-busy'),'false');assert.equal(gift.fileInput.files,giftFile);assert.equal(gift.canvas.pixels,giftPixels,'gift feedback never edits canvas pixels');
+  api.setState('gift-preview',{phase:'ready'});assert.match(gift.art.src,/empty-upload\.svg$/);assert.equal(gift.status.textContent,'');
   const room=tools.room;
   const beforeFiles=room.fileInput.files,beforeResult=room.result.textContent;
   const beforeCanvas=[room.canvas.width,room.canvas.height,room.canvas.pixels];
@@ -129,6 +133,7 @@ const api=sandbox.window.FunToolkitUI;
   assert.equal(room.root.animationCalls.length,roomRouteAnimations,'click followed by hashchange must not replay one route');
   assert.equal(refreshes,routeRefreshes);
   api.activate('avatar');assert.equal(tools.avatar.root.animationCalls.length,1,'a newly active tool receives one reveal');
+  api.activate('gift-preview');assert.equal(gift.root.animationCalls.length,1,'gift preview shares the opacity-only page reveal');api.activate('gift-preview');assert.equal(gift.root.animationCalls.length,1);
 
   // Existing media decode callbacks decide placeholder state; no source or file rewrite.
   const list=new Element(),readyBox=new Element('div',['output-img']),pendingBox=new Element('div',['output-img']),brokenBox=new Element('div',['output-img']);
@@ -148,7 +153,7 @@ const api=sandbox.window.FunToolkitUI;
   documentListeners.get('error')({target:new Element('img')});api.prepareImages(null);
 
   // Resolve the last route animations so the check also covers normal completion cleanup.
-  room.root.animationCalls.at(-1).finish();tools.avatar.root.animationCalls.at(-1).finish();
+  room.root.animationCalls.at(-1).finish();tools.avatar.root.animationCalls.at(-1).finish();gift.root.animationCalls.at(-1).finish();
   await Promise.resolve();
   console.log('PASS: shared phases and labels, retained result/file/canvas state, opacity-only reveals, route deduplication, hidden/background/reduced-motion handling and thumbnail loaded/error placeholders.');
 })().catch(error=>{console.error(error);process.exitCode=1});

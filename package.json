@@ -1,6 +1,6 @@
 {
   "name": "fun-toolkit",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "dev": "node scripts/build-site.mjs && wrangler dev --ip 127.0.0.1 --port 8787",
     "deploy": "npm run deploy:pages",
     "deploy:worker": "node scripts/build-site.mjs && wrangler deploy",
-    "test": "node tests/regression.cjs && node tests/toolkit.cjs && node tests/banner.cjs && node tests/hub.cjs && node tests/resources.cjs && node tests/market-icon-png.cjs"
+    "test": "node tests/regression.cjs && node tests/toolkit.cjs && node tests/banner.cjs && node tests/hub.cjs && node tests/resources.cjs && node tests/market-icon-png.cjs && node tests/tool-feedback.cjs && node tests/gift-preview-render.cjs && node tests/gift-preview.cjs && node tests/gift-preview-history.cjs && node tests/gift-background.cjs && node tests/gift-background-matte.cjs"
   },
   "devDependencies": {
     "wrangler": "4.151.3"

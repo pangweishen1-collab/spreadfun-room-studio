@@ -1,0 +1,66 @@
+{
+  "name": "studioludens/birefnet-lite-512",
+  "revision": "962e67969ec6acec9c19fab76acee4f5e22e990c",
+  "variant": "fp16",
+  "license": "MIT",
+  "bytes": 98484532,
+  "sha256": "eff9216bb2f9d3f023d9c2b7196845a7485739ab1f231593633e4d2344ffc516",
+  "input": {
+    "name": "input_image",
+    "type": "float32",
+    "shape": [
+      1,
+      3,
+      512,
+      512
+    ],
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "output": {
+    "name": "output_image",
+    "type": "float32",
+    "shape": [
+      1,
+      1,
+      512,
+      512
+    ],
+    "activation": "sigmoid"
+  },
+  "chunks": [
+    {
+      "file": "birefnet-lite-512-fp16-01.bin",
+      "bytes": 20971520,
+      "sha256": "f8b3b98801b21354a93eb88acfa980a4a1c17001bc5f87a31a0bb789b401a749"
+    },
+    {
+      "file": "birefnet-lite-512-fp16-02.bin",
+      "bytes": 20971520,
+      "sha256": "2d6750ef8bd65d3e5e893c8f3b6c3fa655ec9aee9e615c5fea01ff350adc86ee"
+    },
+    {
+      "file": "birefnet-lite-512-fp16-03.bin",
+      "bytes": 20971520,
+      "sha256": "96b33049bdc812c35c38f96d72365d1608e3e43169ee1901b4e7c09d02ff5a41"
+    },
+    {
+      "file": "birefnet-lite-512-fp16-04.bin",
+      "bytes": 20971520,
+      "sha256": "46f14ecab6e492ad783e99c81eeeaad449748f332e9bba2026944d1373b055e7"
+    },
+    {
+      "file": "birefnet-lite-512-fp16-05.bin",
+      "bytes": 14598452,
+      "sha256": "aad1fd51b68ca195b20a8c54b810f75db1e1bec89a35ff7e590db6afa5f8b056"
+    }
+  ]
+}

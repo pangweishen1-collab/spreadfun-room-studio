@@ -1,10 +1,12 @@
 # Fun Toolkit
 
-专为乐趣运营打造的素材处理工作台，包含聚合首页、三个工具与共享统计页。图片在浏览器中处理，线上统计与工具需求由 Cloudflare Worker + D1 保存；本地可用 Python + SQLite 预览服务。
+专为乐趣运营打造的素材处理工作台，包含聚合首页、四个生产工具、资源库与共享统计页。图片在浏览器中处理，正式站由 Cloudflare Pages 提供静态资源，API Worker + D1 保存现有工具统计与需求；本地可用 Python + SQLite 预览服务。
 
 - 房间背景工具：批量图片上传、合成预览、每图每尺寸独立裁切、720 × 1560 / 300 × 480 WebP 与 ZIP 下载。
 - 头像框生产工具：读取本地 SVGA、循环动态预览、播放/暂停、时间轴、上一帧/下一帧、帧号输入和透明 WebP 单帧导出。
 - Banner 生产工具：上传一张图片，自动居中裁切，生成 772 × 200 房间 Banner 与 684 × 240 游戏 Banner；游戏图内部为 645 × 201，保留提供的外框。两图使用无损 WebP 压缩，支持单独下载与 ZIP。
+- 礼物&座驾预览图生产工具：上传 PNG、JPG、WebP，调整构图并导出正方形 WebP；支持场景羽化、透明素材、黑底光效快速抠图、擦除与恢复、历史记录、旋转和安全区。
+- 资源库：六个项目 Logo，支持尺寸、圆角和 PNG/JPG/WebP 导出。
 - 统一中英文切换与响应式布局；切换工具保留本次会话中的上传内容与选中帧。
 - 点击 Logo 返回聚合首页，查看工具介绍、累计生成与下载，并提出新的工具需求。首页和页脚均可进入使用统计页。
 - 首页采用精简双语文案与原创蓝黄扁平插画，工具入口改为紧凑布局。插画使用带透明通道的 960 / 480px WebP 响应式资源，小屏仍保留插画。
@@ -22,12 +24,14 @@ python3 server.py --host 127.0.0.1 --port 8765
 - `http://127.0.0.1:8765/index.html#room-backgrounds`
 - `http://127.0.0.1:8765/index.html#avatar-frames`
 - `http://127.0.0.1:8765/index.html#banners`
+- `http://127.0.0.1:8765/index.html#gift-previews`
+- `http://127.0.0.1:8765/index.html#resources`
 - `http://127.0.0.1:8765/index.html#home`（不带地址片段时也进入首页）
 - `http://127.0.0.1:8765/index.html#statistics`
 
 需要 Python 3.9 或更新版本。请使用 `server.py` 启动；普通静态服务器仍可使用图片工具，但无法提供共享统计或接收需求，页面会显示服务不可用。
 
-`Room BG Studio.html` 是旧书签的跳转入口。最新源码入口为 `index.html`，需要同时保留 `toolkit.css`、`toolkit.js`、`hub.css`、`hub.js`、`home.css`、`tokens.css`、`banner.js`、`banner-webp.js`、`assets/` 和 `vendor/`，不能只复制一个 HTML。
+`Room BG Studio.html` 是旧书签的跳转入口。最新源码入口为 `index.html`，需要同时保留各工具的 CSS/JS、`assets/`、`vendor/` 和 `design-system/`，不能只复制一个 HTML。发布时使用 `npm run build:pages` 生成完整目录。
 
 ## 统计与需求
 
@@ -120,9 +124,9 @@ node --check hub.js
 
 ## 发布状态
 
-正式网站：[Fun Toolkit](https://fun-toolkit.pangweishen1.workers.dev)。源码仓库：[pangweishen1-collab/spreadfun-room-studio](https://github.com/pangweishen1-collab/spreadfun-room-studio)。
+正式网站：[Fun Toolkit](https://fun-toolkit.pages.dev/)。源码仓库：[pangweishen1-collab/spreadfun-room-studio](https://github.com/pangweishen1-collab/spreadfun-room-studio)。
 
-线上使用 Cloudflare Worker Static Assets + D1，提供完整工具、共享统计和私有需求提交。`server.py` 保留为本地开发服务。GitHub Pages 使用 `docs/` 中的轻量入口跳转到正式站；不再直接发布仓库根目录。部署步骤和作者查看需求的方法见 `DEPLOYMENT.md`。数据库、运行状态和账号凭据不进入仓库或静态资源目录。
+线上使用 Cloudflare Pages + API Worker + D1，提供完整工具、共享统计和私有需求提交。旧 [Workers 地址](https://fun-toolkit.pangweishen1.workers.dev/) 作为兼容入口保留，默认发布目标为 Pages。`server.py` 保留为本地开发服务。GitHub Pages 使用 `docs/` 中的轻量入口跳转到正式 Pages 站并保留地址片段；不再直接发布仓库根目录。部署步骤和作者查看需求的方法见 `DEPLOYMENT.md`。数据库、运行状态和账号凭据不进入仓库或静态资源目录。
 
 ## 生成性能
 

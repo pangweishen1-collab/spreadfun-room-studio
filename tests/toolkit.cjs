@@ -5,6 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const elements=new Map(),storage=new Map(),links=[];
 const events=[],feedback=[],reveals=[],activations=[],players=[];
+let giftActivations=0,giftLanguageSyncs=0;
 const latestFeedback=()=>feedback.at(-1);
 const recorded=type=>events.filter(event=>event.tool==='avatar'&&event.type===type).reduce((total,event)=>total+event.count,0);
 let nextVideo=null,parseFails=false,encodeFails=false,downloadClicks=0,holdParser=false,pendingParser=null,holdRenderers=false;
@@ -19,8 +20,9 @@ function element(){
   };
 }
 const get=selector=>{if(!elements.has(selector))elements.set(selector,element());return elements.get(selector)};
-links.push(get('roomLink'),get('avatarLink'),get('bannerLink'));links[0].dataset.toolLink='room';links[1].dataset.toolLink='avatar';links[2].dataset.toolLink='banner';
-const doc={hidden:false,body:element(),title:'',querySelector:get,querySelectorAll:s=>s==='[data-tool-link]'?links:[],createElement:tag=>Object.assign(element(),{isCanvas:tag==='canvas'}),addEventListener(k,fn){docListeners.set(k,fn)}};
+for(const [id,tool] of [['roomLink','room'],['avatarLink','avatar'],['bannerLink','banner'],['giftPreviewLink','gift-preview'],['resourcesLink','resources']]){const link=get(id);link.dataset.toolLink=tool;links.push(link)}
+links[3].dataset.i18n='giftPreviewNav';get('#giftPreviewHeading').dataset.i18n='giftPreviewTitle';
+const doc={hidden:false,body:element(),title:'',querySelector:get,querySelectorAll:s=>s==='[data-tool-link]'?links:s==='[data-i18n]'?[links[3],get('#giftPreviewHeading')]:[],createElement:tag=>Object.assign(element(),{isCanvas:tag==='canvas'}),addEventListener(k,fn){docListeners.set(k,fn)}};
 class MockPlayer {
   constructor(host){this.host=host;this.steps=[];this._renderer={_prepared:true};players.push(this);host.append(Object.assign(element(),{isCanvas:true}))}
   setContentMode(){}onFrame(fn){this.callback=fn}setVideoItem(video){this.video=video;this._renderer._prepared=!holdRenderers}pauseAnimation(){this.paused=true}stepToFrame(frame,andPlay){this.steps.push({frame,andPlay});this.lastFrame=frame;this.paused=!andPlay}
@@ -29,6 +31,7 @@ const video=()=>({videoSize:{width:320,height:320},frames:60,FPS:30});
 const sandbox={document:doc,window:{addEventListener(){},FunToolkitUI:{setState(tool,value){assert.equal(tool,'avatar');feedback.push({...value})},reveal(target){reveals.push(target)},activate(tool){activations.push(tool)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},location:{hash:'#avatar-frames'},language:'en',localStorage:{getItem:k=>storage.get(k)},SVGA:{Player:MockPlayer,Parser:class{load(file,success,failure){const complete=()=>parseFails?failure(Error('bad')):success(nextVideo||video());if(holdParser)pendingParser=complete;else queueMicrotask(complete)}}},JSZip:{},ResizeObserver:class{observe(){}},IntersectionObserver:class{observe(){}},performance,URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},Blob,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,setTimeout,clearTimeout,matchMedia:()=>({matches:false,addEventListener(){}}),canvasToWebP:async()=>{if(encodeFails)throw Error('encode failed');return new Blob(['test'],{type:'image/webp'})},setLanguage(value){sandbox.language=value}};
 sandbox.window.SVGA=sandbox.SVGA;sandbox.window.JSZip=sandbox.JSZip;
 sandbox.window.Hub.activate=()=>{};sandbox.window.Hub.syncLanguage=()=>{};
+sandbox.window.GiftPreviewTool={activate(){assert.equal(get('#giftPreviewTool').classList.contains('hidden'),false,'gift activates after its page is visible');giftActivations++},syncLanguage(){giftLanguageSyncs++}};
 let source=fs.readFileSync(path.join(__dirname,'../toolkit.js'),'utf8');
 source=source.replace('window.Toolkit={syncLanguage};','window.Toolkit={syncLanguage};window.test={state,loadSvga,seek,togglePlayback,changeDimension,exportFrame,activateTool,syncLanguage,validateVideo};');
 vm.createContext(sandbox);vm.runInContext(source,sandbox);const api=sandbox.window.test;
@@ -97,5 +100,12 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   assert.equal(recorded('generated'),2);assert.equal(recorded('download'),3,'file failures, route and language changes, and page-wide drops must not count');
   get('#frameWidth').value='2048';api.changeDimension(get('#frameWidth'));const resizedStart=players[1].steps.length;await api.exportFrame();assert.equal(players[1].steps.length,resizedStart+2,'larger exports render at full size, then release the enlarged canvas');assert.equal(api.state.download.endsWith('-2048x2048.webp'),true);
   sandbox.location.hash='#resources';api.activateTool();assert.equal(api.state.active,'resources');assert.equal(get('#resourceTool').classList.contains('hidden'),false);assert.equal(get('#avatarTool').classList.contains('hidden'),true);assert.equal(doc.title,'资源库 · Fun Toolkit');sandbox.language='en';api.syncLanguage();assert.equal(doc.title,'Asset library · Fun Toolkit');
+  const retainedFrame=api.state.frame,retainedVideo=api.state.video;
+  sandbox.location.hash='#gift-previews';api.activateTool();assert.equal(api.state.active,'gift-preview');assert.equal(activations.at(-1),'gift-preview');assert.equal(links[3]['aria-current'],'page');assert.equal(links[4]['aria-current'],undefined);assert.equal(get('#giftPreviewTool').classList.contains('hidden'),false);assert.equal(get('#resourceTool').classList.contains('hidden'),true);assert.equal(get('#avatarTool').classList.contains('hidden'),true);assert.equal(doc.title,'Gift & vehicle preview maker · Fun Toolkit');assert.equal(giftActivations,1);
+  api.activateTool();assert.equal(giftActivations,1,'click followed by hashchange only activates the new tool once');
+  const giftSyncBefore=giftLanguageSyncs;sandbox.language='zh';api.syncLanguage();assert.equal(giftLanguageSyncs,giftSyncBefore+1);assert.equal(doc.title,'礼物&座驾预览图生产工具 · Fun Toolkit');assert.equal(links[3].textContent,'预览图');assert.equal(get('#giftPreviewHeading').textContent,'礼物&座驾预览图生产工具');
+  sandbox.location.hash='#resources';api.activateTool();assert.equal(get('#giftPreviewTool').classList.contains('hidden'),true);assert.equal(links[4]['aria-current'],'page');
+  sandbox.location.hash='#gift-previews';api.activateTool();assert.equal(giftActivations,2,'re-entering gift preview activates its retained canvas');
+  sandbox.location.hash='#avatar-frames';api.activateTool();assert.equal(get('#giftPreviewTool').classList.contains('hidden'),true);assert.equal(api.state.video,retainedVideo);assert.equal(api.state.frame,retainedFrame,'gift navigation preserves the avatar file and selected frame');sandbox.language='en';api.syncLanguage();assert.equal(links[3].textContent,'Preview');assert.equal(get('#giftPreviewHeading').textContent,'Gift & vehicle preview maker');
   console.log('PASS: shared empty/loading/processing/ready/success/error feedback, translated async labels, busy controls, one-time preview/result reveals, no scrub reveal, failed-export preservation; navigation/state retention, live FileList, paused first-frame uploads and export, explicit playback, exact frame/Enter, pause-on-edit, bounded seeking, locked dimensions, invalid input, export naming, corrupt-file preservation, language, page-wide drop, successful-only generation/download and retry counts.');
 })().catch(error=>{console.error(error);process.exitCode=1});

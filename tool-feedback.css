@@ -1,9 +1,9 @@
 /* Shared feedback for the production tools and resource library. No export pixels change. */
 .tool-empty-art{display:block;width:120px;height:90px;object-fit:contain;margin:0 auto 12px;pointer-events:none}
-:is(#roomTool,#avatarTool,#bannerTool) .upload-empty{max-width:100%;padding:24px 16px;text-align:center}
-:is(#roomTool,#avatarTool,#bannerTool) .upload-empty strong{font-size:16px;line-height:24px;font-weight:600;margin-bottom:6px}
-:is(#roomTool,#avatarTool,#bannerTool) .upload-empty>span{display:block;font-size:12px;line-height:18px;color:#626c7c}
-:is(#roomTool,#avatarTool,#bannerTool) .upload-empty .preview-upload{height:44px;min-height:44px;min-width:160px;margin-top:20px;font-size:14px}
+:is(#roomTool,#avatarTool,#bannerTool,#giftPreviewTool) .upload-empty{max-width:100%;padding:24px 16px;text-align:center}
+:is(#roomTool,#avatarTool,#bannerTool,#giftPreviewTool) .upload-empty strong{font-size:16px;line-height:24px;font-weight:600;margin-bottom:6px}
+:is(#roomTool,#avatarTool,#bannerTool,#giftPreviewTool) .upload-empty>span{display:block;font-size:12px;line-height:18px;color:#626c7c}
+:is(#roomTool,#avatarTool,#bannerTool,#giftPreviewTool) .upload-empty .preview-upload{height:44px;min-height:44px;min-width:160px;margin-top:20px;font-size:14px}
 .tool-output-empty{position:relative;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:0;min-height:196px;padding:28px 20px;border:1px dashed #d8dce2;border-radius:13px;background:#f9fbfe;color:#626c7c;text-align:center;font-size:12px;line-height:20px}
 .tool-output-empty .tool-empty-art{width:96px;height:72px;margin-bottom:12px}
 .tool-output-empty .tool-placeholder-art{width:72px;height:72px}
@@ -33,10 +33,10 @@ button[data-feedback-button][aria-busy="true"][data-ft-running="true"]::before{a
 .progress-track{height:6px;background:#e8edf4}.progress-bar{background:#0071e3;transition:width 160ms ease-out}
 @media(max-width:540px){
  .tool-empty-art{width:96px;height:72px}
- :is(#roomTool,#avatarTool,#bannerTool) .upload-empty{padding:20px 12px}
- :is(#roomTool,#avatarTool,#bannerTool) .upload-empty strong{font-size:15px;line-height:22px}
- :is(#roomTool,#avatarTool,#bannerTool) .upload-empty>span{font-size:12px;line-height:18px}
- :is(#roomTool,#avatarTool,#bannerTool) .upload-empty .preview-upload{min-width:148px;margin-top:16px}
+ :is(#roomTool,#avatarTool,#bannerTool,#giftPreviewTool) .upload-empty{padding:20px 12px}
+ :is(#roomTool,#avatarTool,#bannerTool,#giftPreviewTool) .upload-empty strong{font-size:15px;line-height:22px}
+ :is(#roomTool,#avatarTool,#bannerTool,#giftPreviewTool) .upload-empty>span{font-size:12px;line-height:18px}
+ :is(#roomTool,#avatarTool,#bannerTool,#giftPreviewTool) .upload-empty .preview-upload{min-width:148px;margin-top:16px}
  .tool-output-empty{padding:24px 16px;min-height:180px}
  .tool-output-empty .tool-empty-art{width:80px;height:60px}
  .tool-output-empty .tool-placeholder-art{width:64px;height:64px}
