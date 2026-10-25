@@ -200,6 +200,42 @@ const restoredMissedRGB = Uint8ClampedArray.from([12,3,1,61]);
 renderer.recoverBlackPixels(restoredMissedRGB, Uint8ClampedArray.of(0), Uint8ClampedArray.of(255));
 assert.deepEqual(Array.from(restoredMissedRGB), [12,3,1,61], 'restore can recover original RGB even when the base matte removed the pixel');
 
+// A quality matte already contains straight, decontaminated RGBA. Erasing fades
+// that alpha without recovering RGB again; restoring adds only the newly
+// revealed original pixels, leaving the existing cutout contribution intact.
+const retouchOriginal = Uint8ClampedArray.from([120,60,30,255]);
+const retouchOriginalBefore = retouchOriginal.slice();
+const cleanCutout = Uint8ClampedArray.from([240,120,60,128]);
+const eraseTarget = Uint8ClampedArray.of(64);
+assert.equal(renderer.retouchForeground(cleanCutout, retouchOriginal, eraseTarget), cleanCutout,
+  'foreground retouch returns its edited pixel buffer');
+assert.deepEqual(Array.from(cleanCutout), [240,120,60,64], 'erase preserves decontaminated RGB and changes alpha only');
+assert.deepEqual(Array.from(eraseTarget), [64], 'retouch does not mutate the brush target');
+const restoredCutout = Uint8ClampedArray.from([240,120,60,128]);
+renderer.retouchForeground(restoredCutout, retouchOriginal, Uint8ClampedArray.of(192));
+assert.deepEqual(Array.from(restoredCutout), [200,100,50,192], 'partial restore mixes existing straight colour with only the original alpha increment');
+for (let channel = 0; channel < 3; channel++) {
+  close(restoredCutout[channel] * restoredCutout[3],
+    [240,120,60][channel] * 128 + retouchOriginal[channel] * 64,
+    'restore preserves the previous premultiplied cutout contribution');
+}
+const whollyRemoved = Uint8ClampedArray.from([99,88,77,0]);
+renderer.retouchForeground(whollyRemoved, retouchOriginal, Uint8ClampedArray.of(128));
+assert.deepEqual(Array.from(whollyRemoved), [120,60,30,128], 'a zero-alpha cutout can recover original colour on restore');
+const fullyRestored = Uint8ClampedArray.from([0,0,0,0]);
+renderer.retouchForeground(fullyRestored, retouchOriginal, Uint8ClampedArray.of(255));
+assert.deepEqual(fullyRestored, retouchOriginal, 'full restore from zero alpha reproduces the original RGBA');
+const zeroTarget = Uint8ClampedArray.from([240,120,60,128]);
+renderer.retouchForeground(zeroTarget, retouchOriginal, Uint8ClampedArray.of(0));
+assert.deepEqual(Array.from(zeroTarget), [240,120,60,0], 'full erase does not divide by zero or change hidden colour');
+const untouchedCutout = Uint8ClampedArray.from([240,120,60,128]);
+renderer.retouchForeground(untouchedCutout, retouchOriginal, Uint8ClampedArray.of(128));
+assert.deepEqual(Array.from(untouchedCutout), [240,120,60,128], 'an unchanged mask is a no-op');
+assert.deepEqual(retouchOriginal, retouchOriginalBefore, 'restoring never changes the saved original pixels');
+assert.throws(() => renderer.retouchForeground(new Uint8ClampedArray(3), retouchOriginal, Uint8ClampedArray.of(128)), RangeError);
+assert.throws(() => renderer.retouchForeground(new Uint8ClampedArray(4), new Uint8ClampedArray(8), Uint8ClampedArray.of(128)), RangeError);
+assert.throws(() => renderer.retouchForeground(new Uint8ClampedArray(4), retouchOriginal, new Uint8ClampedArray(2)), RangeError);
+
 const calls = [];
 const canvasPixels = Uint8ClampedArray.from([210, 90, 25, 128]);
 const context = {

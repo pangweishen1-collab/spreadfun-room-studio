@@ -1,12 +1,8 @@
-import * as ort from './vendor/ort/ort.wasm.min.mjs';
+import {ort} from './gift-matting-runtime.mjs?v=20261025-speed1';
 
 const SIDE=512,MODEL_SHA='eff9216bb2f9d3f023d9c2b7196845a7485739ab1f231593633e4d2344ffc516';
 const assetBase=new URL('./assets/matting/',import.meta.url);
 let sessionPromise=null;
-ort.env.wasm.numThreads=1;
-ort.env.wasm.proxy=false;
-ort.env.wasm.wasmPaths=new URL('./vendor/ort/',import.meta.url).href;
-ort.env.logLevel='error';
 
 export function preprocess(rgba,width=SIDE,height=SIDE){
   if(!(rgba instanceof Uint8ClampedArray)||!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||rgba.length!==width*height*4)throw new Error('图片像素尺寸无效。');

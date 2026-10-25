@@ -13,8 +13,8 @@
   Object.assign(copy.en,{alignment:'Canvas alignment and preview',alignHorizontal:'Horizontal align',alignVertical:'Vertical align',viewContext:'Gift panel preview',returnEdit:'Gift image preview',contextLabel:'Gift panel preview. Scroll to explore.',contextHint:'Live gift panel preview. Adjust settings, or press Esc to edit.',dragHint:'Drag to position, scroll to zoom, double-click to center. Arrow keys to nudge.'});
   Object.assign(copy.zh,{advanced:'高级调整',retouch:'局部修整',toolMove:'移动',toolErase:'擦除',toolRestore:'恢复',brushSize:'笔刷大小',brushHardness:'硬度',brushOpacity:'不透明度',clearErase:'清空擦除',history:'操作历史',undo:'撤销',redo:'重做',transform:'旋转与翻转',rotation:'旋转角度',rotateLeft:'左转 90°',rotateRight:'右转 90°',flipHorizontal:'水平翻转',flipVertical:'垂直翻转',safeArea:'安全区辅助线',safeToggle:'显示安全区与中心线',safeInset:'安全边距',brushHint:'拖动笔刷修整；[ / ] 调整大小，Esc 返回移动，⌘/Ctrl Z 撤销'});
   Object.assign(copy.en,{advanced:'Advanced adjustments',retouch:'Retouch',toolMove:'Move',toolErase:'Erase',toolRestore:'Restore',brushSize:'Brush size',brushHardness:'Hardness',brushOpacity:'Opacity',clearErase:'Clear erasing',history:'Edit history',undo:'Undo',redo:'Redo',transform:'Rotate and flip',rotation:'Rotation',rotateLeft:'Rotate left 90°',rotateRight:'Rotate right 90°',flipHorizontal:'Flip horizontally',flipVertical:'Flip vertically',safeArea:'Safe area guides',safeToggle:'Show safe area and center lines',safeInset:'Safe margin',brushHint:'Drag to retouch. [ / ] size, Esc to move, Cmd/Ctrl Z to undo.'});
-  Object.assign(copy.zh,{removeBackground:'一键抠图',restoreBackground:'还原背景',removing:'正在抠图…',removeProgress:'抠图进度',modelLoading:'正在加载抠图组件',removeError:'抠图失败，请检查网络或稍后重试；原图已保留。',removeHint:'自动保留黑底光效与粒子；复杂背景使用主体识别，图片仅在本地处理。'});
-  Object.assign(copy.en,{removeBackground:'Remove background',restoreBackground:'Restore background',removing:'Removing background…',removeProgress:'Background removal progress',modelLoading:'Loading background removal',removeError:'Background removal failed. Check your connection and retry. Your original image is preserved.',removeHint:'Preserves light effects on black. Complex backgrounds use subject detection. Your image stays on this device.'});
+  Object.assign(copy.zh,{removeBackground:'一键抠图',restoreBackground:'还原背景',removing:'正在抠图…',removeProgress:'抠图进度',modelLoading:'正在加载抠图组件',removeError:'抠图失败，请检查网络或稍后重试；原图已保留。',removeHint:'先识别主体，再精修黑底边缘并恢复光效与粒子；首次使用需加载模型，图片仅在本地处理。'});
+  Object.assign(copy.en,{removeBackground:'Remove background',restoreBackground:'Restore background',removing:'Removing background…',removeProgress:'Background removal progress',modelLoading:'Loading background removal',removeError:'Background removal failed. Check your connection and retry. Your original image is preserved.',removeHint:'Detects the subject, refines dark-backed edges and recovers light effects. Models load on first use. Your image stays on this device.'});
   const state={image:null,file:null,settings:{...defaults},strokes:[],baseMask:null,removing:false,removeProgress:null,tool:'move',brush:{size:20,hardness:70,opacity:100},safe:{enabled:false,inset:10},mode:'feather',modeChosen:false,side:200,valid:true,loading:false,exporting:false,notice:null,background:'black',view:'edit',download:null,revision:0};
   const t=key=>(copy[language]||copy.en)[key]||copy.en[key]||key;
   let renderRequest=0,drag=null,loadToken=0,editGroup=null,wheelTimer=0,hoverPoint=null,mattingTimer=0,mattingPresentation=0,mattingPercent=0,mattingVisible=false;
@@ -55,7 +55,7 @@
   }
   function updateMattingProgress(progress){
     const fraction=Math.max(0,Math.min(1,Number(progress?.progress)||0));
-    const percent={analyzing:10*fraction,matting:10+90*fraction,loading:10+70*fraction,processing:80+20*fraction}[progress?.phase];
+    const percent=['analyzing','matting','loading','processing'].includes(progress?.phase)?100*fraction:NaN;
     if(Number.isFinite(percent))mattingPercent=Math.max(mattingPercent,Math.round(percent));
   }
   function syncControls(){

@@ -1,0 +1,48 @@
+{
+  "file": "model_quantized.onnx",
+  "bytes": 27499369,
+  "sha256": "8216103d998864e122333e17d7d346feb1d6558d96bf08695a9838dba4f114e0",
+  "ir_version": 7,
+  "opsets": [
+    {
+      "domain": "",
+      "version": 12
+    }
+  ],
+  "operators": {
+    "Add": 243,
+    "Cast": 352,
+    "Concat": 171,
+    "Constant": 811,
+    "ConstantOfShape": 8,
+    "ConvInteger": 22,
+    "DequantizeLinear": 16,
+    "Div": 120,
+    "DynamicQuantizeLinear": 69,
+    "Einsum": 24,
+    "Erf": 20,
+    "Gather": 134,
+    "Identity": 7,
+    "MatMul": 24,
+    "MatMulInteger": 48,
+    "Mod": 32,
+    "Mul": 340,
+    "Pad": 8,
+    "Pow": 37,
+    "Range": 24,
+    "ReduceMean": 72,
+    "Relu": 8,
+    "Reshape": 151,
+    "Resize": 13,
+    "Shape": 111,
+    "Sigmoid": 1,
+    "Slice": 25,
+    "Softmax": 12,
+    "Split": 12,
+    "Sqrt": 36,
+    "Squeeze": 36,
+    "Sub": 116,
+    "Transpose": 78,
+    "Unsqueeze": 492
+  }
+}

@@ -1,0 +1,19 @@
+ViTMatte small Composition-1k ONNX (quantized)
+
+Base model: https://huggingface.co/hustvl/vitmatte-small-composition-1k
+The base-model card declares Apache-2.0. See BASE-MODEL-README.md and
+APACHE-2.0.txt. This is a converted inference model, not a newly trained model.
+
+ONNX conversion: https://huggingface.co/Xenova/vitmatte-small-composition-1k
+Pinned revision: 6bc1297f6140f055a227b6d2cfe8c093281f35d2
+The conversion repository does not declare an additional license in its model
+card. Its README identifies the upstream HUST model as the base.
+
+Original ViTMatte code: https://github.com/hustvl/ViTMatte
+Copyright (c) 2023 Hust Vision Lab. Original code is MIT licensed; preserved in
+UPSTREAM-CODE-MIT.txt. The original-code MIT notice is not a replacement for
+the base-model card's Apache-2.0 declaration.
+
+This asset is split byte-for-byte into two binary chunks for local static
+hosting. Reconstruct in manifest order, verify each chunk and full SHA-256.
+No image or image pixel data is sent to either upstream service by this module.

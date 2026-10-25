@@ -5,6 +5,8 @@
   let maskCache = null;
   let brushCache = null;
   let lightCanvasCache = null;
+  let foregroundCache = null;
+  let restoreCanvas = null;
 
   function number(value, fallback) {
     return Number.isFinite(Number(value)) ? Number(value) : fallback;
@@ -78,7 +80,7 @@
     if (!mask) return output;
     if (!Number.isInteger(mask.width) || !Number.isInteger(mask.height) || mask.width < 1 || mask.height < 1 || mask.width > 2048 || mask.height > 2048 || mask.data?.length !== mask.width * mask.height) throw new RangeError('Invalid source alpha mask.');
     const p = getPlacement(sourceWidth, sourceHeight, side, config), sx = p.flipX ? -1 : 1, sy = p.flipY ? -1 : 1;
-    if (mask.recoverBlack === true && typeof document !== 'undefined') return canvasLightMask(mask, p, side);
+    if ((mask.recoverBlack === true || mask.foreground) && typeof document !== 'undefined') return canvasLightMask(mask, p, side);
     for (let y = 0; y < side; y++) for (let x = 0; x < side; x++) {
       const dx = (x + .5 - p.centerX) * sx, dy = (y + .5 - p.centerY) * sy;
       const u = .5 + (dx * p.cosine + dy * p.sine) / p.width, v = .5 + (-dx * p.sine + dy * p.cosine) / p.height;
@@ -112,7 +114,10 @@
     if (!lightCanvasCache || lightCanvasCache.mask !== mask) {
       const source = document.createElement('canvas'); source.width = mask.width; source.height = mask.height;
       const ctx = source.getContext('2d', {willReadFrequently: true}), pixels = ctx.createImageData(mask.width, mask.height);
-      for (let i = 0; i < mask.data.length; i++) { pixels.data[i * 4] = pixels.data[i * 4 + 1] = pixels.data[i * 4 + 2] = mask.data[i]; pixels.data[i * 4 + 3] = 255; }
+      for (let i = 0; i < mask.data.length; i++) {
+        pixels.data[i * 4] = pixels.data[i * 4 + 1] = pixels.data[i * 4 + 2] = mask.foreground ? 255 : mask.data[i];
+        pixels.data[i * 4 + 3] = mask.foreground ? mask.data[i] : 255;
+      }
       ctx.putImageData(pixels, 0, 0);
       lightCanvasCache = {mask, source, output: document.createElement('canvas')};
     }
@@ -121,8 +126,29 @@
     const context = target.getContext('2d', {willReadFrequently: true});
     paintPlaced(context, lightCanvasCache.source, side, placement);
     const rgba = context.getImageData(0, 0, side, side).data, output = new Uint8ClampedArray(side * side);
-    for (let i = 0; i < output.length; i++) output[i] = rgba[i * 4];
+    for (let i = 0; i < output.length; i++) output[i] = rgba[i * 4 + (mask.foreground ? 3 : 0)];
     return output;
+  }
+
+  function foregroundSource(mask) {
+    if (!foregroundCache || foregroundCache.mask !== mask) {
+      if (!(mask.foreground instanceof Uint8ClampedArray) || mask.foreground.length !== mask.width * mask.height * 4) throw new RangeError('Invalid foreground pixels.');
+      const source = document.createElement('canvas'); source.width = mask.width; source.height = mask.height;
+      const context = source.getContext('2d'), pixels = context.createImageData(mask.width, mask.height);
+      pixels.data.set(mask.foreground); context.putImageData(pixels, 0, 0);
+      foregroundCache = {mask, source};
+    }
+    return foregroundCache.source;
+  }
+
+  function retouchForeground(pixels, original, editedMask) {
+    if (pixels.length !== original.length || pixels.length !== editedMask.length * 4) throw new RangeError('Invalid foreground retouch pixels.');
+    for (let i = 0; i < editedMask.length; i++) {
+      const offset = i * 4, base = pixels[offset + 3], target = editedMask[i], restored = Math.max(0, target - base);
+      if (restored) for (let channel = 0; channel < 3; channel++) pixels[offset + channel] = Math.round((pixels[offset + channel] * base + original[offset + channel] * restored) / target);
+      pixels[offset + 3] = target;
+    }
+    return pixels;
   }
 
   function brushCoverage(distance, radius, hardness) {
@@ -288,17 +314,26 @@
     const placement = getPlacement(image.naturalWidth || image.width, image.naturalHeight || image.height, side, config);
     const context = canvas.getContext('2d', {willReadFrequently: true});
     if (!context) throw new Error('A 2D canvas context is required.');
-    paintPlaced(context, image, side, placement);
+    const cutout = config.baseMask?.foreground;
+    // Resize the already transparent, decontaminated pixels. Resizing the old
+    // black-backed image first mixes black into the 200px edge a second time.
+    paintPlaced(context, cutout ? foregroundSource(config.baseMask) : image, side, placement);
     if (!config.baseMask && !config.strokes.length && config.mode === 'transparent' && config.saturation === 100 && config.brightness === 100 && config.contrast === 100) return placement;
     const pixels = context.getImageData(0, 0, side, side);
     const brushMask = config.baseMask || config.strokes.length ? cachedBrushMask(image.naturalWidth || image.width, image.naturalHeight || image.height, side, config) : null;
-    if (config.baseMask?.recoverBlack === true) recoverBlackPixels(pixels.data, config.strokes.length ? sourceMask(image.naturalWidth || image.width, image.naturalHeight || image.height, side, config) : brushMask, brushMask);
+    if (cutout && config.strokes.length) {
+      if (!restoreCanvas) restoreCanvas = document.createElement('canvas');
+      restoreCanvas.width = restoreCanvas.height = side;
+      const original = restoreCanvas.getContext('2d', {willReadFrequently: true});
+      paintPlaced(original, image, side, placement);
+      retouchForeground(pixels.data, original.getImageData(0, 0, side, side).data, brushMask);
+    } else if (config.baseMask?.recoverBlack === true) recoverBlackPixels(pixels.data, config.strokes.length ? sourceMask(image.naturalWidth || image.width, image.naturalHeight || image.height, side, config) : brushMask, brushMask);
     applyPixels(pixels.data, side, side, config);
-    if (brushMask) applyBrushMask(pixels.data, brushMask);
+    if (brushMask && !cutout) applyBrushMask(pixels.data, brushMask);
     context.putImageData(pixels, 0, 0);
     return placement;
   }
 
-  const renderer = {render, getPlacement, toSourcePoint, toCanvasPoint, applyPixels, createMask, createBrushMask, applyBrushMask, recoverBlackPixels, brushCoverage};
+  const renderer = {render, getPlacement, toSourcePoint, toCanvasPoint, applyPixels, createMask, createBrushMask, applyBrushMask, recoverBlackPixels, retouchForeground, brushCoverage};
   root.GiftPreviewRenderer = renderer;
 })(typeof window !== 'undefined' ? window : globalThis);

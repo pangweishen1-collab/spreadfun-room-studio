@@ -11,7 +11,7 @@ function median(histogram, count) {
 
 // Bright wisps may cross an edge. Require the dominant colour on every edge,
 // and almost all of each corner patch, to agree on one nearly black backdrop.
-function darkBackground(rgba, width, height) {
+export function darkBackground(rgba, width, height) {
   const sides = [];
   for (let side = 0; side < 4; side++) {
     const length = side < 2 ? width : height;

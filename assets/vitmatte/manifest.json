@@ -1,0 +1,47 @@
+{
+  "schema": 1,
+  "name": "vitmatte-small-composition-1k-quantized",
+  "revision": "6bc1297f6140f055a227b6d2cfe8c093281f35d2",
+  "source": "https://huggingface.co/Xenova/vitmatte-small-composition-1k",
+  "base_model": "https://huggingface.co/hustvl/vitmatte-small-composition-1k",
+  "license": "Apache-2.0 (base model card); original HUST code MIT; ONNX conversion repo declares no additional license",
+  "bytes": 27499369,
+  "sha256": "8216103d998864e122333e17d7d346feb1d6558d96bf08695a9838dba4f114e0",
+  "chunks": [
+    {
+      "file": "vitmatte-small-q8-01.bin",
+      "bytes": 20971520,
+      "sha256": "ae43ca10397215cf30c001d9ac44c47b62d37b153a98fac29d88eee33e1aed2d"
+    },
+    {
+      "file": "vitmatte-small-q8-02.bin",
+      "bytes": 6527849,
+      "sha256": "10e5cd907dc8086d66c994178205522453f8fa4b1aa0c135959e7ec9fa553adc"
+    }
+  ],
+  "input": {
+    "name": "pixel_values",
+    "type": "float32",
+    "shape": [
+      1,
+      4,
+      "H",
+      "W"
+    ],
+    "rgb": "rgbaByte / 127.5 - 1",
+    "trimap": "trimapByte / 255 (0=background, 127/128=unknown, 255=foreground)",
+    "pad": "right and bottom 0 padding after normalization; H and W divisible by 32"
+  },
+  "output": {
+    "name": "alphas",
+    "type": "float32",
+    "shape": [
+      1,
+      1,
+      "H",
+      "W"
+    ],
+    "values": "already sigmoid alpha 0..1; crop padding; enforce known trimap labels"
+  },
+  "ort_wasm_validation": "project vendored ONNX Runtime 1.30.0; single-thread WASM on Node v24.22.1, successful at 256 and 512. Browser actual run remains integration check."
+}
