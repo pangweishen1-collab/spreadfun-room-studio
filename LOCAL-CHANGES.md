@@ -45,3 +45,15 @@ python3 -m http.server 8765 --bind 127.0.0.1
 尚未同步发布目录，也未提交、推送 GitHub 或部署。需要发布时先将主文件同步为 `GitHub-Pages/index.html`，再按交接说明发布与验收。
 
 旧 JXA 检查依赖原设备的固定路径，已改用项目相对路径的 Node 回归脚本。原始交接 ZIP 保持原样。
+
+
+## 2026-10-26 · VAP invisible RGB cleanup (local, after 1.3.0)
+
+The user-provided Pakistan reference visibly blacks out fully clear areas in RGB as well as storing Alpha. Previous exports retained hidden RGB in these areas, so ordinary-player views did not expose mask bounds. The local engine now clears RGB only at exact full-resolution Alpha=0; partial RGB stays straight and the independent Alpha plane is unchanged. Native opaque conversion caches a binary full-size clearing surface and avoids per-frame JS readback. Player and third-party SDK files remain unchanged. 23 regression suites, Pages build, independent review, actual browser export, decoded color/Alpha checks, QuickTime and Tencent Web playback passed. The verification sample reconstructed from the older packed file is 720×1560, 24 FPS, 2,457,569 bytes; it is not a replacement for testing the original source. Production remains v1.3.0 until a separate release.
+
+
+## 2026-10-26 · Continuous RGB feather (supersedes clear-only default; local)
+
+The user rejected the hard RGB boundary of the clear-only sample. The UI now defaults to synchronized RGB/Alpha feather: RGB is weighted by the final continuous full-resolution alpha; independent Alpha remains continuous. Cached native masking avoids per-frame JS readback. The embedded namespaced rgbAlphaMode marker configures WebGL premultiplied composition and prevents a second alpha multiplication on this website. Advanced settings retain straight RGB for SDKs requiring SourceAlpha blending; engine API default and unmarked historical resources retain straight behavior. Do not claim all native SDKs accept the new reference-style default without target-device checks.
+
+23 regression suites, independent review, actual UI encoding, 0/4/8-second RGB curve/composite analysis, QuickTime soft-edge playback, main and inspector White/checker playback, and Pages build passed. Sample is 720×1560 at24fps, 2,454,702 bytes, reconstructed from old packed RGB for visual verification; not the untouched source. Production remains unchanged until release authorization. Evidence is outside the public source under outputs/vap-feather-verification.

@@ -82,17 +82,19 @@ main[data-tool]{padding-top:32px}
 }
 
 /* Banner previews use the shared upload, file and download controls. */
-.banner-preview{min-height:0}
-.banner-project-picker{padding-top:20px;margin-top:20px;border-top:1px solid var(--tool-border,#e5e7eb)}
-.banner-project-picker h3{margin:0 0 16px;color:var(--tool-heading);font-size:16px;line-height:24px;font-weight:650}
-.banner-project-catalog{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.banner-preview{min-height:0;container-type:inline-size}
+.banner-project-catalog{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+#bannerTool .banner-project-catalog .resource-project{flex-direction:row;justify-content:flex-start;gap:10px;min-height:64px;padding:12px 28px 12px 12px;text-align:left}
+#bannerTool .banner-project-catalog .resource-project-art{width:32px;flex:0 0 32px}
+#bannerTool .banner-project-catalog .resource-project-name{justify-content:flex-start;margin:0;text-align:left;font-size:14px;line-height:20px}
+#bannerTool .banner-project-catalog .resource-project-check{top:50%;right:8px;transform:translateY(-50%)}
 .banner-export-project{margin:14px 0 10px;color:var(--tool-heading);font-size:14px;font-weight:600}
 .banner-output-specs{display:grid;gap:10px;margin-bottom:14px}
 .banner-output-spec{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;padding:14px 12px;border:1px solid var(--line);border-radius:12px;background:var(--tool-bg)}
 .banner-output-spec strong{font-size:13px;font-weight:600}
 .banner-output-spec span{font-size:12px;color:var(--tool-muted);font-variant-numeric:tabular-nums;white-space:nowrap}
 
-@media(max-width:540px){.banner-project-catalog{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
+@container(max-width:600px){#bannerTool .banner-project-catalog{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}}
 .frame-stage,.banner-stage{height:440px}
 .banner-stage.has-banners{height:auto;min-height:0;padding:20px;background:var(--tool-bg);cursor:default}
 .banner-stage.drag{box-shadow:inset 0 0 0 3px #2786ed;background:#dcecff}

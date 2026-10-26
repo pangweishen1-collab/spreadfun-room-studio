@@ -1,0 +1,4 @@
+/* A decorative icon follows the existing playback button's pressed state. */
+#vapResultPlay{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+#vapResultPlay::before{content:"";display:block;flex:0 0 14px;width:14px;height:14px;background:currentColor;clip-path:polygon(25% 10%,85% 50%,25% 90%)}
+#vapResultPlay[aria-pressed=true]::before{clip-path:polygon(18% 10%,40% 10%,40% 90%,18% 90%,18% 10%,60% 10%,82% 10%,82% 90%,60% 90%,60% 10%)}

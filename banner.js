@@ -43,7 +43,7 @@
       "exportError": "生成失败，请重试。",
       "frameError": "游戏外框未能加载，请刷新后重试。",
       "zipError": "打包失败，请重试或分别下载。",
-      "projects": "选择项目",
+      "projects": "选择项目规范",
       "select": "选择",
       "banner": "Banner"
     },
@@ -87,7 +87,7 @@
       "exportError": "Could not create the banners. Please try again.",
       "frameError": "Could not load the game frame. Refresh and try again.",
       "zipError": "Could not create the ZIP. Retry or download each file.",
-      "projects": "Choose a project",
+      "projects": "Choose project specifications",
       "select": "Select",
       "banner": "Banner"
     }

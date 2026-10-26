@@ -18,7 +18,7 @@ function fileCheck(file){
 }
 
 export function normalizeOptions(options={},metadata={}){
-  const o={sourceKind:'plain_mp4',matteMethod:'black_luma',screenColor:'auto',alphaScale:.5,width:720,height:1560,fps:24,targetBytes:3000000,quality:'balanced',keepAudio:true,audioGain:1,confirmedOpaque:false,...options};
+  const o={sourceKind:'plain_mp4',matteMethod:'black_luma',screenColor:'auto',alphaScale:.5,width:720,height:1560,fps:24,targetBytes:3000000,quality:'balanced',rgbAlphaMode:'straight',keepAudio:true,audioGain:1,confirmedOpaque:false,...options};
   if(o.verticalMask===undefined)o.verticalMask={enabled:false};
   else{
     const m=o.verticalMask;
@@ -34,6 +34,7 @@ export function normalizeOptions(options={},metadata={}){
   const methods=o.sourceKind==='chroma_mp4'?['chroma_key']:['black_luma','white_luma','ai_foreground','manual_mask','opaque'];
   if(!methods.includes(o.matteMethod))throw new VapError('invalid','当前输入类型与去背景方式不匹配。');
   if(!['auto','green','blue'].includes(o.screenColor)||![.5,1].includes(o.alphaScale)||!['ultra','quality','balanced','size'].includes(o.quality)||typeof o.keepAudio!=='boolean')throw new VapError('invalid','转换参数无效，请重新选择。');
+  if(!['straight','premultiplied'].includes(o.rgbAlphaMode))throw new VapError('invalid','RGB 羽化方式无效。');
   if(!finite(o.audioGain)||o.audioGain<0||o.audioGain>2)throw new VapError('invalid','视频音量须为 0–200%。');
   if(o.matteMethod==='opaque'&&o.confirmedOpaque!==true)throw new VapError('invalid','请先确认保留不透明的矩形背景。');
   if(o.matteMethod==='manual_mask'&&!o.maskFile)throw new VapError('invalid','请先选择与原视频同步的遮罩文件。');
@@ -98,12 +99,21 @@ function prepareNativeOpaque(o,info,matteModule,images){
     return {enabled:false,reason:'fractional-contain-coverage'};
   }
   const weighted=matteModule.applyVerticalMask(base.data,o.width,o.height,o.verticalMask);
-  for(let i=0;i<weighted.length;i+=4){const alpha=weighted[i+3];weighted[i]=weighted[i+1]=weighted[i+2]=alpha;weighted[i+3]=255;}
+  let hasClearPixels=false,hasNonOpaquePixels=false;
+  for(let i=0;i<weighted.length;i+=4){const alpha=weighted[i+3];hasClearPixels ||= alpha===0;hasNonOpaquePixels ||= alpha!==255;weighted[i]=weighted[i+1]=weighted[i+2]=alpha;weighted[i+3]=255;}
   coverage.ctx.putImageData(new ImageData(weighted,o.width,o.height),0,0);
   const [, ,aw,ah]=computeVapLayout(o).aFrame,alpha=canvas(aw,ah);images.push(alpha.canvas);
   alpha.ctx.drawImage(coverage.canvas,0,0,aw,ah);
-  white.canvas.width=white.canvas.height=coverage.canvas.width=coverage.canvas.height=1;
-  return {enabled:true,reason:null,alpha:alpha.canvas,rect:[x,y,w,h]};
+  // Keep Alpha continuous and independent of RGB. Reference-style exports
+  // multiply RGB by full-resolution alpha; straight mode only clears hidden RGB.
+  const needsRGBMask=o.rgbAlphaMode==='premultiplied'?hasNonOpaquePixels:hasClearPixels;
+  if(needsRGBMask&&o.rgbAlphaMode==='straight'){
+    for(let i=0;i<weighted.length;i+=4)weighted[i]=weighted[i+1]=weighted[i+2]=weighted[i]===0?0:255;
+    coverage.ctx.putImageData(new ImageData(weighted,o.width,o.height),0,0);
+  }
+  if(!needsRGBMask)coverage.canvas.width=coverage.canvas.height=1;
+  white.canvas.width=white.canvas.height=1;
+  return {enabled:true,reason:null,alpha:alpha.canvas,rgbMask:needsRGBMask?coverage.canvas:null,rect:[x,y,w,h]};
 }
 async function open(file){
   fileCheck(file);const M=await media();
@@ -167,12 +177,14 @@ export async function probeSupport(options={}){
   return {...result,supported:result.secureContext&&result.webCodecsDecode&&result.webCodecsEncode&&result.canEncodeAvc};
 }
 
-/** Split a straight-RGBA matte into opaque RGB and opaque gray alpha planes. */
-export function splitPlanes(rgba,width,height,rgb,alpha){
+/** Pack either reference-style feathered RGB or legacy straight RGB with independent alpha. */
+export function splitPlanes(rgba,width,height,rgb,alpha,rgbAlphaMode='straight'){
   if(!(rgba instanceof Uint8ClampedArray)||rgba.length!==width*height*4)throw new VapError('matte','前景处理返回的像素尺寸不匹配。');
   if(!rgb)rgb=new Uint8ClampedArray(rgba.length);if(!alpha)alpha=new Uint8ClampedArray(rgba.length);
   if(rgb.length!==rgba.length||alpha.length!==rgba.length)throw new VapError('matte','打包缓冲区尺寸不匹配。');
-  for(let i=0;i<rgba.length;i+=4){rgb[i]=rgba[i];rgb[i+1]=rgba[i+1];rgb[i+2]=rgba[i+2];rgb[i+3]=255;alpha[i]=alpha[i+1]=alpha[i+2]=rgba[i+3];alpha[i+3]=255;}
+  if(!['straight','premultiplied'].includes(rgbAlphaMode))throw new VapError('invalid','RGB 羽化方式无效。');
+  const premultiplied=rgbAlphaMode==='premultiplied';
+  for(let i=0;i<rgba.length;i+=4){const a=rgba[i+3],visible=a!==0;for(let c=0;c<3;c++)rgb[i+c]=premultiplied?Math.round(rgba[i+c]*a/255):visible?rgba[i+c]:0;rgb[i+3]=255;alpha[i]=alpha[i+1]=alpha[i+2]=a;alpha[i+3]=255;}
   return {rgb,alpha};
 }
 
@@ -277,10 +289,13 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses})
           if(native.enabled){
             if(visible){
               packed.ctx.save();packed.ctx.beginPath();packed.ctx.rect(0,0,o.width,o.height);packed.ctx.clip();packed.ctx.drawImage(decoded.value.canvas,...native.rect);packed.ctx.restore();
+              // Cached full-resolution mask: continuous RGB feather or legacy clear-only
+              // packing, with no per-frame JavaScript pixel readback.
+              if(native.rgbMask){packed.ctx.globalCompositeOperation='multiply';packed.ctx.drawImage(native.rgbMask,0,0);packed.ctx.globalCompositeOperation='source-over';}
               packed.ctx.drawImage(native.alpha,ax,ay);
             }
           }else{
-            splitPlanes(matte.data,o.width,o.height,rgbPixels,alphaPixels);rgb.ctx.putImageData(rgbData,0,0);alpha.ctx.putImageData(alphaData,0,0);
+            splitPlanes(matte.data,o.width,o.height,rgbPixels,alphaPixels,o.rgbAlphaMode);rgb.ctx.putImageData(rgbData,0,0);alpha.ctx.putImageData(alphaData,0,0);
             packed.ctx.drawImage(rgb.canvas,0,0);packed.ctx.drawImage(alpha.canvas,ax,ay,aw,ah);
           }
           times.packMs+=clock()-t;
@@ -298,6 +313,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses})
     progress({phase:'packaging',progress:totalPasses===1?.97:.05+.90*pass/totalPasses,frame:frameCount,totalFrames:frameCount,pass});
     let t=clock();await output.finalize();times.muxMs=clock()-t;
     const config=makeVapc({width:o.width,height:o.height,fps:o.fps,frames:frameCount,alphaScale:o.alphaScale});
+    config.funToolkit={exportRevision:'rgb-feather-v1',rgbAlphaMode:o.rgbAlphaMode,verticalMask:{...o.verticalMask}};
     t=clock();const bytes=appendVapcBox(new Uint8Array(target.buffer),config);extractVapcBox(bytes);times.vapcMs=clock()-t;
     times.wallMs=clock()-started;
     return {blob:new Blob([bytes],{type:'video/mp4'}),config,frames:frameCount,audioMode,actualCodec,bitrate:plan.bitrate,processingPath:native.enabled?'native-opaque':'matte-processor',nativeOpaqueFallback:native.reason,times};
@@ -329,7 +345,7 @@ export async function convertVideo(file,options={}, {signal,onProgress=()=>{},on
   cancelled(signal);const warnings=[];
   if(plan.layout.legacyDimensionWarning)warnings.push('legacy-size');
   if(['black_luma','white_luma'].includes(o.matteMethod))warnings.push('luma-may-remove-subject');if(o.matteMethod==='opaque')warnings.push('opaque');if(o.matteMethod==='ai_foreground')warnings.push('ai-person-only');if(selected.audioMode==='transcoded')warnings.push('audio-transcoded');if(o.quality==='size')warnings.push('size-priority-loss');
-  const report={valid:true,version:2,quality:o.quality,qualityBudgetLimited:plan.qualityBudgetLimited,frames:selected.frames,fps:o.fps,width:o.width,height:o.height,packedWidth:plan.layout.videoW,packedHeight:plan.layout.videoH,alphaScale:o.alphaScale,bytes:selected.blob.size,targetBytes:o.targetBytes,maxBytes:LIMITS.outputBytes,budgetExceeded:false,durationSeconds:info.duration,audioKept:selected.audioMode==='copied'||selected.audioMode==='transcoded',audioCodec:info.hasAudio&&o.keepAudio&&o.audioGain>0?'aac':null,audioMode:selected.audioMode,audioGain:o.audioGain,bitrate:selected.bitrate,codec:selected.actualCodec,attempts,processingPath:selected.processingPath,nativeOpaqueFallback:selected.nativeOpaqueFallback,timings:{...timings,analysisMs,probeMs,wallMs:clock()-started},timingNotes:{packMs:'Elapsed Canvas calls/submission, not a GPU timer.',matteMs:'Null when no processor.process call was needed; native-opaque only calls it for requested preview frames.',previewMs:'Null when no preview callback was called; callback elapsed only.'},warnings};
+  const report={valid:true,version:2,transparentRGB:'black',rgbAlphaMode:o.rgbAlphaMode,quality:o.quality,qualityBudgetLimited:plan.qualityBudgetLimited,frames:selected.frames,fps:o.fps,width:o.width,height:o.height,packedWidth:plan.layout.videoW,packedHeight:plan.layout.videoH,alphaScale:o.alphaScale,bytes:selected.blob.size,targetBytes:o.targetBytes,maxBytes:LIMITS.outputBytes,budgetExceeded:false,durationSeconds:info.duration,audioKept:selected.audioMode==='copied'||selected.audioMode==='transcoded',audioCodec:info.hasAudio&&o.keepAudio&&o.audioGain>0?'aac':null,audioMode:selected.audioMode,audioGain:o.audioGain,bitrate:selected.bitrate,codec:selected.actualCodec,attempts,processingPath:selected.processingPath,nativeOpaqueFallback:selected.nativeOpaqueFallback,timings:{...timings,analysisMs,probeMs,wallMs:clock()-started},timingNotes:{packMs:'Elapsed Canvas calls/submission, not a GPU timer.',matteMs:'Null when no processor.process call was needed; native-opaque only calls it for requested preview frames.',previewMs:'Null when no preview callback was called; callback elapsed only.'},warnings};
   progress({phase:'packaging',progress:1,frame:selected.frames,totalFrames:selected.frames});
   return {blob:selected.blob,config:selected.config,report};
 }

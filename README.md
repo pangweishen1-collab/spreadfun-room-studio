@@ -1,6 +1,6 @@
 # Fun Toolkit
 
-当前版本 **1.3.0**。VAP 工具支持实时上下透明遮罩与本机导出；`vap-inspect.html` 可打开成品并按内嵌 Alpha 透明播放，普通视频播放器只显示 RGB 与灰度 Alpha 的拼接画面。完整更新见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **1.3.1**。VAP 工具支持实时上下透明遮罩与本机导出；`vap-inspect.html` 可打开成品并按内嵌 Alpha 透明播放，普通视频播放器只显示 RGB 与灰度 Alpha 的拼接画面。完整更新见 [CHANGELOG.md](CHANGELOG.md)。
 
 专为乐趣运营打造的素材处理工作台，包含聚合首页、五个生产工具、资源库与共享统计页。图片在浏览器中处理，正式站由 Cloudflare Pages 提供静态资源，API Worker + D1 保存现有工具统计与需求；本地可用 Python + SQLite 预览服务。
 

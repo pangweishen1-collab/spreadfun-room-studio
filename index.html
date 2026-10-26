@@ -51,7 +51,7 @@ body{min-width:320px}
 @media(max-width:540px){.topbar{padding:14px 16px;gap:14px}.brand{font-size:16px}.top-actions{width:100%;gap:8px}.language-switch{width:auto;min-width:112px;flex:1;height:40px}.top-actions #examplesButton,.top-actions #contactButton{width:auto;min-width:0;flex:1;font-size:12px;padding:5px 8px}main{padding:22px 16px 32px}.intro{margin-bottom:24px}.intro h1,.intro h1:lang(zh-CN){font-size:28px;letter-spacing:-.5px}.intro .eyebrow{font-size:9px;letter-spacing:1.4px;gap:8px}.intro .eyebrow:before,.intro .eyebrow:after{width:16px}.preview{padding:16px}.preview-head{gap:8px}.stage{height:450px}.upload-empty{padding:16px}.upload-empty strong{font-size:15px}.upload-empty span{display:block;line-height:1.6}.preview-grid{padding:12px;gap:10px}.preview-grid.count-2,.preview-grid.count-3{grid-template-columns:repeat(2,minmax(0,1fr))}.preview-grid.count-1 .batch-preview canvas{height:375px}.preview-grid.count-2 .batch-preview canvas,.preview-grid.count-3 .batch-preview canvas{height:210px}.delete-preview{width:30px;height:30px;line-height:30px}.preview-caption{font-size:11px}.exports{padding:16px}.file-actions button{min-height:36px}.examples-grid{grid-template-columns:1fr}.crop-dialog{padding:18px}.crop-dialog p{line-height:1.6}.crop-actions button{min-height:44px}.crop-control input{min-height:24px}.lifetime-stat{padding:16px}.site-footer{line-height:1.6}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
 </style>
-  <link rel="stylesheet" href="toolkit.css?v=20261026-banner-project-below">
+  <link rel="stylesheet" href="toolkit.css?v=20261026-banner-project-inline">
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="hub.css?v=20261023-tool-sheen1">
@@ -62,6 +62,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="resource-library.css?v=20261026-projects1">
   <link rel="stylesheet" href="design-system/select.css?v=20261024-select1">
   <link rel="stylesheet" href="design-system/upload-surface.css?v=1.4.4">
+  <link rel="stylesheet" href="vap-player.css?v=20261026-play-icon1">
 </head>
 <body>
   <header class="topbar"><a class="brand" id="brandHome" href="#home" data-i18n-label="homeLink" aria-label="Fun Toolkit home"><div class="mark" aria-hidden="true"><img src="assets/spreadfun-mark.webp" alt="" width="30" height="30"></div><div class="brand-copy"><span class="brand-name">Fun Toolkit</span></div></a><nav class="tool-navigation" id="toolsNavigation" aria-label="Tools"><a href="#room-backgrounds" data-tool-link="room" data-i18n-label="roomNav" aria-current="page"><span class="nav-label-full" data-i18n="roomNav">Room backgrounds</span><span class="nav-label-short" data-i18n="roomNavShort">Room BG</span></a><a href="#avatar-frames" data-tool-link="avatar" data-i18n-label="avatarNav"><span class="nav-label-full" data-i18n="avatarNav">Avatar frames</span><span class="nav-label-short" data-i18n="avatarNavShort">Avatar</span></a><a href="#banners" data-tool-link="banner" data-i18n-label="bannerNav"><span data-i18n="bannerNav">Banner</span></a><a id="giftPreviewLink" href="#gift-previews" data-tool-link="gift-preview" data-i18n-label="giftPreviewNav"><span data-i18n="giftPreviewNav">礼物图</span></a><a id="vapToolLink" href="#vap-tools" data-tool-link="vap" data-i18n-label="vapNav"><span data-i18n="vapNav">VAP工具</span></a><a id="resourcesLink" href="#resources" data-tool-link="resources" data-i18n-label="resourcesNav"><span data-i18n="resourcesNav">资源库</span></a></nav><div class="top-actions"><button class="tiny lang-button" id="langToggle" onclick="toggleLanguage()" aria-label="切换语言"><span class="lang-icon">文</span><span class="lang-label" id="langLabel">中文</span></button><button class="tiny" id="contactButton" onclick="openContact()"><span class="nav-author-avatar" aria-hidden="true"><img src="assets/author-profile.webp" alt="" width="452" height="544"></span><span id="contactButtonText">Contact author</span></button></div></header>
@@ -263,7 +264,7 @@ body{min-width:320px}
   <input id="giftPreviewInput" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden>
 </main>
 
-            <main id="vapTool" class="hidden" data-tool="vap" data-state="idle" aria-labelledby="vapTitle">
+            <main id="vapTool" class="hidden" data-tool="vap" data-state="idle" data-export-revision="rgb-feather-v1" aria-labelledby="vapTitle">
     <div class="intro tool-intro vap-intro"><h1 id="vapTitle" data-vap-i18n="title">MP4 转 VAP 工具</h1><button class="vap-help" id="vapHelp" type="button" data-vap-i18n="help">使用说明</button><a class="vap-help vap-inspect-link" href="vap-inspect.html" target="_blank" rel="noopener" data-vap-i18n="inspectVap">查看 VAP 成品</a></div>
     <div class="vap-workspace">
       <section class="card vap-card" aria-labelledby="vapPreviewTitle">
@@ -317,7 +318,7 @@ body{min-width:320px}
         <label class="vap-field-label" for="vapQuality" data-vap-i18n="compression">压缩预设</label><div class="ft-select"><select id="vapQuality"><option value="ultra" selected data-vap-i18n="ultraQuality">超清优先</option><option value="quality" data-vap-i18n="qualityFirst">高清优先</option><option value="balanced" data-vap-i18n="balanced">智能均衡</option><option value="size" data-vap-i18n="sizeFirst">体积优先</option></select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div>
 
         <div class="vap-volume vap-separator"><div class="vap-volume-heading"><label for="vapVolume" data-vap-i18n="volume">视频音量</label><output id="vapVolumeValue" for="vapVolume">60%</output></div><input id="vapVolume" type="range" min="0" max="200" step="1" value="60" disabled aria-describedby="vapVolumeHint"><div class="vap-volume-presets" id="vapVolumePresets" role="group" aria-label="音量预设"><button id="vapVolumeMobile" type="button" aria-pressed="true" disabled data-vap-i18n="volumeMobile">移动端 60%</button><button id="vapVolumeOriginal" type="button" aria-pressed="false" disabled data-vap-i18n="volumeOriginal">原声 100%</button></div></div>
-        <details class="vap-disclosure"><summary><span class="vap-disclosure-title" data-vap-i18n="advanced">高级设置</span><span class="vap-disclosure-meta"><svg class="vap-disclosure-chevron" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4"/></svg></span></summary><label class="vap-check"><input id="vapKeepAudio" type="checkbox" checked><span data-vap-i18n="keepAudio">保留原片声音</span></label></details>
+        <details class="vap-disclosure"><summary><span class="vap-disclosure-title" data-vap-i18n="advanced">高级设置</span><span class="vap-disclosure-meta"><svg class="vap-disclosure-chevron" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4"/></svg></span></summary><label class="vap-check"><input id="vapKeepAudio" type="checkbox" checked><span data-vap-i18n="keepAudio">保留原片声音</span></label><label class="vap-field-label" for="vapRgbAlphaMode" data-vap-i18n="rgbFeather">RGB 羽化</label><div class="ft-select"><select id="vapRgbAlphaMode"><option value="premultiplied" selected data-vap-i18n="rgbFeatherReference">同步羽化（参考效果）</option><option value="straight" data-vap-i18n="rgbFeatherStraight">标准 Alpha（兼容直通）</option></select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div></details>
         <div class="vap-task-progress" id="vapProgressRow" hidden><div><span id="vapPhase"></span><strong id="vapPercent">0%</strong></div><progress id="vapProgress" max="1" value="0" aria-label="转换进度"></progress></div>
         <p class="vap-notice" id="vapNotice" role="status" aria-live="polite" hidden></p>
         <div class="vap-actions"><button id="vapConvert" class="vap-button vap-primary ft-motion-sheen" type="button" data-feedback-button disabled data-vap-i18n="convert">开始转换 VAP</button><button id="vapCancel" class="vap-button vap-secondary" type="button" hidden data-vap-i18n="cancel">取消</button></div>
@@ -326,7 +327,7 @@ body{min-width:320px}
     </div>
     <input id="vapInput" type="file" accept="video/mp4,.mp4" hidden>
     <input id="vapMaskInput" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,.png,.jpg,.jpeg,.webp,.mp4" hidden>
-    <dialog id="vapHelpDialog" aria-labelledby="vapHelpTitle"><div class="vap-help-head"><h2 id="vapHelpTitle" data-vap-i18n="helpTitle">MP4 转 VAP 使用说明</h2><button id="vapHelpClose" class="vap-button vap-secondary" type="button" data-vap-i18n="close">关闭</button></div><ol><li data-vap-i18n="helpOne">上传 MP4，选择普通视频或绿 / 蓝幕视频。</li><li data-vap-i18n="helpTwo">选择匹配的去背景方式，先检查透明预览和 Alpha 黑白图。AI 人像只适用于人像，黑白底方式可能误删相近颜色。</li><li data-vap-i18n="helpThree">设置尺寸、Alpha 分辨率和目标体积，再开始转换。0.5 / 1.0 表示 Alpha 平面分辨率，不是整体透明度。</li><li data-vap-i18n="helpFour">下载 MP4，旧版网页播放器可配合 vapc.json 使用。成品是否适配具体 iOS / Android SDK，仍需目标设备实测。</li></ol><div class="vap-guide-details"><h3 data-vap-i18n="parameterGuide">参数说明</h3><p class="vap-hint vap-method-hint" id="vapMethodHint"></p><p class="vap-hint" data-vap-i18n="resultPreviewHint">VAP MP4 拼接存储 RGB 与黑白 Alpha；请在本页“透明播放”或 VAP SDK 中查看合成效果。</p><p class="vap-hint" data-vap-i18n="verticalMaskHint">拖动画面中的四条辅助线，或输入百分比。上、下边缘平滑过渡到透明，中间画面保留；辅助线不写入成品。</p><p class="vap-hint" data-vap-i18n="maskLiveHint">遮罩调整实时生效，预览与导出使用当前参数；若已生成成品，修改后需重新转换。</p><div class="vap-lock" data-vap-i18n="ratioLocked">输出比例锁定</div><p id="vapAlphaHint" class="vap-hint" data-vap-i18n="alphaHalfHint">透明边缘宽高各减半，RGB 保持完整尺寸；不是 50% 透明度。</p><p class="vap-hint" data-vap-i18n="budgetHint">成品严格控制在 3 MB 以内，优先保留输出尺寸、帧率与透明效果，按实际体积自动调整码率；无法达标时不提供超标文件。</p><p id="vapVolumeHint" class="vap-hint" data-vap-i18n="volumeHint">本站移动端推荐默认 60%（相对原片约 -4.4 dB），预览与导出同时生效；100% 保持原音量，0% 无声。这是音频增益预设，不是 LUFS 自动响度归一化；实际响度受原片、播放器与设备音量影响，交付前请在目标手机中试听。</p><p class="vap-hint" data-vap-i18n="codecHint">默认 H.264 兼容编码；原音量 AAC 直接保留，调整音量时在本机重新编码声音。</p></div><p class="vap-hint" data-vap-i18n="privacy">视频与声音仅在本机处理，不上传至服务器。</p></dialog>
+    <dialog id="vapHelpDialog" aria-labelledby="vapHelpTitle"><div class="vap-help-head"><h2 id="vapHelpTitle" data-vap-i18n="helpTitle">MP4 转 VAP 使用说明</h2><button id="vapHelpClose" class="vap-button vap-secondary" type="button" data-vap-i18n="close">关闭</button></div><ol><li data-vap-i18n="helpOne">上传 MP4，选择普通视频或绿 / 蓝幕视频。</li><li data-vap-i18n="helpTwo">选择匹配的去背景方式，先检查透明预览和 Alpha 黑白图。AI 人像只适用于人像，黑白底方式可能误删相近颜色。</li><li data-vap-i18n="helpThree">设置尺寸、Alpha 分辨率和目标体积，再开始转换。0.5 / 1.0 表示 Alpha 平面分辨率，不是整体透明度。</li><li data-vap-i18n="helpFour">下载 MP4，旧版网页播放器可配合 vapc.json 使用。成品是否适配具体 iOS / Android SDK，仍需目标设备实测。</li></ol><div class="vap-guide-details"><h3 data-vap-i18n="parameterGuide">参数说明</h3><p class="vap-hint vap-method-hint" id="vapMethodHint"></p><p class="vap-hint" data-vap-i18n="resultPreviewHint">VAP MP4 拼接存储 RGB 与黑白 Alpha；请在本页“透明播放”或 VAP SDK 中查看合成效果。</p><p class="vap-hint" data-vap-i18n="verticalMaskHint">拖动画面中的四条辅助线，或输入百分比。上、下边缘平滑过渡到透明，中间画面保留；辅助线不写入成品。</p><p class="vap-hint" data-vap-i18n="maskLiveHint">遮罩调整实时生效，预览与导出使用当前参数；若已生成成品，修改后需重新转换。</p><p class="vap-hint" data-vap-i18n="rgbFeatherHint">同步羽化会把渐隐写入 RGB 与 Alpha；接入要求直通 RGB 的 SDK 时请选择标准 Alpha。</p><div class="vap-lock" data-vap-i18n="ratioLocked">输出比例锁定</div><p id="vapAlphaHint" class="vap-hint" data-vap-i18n="alphaHalfHint">透明边缘宽高各减半，RGB 保持完整尺寸；不是 50% 透明度。</p><p class="vap-hint" data-vap-i18n="budgetHint">成品严格控制在 3 MB 以内，优先保留输出尺寸、帧率与透明效果，按实际体积自动调整码率；无法达标时不提供超标文件。</p><p id="vapVolumeHint" class="vap-hint" data-vap-i18n="volumeHint">本站移动端推荐默认 60%（相对原片约 -4.4 dB），预览与导出同时生效；100% 保持原音量，0% 无声。这是音频增益预设，不是 LUFS 自动响度归一化；实际响度受原片、播放器与设备音量影响，交付前请在目标手机中试听。</p><p class="vap-hint" data-vap-i18n="codecHint">默认 H.264 兼容编码；原音量 AAC 直接保留，调整音量时在本机重新编码声音。</p></div><p class="vap-hint" data-vap-i18n="privacy">视频与声音仅在本机处理，不上传至服务器。</p></dialog>
   </main>
   </main>
 
@@ -375,7 +376,8 @@ body{min-width:320px}
     <div class="intro tool-intro"><div><h1 data-banner-i18n="title">Banner maker</h1></div><button class="title-help" id="bannerHelpButton" type="button" aria-haspopup="dialog" aria-controls="bannerHelpDialog" data-banner-i18n="help">Usage guide</button></div>
     <section class="workspace banner-workspace">
       <section class="preview card banner-preview">
-        <div class="preview-head"><h2 data-banner-i18n="preview">Banner preview</h2><span class="frame-status" id="bannerStatus">No file selected</span></div>
+        <div class="preview-head"><h2 id="bannerProjectsTitle" data-banner-i18n="projects">Choose project specifications</h2><span class="frame-status" id="bannerStatus">No file selected</span></div>
+        <div id="bannerProjectCatalog" class="banner-project-catalog" role="group" aria-labelledby="bannerProjectsTitle"></div>
         <span class="tool-feedback-status" data-feedback-status role="status" aria-live="polite"></span><div class="stage upload-ready banner-stage ft-upload-zone" id="bannerDropzone" role="button" tabindex="0" aria-label="Upload a banner image" data-feedback-stage><div class="tool-stage-busy" data-ft-activity aria-hidden="true"><span class="ft-spinner" data-size="16"></span><span data-feedback-message></span></div>
           <div class="upload-empty" id="bannerEmpty">
             <img class="tool-empty-art" data-feedback-art="empty-upload" src="design-system/assets/feedback/empty-upload.svg" alt="" width="120" height="90">
@@ -390,10 +392,6 @@ body{min-width:320px}
         <div class="frame-sourcebar hidden" id="bannerSourcebar"><div><strong id="bannerFileName"></strong><span id="bannerFileMeta"></span></div><button type="button" class="tiny" id="bannerReplace" data-banner-i18n="replace" data-feedback-button data-ft-activity>Replace file</button></div>
         <p class="banner-resolution-note hidden" id="bannerResolutionNote" role="status"></p>
         <p class="tool-notice hidden" id="bannerNotice" role="status" aria-live="polite"></p>
-    <section class="banner-project-picker" aria-labelledby="bannerProjectsTitle">
-      <h3 id="bannerProjectsTitle" data-banner-i18n="projects">Choose a project</h3>
-      <div id="bannerProjectCatalog" class="banner-project-catalog" role="group" aria-labelledby="bannerProjectsTitle"></div>
-    </section>
         <p class="local-privacy"><span class="privacy-dot" aria-hidden="true"></span><span data-banner-i18n="privacy">Processed locally. Your files never leave this device.</span></p>
       </section>
       <aside class="exports card banner-export">
@@ -689,7 +687,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="vendor/svga-2.3.2.min.js"></script>
   <script src="banner-webp.js?v=20261024-speed3"></script>
   <script src="project-selector.js?v=20261026-projects1"></script>
-  <script src="banner.js?v=20261026-projects1"></script>
+  <script src="banner.js?v=20261026-project-inline"></script>
   <script src="hub.js?v=20261023-flat-home"></script>
   <script src="market-icon-png.js?v=20261024-resources-nav1"></script>
   <script src="resource-library.js?v=20261026-projects1"></script>
@@ -697,7 +695,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
   <script src="gift-background.js?v=20261026-lucida2"></script>
   <script src="gift-preview.js?v=20261026-upload1"></script>
-  <script src="vap-player.js?v=20261026-preview1"></script>
-  <script src="vap-tool.js?v=20261026-vap-inspect"></script>
+  <script src="vap-player.js?v=20261026-rgb-feather1"></script>
+  <script src="vap-tool.js?v=20261026-rgb-feather2"></script>
   <script src="toolkit.js?v=20261026-vap1"></script>
 </body></html>

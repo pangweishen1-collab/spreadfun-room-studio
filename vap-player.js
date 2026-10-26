@@ -45,15 +45,17 @@
       // Native buffer dimensions preserve the output ratio; CSS fits it beside the editing canvas.
       const width=config.info.w,height=config.info.h;
       candidate=new Vap();
-      // The pinned SDK writes straight RGB/alpha. Its first context must opt out of browser premultiplication.
-      const canvas=document.createElement('canvas'),attributes={alpha:true,premultipliedAlpha:false};
+      // New feather exports declare their RGB convention. Unmarked legacy files
+      // remain straight; choose the first WebGL context before the SDK reuses it.
+      const premultiplied=config.funToolkit?.rgbAlphaMode==='premultiplied';
+      const canvas=document.createElement('canvas'),attributes={alpha:true,premultipliedAlpha:premultiplied};
       candidate.canvas=canvas;
       const gl=canvas.getContext('webgl',attributes)||canvas.getContext('experimental-webgl',attributes),actual=gl?.getContextAttributes?.();
-      if(!actual||actual.alpha!==true||actual.premultipliedAlpha!==false)throw new Error('Transparent WebGL context unavailable');
+      if(!actual||actual.alpha!==true||actual.premultipliedAlpha!==premultiplied)throw new Error('Transparent WebGL context unavailable');
       if(token!==version||failed){dispose(candidate);if(token===version&&failed){el.replaceChildren();sync();}return;}
       player=candidate;
       el.dataset.sdk='Tencent VAP Web 1.0.5';
-      el.dataset.alphaMode='straight';
+      el.dataset.alphaMode=premultiplied?'premultiplied':'straight';
       // initVideo creates the native video and clears SDK listeners; shader/frame startup follows asynchronously.
       candidate.play({container:el,src:url,config,width,height,fps:config.info.fps,mute:true,loop:true,accurate:true,onLoadError:fail});
       if(token!==version||failed){canvas.remove();if(token===version&&failed){el.replaceChildren();sync();}return;}

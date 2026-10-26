@@ -22,6 +22,10 @@
   Object.assign(copy.en,{vapPlaybackNotice:'Use Play transparent on this page. Regular video players show RGB and grayscale alpha side by side.'});
   Object.assign(copy.zh,{inspectVap:'查看 VAP 成品'});
   Object.assign(copy.en,{inspectVap:'Check VAP output'});
+  Object.assign(copy.zh,{rgbFeather:'RGB 羽化',rgbFeatherReference:'同步羽化（参考效果）',rgbFeatherStraight:'标准 Alpha（兼容直通）',rgbFeatherHint:'同步羽化会把渐隐写入 RGB 与 Alpha，系统播放器也能看到柔和边缘。本站按文件标记播放；接入要求直通 RGB 的 SDK 时，请选择标准 Alpha。'});
+  Object.assign(copy.en,{rgbFeather:'RGB feathering',rgbFeatherReference:'Feather RGB and Alpha',rgbFeatherStraight:'Straight RGB compatibility',rgbFeatherHint:'Feathered RGB also shows soft edges in regular video players. This site reads the embedded mode. Choose straight RGB for SDKs that require it.'});
+  Object.assign(copy.zh,{rgbFeatherApplied:'RGB 同步羽化',errorFeather:'羽化组件版本不一致，请刷新页面后重新转换。'});
+  Object.assign(copy.en,{rgbFeatherApplied:'RGB + Alpha feathered',errorFeather:'The feathering component is outdated. Refresh this page and convert again.'});
   const maskDefaults={enabled:true,topStart:0,topEnd:.15,bottomStart:.85,bottomEnd:1};
   const maskFields=[['TopStart','topStart'],['TopEnd','topEnd'],['BottomStart','bottomStart'],['BottomEnd','bottomEnd']];
   const maskStorageKey='fun-toolkit.vap.vertical-mask.v1';
@@ -44,7 +48,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[];
   const busy=()=>state.loading||state.converting||state.packing;
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261026-budget1').catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261026-rgb-feather2').catch(error=>{enginePromise=null;throw error}));
   function errorKey(error,fallback='errorConvert'){
     const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',budget:'errorBudget',cancelled:'cancelled'};
     return codes[error?.code]||fallback;
@@ -56,7 +60,7 @@
     if(matteMethod==='manual_mask'&&!state.maskFile)throw Object.assign(new Error('mask required'),{uiKey:'errorMask'});
     const verticalMask=state.verticalMask;if(!validVerticalMask(verticalMask))throw Object.assign(new Error('invalid vertical mask'),{code:'invalid'});
     const audioGain=Number($('Volume').value)/100;if(!Number.isFinite(audioGain)||audioGain<0||audioGain>2)throw Object.assign(new Error('invalid volume'),{code:'invalid'});
-    return {sourceKind:state.sourceKind,matteMethod,screenColor:$('Screen').value,alphaScale:state.alphaScale,width,height,fps,targetBytes:Math.round(target*1e6),quality:$('Quality').value,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value)};
+    return {rgbAlphaMode:$('RgbAlphaMode').value||'premultiplied',sourceKind:state.sourceKind,matteMethod,screenColor:$('Screen').value,alphaScale:state.alphaScale,width,height,fps,targetBytes:Math.round(target*1e6),quality:$('Quality').value,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value)};
   }
   function syncPreviewVolume(){
     const gain=$('KeepAudio').checked?Math.max(0,Math.min(2,Number($('Volume').value)/100||0)):0;
@@ -134,7 +138,7 @@
     const locked=busy(),ready=!!state.file,valid=validOptions();
     root.dataset.state=state.loading?'loading':state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'idle';
     root.setAttribute('aria-busy',String(locked));stage.setAttribute('aria-busy',String(locked));stage.classList.toggle('has-file',ready);stage.classList.toggle('upload-ready',!ready);
-    for(const id of ['Upload','Replace','Input','Method','Screen','MaskPick','MaskInput','Width','Height','Fps','Target','Quality','KeepAudio','Tolerance','Softness','Spill','AlphaHalf','AlphaFull','SizeDefault','Size750'])$(id).disabled=locked;
+    for(const id of ['Upload','Replace','Input','Method','Screen','MaskPick','MaskInput','Width','Height','Fps','Target','Quality','RgbAlphaMode','KeepAudio','Tolerance','Softness','Spill','AlphaHalf','AlphaFull','SizeDefault','Size750'])$(id).disabled=locked;
     for(const id of ['Play','Mute','Timeline','ViewOriginal','ViewTransparent','ViewAlpha'])$(id).disabled=locked||!ready;
     for(const id of ['BgChecker','BgBlack','BgWhite'])$(id).disabled=locked;
     $('Empty').hidden=ready;$('Sourcebar').hidden=!ready;$('Playback').hidden=!ready;$('ViewToolbar').hidden=false;
@@ -175,7 +179,7 @@
     $('ResultPlay').disabled=locked||!state.result||state.playerState!=='ready';$('ResultPlay').title=t('vapPlaybackNotice');$('DownloadMp4').title=t('vapPlaybackNotice');
     if(state.result){
       const {blob,config,report}=state.result,info=config.info;const seconds=Number(report.timings?.wallMs)/1000;
-      $('ResultMeta').textContent=`${info.w} × ${info.h} px · ${info.fps} FPS · Alpha ${state.alphaScale.toFixed(1)}\n${(blob.size/1e6).toFixed(2)} MB · ${t(report.audioKept?'audioKept':state.meta.hasAudio?'audioMuted':'audioNone')}${report.audioKept&&Number.isFinite(report.audioGain)&&report.audioGain!==1?` · ${t('volume')} ${Math.round(report.audioGain*100)}%`:''}${Number.isFinite(seconds)?` · ${seconds.toFixed(2)} s`:''}`;
+      $('ResultMeta').textContent=`${info.w} × ${info.h} px · ${info.fps} FPS · Alpha ${state.alphaScale.toFixed(1)}${config.funToolkit?.rgbAlphaMode==='premultiplied'?' · '+t('rgbFeatherApplied'):''}\n${(blob.size/1e6).toFixed(2)} MB · ${t(report.audioKept?'audioKept':state.meta.hasAudio?'audioMuted':'audioNone')}${report.audioKept&&Number.isFinite(report.audioGain)&&report.audioGain!==1?` · ${t('volume')} ${Math.round(report.audioGain*100)}%`:''}${Number.isFinite(seconds)?` · ${seconds.toFixed(2)} s`:''}`;
       $('BudgetNotice').textContent=t(report.budgetExceeded?'overBudget':'withinBudget');
       $('BudgetNotice').hidden=!report.budgetExceeded;
     }
@@ -279,6 +283,7 @@
       }});
       if(job.signal.aborted||revision!==state.revision||controller!==job)return;
       if(!(result.blob instanceof Blob)||!result.blob.size||!result.config?.info||result.config.info.v!==2||result.report?.valid!==true)throw new Error('invalid final VAP result');
+      if((result.config.funToolkit?.rgbAlphaMode||'straight')!==opts.rgbAlphaMode)throw Object.assign(new Error('RGB feather export mode mismatch'),{uiKey:'errorFeather'});
       if(result.blob.size>Math.min(opts.targetBytes,maxOutputBytes))throw Object.assign(new Error('oversized VAP result'),{code:'budget'});
       releaseResult();state.result={...result,url:URL.createObjectURL(result.blob),revision};state.progress=1;state.notice=null;sync();
       document.dispatchEvent(new CustomEvent('vap:result',{detail:state.result}));window.FunToolkitUI?.reveal($('Result'));
@@ -325,7 +330,7 @@
   $('Input').addEventListener('change',event=>{loadFiles(event.target.files);event.target.value=''});
   $('MaskPick').addEventListener('click',()=>{if(!busy())$('MaskInput').click()});
   $('MaskInput').addEventListener('change',event=>{if(!busy()){const file=event.target.files?.[0];if(file&&file.size<=200*1024**2){state.maskFile=file;invalidate()}else if(file)showNotice('errorFile')}event.target.value=''});
-  for(const id of ['Method','Screen','Fps','Target','Quality','KeepAudio'])$(id).addEventListener('change',invalidate);
+  for(const id of ['Method','Screen','Fps','Target','Quality','KeepAudio','RgbAlphaMode'])$(id).addEventListener('change',invalidate);
   for(const id of ['Tolerance','Softness','Spill'])$(id).addEventListener('input',invalidate);
   for(const [id,other] of [['Width','Height'],['Height','Width']])$(id).addEventListener('input',()=>{
     if(busy())return;const value=Number($(id).value);state.sizePreset='custom';if(Number.isInteger(value)&&value>=16&&value<=2048){const ratio=state.outputRatio;$(other).value=String(Math.round(id==='Width'?value/ratio:value*ratio))}invalidate();
