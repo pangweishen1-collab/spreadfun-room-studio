@@ -1,0 +1,14 @@
+/* Fun Toolkit disclosure header · resource 1.4.3 */
+.ft-disclosure{margin-top:20px;padding-top:16px;border-top:1px solid var(--ft-color-surface-divider,#e8e8ed)}
+.ft-disclosure>summary{display:flex;align-items:center;gap:12px;min-height:44px;padding:8px 0;list-style:none;color:var(--ft-color-text-heading,#202a3b);font-size:14px;line-height:20px;font-weight:500;cursor:pointer}
+.ft-disclosure>summary::-webkit-details-marker{display:none}
+.ft-disclosure-title{flex:1;min-width:0;overflow-wrap:anywhere}
+.ft-disclosure-actions{display:inline-flex;align-items:center;gap:8px;flex:none}
+.ft-disclosure-status{display:inline-flex;align-items:center;flex:none;min-height:22px;padding:2px 7px;border-radius:99px;background:#edf1f6;color:#626c7c;font-size:10px;line-height:18px;font-weight:400;white-space:nowrap}
+.ft-disclosure-status[data-state=applied]{background:#eaf7ee;color:#287647}
+.ft-disclosure-status[data-state=pending]{background:#fff2d9;color:#956118}
+.ft-disclosure-arrow{display:block;flex:none;pointer-events:none;width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;color:var(--ft-color-text-secondary,#626c7c);transform-origin:50% 50%;transition:transform 160ms ease}
+.ft-disclosure[open]>summary .ft-disclosure-arrow{transform:rotate(180deg)}
+.ft-disclosure>summary:focus-visible{outline:2px solid #0071e3;outline-offset:2px}
+@media(prefers-reduced-motion:reduce){.ft-disclosure-arrow{transition:none}}
+@media(forced-colors:active){.ft-disclosure-status{border:1px solid CanvasText;color:CanvasText}.ft-disclosure-arrow{color:CanvasText}}

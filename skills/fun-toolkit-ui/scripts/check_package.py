@@ -28,7 +28,8 @@ def inspect(root):
         if path.is_symlink():
             errors.append(f'Symbolic link: {path.relative_to(root)}')
     required = ['SKILL.md', 'funskill.json', 'governance.json', 'asset-manifest.json',
-                'assets/tool-page-starter/index.html', 'assets/tool-page-starter/feedback-motion.css',
+                'assets/tool-page-starter/index.html', 'assets/tool-page-starter/upload-surface.css',
+                'assets/tool-page-starter/feedback-motion.css',
                 'assets/tool-page-starter/feedback-motion.js', 'references/acceptance.md']
     errors.extend(f'Missing: {name}' for name in required if not (root / name).is_file())
     try:

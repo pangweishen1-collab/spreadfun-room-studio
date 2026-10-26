@@ -129,7 +129,6 @@ html[data-input-modality="keyboard"] #giftPreviewTool .dimension-input:focus-wit
  #giftPreviewTool .gift-toolbar-button:hover:not(:disabled){border-color:#add0fa;background:#eaf3ff;color:var(--blue)}
  #giftPreviewTool .gift-size-presets button:hover:not(:disabled){border-color:#add0fa;background:#f2f7ff;color:var(--blue)}
  #giftPreviewTool .gift-disclosure summary:hover{color:var(--blue)}
- #giftPreviewTool .gift-stage:has(#giftPreviewEmpty:not([hidden])):hover{border-color:#a7d0ff;background:#e4efff;box-shadow:none}
  #giftPreviewTool .dimension-input:hover{border-color:#6296d0}
 }
 @media(max-width:900px){#giftPreviewTool .gift-workspace{grid-template-columns:minmax(0,1fr)}#giftPreviewTool .gift-controls{max-width:none}}

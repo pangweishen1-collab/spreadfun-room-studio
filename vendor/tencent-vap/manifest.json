@@ -1,0 +1,14 @@
+{
+  "vap.min.js": {
+    "bytes": 27466,
+    "sha256": "c4df5cc2854ed8a2f030a099b0910160550703c2e18a3bcbf4a4af6fc204e56c"
+  },
+  "NOTICE.txt": {
+    "bytes": 260,
+    "sha256": "c0bc4e1ca55462a2ccf1d4348127b2566ed990b0766b3978f034b1053a858d7b"
+  },
+  "LICENSE.txt": {
+    "bytes": 76318,
+    "sha256": "9b4d1a2861882a06048e64cd60bd019b5331fbec11ec15f3898560e316391139"
+  }
+}

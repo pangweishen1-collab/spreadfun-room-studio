@@ -10,7 +10,9 @@
   <link rel="stylesheet" href="motion-patterns.css">
   <link rel="stylesheet" href="feedback-motion.css">
   <link rel="stylesheet" href="tool-page.css">
+  <link rel="stylesheet" href="upload-surface.css">
   <link rel="stylesheet" href="select.css">
+  <link rel="stylesheet" href="disclosure.css">
   <script src="focus-modality.js" defer></script>
   <script src="feedback-motion.js" defer></script>
   <script src="tool-page.js" defer></script>
@@ -67,7 +69,7 @@
           <span id="state-badge" class="state-badge" data-state="empty">未选择</span>
         </div>
 
-        <div class="preview-stage" id="drop-zone" data-slot="preview-stage">
+        <div class="preview-stage ft-upload-zone upload-ready" id="drop-zone" role="group" data-slot="preview-stage">
           <div class="empty-content" id="empty-content" data-ft-reveal="fade">
             <img class="empty-art" src="assets/feedback/empty-upload.svg" width="120" height="90" alt="" aria-hidden="true">
             <h3 data-i18n="uploadTitle">点击上传或拖入图片</h3>

@@ -1,7 +1,7 @@
 {
   "meta": {
     "name": "Fun Toolkit",
-    "version": "1.4.2",
+    "version": "1.4.4",
     "date": "2026-10-24",
     "status": "Current reference library and starter; production tools use scoped adapters",
     "units": "CSS px; motion ms"

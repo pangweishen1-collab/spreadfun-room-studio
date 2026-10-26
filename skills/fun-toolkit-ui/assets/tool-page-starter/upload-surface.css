@@ -1,0 +1,35 @@
+/* Shared upload empty state. The two ID branches adapt legacy tool specificity;
+   new tools only need .ft-upload-zone.upload-ready and this stylesheet last. */
+:root{
+ --ft-upload-background:radial-gradient(circle at 50% 28%,#f3f8ff,#e3eefb);
+ --ft-upload-hover-background:radial-gradient(circle at 50% 28%,#f7fbff,#dcecff);
+ --ft-upload-drag-background:#dcecff;
+ --ft-upload-border:#d4e4f6;
+ --ft-upload-hover-stroke:#8dc3ff;
+ --ft-upload-drag-stroke:#2786ed;
+ --ft-upload-focus:#0071e3;
+ --ft-upload-duration:180ms;
+}
+:is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready{
+ background:var(--ft-upload-background);border-color:var(--ft-upload-border);box-shadow:none;
+ cursor:pointer;transform:none;transition:background-color var(--ft-upload-duration) ease,border-color var(--ft-upload-duration) ease,box-shadow var(--ft-upload-duration) ease;
+}
+:is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready :is(.upload-empty,.vap-empty,.empty-content){transform:none}
+@media(hover:hover) and (pointer:fine){
+ :is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready:not([aria-busy=true]):not([aria-disabled=true]):hover{
+  background:var(--ft-upload-hover-background);box-shadow:inset 0 0 0 2px var(--ft-upload-hover-stroke);
+ }
+}
+:is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready:not([aria-busy=true]):not([aria-disabled=true]):is(:focus-visible,:has(:focus-visible)){
+ background:var(--ft-upload-hover-background);box-shadow:inset 0 0 0 2px var(--ft-upload-hover-stroke);outline:2px solid var(--ft-upload-focus);outline-offset:2px;
+}
+:is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready:not([aria-busy=true]):not([aria-disabled=true]):active{
+ background:var(--ft-upload-drag-background);box-shadow:inset 0 0 0 2px var(--ft-upload-drag-stroke);
+}
+:is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready:not([aria-busy=true]):not([aria-disabled=true]):is(.drag,.is-dragging){
+ background:var(--ft-upload-drag-background);border-color:var(--ft-upload-drag-stroke);box-shadow:inset 0 0 0 3px var(--ft-upload-drag-stroke);
+}
+:is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready[aria-busy=true]{cursor:progress;box-shadow:none}
+:is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready[aria-disabled=true]{cursor:not-allowed;box-shadow:none}
+@media(prefers-reduced-motion:reduce){:is(.ft-upload-zone,#vapTool .ft-upload-zone,#giftPreviewTool .ft-upload-zone).upload-ready{transition:none}}
+@media(forced-colors:active){:root{--ft-upload-background:Canvas;--ft-upload-hover-background:Canvas;--ft-upload-drag-background:Canvas;--ft-upload-border:CanvasText;--ft-upload-hover-stroke:Highlight;--ft-upload-drag-stroke:Highlight;--ft-upload-focus:Highlight}}

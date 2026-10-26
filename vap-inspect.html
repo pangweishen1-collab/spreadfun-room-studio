@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VAP 透明验收 · Fun Toolkit</title><link rel="icon" href="assets/spreadfun-mark.webp"><link rel="stylesheet" href="vap-inspect.css?v=20261026-1"><link rel="stylesheet" href="design-system/upload-surface.css?v=1.4.4"></head>
+<body>
+<header><a class="brand" href="index.html#vap-tools"><img src="assets/spreadfun-mark.webp" width="40" height="40" alt=""><strong>Fun Toolkit</strong></a><a id="backLink" href="index.html#vap-tools">返回 VAP 工具</a><button id="language" type="button" aria-label="Switch language">EN</button></header>
+<main>
+<div class="heading"><h1 id="title">VAP 透明验收</h1><span class="badge">VAP v2</span></div>
+<p id="explanation">VAP 需要专用播放器合成透明效果。普通视频播放器会显示原画面与黑白遮罩。</p>
+<section class="card" aria-labelledby="previewTitle">
+<div class="card-head"><h2 id="previewTitle">成品透明效果</h2><button id="openFile" type="button" class="primary">打开 VAP MP4</button></div>
+<div id="vapResultFrame" class="ft-upload-zone upload-ready" data-background="checker" role="group" aria-label="VAP 成品预览">
+<div id="empty"><img src="design-system/assets/feedback/empty-upload.svg" width="120" height="90" alt=""><strong id="emptyTitle">点击或拖入已导出的 VAP MP4</strong></div>
+<div id="vapResultPlayer" data-state="empty" hidden></div>
+</div>
+<div class="toolbar"><button id="vapResultPlay" type="button" class="primary" disabled>透明播放</button><div id="backgrounds" role="group" aria-label="预览背景"><button type="button" data-background="checker" aria-pressed="true">透明</button><button type="button" data-background="black" aria-pressed="false">黑</button><button type="button" data-background="white" aria-pressed="false">白</button></div></div>
+<p id="status" role="status" aria-live="polite">读取内嵌 Alpha，在本机播放，不会重新编码或上传文件。</p><p id="fileMeta" hidden></p>
+</section>
+<input id="fileInput" type="file" accept="video/mp4,.mp4" hidden>
+</main>
+<script src="vap-player.js?v=20261026-inspect1"></script><script type="module" src="vap-inspect.mjs?v=20261026-1"></script>
+</body></html>

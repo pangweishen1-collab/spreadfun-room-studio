@@ -1,6 +1,6 @@
 # 视觉、控件与表单
 
-本包的 `assets/tool-page-starter/design-tokens.json` 与 CSS 是资源规范 1.4.2 的可执行值。修改现有产品先复用其共享组件，再按本表补齐，不把 `.ft-ui` 全局覆盖到未审查的旧页面。
+本包的 `assets/tool-page-starter/design-tokens.json` 与 CSS 是资源规范 1.4.4 的可执行值。修改现有产品先复用其共享组件，再按本表补齐，不把 `.ft-ui` 全局覆盖到未审查的旧页面。
 
 ## 颜色和层级
 
@@ -44,6 +44,13 @@
 - 手机选择框字号 **16px**、命中高度至少 **44px**；收窄宽度或切换中英文时仍保持16px右侧留白，不挤压或遮挡箭头。
 - `forced-colors: active` 下隐藏装饰箭头并恢复 `appearance: auto`，交还系统原生箭头、边框与可见焦点；确保只有一个箭头。此时系统高对比可读性优先于常规模式的16px定位。
 
+
+## 上传空态交互
+
+复用 `upload-surface.css`，容器标记 `ft-upload-zone upload-ready`，样式在页面控件样式之后加载。有素材后移除 `upload-ready`；不要给编辑画布加上传 Hover。默认沿用房间背景的径向浅蓝渐变（#F3F8FF → #E3EEFB），细描边 #D4E4F6。精细指针 Hover 与键盘聚焦改为 #F7FBFF → #DCECFF，2px #8DC3FF 内描边；拖入为 #DCECFF 与3px #2786ED 内描边。焦点另有2px #0071E3 外环、偏移2px。过渡180ms，不缩放、位移插画、文字或画布。
+
+触屏不使用持久 Hover；按下有即时反馈。`aria-busy=true` / `aria-disabled=true` 时取消悬停、拖入与按下高亮，业务防重复选择。减少动态取消过渡；forced-colors采用系统色与可见焦点。无文件时整个上传区可点击，内置原生上传按钮支持Enter/空格并阻止冒泡；容器使用group，避免嵌套button角色。有素材后不再拦截编辑操作。资源库没有上传空态，不套用此背景到Logo选择卡片。
+
 ## 表单模式
 
 - 所有字段有常驻 label，单位、默认值、范围、必填/选填清楚；placeholder只举例。帮助文字用aria-describedby关联。
@@ -57,6 +64,12 @@
 ## 弹窗、辅助层与结果
 
 帮助弹窗使用原生dialog与一致的轻弹性/玻璃遮罩，有标题、关闭按钮与Esc关闭，打开进入焦点、关闭返回触发控件；长内容自身滚动，手机不超屏。提示气泡、菜单、折叠区只在业务需要时添加，并保证键盘可达。关键错误不只靠短暂Toast。
+
+## 带状态的折叠标题
+
+参数分组使用原生 `details / summary`。复用模板 `disclosure.css` 与 README 的 title / actions 结构：标题 `flex:1; min-width:0`，允许长英文换行；右侧 `inline-flex; align-items:center; flex:none; gap:8px`，包含不拆行、不压缩的状态与固定16×16px的SVG箭头。状态标签与箭头共用同一垂直中轴，不能靠字符 `⌄`、字体基线或负margin补位置。箭头绕SVG中心旋转180°，展开/收起不能让状态跳位。没有状态时保留actions箭头槽。
+
+summary最小44px，整行点击、Enter/Space和焦点沿用原生行为，不嵌套额外操作按钮；装饰SVG加 `aria-hidden=true` 与 `focusable=false`。双语更新只替换标题span/状态span文本，不给整个summary写textContent，以免删除SVG。检查中文与长英文、320/375px、展开/收起、已应用/待应用/未启用；核对状态与箭头中心差、8px间距和16px图标尺寸。减少动态时保留状态并取消旋转过渡。
 
 批量列表有稳定任务标识、文件名、规格、体积和单项结果；部分失败不冒充全部成功，重试只处理实际失败项。选择/全选的可用范围明确；ZIP只打包可用结果，空列表不可下载。裁切确认前保留草稿、取消恢复；透明棋盘、黑色预览和操作控件不能进入导出像素。
 

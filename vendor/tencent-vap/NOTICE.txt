@@ -1,0 +1,1 @@
+Tencent VAP official Web player, unmodified web/dist/vap.min.js, upstream version1.0.5. Revision 5d7c9f6789ccc5f384356001b71ef90c876cd95e. Source: https://github.com/Tencent/vap/tree/5d7c9f6789ccc5f384356001b71ef90c876cd95e/web . MIT license, see LICENSE.txt.

@@ -1,0 +1,1 @@
+MediaPipe Tasks Vision 1.1.1 and Selfie Segmenter model. Copyright Google LLC. Apache License 2.0. Runtime from the official npm package; model float16 revision 1 from Google model storage. No model or runtime modifications. See manifest.json for upstream URLs, license, scope, and SHA-256 checksums.

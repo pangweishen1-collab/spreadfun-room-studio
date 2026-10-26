@@ -2,7 +2,7 @@
 
 适用范围：新工具页面、列表与结果区的统一反馈。作为设计规范目录 v1.4.1 的增补，配合工具页框架使用。当前三个生产工具已通过 `tool-feedback.css` / `tool-feedback.js` 接入共用空态、占位、加载与轻淡入；装饰视差等扩展保留为可选示例。
 
-[团队 Skill v1.0.2](https://fun-toolkit.pangweishen1.workers.dev/design-system/downloads/fun-toolkit-ui-1.0.2.zip) 已合并最新模板、8 个 SVG、反馈动效资源、接入说明与验收清单；解压添加并确认 Agent 识别 `SKILL.md` 后，用 `$fun-toolkit-ui` 调用。ZIP 是自包含交付包，下载不等于安装。在线规范及团队包为当前交付；PDF v1.2 是历史快照。
+[团队 Skill v1.0.4](https://fun-toolkit.pangweishen1.workers.dev/design-system/downloads/fun-toolkit-ui-1.0.4.zip) 已合并最新模板、8 个 SVG、反馈动效资源、接入说明与验收清单；解压添加并确认 Agent 识别 `SKILL.md` 后，用 `$fun-toolkit-ui` 调用。ZIP 是自包含交付包，下载不等于安装。在线规范及团队包为当前交付；PDF v1.2 是历史快照。
 
 ## 1. 先判断状态，再选图
 
@@ -294,3 +294,9 @@ python3 scripts/check_package.py
 ## 三工具生产接入记录 · 2026-10-23
 
 房间背景、头像框与Banner已接入对应的空态图、头像/缩略图占位、统一Spinner与Skeleton。实际业务区采用160ms、opacity .35→1的轻淡入，忙碌提示120ms淡出，不对Canvas、裁切或导出做transform。房间背景显示真实文件完成量，SVGA逐帧和语言切换不重播动画。共享生产适配层为站点根目录tool-feedback.css / tool-feedback.js；业务状态由各工具调用，错误提示与旧有效结果仍由原工具维护。视差、错峰和默认180ms/6px模式保留为后续可选规范，不自动用于工作画布。
+
+## 上传空态交互
+
+复用 `upload-surface.css`，容器标记 `ft-upload-zone upload-ready`，样式在页面控件样式之后加载。有素材后移除 `upload-ready`；不要给编辑画布加上传 Hover。默认沿用房间背景的径向浅蓝渐变（#F3F8FF → #E3EEFB），细描边 #D4E4F6。精细指针 Hover 与键盘聚焦改为 #F7FBFF → #DCECFF，2px #8DC3FF 内描边；拖入为 #DCECFF 与3px #2786ED 内描边。焦点另有2px #0071E3 外环、偏移2px。过渡180ms，不缩放、位移插画、文字或画布。
+
+触屏不使用持久 Hover；按下有即时反馈。`aria-busy=true` / `aria-disabled=true` 时取消悬停、拖入与按下高亮，业务防重复选择。减少动态取消过渡；forced-colors采用系统色与可见焦点。无文件时整个上传区可点击，内置原生上传按钮支持Enter/空格并阻止冒泡；容器使用group，避免嵌套button角色。有素材后不再拦截编辑操作。资源库没有上传空态，不套用此背景到Logo选择卡片。

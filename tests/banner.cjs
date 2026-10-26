@@ -8,15 +8,15 @@ const events=[],uiStates=[],reveals=[];
 const feedback=()=>uiStates.at(-1);
 const recorded=type=>events.filter(event=>event.tool==='banner'&&event.type===type).reduce((total,event)=>total+event.count,0);
 const docListeners=new Map(),windowListeners=new Map();
-let serial=0,encodeFails=false,failEncodeAt=0,zipFails=false;
+let serial=0,encodeFails=false,failEncodeAt=0,zipFails=false,holdEncode=null;
 function element(tag='div'){
   const classes=new Set(),listeners=new Map(),attributes=new Map();
   const node={tagName:tag.toUpperCase(),style:{},dataset:{},value:'',textContent:'',innerHTML:'',width:0,height:0,children:[],disabled:false,
     classList:{add(...xs){xs.forEach(x=>classes.add(x))},remove(...xs){xs.forEach(x=>classes.delete(x))},toggle(x,on){if(on)classes.add(x);else classes.delete(x)},contains(x){return classes.has(x)}},
     setAttribute(k,v){attributes.set(k,v);this[k]=v},getAttribute:k=>attributes.get(k),removeAttribute(k){attributes.delete(k);delete this[k]},
     append(...xs){this.children.push(...xs)},appendChild(x){this.children.push(x);return x},replaceChildren(...xs){this.children=xs;this.innerHTML=''},remove(){},
-    click(){downloads.push({name:this.download,url:this.href});listeners.get('click')?.({button:0,defaultPrevented:false,target:this})},addEventListener(k,fn){listeners.set(k,fn)},fire(k,event={}){return listeners.get(k)?.(event)},
-    querySelector(){return null},querySelectorAll(){return []},contains(target){return target===this},
+    click(){if(this.disabled)return;if(this.download)downloads.push({name:this.download,url:this.href});return listeners.get('click')?.({button:0,defaultPrevented:false,target:this})},addEventListener(k,fn){listeners.set(k,fn)},fire(k,event={}){return listeners.get(k)?.(event)},
+    querySelector(selector){return descendants(this).find(child=>matches(child,selector))||null},querySelectorAll(selector){return descendants(this).filter(child=>matches(child,selector))},contains(target){return target===this},
     getContext(){return this.context??=context(this)},toBlob(callback,type){callback(new Blob(['mock'],{type}))}};
   return node;
 }
@@ -26,8 +26,10 @@ function context(canvas){
     save(){operations.push(['save'])},restore(){operations.push(['restore'])},beginPath(){},closePath(){},rect(){},roundRect(){},
     moveTo(){},lineTo(){},arcTo(){},quadraticCurveTo(){},clip(){operations.push(['clip'])},fill(){},fillRect(){},stroke(){}};
 }
+const descendants=node=>node.children.flatMap(child=>[child,...descendants(child)]);
+const matches=(node,selector)=>selector==='[data-project]'?!!node.dataset.project:selector.startsWith('.')?String(node.className||'').split(' ').includes(selector.slice(1)):false;
 const get=selector=>{if(!elements.has(selector))elements.set(selector,element());return elements.get(selector)};
-const document={body:element('body'),documentElement:{lang:'en'},querySelector:get,querySelectorAll:()=>[],createElement:element,
+const document={body:element('body'),documentElement:{lang:'en'},querySelector:get,querySelectorAll:selector=>selector.includes('[data-project]')?get('#bannerProjectCatalog').querySelectorAll('[data-project]'):[],createElement:element,
   addEventListener(k,fn){docListeners.set(k,fn)}};
 class MockImage{
   constructor(){this.complete=false;this.naturalWidth=this.width=684;this.naturalHeight=this.height=240;this.listeners=new Map()}
@@ -51,14 +53,18 @@ class MockZip{
 const sandbox={window:{addEventListener(k,fn){windowListeners.set(k,fn)},Hub:{record(tool,type,count=1){events.push({tool,type,count})}},FunToolkitUI:{setState(tool,state){uiStates.push({tool,...state})},reveal(node){reveals.push(node)}}},document,Image:MockImage,JSZip:MockZip,language:'en',Blob,TextEncoder,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,Set,console,
   URL:{createObjectURL(blob){const url='blob:banner-'+ ++serial;urls.set(url,blob);return url},revokeObjectURL(url){revoked.add(url);urls.delete(url)}},
   setTimeout(fn,delay){if(delay<60000)queueMicrotask(fn);else timers.push(fn);return serial},clearTimeout(){},
-  prepareBannerWebP:async()=>{},canvasToLosslessWebP:async(canvas)=>{assert.equal(feedback().phase,'processing','real encoding uses processing feedback');encodes.push({canvas,width:canvas.width,height:canvas.height});if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['webp-'+encodes.length],{type:'image/webp'})}};
+  prepareBannerWebP:async()=>{},canvasToLosslessWebP:async(canvas)=>{assert.equal(feedback().phase,'processing','real encoding uses processing feedback');encodes.push({canvas,width:canvas.width,height:canvas.height});if(holdEncode)await holdEncode;if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['webp-'+encodes.length],{type:'image/webp'})}};
 sandbox.window.JSZip=MockZip;
 let source=fs.readFileSync(path.join(__dirname,'../banner.js'),'utf8');
 const marker='window.BannerTool={syncLanguage};';
 assert.ok(source.includes(marker),'banner.js must expose its public language hook');
-source=source.replace(marker,marker+'window.bannerTest={state,cropRect,loadFiles,downloadAll,setPreviewBackground};');
-vm.createContext(sandbox);vm.runInContext(source,sandbox);
+source=source.replace(marker,marker+'window.bannerTest={state,projects,cropRect,loadFiles,downloadAll,setPreviewBackground,selectProject};');
+vm.createContext(sandbox);vm.runInContext(fs.readFileSync(path.join(__dirname,'../project-selector.js'),'utf8'),sandbox);vm.runInContext(source,sandbox);
 const api=sandbox.window.bannerTest;
+const projectButton=id=>get('#bannerProjectCatalog').children.find(button=>button.dataset.project===id);
+const text=node=>[node.textContent,...node.children.map(text)].join(' ');
+const projectSpecs=()=>text(get('#bannerOutputSpecs'));
+function assertSelected(id){assert.equal(api.state.project.id,id);for(const button of get('#bannerProjectCatalog').children)assert.equal(button.getAttribute('aria-pressed'),String(button.dataset.project===id))}
 const file=(name='landscape.png',width=1200,height=600,type='image/png')=>({name,type,size:4096,width,height});
 const crop=(...args)=>JSON.parse(JSON.stringify(api.cropRect(...args)));
 const near=(actual,expected)=>assert.ok(Math.abs(actual-expected)<1e-8,`${actual} should equal ${expected}`);
@@ -77,6 +83,17 @@ function assertPreviewBackground(value){
 (async()=>{
   assert.equal(feedback().tool,'banner');assert.equal(feedback().phase,'empty');assert.equal(reveals.length,0);
   assertPreviewBackground('black');
+  assert.deepEqual(get('#bannerProjectCatalog').children.map(button=>button.dataset.project),['hapi-ludo','hapi','yari','4fun'],'Banner has exactly the four supported project cards');
+  for(const button of get('#bannerProjectCatalog').children){
+    assert.equal(button.tagName,'BUTTON');assert.equal(button.type,'button');
+    const logo=button.children[0].children[0];assert.equal(logo.src,`assets/resources/${button.dataset.project}-256.webp`);assert.equal(logo.alt,'');
+  }
+  assertSelected('hapi-ludo');assert.match(projectSpecs(),/772\s*×\s*200/);assert.match(projectSpecs(),/684\s*×\s*240/);
+  for(const [id,width] of [['hapi',772],['yari',772],['4fun',680]]){
+    await projectButton(id).click();assertSelected(id);assert.match(projectSpecs(),new RegExp(`${width}\\s*×\\s*200`));
+    assert.equal(api.state.outputs.length,0);assert.equal(encodes.length,0,'selecting a project before upload does not encode');
+  }
+  await projectButton('hapi-ludo').click();assertSelected('hapi-ludo');assert.equal(recorded('generated'),0);
   await api.downloadAll();assert.equal(events.length,0,'empty downloads and initial previews must not count');
   assert.equal(get('#bannerResolutionNote').classList.contains('hidden'),true,'no warning before an image is uploaded');
   assert.deepEqual(crop(772,200,772,200),{sx:0,sy:0,sw:772,sh:200});
@@ -175,5 +192,39 @@ function assertPreviewBackground(value){
   windowListeners.get('pagehide')({persisted:false});
   for(const output of currentOutputs)assert.equal(urls.has(output.url),false,'a final page exit releases download URLs');
   assert.equal(recorded('generated'),8);assert.equal(recorded('download'),3,'page cleanup does not affect aggregate counters');
-  console.log('PASS: loading/processing/committed-success/error feedback and localization; reveal only on a new committed result; centered cover crop including extreme ratios, live FileList, two exact lossless WebP canvas sizes, game overlay/rounded inner crop, CSS-only black/transparent preview switch, source-resolution warning boundaries and language, invalid/decode/encode rollback, URL cleanup, language URL reuse, two-file ZIP, committed-only generation and single/ZIP download counts.');
+  // The same decoded source is regenerated to the selected project's actual output contract.
+  await api.loadFiles([file('projects.png',1200,600)]);
+  const sharedImage=api.state.image,sharedFile=api.state.file;
+  for(const [id,width] of [['hapi',772],['yari',772],['4fun',680]]){
+    const oldOutputs=Array.from(api.state.outputs),count=recorded('generated'),before=encodes.length;
+    await projectButton(id).click();assertSelected(id);
+    assert.equal(api.state.image,sharedImage,'switching projects reuses the decoded source');assert.equal(api.state.file,sharedFile);
+    assert.equal(api.state.outputs.length,1);const output=api.state.outputs[0];
+    assert.deepEqual([output.width,output.height],[width,200]);assert.equal(output.blob.type,'image/webp');assert.match(output.name,new RegExp(`${id}.*${width}x200\\.webp$`));
+    assert.equal(encodes.length,before+1);assert.deepEqual([encodes.at(-1).width,encodes.at(-1).height],[width,200]);
+    assert.equal(encodes.at(-1).canvas.getContext('2d').operations.filter(op=>op[0]==='drawImage').length,1,'single-project banners have no Hapi Ludo frame');
+    assert.equal(get('#roomBannerCanvas').width,width);assert.equal(get('#roomBannerCanvas').height,200);
+    assert.equal(get('#bannerGamePreview').classList.contains('hidden'),true,'single-output projects hide the game preview');
+    assert.equal(get('#bannerOutputList').children.length,1);assert.match(projectSpecs(),new RegExp(`${width}\\s*×\\s*200`));
+    assert.equal(get('#bannerStatus').textContent,'1 file ready');
+    assert.equal(recorded('generated'),count+1);for(const old of oldOutputs)assert.equal(revoked.has(old.url),true);
+    const keep=output,keepEncodes=encodes.length;await projectButton(id).click();assert.equal(api.state.outputs[0],keep);assert.equal(encodes.length,keepEncodes,'selecting the current project keeps its generated result');
+    const beforeZip=recorded('download');await api.downloadAll();assert.equal(zips.at(-1).files.length,1);assert.equal(zips.at(-1).files[0].blob,output.blob);assert.equal(recorded('download'),beforeZip+1);
+  }
+  const fourfunOutput=api.state.outputs[0];sandbox.language='zh';sandbox.window.BannerTool.syncLanguage();
+  assert.equal(get('#bannerStatus').textContent,'已生成 1 个文件');assert.equal(api.state.outputs[0],fourfunOutput);
+  sandbox.language='en';sandbox.window.BannerTool.syncLanguage();
+  // Busy project switches are ignored and a failed switch preserves the visible project and downloads.
+  const beforeFailure=recorded('generated');encodeFails=true;await api.selectProject(api.projects.find(project=>project.id==='hapi'));encodeFails=false;
+  assertSelected('4fun');assert.equal(api.state.outputs[0],fourfunOutput);assert.equal(urls.get(fourfunOutput.url),fourfunOutput.blob);assert.equal(recorded('generated'),beforeFailure);assert.equal(feedback().phase,'error');
+  let finish;holdEncode=new Promise(resolve=>finish=resolve);const switchPending=api.selectProject(api.projects.find(project=>project.id==='hapi-ludo'));
+  await new Promise(setImmediate);assert.equal(api.state.busy,true);assert.ok(get('#bannerProjectCatalog').children.every(button=>button.disabled),'all project cards lock during generation');
+  await api.selectProject(api.projects.find(project=>project.id==='yari'));assertSelected('4fun');
+  finish();await switchPending;holdEncode=null;assertSelected('hapi-ludo');assert.equal(api.state.outputs.length,2);assert.equal(get('#bannerGamePreview').classList.contains('hidden'),false);
+  assert.deepEqual(Array.from(api.state.outputs,output=>[output.width,output.height]),[[772,200],[684,240]]);assert.equal(get('#roomBannerCanvas').width,772);
+  assert.equal(get('#bannerStatus').textContent,'2 files ready');assert.ok(get('#bannerProjectCatalog').children.every(button=>!button.disabled));
+  assert.equal(recorded('generated'),beforeFailure+2);assert.equal(revoked.has(fourfunOutput.url),true);
+  await api.downloadAll();assert.equal(zips.at(-1).files.length,2);
+  const last=Array.from(api.state.outputs);windowListeners.get('pagehide')({persisted:false});for(const output of last)assert.equal(urls.has(output.url),false);
+  console.log('PASS: loading/processing/committed-success/error feedback and localization; reveal only on a new committed result; centered cover crop including extreme ratios, live FileList, two exact lossless WebP canvas sizes, game overlay/rounded inner crop, CSS-only black/transparent preview switch, source-resolution warning boundaries and language, invalid/decode/encode rollback, URL cleanup, language URL reuse, four shared project cards and preupload dimensions, transactional regeneration and project-specific WebP dimensions, retained source, one/two-file ZIP, busy locks, project rollback, committed-only generation and single/ZIP download counts.');
 })().catch(error=>{console.error(error);process.exitCode=1});

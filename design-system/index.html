@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="Fun Toolkit 设计规范与交互组件示例。2026-10-24，v1.4.2。">
-<title>Fun Toolkit · 设计规范 v1.4.2</title>
+<meta name="description" content="Fun Toolkit 设计规范与交互组件示例。2026-10-26，v1.4.4。">
+<title>Fun Toolkit · 设计规范 v1.4.4</title>
 <link rel="icon" type="image/png" href="../assets/favicon.png">
 <style>
 :root{--primary:#0071e3;--primary-hover:#0062cc;--primary-active:#0055b3;--brand:#136bff;--deep:#0b45d9;--yellow:#ffc928;--ink:#202a3b;--body:#1d1d1f;--secondary:#626c7c;--muted:#6e7785;--page:#f5f5f7;--surface:#fff;--line:#e8e8ed;--input-line:#8b95a5;--soft:#eaf3ff;--green:#21834b;--green-hover:#196b3c;--error:#b42318;--error-soft:#fff1f0;--warning:#8a4b00;--warning-soft:#fff7e8;--success:#237957;--success-soft:#edf8f3;--disabled:#edf0f4;--disabled-text:#647083;--radius:12px;--ease:cubic-bezier(.16,1,.3,1);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","PingFang SC","Microsoft YaHei",sans-serif;color:var(--body);background:var(--page);font-synthesis:none;scroll-behavior:smooth;scroll-padding-top:32px}
@@ -146,7 +146,10 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
 
 .doc-actions .btn:hover,#team-skill .btn:hover{text-decoration:none}.team-skill-prompt{display:block;width:100%;min-width:0;min-height:168px;margin-top:8px;line-height:1.8;overflow-wrap:anywhere;resize:vertical}.team-skill-prompt[readonly]{color:var(--ink);background:#f8faff;border-style:solid}.team-skill-prompt:focus{border-color:var(--primary)}@media(max-width:540px){#team-skill .section-title{align-items:flex-start;flex-direction:column}#team-skill .button-row{align-items:stretch}#team-skill .button-row .btn{width:100%;white-space:normal;min-height:44px}#team-skill textarea{font-size:16px;min-height:244px}}
 </style>
-<link rel="stylesheet" href="select.css?v=1.4.2">
+<link rel="stylesheet" href="select.css?v=1.4.4">
+<link rel="stylesheet" href="disclosure.css?v=1.4.4">
+<link rel="stylesheet" href="upload-surface.css?v=1.4.4">
+<style>.doc-upload-zone{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;min-width:0;min-height:250px;padding:24px;border:1px solid;border-radius:16px;font:inherit;text-align:center}.doc-upload-zone img{display:block;object-fit:contain}.doc-upload-zone strong{font-size:16px}.doc-upload-zone span{font-size:12px;color:#6e7785}.doc-upload-zone:disabled{color:#626c7c}@media(max-width:540px){.doc-upload-zone{min-height:230px;padding:16px}}</style>
 </head>
 <body>
 <a class="skip" href="#main">跳至规范正文</a>
@@ -169,13 +172,13 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
 <aside class="rail" aria-label="规范目录">
   <div class="rail-top"><a class="brand" href="#overview"><img src="assets/spreadfun-mark.webp" alt=""><span>Fun Toolkit</span></a><p class="brand-meta">DESIGN SYSTEM · 设计规范</p></div>
   <nav class="rail-nav">
-    <a href="#overview" class="current"><span>00</span>规范概览</a><a href="#foundations"><span>01</span>品牌与颜色</a><a href="#typography"><span>02</span>字体与基础尺度</a><a href="#layout"><span>03</span>页面与导航</a><a href="#buttons"><span>04</span>按钮与状态</a><a href="#forms"><span>05</span>表单与选择</a><a href="#upload"><span>06</span>上传与预览</a><a href="#feedback"><span>07</span>反馈与弹窗</a><a href="#form-demo"><span>08</span>完整表单示例</a><a href="#responsive"><span>09</span>响应式与双语</a><a href="#ex-batch"><span>10</span>批量与恢复</a><a href="#ex-edge-forms"><span>11</span>表单边界</a><a href="#ex-media-data"><span>12</span>裁切与数据</a><a href="#ex-state-matrix"><span>13</span>场景覆盖清单</a><a href="#motion"><span>14</span>动效与玻璃遮罩</a><a href="#tool-framework"><span>15</span>工具页框架</a><a href="#feedback-motion"><span>16</span>空态与加载动效</a><a href="#team-skill"><span>17</span>团队 Skill</a><a href="#handoff"><span>18</span>交付与验收</a>
+    <a href="#overview" class="current"><span>00</span>规范概览</a><a href="#foundations"><span>01</span>品牌与颜色</a><a href="#typography"><span>02</span>字体与基础尺度</a><a href="#layout"><span>03</span>页面与导航</a><a href="#buttons"><span>04</span>按钮与状态</a><a href="#upload-states">上传空态</a><a href="#forms"><span>05</span>表单与选择</a><a href="#upload"><span>06</span>上传与预览</a><a href="#feedback"><span>07</span>反馈与弹窗</a><a href="#form-demo"><span>08</span>完整表单示例</a><a href="#responsive"><span>09</span>响应式与双语</a><a href="#ex-batch"><span>10</span>批量与恢复</a><a href="#ex-edge-forms"><span>11</span>表单边界</a><a href="#ex-media-data"><span>12</span>裁切与数据</a><a href="#ex-state-matrix"><span>13</span>场景覆盖清单</a><a href="#motion"><span>14</span>动效与玻璃遮罩</a><a href="#tool-framework"><span>15</span>工具页框架</a><a href="#feedback-motion"><span>16</span>空态与加载动效</a><a href="#team-skill"><span>17</span>团队 Skill</a><a href="#handoff"><span>18</span>交付与验收</a>
   </nav>
-  <div class="rail-bottom"><strong>在线规范 · 交互示例</strong>2026-10-24 / v1.4.2<br>当前网站提取 + 后续扩展规范<br>交互示例不会上传或提交数据。</div>
+  <div class="rail-bottom"><strong>在线规范 · 交互示例</strong>2026-10-26 / v1.4.4<br>当前网站提取 + 后续扩展规范<br>交互示例不会上传或提交数据。</div>
 </aside>
 <main id="main" class="content">
-  <div class="document-top"><span class="eyebrow">FUN TOOLKIT / DESIGN GUIDELINES</span><span class="edition">在线规范 v1.4.2 · 团队 Skill v1.0.2</span></div>
-  <nav class="doc-actions" aria-label="规范资源"><a class="btn ghost compact" href="../index.html#home">← 返回工具首页</a><a class="btn ft-motion-sheen" href="downloads/fun-toolkit-ui-1.0.2.zip" download>下载团队 Skill · v1.0.2</a><a class="btn secondary" href="https://funskill-studio.pages.dev/skills/fun-toolkit-ui" target="_blank" rel="noopener noreferrer" aria-label="FunSkill 查看与下载（新窗口打开）">FunSkill 查看与下载 ↗</a><a class="btn secondary compact" href="Fun-Toolkit-UI-Spec-v1.2.pdf" download>历史 PDF · v1.2</a><a class="btn secondary compact" href="design-tokens.json" download>下载设计变量</a></nav>
+  <div class="document-top"><span class="eyebrow">FUN TOOLKIT / DESIGN GUIDELINES</span><span class="edition">在线规范 v1.4.4 · 团队 Skill v1.0.4</span></div>
+  <nav class="doc-actions" aria-label="规范资源"><a class="btn ghost compact" href="../index.html#home">← 返回工具首页</a><a class="btn ft-motion-sheen" href="downloads/fun-toolkit-ui-1.0.4.zip" download>下载团队 Skill · v1.0.4</a><a class="btn secondary" href="https://funskill-studio.pages.dev/skills/fun-toolkit-ui" target="_blank" rel="noopener noreferrer" aria-label="FunSkill 查看与下载（新窗口打开）">FunSkill 已发布版 ↗</a><a class="btn secondary compact" href="Fun-Toolkit-UI-Spec-v1.2.pdf" download>历史 PDF · v1.2</a><a class="btn secondary compact" href="design-tokens.json" download>下载设计变量</a></nav>
   <section id="overview" class="hero">
     <div class="hero-grid"><div><span class="chip blue">设计与开发共用</span><h1>轻量、清晰、好用。</h1><p>让每个运营工具都拥有同一种使用体验。以现有 Fun Toolkit 为基础，统一视觉尺度、控件行为与完整状态，方便团队扩展新的工具。</p></div><div class="hero-mark" aria-hidden="true"><img src="assets/spreadfun-mark.webp" alt=""></div></div>
     <div class="hero-foot"><span class="chip">房间背景</span><span class="chip">头像框</span><span class="chip">Banner</span><span class="chip blue">三工具已接入共用反馈</span></div>
@@ -237,7 +240,22 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
     <div class="table-wrap" style="margin-top:16px"><table class="spec-table"><thead><tr><th>状态</th><th>视觉</th><th>行为 / 无障碍</th></tr></thead><tbody><tr><td>Hover</td><td>主蓝 #0062CC；轻影，可上移 1 px；180 ms。</td><td>仅有指针时增强；关键操作不能只在 hover 出现。</td></tr><tr><td>Pressed</td><td>主蓝 #0055B3；去阴影，可下移 1 px。</td><td>按下即反馈，释放才触发；不改变组件宽度。</td></tr><tr><td>Focus-visible</td><td>2 px #0071E3 外描边，间隔 2 px。</td><td>Tab 可达，Enter / Space 触发；不可用 outline:none 整体抹掉。</td></tr><tr><td>Loading</td><td>旋转标 + “正在生成…”；保留原宽；无进度时不写虚假百分比。</td><td>设置 aria-busy；阻止重复动作；只有能真实中断的任务才显示取消入口。</td></tr><tr><td>Disabled</td><td>背景 #EDF0F4，字 #647083；无 hover、位移或阴影。</td><td>真实 disabled；不能点击；锁定原因由旁边文案解释。</td></tr></tbody></table></div>
   </section>
 
-  <section id="forms" class="section">
+
+<section class="section" id="upload-states" aria-labelledby="upload-states-title">
+  <div class="section-title"><div><span class="section-number">UPLOAD SURFACE</span><h2 id="upload-states-title">上传空态 · 全局交互</h2><p class="section-description">房间背景、头像框、Banner、礼物图与 VAP 共用一份 upload-surface.css。</p></div><span class="chip">默认 / Hover / 拖入 / 焦点</span></div>
+  <div class="panel"><div class="grid-2">
+    <button id="upload-state-default" type="button" class="ft-upload-zone upload-ready doc-upload-zone" data-toast="上传区交互示例，不读取或上传文件。"><img src="assets/feedback/empty-upload.svg" width="120" height="90" alt=""><strong>悬停或用 Tab 聚焦</strong><span>浅蓝渐变 · 2px 蓝色内边框 · 无缩放位移</span></button>
+    <div id="upload-state-drag" class="ft-upload-zone upload-ready is-dragging doc-upload-zone" role="img" aria-label="文件拖入视觉示例"><img src="assets/feedback/empty-upload.svg" width="120" height="90" alt=""><strong>文件拖入状态</strong><span>更实的浅蓝底 · 3px 蓝色内边框</span></div>
+    <button id="upload-state-busy" type="button" class="ft-upload-zone upload-ready doc-upload-zone" aria-busy="true" disabled><img src="assets/feedback/empty-upload.svg" width="120" height="90" alt=""><strong>处理中，不响应 Hover</strong><span>保留空态布局 · 真实任务控制 busy</span></button>
+    <button id="upload-state-disabled" type="button" class="ft-upload-zone upload-ready doc-upload-zone" aria-disabled="true" disabled><img src="assets/feedback/empty-upload.svg" width="120" height="90" alt=""><strong>不可用，不响应 Hover</strong><span>不暗示可以点击，也不触发文件选择</span></button>
+  </div><div class="table-wrap" style="margin-top:20px"><table class="spec-table"><thead><tr><th>状态</th><th>统一参数</th><th>边界</th></tr></thead><tbody>
+    <tr><td>默认</td><td>径向渐变 #F3F8FF → #E3EEFB；描边 #D4E4F6</td><td>仅未上传时；已上传画布保留透明棋盘或素材背景</td></tr>
+    <tr><td>Hover / 焦点</td><td>渐变 #F7FBFF → #DCECFF；内描边 2px #8DC3FF；180ms</td><td>Hover 仅精细指针；键盘焦点额外 2px #0071E3 外环、偏移 2px</td></tr>
+    <tr><td>拖入 / 按下</td><td>#DCECFF；拖入内描边 3px #2786ED</td><td>不缩放插画、文字或画布；触屏仅保留按下反馈</td></tr>
+    <tr><td>处理中 / 禁用</td><td>禁止 Hover、按下与拖入高亮；静态布局</td><td>aria-busy / aria-disabled 必须来自真实状态，业务阻止重复选择</td></tr>
+  </tbody></table></div><p class="annotation">标记 <code>ft-upload-zone upload-ready</code>，样式在页面控件样式之后加载；有素材后移除 <code>upload-ready</code>。无文件时整块支持点击，内置原生上传按钮支持 Enter / 空格，按钮阻止冒泡，避免重复弹窗。减少动态时取消过渡，高对比使用系统颜色。此处示例不读取文件。</p></div>
+</section>
+<section id="forms" class="section">
     <div class="section-title"><div><div class="section-number">05 / FORMS & SELECTION</div><h2>表单与选择</h2><p class="section-description">标签始终可见，帮助说明靠近字段，错误出现在对应控件下方。placeholder 用于示例，不代替字段名。</p></div><span class="chip new">新增统一表单规范</span></div>
     <div class="panel"><div class="panel-header"><div><h3>输入框状态</h3><p>44px高、10px圆角、1px描边。点击输入只用细蓝边和极淡光晕；Tab键进入时显示2px焦点线。已填写不等于聚焦。</p></div></div><div class="input-grid">
       <div class="field"><label for="state-default">默认</label><input class="input" id="state-default" placeholder="例如：活动封面工具"><span class="field-helper">输入清楚的工具名称。</span></div>
@@ -257,6 +275,18 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
     &lt;path d="m4 6 4 4 4-4"/&gt;
   &lt;/svg&gt;
 &lt;/div&gt;</pre></div>
+    <div class="panel" id="disclosure-alignment" style="margin-top:16px">
+      <div class="panel-header"><div><h3>折叠标题：状态与箭头对齐</h3><p>标题伸缩，右侧状态与箭头组成固定操作组。以下示例可用鼠标或 Enter / Space 展开。</p></div><span class="badge-note">v1.4.4 增补</span></div>
+      <div class="grid-2">
+        <div>
+          <details class="ft-disclosure" id="disclosure-demo-applied" open><summary><span class="ft-disclosure-title">上下透明渐变</span><span class="ft-disclosure-actions"><span class="ft-disclosure-status" data-state="applied">已应用</span><svg class="ft-disclosure-arrow" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4"/></svg></span></summary><p class="annotation">标题占剩余空间；状态不拆行，箭头在 16 × 16px 独立槽内绕中心旋转。</p></details>
+          <details class="ft-disclosure" id="disclosure-demo-plain"><summary><span class="ft-disclosure-title">高级设置</span><span class="ft-disclosure-actions"><svg class="ft-disclosure-arrow" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4"/></svg></span></summary><p class="annotation">没有状态时保留同一结构与箭头槽，不改用字符箭头。</p></details>
+        </div>
+        <details class="ft-disclosure" id="disclosure-demo-pending"><summary><span class="ft-disclosure-title" lang="en">Top and bottom transparency with a long English parameter title</span><span class="ft-disclosure-actions"><span class="ft-disclosure-status" data-state="pending" lang="en">Pending</span><svg class="ft-disclosure-arrow" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m4 6 4 4 4-4"/></svg></span></summary><p class="annotation">长英文标题可以换行，右侧状态与箭头不压缩、不挤入标题；窄屏仍保持两者中轴一致。</p></details>
+      </div>
+      <p class="annotation">统一结构为 title + actions；title 使用 flex:1、min-width:0，actions 使用 inline-flex、align-items:center、flex:none、gap:8px。summary 高度至少44px；状态 white-space:nowrap，箭头固定16 × 16px。展开与收起只旋转SVG，不移动状态；不使用 ⌄ 等字体字形修补基线。保留原生 details / summary 语义与整行点击，不嵌套额外按钮；语言更新只改标题/状态文字，不覆盖整个 summary。</p>
+      <p class="component-source">复用 <a href="disclosure.css" download>disclosure.css</a>；模板 README 附可复制 HTML。验收中文 / 长英文、320px窄屏、已应用 / 待应用 / 未启用、展开 / 收起和键盘焦点。此示例不上传或修改素材。</p>
+    </div>
   </section>
 
   <section id="upload" class="section">
@@ -454,11 +484,11 @@ html[data-input-modality=pointer] :is(.input,textarea,select)[aria-invalid=true]
 </section>
 
 <section id="team-skill" class="section" aria-labelledby="team-skill-title">
- <div class="section-title"><div><div class="section-number">17 / TEAM SKILL</div><h2 id="team-skill-title">同一套规范，下一个工具直接用。</h2><p class="section-description">把页面框架、空态与动效装进一份可复用 Skill，交给同事和 AI 从同一个起点开始。</p></div><span class="badge-note">fun-toolkit-ui · v1.0.2</span></div>
+ <div class="section-title"><div><div class="section-number">17 / TEAM SKILL</div><h2 id="team-skill-title">同一套规范，下一个工具直接用。</h2><p class="section-description">把页面框架、空态与动效装进一份可复用 Skill，交给同事和 AI 从同一个起点开始。</p></div><span class="badge-note">fun-toolkit-ui · v1.0.4</span></div>
  <div class="panel">
   <div class="grid-3"><div><h3>最新页面模板</h3><p class="annotation">原生 HTML / CSS / JS，统一导航、双栏工作台、中英与移动端；五种演示状态已结合最新反馈基础资源。</p></div><div><h3>8 个 SVG 与动效</h3><p class="annotation">六类空态、图片与头像占位；800ms 加载、1600ms 骨架、轻淡入、玻璃弹窗与主按钮扫光。</p></div><div><h3>接入与验收</h3><p class="annotation">设计变量、业务接入说明、示例需求与检查清单一并打包；真实上传、生成、下载和统计由新工具接入。</p></div></div>
-  <div class="button-row" style="margin-top:20px"><a class="btn ft-motion-sheen" href="downloads/fun-toolkit-ui-1.0.2.zip" download aria-describedby="team-skill-download-note">下载团队 Skill · v1.0.2 <svg aria-hidden="true"><use href="#i-download"/></svg></a><a class="btn secondary" href="https://funskill-studio.pages.dev/skills/fun-toolkit-ui" target="_blank" rel="noopener noreferrer" aria-label="FunSkill 查看与下载（新窗口打开）">FunSkill 查看与下载 ↗</a><a class="btn secondary" href="tool-page-starter/index.html" target="_blank" rel="noopener">预览基础模板 ↗</a></div>
-  <p class="annotation" id="team-skill-download-note">ZIP 是自包含 Skill 交付包，包含 SKILL.md 和配套资源；下载不会自动安装。在线规范与团队包为当前交付，<a href="Fun-Toolkit-UI-Spec-v1.2.pdf" download>PDF v1.2</a> 仅保留为历史快照。</p>
+  <div class="button-row" style="margin-top:20px"><a class="btn ft-motion-sheen" href="downloads/fun-toolkit-ui-1.0.4.zip" download aria-describedby="team-skill-download-note">下载团队 Skill · v1.0.4 <svg aria-hidden="true"><use href="#i-download"/></svg></a><a class="btn secondary" href="https://funskill-studio.pages.dev/skills/fun-toolkit-ui" target="_blank" rel="noopener noreferrer" aria-label="FunSkill 查看与下载（新窗口打开）">FunSkill 已发布版 ↗</a><a class="btn secondary" href="tool-page-starter/index.html" target="_blank" rel="noopener">预览基础模板 ↗</a></div>
+  <p class="annotation" id="team-skill-download-note">ZIP 是自包含 Skill 交付包，包含 SKILL.md 和配套资源；下载不会自动安装。在线规范与团队包为当前交付，<a href="Fun-Toolkit-UI-Spec-v1.2.pdf" download>PDF v1.2</a> 仅保留为历史快照。 本页规范包已更新；FunSkill 入口保留平台已发布版本，不代表已同步此次规范更新。</p>
   <h3 class="subheading">三步开始</h3><ol class="rule-list"><li>下载并解压，按所用 Agent 支持的方式添加 <code>fun-toolkit-ui</code>，确认可识别根目录 <code>SKILL.md</code>。</li><li>明确调用 <code>$fun-toolkit-ui</code>，填写工具用途、输入限制、处理流程和输出规格；先复用模板，再接真实业务。</li><li>按包内清单检查中英、320px 手机、各类状态与真实文件；确认生成、下载和统计正确后再发布。</li></ol>
   <label for="team-skill-prompt" class="field-label" style="display:block;margin-top:20px">发给同事或 AI 的提示词 · 选中文案即可复制</label>
   <textarea id="team-skill-prompt" class="team-skill-prompt" readonly aria-describedby="team-skill-prompt-note">使用 $fun-toolkit-ui 创建「[工具名]」。先阅读 SKILL.md，复用包内最新工具页模板、设计变量、空态、占位和动效资源。输入：[格式、体积、数量限制]；流程：[自动处理或点击生成]；参数：[默认值与范围]；输出：[尺寸、格式、压缩与命名]。补齐中英文、移动端、键盘、减少动画和错误恢复；用真实素材验证上传、生成、下载及统计，未实现的能力明确标为示例。先给出可检查的页面，再按验收清单完成交付。</textarea>
@@ -479,9 +509,9 @@ Button / Replace / Hover
 Input / Number / Error
 Upload / SVGA / Dragging
 Preview / GameBanner / Transparent
-Dialog / Help / Small</pre></div><div class="panel"><div class="panel-header"><div><h3>使用边界</h3><p>交付的是规范，不是自动完成的网站改造。</p></div></div><p class="annotation" style="margin-top:0">本目录v1.4.2覆盖了当前三个工具从输入到下载的核心流程与边界，保留已确认的视觉方向，并为未来扩展提供统一目标。现网仍有历史颜色、圆角、间距与原生字段校验的差异；实施时应有计划地收敛，不能只替换一组 CSS 变量就视为完成。</p><p class="annotation">本文件所有操作均为组件演示，不调用正式接口，不提交需求，不读上传文件内容，不产生真实生成 / 下载统计。</p><p class="component-source">依据：当前源码 index.html、toolkit.css、hub.css、home.css、tokens.css 的只读样式审计。具体实现与上线验收以主交付文档及后续版本为准。版本：2026-10-24 / v1.4.2。</p></div></div>
+Dialog / Help / Small</pre></div><div class="panel"><div class="panel-header"><div><h3>使用边界</h3><p>交付的是规范，不是自动完成的网站改造。</p></div></div><p class="annotation" style="margin-top:0">本目录v1.4.4覆盖了当前三个工具从输入到下载的核心流程与边界，保留已确认的视觉方向，并为未来扩展提供统一目标。现网仍有历史颜色、圆角、间距与原生字段校验的差异；实施时应有计划地收敛，不能只替换一组 CSS 变量就视为完成。</p><p class="annotation">本文件所有操作均为组件演示，不调用正式接口，不提交需求，不读上传文件内容，不产生真实生成 / 下载统计。</p><p class="component-source">依据：当前源码 index.html、toolkit.css、hub.css、home.css、tokens.css 的只读样式审计。具体实现与上线验收以主交付文档及后续版本为准。版本：2026-10-26 / v1.4.4。</p></div></div>
   </section>
-  <footer class="doc-footer"><span>Fun Toolkit · 为乐趣运营而生</span><span>设计规范 / 组件目录 · v1.4.2 · 2026-10-24</span></footer>
+  <footer class="doc-footer"><span>Fun Toolkit · 为乐趣运营而生</span><span>设计规范 / 组件目录 · v1.4.4 · 2026-10-26</span></footer>
 </main>
 <div id="demo-toast" class="toast" role="status" aria-live="polite" hidden><svg aria-hidden="true"><use href="#i-check"/></svg><span id="toast-text"></span><button type="button" id="toast-close" aria-label="关闭轻提示"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div>
 <dialog id="help-dialog" aria-labelledby="dialog-title" aria-describedby="dialog-description" class="ft-motion-dialog"><div class="dialog-header"><h2 id="dialog-title">Banner 使用说明</h2><button class="close-btn" type="button" id="dialog-close" aria-label="关闭说明"><svg aria-hidden="true"><use href="#i-close"/></svg></button></div><div class="dialog-body"><p id="dialog-description">这是规范中的说明弹窗示例，展示尺寸、文字层级和关闭行为。</p><ol style="padding-left:20px;margin:16px 0"><li>准备图片；使用 GPT 生图时，可在提示词中写明 <strong>3.3:1 图片比例</strong>。</li><li>上传素材并检查裁切；内容主体留在中心安全区域。</li><li>生成房间 Banner 与游戏 Banner，确认预览后下载。</li></ol><div class="notice info"><svg aria-hidden="true"><use href="#i-info"/></svg><div>游戏 Banner 预览可切换黑色与透明；实际导出仍保持透明背景。</div></div><p class="focus-note">键盘提示：Tab 在弹窗内切换，Escape 关闭。关闭后返回刚才的按钮。</p></div><div class="dialog-actions"><button type="button" class="btn" id="dialog-confirm">知道了</button></div></dialog>

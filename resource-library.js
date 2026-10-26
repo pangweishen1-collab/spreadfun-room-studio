@@ -78,15 +78,7 @@
     syncReceipt();
   }
   function renderCatalog(){
-    const catalog=$('#resourceCatalog');catalog.replaceChildren();
-    for(const project of projects){
-      const button=document.createElement('button');button.type='button';button.className='resource-project';button.dataset.project=project.id;button.setAttribute('aria-label',`${t('select')} ${projectName(project)}`);
-      const thumb=document.createElement('span');thumb.className='resource-project-art';
-      const image=document.createElement('img');image.src=assetPath(project,256);image.alt='';image.width=256;image.height=256;image.decoding='async';image.loading='lazy';thumb.append(image);
-      const name=document.createElement('span');name.className='resource-project-name';name.textContent=projectName(project);
-      const check=document.createElement('span');check.className='resource-project-check';check.textContent='✓';check.setAttribute('aria-hidden','true');
-      button.append(thumb,name,check);button.addEventListener('click',()=>selectProject(project));catalog.append(button);
-    }
+    window.ProjectSelector.render($('#resourceCatalog'),projects,{getName:projectName,selectLabel:t('select'),onSelect:selectProject,selectedId:state.project.id});
   }
   async function selectProject(project){
     if(state.busy||project===state.project&&state.ready&&state.phase!=='error')return;

@@ -51,6 +51,8 @@
     $('main').dataset.state = state;
     // Keep the live status outside a busy region so assistive technology hears updates immediately.
     $('drop-zone').setAttribute('aria-busy', String(busy));
+    $('drop-zone').classList.toggle('upload-ready',state==='empty');
+    $('drop-zone').setAttribute('aria-label',t(state==='empty'?'uploadTitle':'preview'));
     $('output-result').setAttribute('aria-busy', String(busy));
     $('demo-state').value = state;
     $('state-badge').textContent = t(stateKeys[state]);
@@ -156,7 +158,8 @@
 
   $('demo-state').addEventListener('change', event => { setToolState(event.target.value); });
   document.querySelectorAll('[data-language]').forEach(button => { button.addEventListener('click', () => { setLanguage(button.dataset.language); }); });
-  [$('upload-button'),$('replace-button')].forEach(button => { button.addEventListener('click', () => { $('source-file').click(); }); });
+  [$('upload-button'),$('replace-button')].forEach(button => { button.addEventListener('click', event => { event.stopPropagation();if(state!=='processing')$('source-file').click(); }); });
+  $('drop-zone').addEventListener('click',()=>{if(state==='empty')$('source-file').click()});
   $('source-file').addEventListener('change', event => {
     const file = event.target.files[0];
     event.target.value = '';

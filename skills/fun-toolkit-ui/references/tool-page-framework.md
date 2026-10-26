@@ -2,7 +2,7 @@
 
 适用范围：新增图片、文件与素材生产工具。配合现有 UI 规范使用，先搭结构与状态，再接真实处理逻辑。
 
-当前团队交付为 [fun-toolkit-ui v1.0.2](https://fun-toolkit.pangweishen1.workers.dev/design-system/downloads/fun-toolkit-ui-1.0.2.zip)：自包含 Skill、最新页面模板、8 个空态 / 占位 SVG、反馈与动效资源、接入说明和验收清单。下载不等于安装；按所用 Agent 的方式添加并确认识别 `SKILL.md` 后，使用 `$fun-toolkit-ui` 发起任务。在线规范与团队包是当前交付，PDF v1.2 为历史快照。
+当前团队交付为 [fun-toolkit-ui v1.0.4](https://fun-toolkit.pangweishen1.workers.dev/design-system/downloads/fun-toolkit-ui-1.0.4.zip)：自包含 Skill、最新页面模板、8 个空态 / 占位 SVG、反馈与动效资源、接入说明和验收清单。下载不等于安装；按所用 Agent 的方式添加并确认识别 `SKILL.md` 后，使用 `$fun-toolkit-ui` 发起任务。在线规范与团队包是当前交付，PDF v1.2 为历史快照。
 
 ## 1. 从一张工作台开始
 
@@ -127,7 +127,7 @@
 
 > 使用 `$fun-toolkit-ui`，请按 Fun Toolkit 工具页面框架搭建「[工具名]」。复用现有全站导航、左对齐标题与帮助、7:3 双栏工作台和页脚。选择 [单文件 / 批量 / 动画] 变体；输入为 [格式与限制]，采用 [上传后自动处理 / 点击生成]，参数为 [字段、默认值、范围]，输出为 [尺寸、格式、压缩、文件名]。补齐上传前、已载入、处理中、成功、错误五态；新参数使旧结果失效，保留输入并提供真实恢复入口。统一蓝色 hover、精细焦点、轻扫光和玻璃弹窗；支持中英、键盘与减少动画。≤900 px 单列，手机边距 16 px、操作目标 44 px，验证至 320 px。真实处理与统计单独接入，未实现能力明确标为示例，不制造成功结果。
 
-参考来源：当前 Fun Toolkit 三工具源码、在线 UI 设计规范 v1.4.2 与团队 Skill v1.0.2。PDF v1.2 为历史快照。本文是新增工具的统一接入标准，现有页面中的历史间距和状态差异按后续迭代逐步收敛。
+参考来源：当前 Fun Toolkit 三工具源码、在线 UI 设计规范 v1.4.4 与团队 Skill v1.0.4。PDF v1.2 为历史快照。本文是新增工具的统一接入标准，现有页面中的历史间距和状态差异按后续迭代逐步收敛。
 
 ## 下载模板的实际入口
 
@@ -138,6 +138,12 @@
 
 ## 配套反馈与动效
 
-新增工具的空状态、加载、图片与头像占位、元素出入场和装饰视差，参见 [反馈规范](feedback-states.md)。团队 Skill v1.0.2 已合并最新模板、`feedback-motion.css` / `.js` 和 8 个 SVG；无需另下载单独资源包。
+新增工具的空状态、加载、图片与头像占位、元素出入场和装饰视差，参见 [反馈规范](feedback-states.md)。团队 Skill v1.0.4 已合并最新模板、`feedback-motion.css` / `.js` 和 8 个 SVG；无需另下载单独资源包。
 
 当前房间背景、头像框与 Banner 通过根目录 `tool-feedback.css` / `tool-feedback.js` 适配共享 `feedback-motion`，保留各自真实处理流程。模板已接入同一套空态 / 占位、800ms Spinner、1600ms Skeleton，以及离屏 / 后台 / 减少动画规则。普通内容入场 180ms、最多上移 6px；生产工具的 Canvas 区域采用 160ms、opacity .35→1 的轻淡入，不改变精确坐标，忙碌提示 120ms 淡出。不能把模板演示控制器当作生产适配层或业务处理器。
+
+## 上传空态交互
+
+复用 `upload-surface.css`，容器标记 `ft-upload-zone upload-ready`，样式在页面控件样式之后加载。有素材后移除 `upload-ready`；不要给编辑画布加上传 Hover。默认沿用房间背景的径向浅蓝渐变（#F3F8FF → #E3EEFB），细描边 #D4E4F6。精细指针 Hover 与键盘聚焦改为 #F7FBFF → #DCECFF，2px #8DC3FF 内描边；拖入为 #DCECFF 与3px #2786ED 内描边。焦点另有2px #0071E3 外环、偏移2px。过渡180ms，不缩放、位移插画、文字或画布。
+
+触屏不使用持久 Hover；按下有即时反馈。`aria-busy=true` / `aria-disabled=true` 时取消悬停、拖入与按下高亮，业务防重复选择。减少动态取消过渡；forced-colors采用系统色与可见焦点。无文件时整个上传区可点击，内置原生上传按钮支持Enter/空格并阻止冒泡；容器使用group，避免嵌套button角色。有素材后不再拦截编辑操作。资源库没有上传空态，不套用此背景到Logo选择卡片。

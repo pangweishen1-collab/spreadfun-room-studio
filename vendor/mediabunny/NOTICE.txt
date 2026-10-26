@@ -1,0 +1,1 @@
+Mediabunny 1.62.1. Unmodified official npm browser bundle. MPL-2.0. Source: https://github.com/Vanilagy/mediabunny/tree/v1.62.1 ; https://registry.npmjs.org/mediabunny/-/mediabunny-1.62.1.tgz

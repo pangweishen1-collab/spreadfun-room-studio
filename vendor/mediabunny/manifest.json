@@ -1,0 +1,14 @@
+{
+  "LICENSE": {
+    "bytes": 16726,
+    "sha256": "3f3d9e0024b1921b067d6f7f88deb4a60cbe7a78e76c64e3f1d7fc3b779b9d04"
+  },
+  "mediabunny.mjs": {
+    "bytes": 703759,
+    "sha256": "b365395e7cd4b130553a1203fc23c52c035aedf6d1e07d6fedb4663745b5c790"
+  },
+  "NOTICE.txt": {
+    "bytes": 192,
+    "sha256": "9be21f72d3fe5b9844761bab451267db1c6f52c03c236b08ecde53acbe1a03fe"
+  }
+}
