@@ -26,85 +26,93 @@ async function tests(){
   const temporary=fs.mkdtempSync(path.join(os.tmpdir(),'gift-background-lazy-'));
   try{
     fs.copyFileSync(path.join(root,'gift-background-worker.js'),path.join(temporary,'worker.mjs'));
-    fs.copyFileSync(path.join(root,'gift-background-matte.mjs'),path.join(temporary,'gift-background-matte.mjs'));
-    fs.copyFileSync(path.join(root,'gift-quality-matte.mjs'),path.join(temporary,'gift-quality-matte.mjs'));
-    const messages=[],handlers=new Map();
-    let resolveWorker;
-    global.self={addEventListener(type,handler){handlers.set(type,handler)},postMessage(message,transfer){messages.push({message,transfer});if(message.id===11&&(message.type==='result'||message.type==='error'))resolveWorker?.(message)}};
+    for(const filename of ['gift-background-matte.mjs','gift-uniform-matte.mjs'])fs.copyFileSync(path.join(root,filename),path.join(temporary,filename));
+    const messages=[],handlers=new Map(),settlers=new Map();
+    const waitForWorker=id=>new Promise(resolve=>settlers.set(id,resolve));
+    global.self={addEventListener(type,handler){handlers.set(type,handler)},postMessage(message,transfer){messages.push({message,transfer});if(message.type==='result'||message.type==='error'){settlers.get(message.id)?.(message);settlers.delete(message.id)}}};
     const {routeBackground}=await import(pathToFileURL(path.join(temporary,'worker.mjs')));
     const native=new Uint8ClampedArray(96*48*4);for(let pixel=0;pixel<96*48;pixel++)native[pixel*4+3]=255;
     const prior={width:96,height:48,data:new Uint8ClampedArray(96*48),recoverBlack:false,method:'ai'};
-    for(let y=10;y<38;y++)for(let x=24;x<72;x++){native.set([60,20,5,255],(y*96+x)*4);prior.data[y*96+x]=255}
+    // Model coverage stays floating until native foreground composition. Flat
+    // exterior tails are deliberately nonzero to exercise real cleanup.
+    const floatPrior=new Float32Array(96*48).fill(.25);
+    for(let y=10;y<38;y++)for(let x=24;x<72;x++){native.set([60,20,5,255],(y*96+x)*4);floatPrior[y*96+x]=1}
     const shadow=24*96+48;native.set([3,2,1,255],shadow*4);
-    native.set([22,7,0,255],(20*96+40)*4);
-    const particle=5*96+12;native.set([22,7,0,255],particle*4);
-    const order=[],qualityProgress=[],darkInput={type:'remove',id:1,width:96,height:48,data:native},beforeDark=native.slice();
-    const mockedAI={async remove(message,progress){order.push('semantic');assert.equal(message,darkInput);progress('processing',.5);return prior}};
-    const mockedRefiner={async refine(message,trimap,progress){
-      order.push('refine');assert.equal(message,darkInput,'the refiner receives the original native bitmap');
-      assert.ok(trimap instanceof Uint8ClampedArray);assert.equal(trimap.length,96*48);
-      assert.deepEqual([...new Set(trimap)].sort((a,b)=>a-b),[0,128,255],'the real trimap has definite background, unknown edges and a subject core');
-      assert.equal(trimap[0],0);assert.equal(trimap[shadow],255,'the closed dark subject shadow is protected by the semantic core');
-      progress('processing',1);
-      // A deliberately imperfect model output tests that composition enforces
-      // hard trimap labels, rather than allowing learned alpha to fill black.
-      return {width:96,height:48,data:new Uint8ClampedArray(96*48).fill(64)};
+    const material=20*96+40;native.set([22,7,0,255],material*4);floatPrior[material]=.12;
+    const particle=5*96+12;native.set([22,7,0,255],particle*4);floatPrior[particle]=0;
+    const weakLight=5*96+13;native.set([2,1,0,255],weakLight*4);floatPrior[weakLight]=0;
+    const order=[],qualityProgress=[],darkInput={type:'remove',id:1,width:96,height:48,data:native},beforeDark=native.slice(),priorBefore=floatPrior.slice();
+    const mockedLucida={async remove(message,progress){
+      order.push('lucida');assert.equal(message,darkInput,'Lucida receives the unchanged native bitmap');
+      progress('loading',.5);progress('processing',1);
+      return {width:96,height:48,data:floatPrior};
     }};
     const quality=await routeBackground(darkInput,{
       onProgress:(phase,progress)=>qualityProgress.push({phase,progress}),
-      loadAI:async()=>{order.push('loadAI');return mockedAI},
-      loadRefiner:async()=>{order.push('loadRefiner');return mockedRefiner}
+      loadAI:async()=>{throw new Error('black images must not load the legacy semantic model')},
+      loadLucida:async()=>{order.push('loadLucida');return mockedLucida}
     });
-    assert.deepEqual(order,['loadAI','semantic','loadRefiner','refine'],'dark images run semantic prior before learned edge refinement');
+    assert.deepEqual(order,['loadLucida','lucida'],'dark images use one native float matte without the semantic/refiner pair');
     assert.equal(quality.method,'quality-matte');assert.equal(quality.recoverBlack,false);assert.equal(quality.width,96);assert.equal(quality.height,48);
-    assert.equal(quality.data[0],0,'known black background stays transparent despite a nonzero model prediction');
-    assert.equal(quality.data[shadow],255);assert.deepEqual(quality.foreground.slice(shadow*4,shadow*4+4),Uint8ClampedArray.of(3,2,1,255),'the solid subject shadow keeps its original colour');
-    assert.equal(quality.data[particle],22);assert.deepEqual(quality.foreground.slice(particle*4,particle*4+4),Uint8ClampedArray.of(255,81,0,22),'a separate light layer retains and unmattes the disconnected particle');
-    assert.deepEqual(quality.background,[0,0,0]);assert.equal(quality.foreground.length,native.length);assert.deepEqual(native,beforeDark,'routing does not mutate native RGBA');
+    assert.equal(quality.data[0],0,'colour-matching exterior tails are cleared despite nonzero model coverage');
+    assert.equal(quality.data[shadow],255);assert.deepEqual(quality.foreground.slice(shadow*4,shadow*4+4),Uint8ClampedArray.of(3,2,1,255),'opaque subject shadows retain their original colour');
+    assert.equal(quality.data[material],31);assert.deepEqual(quality.foreground.slice(material*4,material*4+4),Uint8ClampedArray.of(183,58,0,31),'foreground colours use .12 float coverage rather than an early byte-rounded prior');
+    assert.equal(quality.data[particle],22);assert.deepEqual(quality.foreground.slice(particle*4,particle*4+4),Uint8ClampedArray.of(255,81,0,22),'physical colour coverage retains disconnected particles');
+    assert.equal(quality.data[weakLight],2,'weak light is retained independently of low learned coverage');
+    assert.deepEqual(quality.background,[0,0,0]);assert.equal(quality.foreground.length,native.length);assert.deepEqual(native,beforeDark);assert.deepEqual(floatPrior,priorBefore,'composition does not mutate model coverage');
+    assert.ok(qualityProgress.some(event=>event.phase==='loading'&&Math.abs(event.progress-.27)<1e-12));
     assert.ok(qualityProgress.some(event=>event.phase==='matting'));assert.deepEqual(qualityProgress.at(-1),{phase:'processing',progress:1});
 
     const white=new Uint8ClampedArray(32*16*4).fill(255),fallbackInput={type:'remove',id:2,width:32,height:16,data:white};
-    const nonblack=await routeBackground(fallbackInput,{loadAI:async()=>({async remove(message){assert.equal(message,fallbackInput);return prior}}),loadRefiner:async()=>{throw new Error('a nonblack bitmap must not import the refiner')}});
-    assert.equal(nonblack,prior,'nonblack images keep the existing semantic AI result protocol');
-    await assert.rejects(routeBackground(darkInput,{loadAI:async()=>{throw new Error('semantic unavailable')},loadRefiner:async()=>{throw new Error('must not refine without a prior')}}),/semantic unavailable/,'semantic failure never falls back to the old fill-black route');
-    await assert.rejects(routeBackground(darkInput,{loadAI:async()=>mockedAI,loadRefiner:async()=>({async refine(){throw new Error('edge refinement unavailable')}})}),/edge refinement unavailable/,'refinement failure never returns a misleading old dark mask');
+    const nonblack=await routeBackground(fallbackInput,{loadAI:async()=>({async remove(message){assert.equal(message,fallbackInput);return prior}}),loadLucida:async()=>{throw new Error('nonblack images must not import Lucida')}});
+    assert.equal(nonblack,prior,'nonblack images retain the existing semantic result protocol');
+    await assert.rejects(routeBackground(darkInput,{loadAI:async()=>{throw new Error('must not use a legacy black fallback')},loadLucida:async()=>{throw new Error('Lucida unavailable')}}),/Lucida unavailable/);
+    await assert.rejects(routeBackground(darkInput,{loadLucida:async()=>({async remove(){throw new Error('Lucida inference unavailable')}})}),/Lucida inference unavailable/,'inference failure never returns a misleading legacy dark mask');
+    await assert.rejects(routeBackground(darkInput,{loadLucida:async()=>({async remove(){return {width:1,height:1,data:new Float32Array(1)}}})}),/匹配原图尺寸/);
+    for(const badPrior of [new Uint8ClampedArray(96*48),new Float32Array(1),new Float32Array(96*48).fill(NaN),new Float32Array(96*48).fill(-.1),new Float32Array(96*48).fill(1.1)]){
+      await assert.rejects(routeBackground(darkInput,{loadLucida:async()=>({async remove(){return {width:96,height:48,data:badPrior}}})}),/主体透明度/);
+    }
 
-    global.__giftBackgroundTestState={aiImports:0,refinerImports:0,calls:[],prior,failAI:false,failRefiner:false,gate:null};
-    await assert.rejects(routeBackground(fallbackInput),/gift-background-ai/,'other backgrounds attempt the lazy AI import');
+    global.__giftBackgroundTestState={aiImports:0,lucidaImports:0,calls:[],prior,floatPrior,failAI:false,failLucida:false,gate:null,aiWarm:false,lucidaWarm:false};
+    await assert.rejects(routeBackground(fallbackInput),/gift-background-ai/,'other backgrounds lazily import the existing AI');
     fs.writeFileSync(path.join(temporary,'gift-background-ai.mjs'),`globalThis.__giftBackgroundTestState.aiImports++;
       export async function remove(message,progress){
         const state=globalThis.__giftBackgroundTestState;state.calls.push('semantic');state.input=message;
-        if(state.gate)await state.gate;if(state.failAI)throw new Error('semantic failed');
-        progress('processing',1);
+        if(state.failAI)throw new Error('semantic failed');
+        if(!state.aiWarm){progress('loading',1);state.aiWarm=true}progress('processing',1);
         return state.prior;
       }`);
     const fallbackProgress=[],fallback=await routeBackground(fallbackInput,{onProgress:(phase,progress)=>fallbackProgress.push({phase,progress})});
     const state=global.__giftBackgroundTestState;
-    assert.equal(fallback,prior);assert.equal(state.input,fallbackInput,'AI gets the unchanged native bitmap after detection');
-    assert.ok(fallbackProgress.some(event=>event.phase==='loading'),'an actual AI module import reports loading');assert.equal(state.aiImports,1,'a failed AI import can be retried');
-    assert.equal(fs.existsSync(path.join(temporary,'gift-matting-refine.mjs')),false,'the nonblack route succeeds without a refiner or its model present');
-    await assert.rejects(routeBackground(darkInput),/gift-matting-refine/,'the dark quality route lazily imports refinement after semantic inference');
-    fs.writeFileSync(path.join(temporary,'gift-matting-refine.mjs'),`globalThis.__giftBackgroundTestState.refinerImports++;
-      export async function refine(message,trimap,progress){
-        const state=globalThis.__giftBackgroundTestState;state.calls.push('refine');state.refineInput=message;state.trimap=trimap;
-        if(state.failRefiner)throw new Error('refinement failed');progress('processing',1);
-        return {width:message.width,height:message.height,data:new Uint8ClampedArray(message.width*message.height).fill(64)};
+    assert.equal(fallback,prior);assert.equal(state.input,fallbackInput);assert.ok(fallbackProgress.some(event=>event.phase==='loading'));assert.equal(state.aiImports,1,'a failed legacy AI import can be retried');
+    assert.equal(fs.existsSync(path.join(temporary,'gift-lucida-ai.mjs')),false,'the nonblack path succeeds without Lucida or its assets');
+    assert.equal(fs.existsSync(path.join(temporary,'gift-matting-refine.mjs')),false,'the old refiner is never required by either route');
+    const callsBeforeDark=state.calls.length;
+    await assert.rejects(routeBackground(darkInput),/gift-lucida-ai/,'the black quality path lazily imports Lucida');assert.equal(state.calls.length,callsBeforeDark,'Lucida import failure does not invoke legacy semantic inference');
+    fs.writeFileSync(path.join(temporary,'gift-lucida-ai.mjs'),`globalThis.__giftBackgroundTestState.lucidaImports++;
+      export async function remove(message,progress){
+        const state=globalThis.__giftBackgroundTestState;state.calls.push('lucida');state.qualityInput=message;
+        if(state.gate)await state.gate;if(state.failLucida)throw new Error('Lucida inference failed');
+        if(!state.lucidaWarm){progress('loading',1);state.lucidaWarm=true}progress('processing',1);
+        return {width:message.width,height:message.height,data:state.floatPrior};
       }`);
-    const retried=await routeBackground(darkInput);assert.equal(retried.method,'quality-matte');assert.equal(state.refinerImports,1,'a failed refiner import can be retried');assert.equal(state.refineInput,darkInput);
+    const retried=await routeBackground(darkInput);assert.equal(retried.method,'quality-matte');assert.equal(state.lucidaImports,1,'a failed Lucida import can be retried');assert.equal(state.qualityInput,darkInput);
     const reusedProgress=[];await routeBackground(fallbackInput,{onProgress:phase=>reusedProgress.push(phase)});await routeBackground(darkInput);
-    assert.equal(state.aiImports,1);assert.equal(state.refinerImports,1,'successful jobs reuse both lazy modules');assert.ok(!reusedProgress.includes('loading'),'the reused AI module does not report another module import');
-    state.failRefiner=true;await assert.rejects(routeBackground(darkInput),/refinement failed/);state.failRefiner=false;
-    assert.equal((await routeBackground(darkInput)).method,'quality-matte','a failed inference can be retried using the loaded module');assert.equal(state.refinerImports,1);
-    state.failAI=true;await assert.rejects(routeBackground(darkInput),/semantic failed/);state.failAI=false;
-    assert.equal((await routeBackground(darkInput)).method,'quality-matte');assert.equal(state.aiImports,1);
+    assert.equal(state.aiImports,1);assert.equal(state.lucidaImports,1,'successful jobs reuse their lazy modules');assert.ok(!reusedProgress.includes('loading'));
+    state.failLucida=true;await assert.rejects(routeBackground(darkInput),/Lucida inference failed/);state.failLucida=false;
+    assert.equal((await routeBackground(darkInput)).method,'quality-matte');assert.equal(state.lucidaImports,1,'loaded Lucida inference is retryable without reimport');
+    state.failAI=true;await assert.rejects(routeBackground(fallbackInput),/semantic failed/);state.failAI=false;
+    assert.equal(await routeBackground(fallbackInput),prior);assert.equal(state.aiImports,1,'legacy inference failures also remain retryable');
     await assert.rejects(routeBackground({...darkInput,width:2049}),/尺寸/);await assert.rejects(routeBackground({...darkInput,data:new Uint8Array(native)}),/尺寸/);
-    let releaseAI;state.gate=new Promise(resolve=>{releaseAI=resolve});const workerDone=new Promise(resolve=>{resolveWorker=resolve});
+    let releaseLucida;state.gate=new Promise(resolve=>{releaseLucida=resolve});const workerDone=waitForWorker(11);
     handlers.get('message')({data:{...darkInput,id:11}});handlers.get('message')({data:{...darkInput,id:12}});await new Promise(resolve=>setImmediate(resolve));
-    assert.ok(messages.some(({message})=>message.id===12&&message.type==='error'&&/处理中/.test(message.message)),'the worker rejects simultaneous jobs while semantic inference is pending');
-    assert.ok(!messages.some(({message})=>message.id===11&&message.type==='result'));releaseAI();await workerDone;state.gate=null;
+    assert.ok(messages.some(({message})=>message.id===12&&message.type==='error'&&/处理中/.test(message.message)),'simultaneous jobs are rejected while Lucida inference is pending');
+    assert.ok(!messages.some(({message})=>message.id===11&&message.type==='result'));releaseLucida();await workerDone;state.gate=null;
     const transferred=messages.find(({message})=>message.id===11&&message.type==='result');assert.equal(transferred.message.method,'quality-matte');
-    assert.equal(transferred.transfer.length,2);assert.equal(transferred.transfer[0],transferred.message.data.buffer);assert.equal(transferred.transfer[1],transferred.message.foreground.buffer,'native RGBA foreground and alpha transfer separately');
+    assert.equal(transferred.transfer.length,2);assert.equal(transferred.transfer[0],transferred.message.data.buffer);assert.equal(transferred.transfer[1],transferred.message.foreground.buffer);
     assert.equal(transferred.message.foreground.length,96*48*4);assert.equal(transferred.message.width,96);assert.equal(transferred.message.height,48);assert.deepEqual(transferred.message.background,[0,0,0]);
+    state.failLucida=true;const failedWorker=waitForWorker(13);handlers.get('message')({data:{...darkInput,id:13}});assert.match((await failedWorker).message,/Lucida inference failed/);
+    state.failLucida=false;const recoveredWorker=waitForWorker(14);handlers.get('message')({data:{...darkInput,id:14}});assert.equal((await recoveredWorker).type,'result','worker busy state resets after a real inference rejection');
   }finally{delete global.self;delete global.__giftBackgroundTestState;fs.rmSync(temporary,{recursive:true,force:true})}
 
   const {preprocess,logitsToAlpha,resizeRGBA}=await import(pathToFileURL(path.join(root,'gift-background-ai.mjs')));
@@ -159,7 +167,7 @@ async function tests(){
   const {remove}=sandbox.window.GiftBackground,image={naturalWidth:1200,naturalHeight:800,complete:true};
   assert.equal(workers.length,0,'loading the tool never eagerly loads the worker or model');await assert.rejects(remove({naturalWidth:0,naturalHeight:0}),/载入/);assert.equal(workers.length,0);
   const first=remove(image,{onProgress:event=>progress.push(event)}),also=[];
-  assert.equal(workers.length,1);assert.equal(String(workers[0].url),'http://127.0.0.1:8792/gift-background-worker.js?v=20261025-speed1');assert.equal(workers[0].options.type,'module');assert.equal(progress[0].phase,'analyzing');
+  assert.equal(workers.length,1);assert.equal(String(workers[0].url),'http://127.0.0.1:8792/gift-background-worker.js?v=20261026-lucida1');assert.equal(workers[0].options.type,'module');assert.equal(progress[0].phase,'analyzing');
   assert.equal(remove(image,{onProgress:event=>also.push(event)}),first,'repeated calls for the same source share the active job');
   await assert.rejects(remove({...image}),/处理中/,'a different source cannot race the current job');
   const worker=workers[0],message=worker.messages[0].message;
@@ -227,6 +235,6 @@ async function tests(){
   const afterCrash=freshRemove(image);assert.equal(workers.length,2,'a worker crash is retryable with a fresh worker');listeners.get('pagehide')();await assert.rejects(afterCrash,/取消/);assert.equal(workers[1].terminated,true);assert.equal(timers.size,0);
   readError=true;await assert.rejects(freshRemove(image),/cannot read/);readError=false;
   const timed=freshRemove(image);assert.equal(timers.size,1);[...timers.values()][0]();await assert.rejects(timed,/耗时过长/);assert.equal(timers.size,0);
-  console.log('gift-background: semantic-to-trimap-to-refinement routing, preserved shadow/light foreground, lazy nonblack route, failures without old black-fill fallback, retry/reuse and native foreground transfer, bilinear preprocessing, sigmoid alpha, official asset hashes/licenses, quality/legacy result protocols, worker busy/deduplication and cleanup passed');
+  console.log('gift-background: native Lucida float prior to uniform composition, retained shadows/weak lights/particles, lazy nonblack route, import/inference retry without legacy black fallback, worker busy reset and foreground transfer, bilinear preprocessing, sigmoid alpha, official asset hashes/licenses, quality/legacy result protocols, worker busy/deduplication and cleanup passed');
 }
 tests().catch(error=>{console.error(error);process.exitCode=1});

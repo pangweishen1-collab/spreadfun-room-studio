@@ -57,7 +57,7 @@ html[data-input-modality="keyboard"] #resourceTool .dimension-input:focus-within
 @media(max-width:900px){#resourceTool .resource-workspace{grid-template-columns:minmax(0,1fr)}#resourceTool .resource-project-art{width:56px}}
 @media(max-width:540px){
  .topbar{column-gap:8px}
- .topbar .brand-name{font-size:14px}.topbar .brand{gap:6px}.topbar .mark{width:34px;height:34px;flex-basis:34px}
+ .topbar .brand-name{font-size:18px}.topbar .brand{gap:6px}.topbar .mark{width:34px;height:34px;flex-basis:34px}
  #resourceTool .resource-intro p{font-size:12px;line-height:20px;margin-top:6px}
  #resourceTool .resource-card{padding:16px;border-radius:18px}
  #resourceTool .resource-workspace{gap:14px}

@@ -23,7 +23,7 @@
   function getWorker(){
     if(worker)return worker;
     if(typeof Worker==='undefined')throw new Error('此浏览器不支持本地抠图，请使用较新的浏览器。');
-    worker=new Worker(new URL('gift-background-worker.js?v=20261025-speed1',base),{type:'module',name:'gift-background'});
+    worker=new Worker(new URL('gift-background-worker.js?v=20261026-lucida1',base),{type:'module',name:'gift-background'});
     worker.addEventListener('message',event=>{
       const message=event.data;if(!active||message.id!==active.id)return;
       if(message.type==='progress')report(active,{phase:message.phase,progress:message.progress});

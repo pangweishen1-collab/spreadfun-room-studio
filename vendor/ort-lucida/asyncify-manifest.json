@@ -1,0 +1,17 @@
+{
+  "version": "1.30.0",
+  "bytes": 26781914,
+  "sha256": "39f9f0894d478800487ed9f7dbe92618498db320cf55c8e3d89adff8dce658da",
+  "chunks": [
+    {
+      "file": "asyncify-wasm-1.bin",
+      "bytes": 20971520,
+      "sha256": "4d069564e511c595122c3b6c51ff25ae39263d7fd0f4960627b30ce646bfc351"
+    },
+    {
+      "file": "asyncify-wasm-2.bin",
+      "bytes": 5810394,
+      "sha256": "3fb2f4b203c85e962d18a32d0f3ffd48104cbd570287257bc5a01171909860ac"
+    }
+  ]
+}

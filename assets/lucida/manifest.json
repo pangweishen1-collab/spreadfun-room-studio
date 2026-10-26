@@ -1,0 +1,171 @@
+{
+  "name": "egeorcun/lucida-grid19-native1024-folded-nbits8-f32",
+  "revision": "6cbedc9722652dc9a3df91dd871f0c4f3334e922",
+  "license": "MIT",
+  "weightsSha256": "2f1aa6913426537d4b93dd5f7138ae5c6664e99abda98c95f3d5b9101283e7d5",
+  "bytes": 422542645,
+  "sha256": "74df4d6f7e2ba5b92639567a06ee3e00dcb34e92b098db47c9d10060b0ab4ca1",
+  "precision": "Only constant MatMul weights block32 U8; F32 activations/scales/outputs and all other arithmetic/weights unchanged. Lossy weight quantization needs new QA.",
+  "opset": 19,
+  "preprocess": "pillow-bilinear",
+  "input": {
+    "name": "input_image",
+    "type": "float32",
+    "shape": [
+      1,
+      3,
+      1024,
+      1024
+    ],
+    "mean": [
+      0.485,
+      0.456,
+      0.406
+    ],
+    "std": [
+      0.229,
+      0.224,
+      0.225
+    ]
+  },
+  "output": {
+    "name": "output_image",
+    "type": "float32",
+    "shape": [
+      1,
+      1,
+      1024,
+      1024
+    ],
+    "activation": "apply sigmoid externally"
+  },
+  "chunks": [
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-01.bin",
+      "bytes": 20971520,
+      "sha256": "30e3d8a3859b18cd83679325672c777c361ecd759c8e2ccb4fb78937fe413398"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-02.bin",
+      "bytes": 20971520,
+      "sha256": "ff429b7d2e76ff2a963471a0ae8a156fc2fc2d58b54c3c5398eb67936dcba237"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-03.bin",
+      "bytes": 20971520,
+      "sha256": "5b4a436b2364e872ecda1e3fb4abd03f6cb9af071079354764e14a21616071b5"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-04.bin",
+      "bytes": 20971520,
+      "sha256": "11ad6720b7157282bd7631a0280861c192b530e907986d744f026dcb17c7d233"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-05.bin",
+      "bytes": 20971520,
+      "sha256": "3d7930c6ae7ac04179e95b1074aa78fadb4f0b50a42fc6b7a7fac536658c9c12"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-06.bin",
+      "bytes": 20971520,
+      "sha256": "a294524219b1929cc8037358db3d899ab4b7871a8512d98732eda4348b054256"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-07.bin",
+      "bytes": 20971520,
+      "sha256": "26c36e67c8f2ea6bacd41035fa00f34d9439f4bd026edf11c572c9d2951f5f08"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-08.bin",
+      "bytes": 20971520,
+      "sha256": "fc27ef4e548a7780ed556d01c40c9452de8ac79e3ef72ecacacc61548371e74e"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-09.bin",
+      "bytes": 20971520,
+      "sha256": "e5735c3ed6513d720b834daf194c604d2651a60d9bdfbbfc0ff8f1cca487f531"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-10.bin",
+      "bytes": 20971520,
+      "sha256": "7f1fbcbc89e03787dba20e44afd6f548dc21634c3a6a78f3b0bca3ee7738a386"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-11.bin",
+      "bytes": 20971520,
+      "sha256": "6d4a1d8934e80c15ed09eb5e36def2fa99be52b6399fdeba46cd8494367f89ce"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-12.bin",
+      "bytes": 20971520,
+      "sha256": "2f570fb7dca53b62ef0bbfcd70af022570d8d3ca64703d646de43db15e701216"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-13.bin",
+      "bytes": 20971520,
+      "sha256": "f6be06f92fddd5bff4f516bedf0fd2428c6098bae8503792c39d68576a70317f"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-14.bin",
+      "bytes": 20971520,
+      "sha256": "0bdd388c49b4b7e068da417f11657ed777d16c797a9dc7af1933c266a8a3f3fd"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-15.bin",
+      "bytes": 20971520,
+      "sha256": "f26fe6f0d924410c607ef4f74ca51619ce43586212f81235df7e89f77c605c81"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-16.bin",
+      "bytes": 20971520,
+      "sha256": "56b1a3fc486a0d2f6867ead3a56cacb57e51f1130046995efdb478654e7b27ed"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-17.bin",
+      "bytes": 20971520,
+      "sha256": "8f5c4ea7e7a913513d29e06ee9a6eade25acc3b05af5407b13b0688a60effa72"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-18.bin",
+      "bytes": 20971520,
+      "sha256": "701ba38f7314d5687927e3b3fbfedb8e004f5ac672c30c3cd6b18dc27936f7ea"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-19.bin",
+      "bytes": 20971520,
+      "sha256": "2d00338652afac8f95804e4135819bd63dc63173303a68b1da7d3ff603a8f44d"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-20.bin",
+      "bytes": 20971520,
+      "sha256": "a1fcd6897e3730dd22e2b3f72091ef4f04de51ce4ac11742f19c43749bc6ab1f"
+    },
+    {
+      "file": "lucida-grid19-native1024-folded-nbits8-f32-21.bin",
+      "bytes": 3112245,
+      "sha256": "349cb9b88c9c59be0a58f5afd75caa9550b342f5e9618399c67389f3a39634c1"
+    }
+  ],
+  "sourceOnnxSha256": "d33504d934b729ab1c2e449b6fa7ffe38947bc74166250ab18b6ddde2f1628a8",
+  "quantization": {
+    "tool": "official ORT quantize_matmul_8bits C++ kernel",
+    "runtime": "1.30.0",
+    "operator": "com.microsoft.MatMulNBits",
+    "bits": 8,
+    "blockSize": 32,
+    "symmetric": true,
+    "implicitZeroPoint": 128,
+    "accuracyLevel": 0,
+    "constantMatMulNodes": 198,
+    "uniqueSharedWeights": 99,
+    "activationDtype": "float32",
+    "scaleDtype": "float32",
+    "outputDtype": "float32",
+    "nonquantizedNodeAndInitializerBytesUnchanged": true
+  },
+  "licenses": [
+    "LICENSE-LUCIDA",
+    "LICENSE-BIREFNET"
+  ],
+  "notice": "NOTICE.txt"
+}

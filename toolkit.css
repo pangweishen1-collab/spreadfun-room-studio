@@ -8,10 +8,14 @@
 .topbar .mark{width:40px;height:40px;border-radius:0;flex:0 0 40px;overflow:visible;box-shadow:none}
 .topbar .mark img{object-fit:contain}
 .topbar .brand-copy{display:block;white-space:nowrap;padding:0;border:0}
-.brand-name{color:#111;font-size:16px;line-height:20px;font-weight:750;letter-spacing:-.35px;white-space:nowrap}
+.brand-name{color:#111;font-size:20px;line-height:26px;font-weight:750;letter-spacing:-.35px;white-space:nowrap}
 .tool-navigation{display:flex;align-items:center;gap:24px;margin-right:auto;padding:0;background:none;border-radius:0}
 .tool-navigation a,.topbar .top-actions>.tiny,.topbar .language-switch button{position:relative;display:inline-flex;align-items:center;justify-content:center;min-height:36px;border:0;border-radius:0;background:transparent;box-shadow:none;color:#626c7c;text-decoration:none;font-size:var(--toolbar-font-size);line-height:22px;font-weight:600;white-space:nowrap;cursor:pointer;transition:color .18s ease}
-.tool-navigation a{padding:7px 0;font-weight:600}
+.tool-navigation a{display:inline-grid;padding:7px 0;font-weight:400}
+.tool-navigation a>span{grid-area:1/1}
+/* Reserve the bold label width so selection never moves neighbouring links. */
+.tool-navigation a::after{content:attr(aria-label);grid-area:1/1;max-width:100%;overflow:hidden;font-weight:700;visibility:hidden;pointer-events:none}
+.tool-navigation a[aria-current="page"]{font-weight:700}
 .nav-label-short{display:none}
 .topbar .top-actions>.tiny::after{content:"";position:absolute;left:0;right:0;bottom:1px;height:2px;background:var(--blue);transform:scaleX(0);transform-origin:left;transition:transform .2s cubic-bezier(.2,.65,.3,1)}
 .tool-navigation a:hover,.tool-navigation a:focus-visible,.tool-navigation a[aria-current="page"],.topbar .top-actions>.tiny:hover,.topbar .language-switch button:hover,.topbar .language-switch button.active{background:transparent;color:var(--blue);box-shadow:none}
@@ -109,9 +113,9 @@ main[data-tool]{padding-top:32px}
 
 /* Compact mobile navigation, natural page scrolling and touch-sized controls. */
 @media(max-width:540px){
-  .topbar{grid-template-columns:minmax(0,1fr) 100px 44px;gap:4px 8px;padding:8px 16px}
+  .topbar{grid-template-columns:minmax(0,1fr) 96px 44px;gap:4px 8px;padding:8px 16px}
   .topbar .brand{grid-column:1;grid-row:1;min-width:0}
-  .topbar .language-switch{grid-column:2;grid-row:1;width:100px;min-width:100px}
+  .topbar .language-switch{grid-column:2;grid-row:1;width:96px;min-width:96px}
   .topbar .top-actions #contactButton{grid-column:3;grid-row:1;width:44px;height:44px;min-height:44px;justify-content:center}
   #contactButtonText{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
   .topbar .top-actions #contactButton::after{display:none}

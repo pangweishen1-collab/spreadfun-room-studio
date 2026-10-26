@@ -3,19 +3,20 @@
   'use strict';
   const $=selector=>document.querySelector(selector);
   const root=$('#giftPreviewTool'),canvas=$('#giftPreviewCanvas'),stage=$('#giftPreviewStage');
+  const sizePresets=Array.from(root.querySelectorAll('[data-gift-size]'));
   const defaults={zoom:1,offsetX:0,offsetY:0,saturation:100,brightness:100,contrast:100,feather:10,radius:22,rotation:0,flipX:false,flipY:false};
   const rangeFields=[['Zoom','zoom'],['Feather','feather'],['Radius','radius'],['Saturation','saturation'],['Brightness','brightness'],['Contrast','contrast'],['Rotation','rotation']];
   const copy={
     zh:{title:'礼物&座驾预览图生产工具',preview:'效果预览',modeLabel:'处理方式',modeFeather:'场景羽化',modeTransparent:'透明素材',uploadTitle:'点击或拖入礼物图片',uploadHint:'支持 PNG、JPG、WebP',upload:'上传图片',dragHint:'拖动图片调整位置，双击居中；方向键微调',previewBackground:'预览背景',backgroundBlack:'黑色',backgroundTransparent:'透明',replace:'替换图片',privacy:'图片仅在本地处理，不会上传至服务器。',adjustments:'调整与导出',outputSize:'输出尺寸',lockedRatio:'1:1 比例锁定',width:'宽度',height:'高度',sizeError:'请输入 16–2048 之间的整数。',composition:'画面位置',center:'居中',zoom:'缩放',edges:'边缘处理',feather:'羽化',radius:'圆角',color:'色彩调整',saturation:'饱和度',brightness:'亮度',contrast:'对比度',reset:'重置调整',download:'导出 WebP',reading:'正在读取图片…',encoding:'正在生成 WebP…',saved:'已发起下载',again:'再次下载',fileCount:'一次请选择一张图片。',typeError:'请选择 PNG、JPG 或 WebP 图片。',fileSizeError:'请选择 30 MB 以内的图片。',loadError:'图片无法读取，请更换文件。',pixelError:'请使用 4000 万像素以内的图片。',exportError:'导出失败，请重试。',downloadError:'未能发起下载，请重试。',encoderError:'无损编码组件未能加载，请刷新后重试。',canvasLabel:'礼物预览图；可拖动或用方向键调整位置'},
     en:{title:'Gift & vehicle preview maker',preview:'Preview',modeLabel:'Treatment',modeFeather:'Feathered scene',modeTransparent:'Transparent artwork',uploadTitle:'Click or drop gift artwork',uploadHint:'PNG, JPG or WebP',upload:'Upload image',dragHint:'Drag to position. Double-click to center. Arrow keys to nudge.',previewBackground:'Preview background',backgroundBlack:'Black',backgroundTransparent:'Transparent',replace:'Replace image',privacy:'Processed locally. Your image never leaves this device.',adjustments:'Adjust and export',outputSize:'Output size',lockedRatio:'1:1 locked',width:'Width',height:'Height',sizeError:'Enter a whole number from 16 to 2048.',composition:'Position',center:'Center',zoom:'Zoom',edges:'Edges',feather:'Feather',radius:'Corners',color:'Color',saturation:'Saturation',brightness:'Brightness',contrast:'Contrast',reset:'Reset adjustments',download:'Export WebP',reading:'Reading image…',encoding:'Creating WebP…',saved:'Download requested',again:'Download again',fileCount:'Choose one image at a time.',typeError:'Choose a PNG, JPG or WebP image.',fileSizeError:'Choose an image under 30 MB.',loadError:'Could not read this image. Try another file.',pixelError:'Choose an image with no more than 40 million pixels.',exportError:'Could not export. Please retry.',downloadError:'Could not start the download. Please retry.',encoderError:'Could not load the lossless encoder. Refresh and try again.',canvasLabel:'Gift preview. Drag or use arrow keys to position the image'}
   };
-  Object.assign(copy.zh,{alignment:'画布对齐与效果查看',alignHorizontal:'水平对齐',alignVertical:'垂直对齐',viewContext:'礼物栏效果图',returnEdit:'礼物图效果图',contextLabel:'礼物面板中的预览效果，可滚动查看',contextHint:'礼物面板实时预览，可继续调整参数；Esc 返回编辑',dragHint:'拖动图片定位，滚轮缩放，双击居中；方向键微调'});
-  Object.assign(copy.en,{alignment:'Canvas alignment and preview',alignHorizontal:'Horizontal align',alignVertical:'Vertical align',viewContext:'Gift panel preview',returnEdit:'Gift image preview',contextLabel:'Gift panel preview. Scroll to explore.',contextHint:'Live gift panel preview. Adjust settings, or press Esc to edit.',dragHint:'Drag to position, scroll to zoom, double-click to center. Arrow keys to nudge.'});
+  Object.assign(copy.zh,{alignment:'画布对齐',alignHorizontal:'水平对齐',alignVertical:'垂直对齐',contextTitle:'礼物栏实时预览',contextLabel:'礼物栏实时预览',live:'实时',sizePresets:'常用尺寸',dragHint:'拖动图片定位，滚轮缩放，双击居中；方向键微调'});
+  Object.assign(copy.en,{alignment:'Canvas alignment',alignHorizontal:'Horizontal align',alignVertical:'Vertical align',contextTitle:'Live gift panel preview',contextLabel:'Live gift panel preview',live:'Live',sizePresets:'Common sizes',dragHint:'Drag to position, scroll to zoom, double-click to center. Arrow keys to nudge.'});
   Object.assign(copy.zh,{advanced:'高级调整',retouch:'局部修整',toolMove:'移动',toolErase:'擦除',toolRestore:'恢复',brushSize:'笔刷大小',brushHardness:'硬度',brushOpacity:'不透明度',clearErase:'清空擦除',history:'操作历史',undo:'撤销',redo:'重做',transform:'旋转与翻转',rotation:'旋转角度',rotateLeft:'左转 90°',rotateRight:'右转 90°',flipHorizontal:'水平翻转',flipVertical:'垂直翻转',safeArea:'安全区辅助线',safeToggle:'显示安全区与中心线',safeInset:'安全边距',brushHint:'拖动笔刷修整；[ / ] 调整大小，Esc 返回移动，⌘/Ctrl Z 撤销'});
   Object.assign(copy.en,{advanced:'Advanced adjustments',retouch:'Retouch',toolMove:'Move',toolErase:'Erase',toolRestore:'Restore',brushSize:'Brush size',brushHardness:'Hardness',brushOpacity:'Opacity',clearErase:'Clear erasing',history:'Edit history',undo:'Undo',redo:'Redo',transform:'Rotate and flip',rotation:'Rotation',rotateLeft:'Rotate left 90°',rotateRight:'Rotate right 90°',flipHorizontal:'Flip horizontally',flipVertical:'Flip vertically',safeArea:'Safe area guides',safeToggle:'Show safe area and center lines',safeInset:'Safe margin',brushHint:'Drag to retouch. [ / ] size, Esc to move, Cmd/Ctrl Z to undo.'});
   Object.assign(copy.zh,{removeBackground:'一键抠图',restoreBackground:'还原背景',removing:'正在抠图…',removeProgress:'抠图进度',modelLoading:'正在加载抠图组件',removeError:'抠图失败，请检查网络或稍后重试；原图已保留。',removeHint:'先识别主体，再精修黑底边缘并恢复光效与粒子；首次使用需加载模型，图片仅在本地处理。'});
   Object.assign(copy.en,{removeBackground:'Remove background',restoreBackground:'Restore background',removing:'Removing background…',removeProgress:'Background removal progress',modelLoading:'Loading background removal',removeError:'Background removal failed. Check your connection and retry. Your original image is preserved.',removeHint:'Detects the subject, refines dark-backed edges and recovers light effects. Models load on first use. Your image stays on this device.'});
-  const state={image:null,file:null,settings:{...defaults},strokes:[],baseMask:null,removing:false,removeProgress:null,tool:'move',brush:{size:20,hardness:70,opacity:100},safe:{enabled:false,inset:10},mode:'feather',modeChosen:false,side:200,valid:true,loading:false,exporting:false,notice:null,background:'black',view:'edit',download:null,revision:0};
+  const state={image:null,file:null,settings:{...defaults},strokes:[],baseMask:null,removing:false,removeProgress:null,tool:'move',brush:{size:20,hardness:70,opacity:100},safe:{enabled:false,inset:10},mode:'feather',modeChosen:false,side:200,valid:true,loading:false,exporting:false,notice:null,background:'black',download:null,revision:0};
   const t=key=>(copy[language]||copy.en)[key]||copy.en[key]||key;
   let renderRequest=0,drag=null,loadToken=0,editGroup=null,wheelTimer=0,hoverPoint=null,mattingTimer=0,mattingPresentation=0,mattingPercent=0,mattingVisible=false;
   const busy=()=>state.loading||state.exporting||state.removing;
@@ -61,7 +62,8 @@
   function syncControls(){
     const locked=busy(),ready=!!state.image;
     for(const id of ['Upload','Replace','Input','ModeFeather','ModeTransparent','Width','Height'])$('#giftPreview'+id).disabled=locked;
-    for(const id of ['Zoom','Saturation','Brightness','Contrast','Feather','Radius','Center','Reset','AlignHorizontal','AlignVertical','ContextToggle'])$('#giftPreview'+id).disabled=locked||!ready;
+    for(const id of ['Zoom','Saturation','Brightness','Contrast','Feather','Radius','Center','Reset','AlignHorizontal','AlignVertical'])$('#giftPreview'+id).disabled=locked||!ready;
+    for(const button of sizePresets){button.disabled=locked;button.setAttribute('aria-pressed',String(state.valid&&state.side===Number(button.dataset.giftSize)))}
     for(const id of ['ToolMove','ToolErase','ToolRestore','BrushSize','BrushHardness','BrushOpacity','Rotation','RotateLeft','RotateRight','FlipHorizontal','FlipVertical','SafeToggle'])$('#giftPreview'+id).disabled=locked||!ready;
     $('#giftPreviewClearErase').disabled=locked||!ready||!state.strokes.length;
     $('#giftPreviewSafeInset').disabled=locked||!ready||!state.safe.enabled;
@@ -75,16 +77,14 @@
     canvas.hidden=!ready;$('#giftPreviewEmpty').hidden=ready;$('#giftPreviewSourcebar').hidden=!ready;
     $('#giftPreviewSurface').hidden=!ready;$('#giftPreviewSurface').dataset.tool=state.tool;
     canvas.setAttribute('aria-label',t('canvasLabel'));canvas.setAttribute('aria-disabled',String(locked));
-    const contextView=state.view==='context'&&ready;
-    stage.dataset.view=contextView?'context':'edit';$('#giftPreviewContext').hidden=!contextView;
-    $('#giftPreviewContext').setAttribute('aria-label',t('contextLabel'));
+    $('#giftPreviewContext').hidden=!ready;$('#giftPreviewContext').setAttribute('aria-label',t('contextLabel'));
+    $('#giftPreviewPresets').setAttribute('aria-label',t('sizePresets'));
     $('#giftPreviewAlignment').setAttribute('aria-label',t('alignment'));
-    for(const [id,key] of [['AlignHorizontal','alignHorizontal'],['AlignVertical','alignVertical'],['ContextToggle',contextView?'returnEdit':'viewContext']]){
-      const button=$('#giftPreview'+id),label=button.querySelector?.('[data-gift-toggle-label]');if(label)label.textContent=t(key);else button.textContent=t(key);button.setAttribute('aria-label',t(key));button.title=t(key);
+    for(const [id,key] of [['AlignHorizontal','alignHorizontal'],['AlignVertical','alignVertical']]){
+      const button=$('#giftPreview'+id);button.textContent=t(key);button.setAttribute('aria-label',t(key));button.title=t(key);
     }
-    $('#giftPreviewContextToggle').setAttribute('aria-pressed',String(contextView));
-    $('#giftPreviewDragHint').textContent=t(contextView?'contextHint':state.tool==='move'?'dragHint':'brushHint');
-    for(const id of ['BackgroundBlack','BackgroundTransparent'])$('#giftPreview'+id).disabled=locked||contextView;
+    $('#giftPreviewDragHint').textContent=t(state.tool==='move'?'dragHint':'brushHint');
+    for(const id of ['BackgroundBlack','BackgroundTransparent'])$('#giftPreview'+id).disabled=locked;
     $('#giftPreviewModeFeather').setAttribute('aria-pressed',String(state.mode==='feather'));
     $('#giftPreviewModeTransparent').setAttribute('aria-pressed',String(state.mode==='transparent'));
     $('#giftPreviewFeatherField').hidden=state.mode!=='feather';
@@ -100,7 +100,7 @@
     for(const [id,key] of [['FlipHorizontal','flipX'],['FlipVertical','flipY']])$('#giftPreview'+id).setAttribute('aria-pressed',String(state.settings[key]));
     for(const [id,key] of [['BrushSize','size'],['BrushHardness','hardness'],['BrushOpacity','opacity']])$('#giftPreview'+id+'Value').textContent=state.brush[key]+(key==='size'?'px':'%');
     $('#giftPreviewSafeToggle').checked=state.safe.enabled;$('#giftPreviewSafeInsetValue').textContent=state.safe.inset+'%';
-    $('#giftPreviewSafeArea').hidden=!ready||contextView||!state.safe.enabled;$('#giftPreviewSafeArea').style.setProperty('--gift-safe-inset',state.safe.inset+'%');
+    $('#giftPreviewSafeArea').hidden=!ready||!state.safe.enabled;$('#giftPreviewSafeArea').style.setProperty('--gift-safe-inset',state.safe.inset+'%');
     syncHistory();syncCursor();syncMattingProgress();
     const phase=state.loading?'loading':state.exporting||state.removing?'processing':state.notice||!state.valid?'error':state.download?'success':ready?'ready':'empty';
     const removalMessage=state.removeProgress?.phase==='loading'?`${t('modelLoading')} · ${Math.round((state.removeProgress.progress||0)*100)}%`:t('removing');
@@ -112,15 +112,9 @@
     syncContextPreview();
   }
   function syncContextPreview(){
-    if(state.view!=='context'||!state.image)return;
+    if(!state.image)return;
     const target=$('#giftPreviewContextCanvas'),ctx=target.getContext('2d');
     ctx.clearRect(0,0,target.width,target.height);ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(canvas,0,0,target.width,target.height);
-  }
-  function setView(view){
-    if(busy()||!state.image||state.view===view||!['edit','context'].includes(view))return;
-    prepareEdit();state.view=view;hoverPoint=null;syncControls();
-    if(view==='context'){render();const context=$('#giftPreviewContext');context.scrollTop=context.scrollHeight}
-    window.FunToolkitUI?.reveal(view==='context'?$('#giftPreviewContext'):canvas);
   }
   function scheduleRender(){
     if(renderRequest)return;
@@ -176,7 +170,7 @@
   function center(){if(busy()||!state.image)return;prepareEdit();state.settings.offsetX=state.settings.offsetY=0;changed()}
   function align(axis){if(busy()||!state.image)return;prepareEdit();state.settings[axis==='horizontal'?'offsetX':'offsetY']=0;changed()}
   function zoomWheel(event){
-    if(busy()||!state.image||state.view!=='edit'||event.ctrlKey||event.metaKey||!Number.isFinite(event.deltaY)||!event.deltaY)return;
+    if(busy()||!state.image||event.ctrlKey||event.metaKey||!Number.isFinite(event.deltaY)||!event.deltaY)return;
     event.preventDefault();stopDrag();
     const unit=event.deltaMode===1?16:event.deltaMode===2?canvas.getBoundingClientRect().height:1;
     const zoom=Math.round(Math.max(.25,Math.min(3,state.settings.zoom*Math.exp(-event.deltaY*unit*.0015)))*100)/100;
@@ -187,9 +181,9 @@
     if(drag){const previous=drag;drag=null;if(previous.stroke?.points.length)state.strokes=[...state.strokes,previous.stroke];if(canvas.hasPointerCapture?.(previous.id))canvas.releasePointerCapture(previous.id);commitEdit();syncControls()}
     canvas.classList.remove('is-dragging');
   }
-  function setTool(tool){if(busy()||!state.image||!['move','erase','restore'].includes(tool))return;prepareEdit();state.tool=tool;state.view='edit';hoverPoint=null;syncControls()}
+  function setTool(tool){if(busy()||!state.image||!['move','erase','restore'].includes(tool))return;prepareEdit();state.tool=tool;hoverPoint=null;syncControls()}
   function syncCursor(){
-    const cursor=$('#giftPreviewBrushCursor');cursor.hidden=!hoverPoint||!state.image||state.tool==='move'||state.view!=='edit'||busy();if(cursor.hidden)return;
+    const cursor=$('#giftPreviewBrushCursor');cursor.hidden=!hoverPoint||!state.image||state.tool==='move'||busy();if(cursor.hidden)return;
     const box=canvas.getBoundingClientRect(),diameter=state.brush.size/state.side*box.width;
     cursor.style.left=(hoverPoint.x-box.left)+'px';cursor.style.top=(hoverPoint.y-box.top)+'px';cursor.style.width=cursor.style.height=diameter+'px';
   }
@@ -206,7 +200,6 @@
   }
   function pointerDown(event){
     if(busy()||!state.image||event.isPrimary===false||event.button!==undefined&&event.button!==0)return;
-    if(state.view!=='edit')return;
     prepareEdit();beginEdit('pointer');
     drag={id:event.pointerId,x:event.clientX,y:event.clientY,offsetX:state.settings.offsetX,offsetY:state.settings.offsetY};
     if(state.tool!=='move'){
@@ -283,6 +276,7 @@
     state.settings.offsetX=Math.max(-1,Math.min(1,state.settings.offsetX+move[0]*step));state.settings.offsetY=Math.max(-1,Math.min(1,state.settings.offsetY+move[1]*step));changed();
   });
   for(const id of ['Width','Height']){const field=$('#giftPreview'+id);field.addEventListener('input',event=>changeSize(event.target));field.addEventListener('change',commitEdit);field.addEventListener('blur',commitEdit)}
+  for(const button of sizePresets)button.addEventListener('click',()=>{if(busy())return;prepareEdit();changeSize({value:button.dataset.giftSize});commitEdit()});
   for(const [name,key] of rangeFields){const field=$('#giftPreview'+name);field.addEventListener('input',event=>{
     if(busy()||!state.image)return;
     const value=Number(event.target.value),min=Number(event.target.min),max=Number(event.target.max);if(!Number.isFinite(value)||value<min||value>max)return;
@@ -304,19 +298,17 @@
   $('#giftPreviewCenter').addEventListener('click',center);
   $('#giftPreviewAlignHorizontal').addEventListener('click',()=>align('horizontal'));
   $('#giftPreviewAlignVertical').addEventListener('click',()=>align('vertical'));
-  $('#giftPreviewContextToggle').addEventListener('click',()=>setView(state.view==='edit'?'context':'edit'));
   $('#giftPreviewRemoveBackground').addEventListener('click',removeBackground);
   root.addEventListener('keydown',event=>{
     const editable=event.target?.closest?.('input:not([type="range"]),textarea,[contenteditable="true"]');
     if(!editable&&!busy()&&state.image&&(event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'){event.preventDefault();historyStep(event.shiftKey?'redo':'undo');return}
     if(!editable&&!busy()&&state.image&&state.tool!=='move'&&['[',']'].includes(event.key)){event.preventDefault();state.brush.size=Math.max(1,Math.min(100,state.brush.size+(event.key===']'?1:-1)*(event.shiftKey?10:1)));$('#giftPreviewBrushSize').value=state.brush.size;syncControls();return}
-    if(event.key==='Escape'&&state.view==='context'){setView('edit');$('#giftPreviewContextToggle').focus({preventScroll:true});event.preventDefault()}
-    else if(event.key==='Escape'&&state.tool!=='move'){setTool('move');canvas.focus({preventScroll:true});event.preventDefault()}
+    if(event.key==='Escape'&&state.tool!=='move'){setTool('move');canvas.focus({preventScroll:true});event.preventDefault()}
   });
   $('#giftPreviewReset').addEventListener('click',()=>{if(busy()||!state.image)return;clearMattingProgress();prepareEdit();state.settings={...defaults};if(state.strokes.length)state.strokes=[];state.baseMask=null;state.tool='move';syncRanges();changed()});
   $('#giftPreviewBackgroundBlack').addEventListener('click',()=>setBackground('black'));$('#giftPreviewBackgroundTransparent').addEventListener('click',()=>setBackground('transparent'));
   $('#giftPreviewDownload').addEventListener('click',download);
-  window.addEventListener('hashchange',()=>{if(!active()){clearMattingProgress();prepareEdit();state.view='edit';hoverPoint=null;syncControls()}stage.classList.remove('drag')});
+  window.addEventListener('hashchange',()=>{if(!active()){clearMattingProgress();prepareEdit();hoverPoint=null;syncControls()}stage.classList.remove('drag')});
   window.addEventListener('blur',()=>{prepareEdit();hoverPoint=null;syncCursor()});
   window.addEventListener('pagehide',event=>{clearMattingProgress();prepareEdit();if(!event.persisted){loadToken++;if(renderRequest)cancelAnimationFrame(renderRequest);if(state.download)URL.revokeObjectURL(state.download.url)}});
   window.GiftPreviewTool={activate,syncLanguage};syncLanguage();
