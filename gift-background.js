@@ -8,6 +8,19 @@
     return {...mask,data:mask.data.slice(),...(mask.foreground?{foreground:mask.foreground.slice(),background:mask.background.slice()}: {})};
   }
   function report(job,event){for(const listener of job.listeners)try{listener(event)}catch(ignored){}}
+  function armTimeout(job){
+    clearTimeout(job.timer);
+    job.timer=setTimeout(()=>{if(active===job)dispose('本地抠图耗时过长，请关闭其他占用内存的页面后重试。')},300000);
+  }
+  function noteProgress(job,event){
+    // A progressing cold download may exceed five minutes in total. Repeated
+    // heartbeats and backwards/invalid fractions must not hide a stalled job.
+    const phase=['analyzing','loading','processing','matting'].indexOf(event.phase),value=event.progress;
+    if(phase>=0&&Number.isFinite(value)&&value>=0&&value<=1&&(phase>job.phase||value>job.progress)){
+      job.phase=Math.max(job.phase,phase);job.progress=Math.max(job.progress,value);armTimeout(job);
+    }
+    report(job,event);
+  }
   function finish(error,mask){
     if(!active)return;
     const job=active;active=null;clearTimeout(job.timer);
@@ -23,10 +36,10 @@
   function getWorker(){
     if(worker)return worker;
     if(typeof Worker==='undefined')throw new Error('此浏览器不支持本地抠图，请使用较新的浏览器。');
-    worker=new Worker(new URL('gift-background-worker.js?v=20261026-lucida1',base),{type:'module',name:'gift-background'});
+    worker=new Worker(new URL('gift-background-worker.js?v=20261026-lucida2',base),{type:'module',name:'gift-background'});
     worker.addEventListener('message',event=>{
       const message=event.data;if(!active||message.id!==active.id)return;
-      if(message.type==='progress')report(active,{phase:message.phase,progress:message.progress});
+      if(message.type==='progress')noteProgress(active,{phase:message.phase,progress:message.progress});
       else if(message.type==='result'){
         const {width,height,data,recoverBlack,method,foreground,background}=message;
         if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width>MAX_SIDE||height>MAX_SIDE
@@ -65,8 +78,8 @@
       pixels=context.getImageData(0,0,width,height).data;canvas.width=canvas.height=1;
     }catch(error){return Promise.reject(new Error(error.message||'图片无法读取，请重试。'))}
     let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no});
-    const job={id:++serial,image,source,width:image.naturalWidth,height:image.naturalHeight,promise,resolve,reject,listeners:new Set(typeof onProgress==='function'?[onProgress]:[])};
-    active=job;job.timer=setTimeout(()=>dispose('本地抠图耗时过长，请关闭其他占用内存的页面后重试。'),300000);
+    const job={id:++serial,image,source,width:image.naturalWidth,height:image.naturalHeight,promise,resolve,reject,phase:0,progress:0,listeners:new Set(typeof onProgress==='function'?[onProgress]:[])};
+    active=job;armTimeout(job);
     report(job,{phase:'analyzing',progress:0});
     try{target.postMessage({type:'remove',id:job.id,width,height,data:pixels},[pixels.buffer])}
     catch(error){finish(new Error('无法启动本地抠图，请重试。'))}

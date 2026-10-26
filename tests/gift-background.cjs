@@ -141,7 +141,16 @@ async function tests(){
   for(const entry of runtime.files){const bytes=fs.readFileSync(path.join(root,'vendor/ort',entry.file));assert.equal(bytes.length,entry.bytes);assert.equal(sha(bytes),entry.sha256);assert.ok(bytes.length<25*1024*1024)}
   for(const directory of ['vendor/ort','assets/matting']){assert.match(fs.readFileSync(path.join(root,directory,'LICENSE'),'utf8'),/MIT License/);assert.ok(fs.readFileSync(path.join(root,directory,'NOTICE.txt'),'utf8').length>100)}
 
-  const workers=[],timers=new Map(),listeners=new Map(),canvasCalls=[],progress=[];let serial=0,readError=false;
+  const workers=[],timers=new Map(),listeners=new Map(),canvasCalls=[],progress=[];let serial=0,readError=false,clock=0;
+  function advance(milliseconds){
+    const end=clock+milliseconds;
+    while(true){
+      const next=[...timers.entries()].filter(([,callback])=>callback.due<=end).sort((a,b)=>a[1].due-b[1].due)[0];
+      if(!next)break;
+      clock=next[1].due;timers.delete(next[0]);next[1]();
+    }
+    clock=end;
+  }
   class MockWorker{
     constructor(url,options){this.url=url;this.options=options;this.listeners=new Map();this.messages=[];workers.push(this)}
     addEventListener(name,handler){this.listeners.set(name,handler)}
@@ -161,13 +170,13 @@ async function tests(){
         }}};
       }
     },
-    setTimeout(callback){const id=++serial;timers.set(id,callback);return id},clearTimeout(id){timers.delete(id)},
+    setTimeout(callback,delay){const id=++serial;callback.due=clock+delay;callback.delay=delay;timers.set(id,callback);return id},clearTimeout(id){timers.delete(id)},
     window:{addEventListener(name,callback){listeners.set(name,callback)}}};
   vm.createContext(sandbox);vm.runInContext(fs.readFileSync(path.join(root,'gift-background.js'),'utf8'),sandbox);
   const {remove}=sandbox.window.GiftBackground,image={naturalWidth:1200,naturalHeight:800,complete:true};
   assert.equal(workers.length,0,'loading the tool never eagerly loads the worker or model');await assert.rejects(remove({naturalWidth:0,naturalHeight:0}),/载入/);assert.equal(workers.length,0);
   const first=remove(image,{onProgress:event=>progress.push(event)}),also=[];
-  assert.equal(workers.length,1);assert.equal(String(workers[0].url),'http://127.0.0.1:8792/gift-background-worker.js?v=20261026-lucida1');assert.equal(workers[0].options.type,'module');assert.equal(progress[0].phase,'analyzing');
+  assert.equal(workers.length,1);assert.equal(String(workers[0].url),'http://127.0.0.1:8792/gift-background-worker.js?v=20261026-lucida2');assert.equal(workers[0].options.type,'module');assert.equal(progress[0].phase,'analyzing');
   assert.equal(remove(image,{onProgress:event=>also.push(event)}),first,'repeated calls for the same source share the active job');
   await assert.rejects(remove({...image}),/处理中/,'a different source cannot race the current job');
   const worker=workers[0],message=worker.messages[0].message;
@@ -235,6 +244,32 @@ async function tests(){
   const afterCrash=freshRemove(image);assert.equal(workers.length,2,'a worker crash is retryable with a fresh worker');listeners.get('pagehide')();await assert.rejects(afterCrash,/取消/);assert.equal(workers[1].terminated,true);assert.equal(timers.size,0);
   readError=true;await assert.rejects(freshRemove(image),/cannot read/);readError=false;
   const timed=freshRemove(image);assert.equal(timers.size,1);[...timers.values()][0]();await assert.rejects(timed,/耗时过长/);assert.equal(timers.size,0);
-  console.log('gift-background: native Lucida float prior to uniform composition, retained shadows/weak lights/particles, lazy nonblack route, import/inference retry without legacy black fallback, worker busy reset and foreground transfer, bilinear preprocessing, sigmoid alpha, official asset hashes/licenses, quality/legacy result protocols, worker busy/deduplication and cleanup passed');
+
+  // The five-minute watchdog measures lack of progress, not total cold-load
+  // duration. Duplicate/invalid/stale messages cannot keep a stuck job alive.
+  const slow=freshRemove(image),slowFailure=assert.rejects(slow,/耗时过长/),slowWorker=workers.at(-1),slowId=slowWorker.messages.at(-1).message.id;
+  advance(290000);slowWorker.emit({type:'progress',id:slowId,phase:'loading',progress:.1});
+  advance(290000);assert.equal(slowWorker.terminated,undefined,'download progress survives more than five total minutes');
+  slowWorker.emit({type:'progress',id:slowId,phase:'loading',progress:.2});
+  advance(290000);assert.equal(slowWorker.terminated,undefined,'each completed block extends the inactivity deadline');
+  const unchangedTimer=[...timers.keys()][0];
+  for(const event of [
+    {id:slowId,phase:'loading',progress:.2},{id:slowId,phase:'loading',progress:.1},
+    {id:slowId,phase:'processing',progress:NaN},{id:slowId,phase:'loading',progress:2},
+    {id:slowId,phase:'unknown',progress:1},{id:slowId,phase:'toString',progress:1},
+    {id:slowId-1,phase:'loading',progress:1}
+  ])slowWorker.emit({type:'progress',...event});
+  assert.equal([...timers.keys()][0],unchangedTimer,'no-op or malformed progress never renews the watchdog');
+  slowWorker.emit({type:'progress',id:slowId,phase:'processing',progress:.2});
+  assert.notEqual([...timers.keys()][0],unchangedTimer,'starting inference renews the deadline even at the same fraction');
+  advance(299999);assert.equal(slowWorker.terminated,undefined);
+  slowWorker.emit({type:'progress',id:slowId,phase:'processing',progress:.2});advance(1);
+  await slowFailure;assert.equal(slowWorker.terminated,true);assert.equal(timers.size,0,'stuck inference still times out and releases the worker');
+  const beforeRecovery=workers.length,recovery=remove(image),recoveryWorker=workers.at(-1),recoveryId=recoveryWorker.messages.at(-1).message.id;
+  assert.equal(workers.length,beforeRecovery+1,'an inactivity timeout permits a fresh worker on the same source');
+  recoveryWorker.emit({type:'result',id:recoveryId,width:1,height:1,data:Uint8ClampedArray.of(123),recoverBlack:false,method:'ai'});
+  await recovery;const recoveryCalls=recoveryWorker.messages.length;
+  assert.equal((await remove(image)).cacheHit,true);assert.equal(recoveryWorker.messages.length,recoveryCalls,'completed-result caching still works after timeout recovery');
+  console.log('gift-background: native Lucida float prior to uniform composition, retained shadows/weak lights/particles, lazy nonblack route, import/inference retry, worker busy/foreground protocol, official asset hashes/licenses, advancing-download inactivity watchdog, stalled-inference timeout/retry and completed-result cache passed');
 }
 tests().catch(error=>{console.error(error);process.exitCode=1});

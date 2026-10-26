@@ -168,8 +168,73 @@ const {createHash} = require('node:crypto');
     assert.equal(state.creates,createsBeforeConcurrent+1,'concurrent first uses share the one model-loading promise');
     await namesAI.release();
 
+    // A gated, uneven seven-block fixture proves the real loader starts only
+    // three transfers, assembles out of order at manifest offsets and advances
+    // by completed bytes. No ORT/network/model inference is involved.
+    state.gpu=false;state.badShape=false;
+    const pieces=[1,3,2,4,2,1,3].map((length,index)=>Uint8Array.from({length},(_,byte)=>index*10+byte));
+    const parallelPayload=Buffer.concat(pieces),parallelManifest={...fixture,bytes:parallelPayload.length,sha256:hash(parallelPayload),
+      chunks:pieces.map((bytes,index)=>({file:'parallel-'+index+'.bin',bytes:bytes.length,sha256:hash(bytes)}))};
+    let blockCache=new Map(),pending=new Map(),started=[],inFlight=0,peak=0,aborted=0;
+    globalThis.caches={async open(){return {
+      async match(url){const bytes=blockCache.get(path.basename(url.pathname));return bytes?new Response(bytes):undefined},
+      async put(url,response){blockCache.set(path.basename(url.pathname),new Uint8Array(await response.arrayBuffer()))},
+      async delete(url){return blockCache.delete(path.basename(url.pathname))}
+    }}};
+    const gatedFetch=async(url,options={})=>{
+      const name=path.basename(new URL(url).pathname);
+      if(name==='manifest.json')return new Response(JSON.stringify(parallelManifest));
+      const index=Number(name.match(/^parallel-(\d+)\.bin$/)?.[1]);assert.ok(Number.isInteger(index));
+      started.push(index);inFlight++;peak=Math.max(peak,inFlight);
+      return new Promise((resolve,reject)=>{
+        let done=false;
+        const finish=(error,bytes)=>{if(done)return;done=true;inFlight--;pending.delete(index);options.signal?.removeEventListener('abort',abort);error?reject(error):resolve(new Response(bytes))};
+        const abort=()=>{aborted++;finish(new Error('synthetic aborted block'))};
+        pending.set(index,bytes=>finish(null,bytes));
+        assert.ok(options.signal instanceof AbortSignal,'in-flight downloads have one cancellable signal');
+        options.signal.addEventListener('abort',abort,{once:true});if(options.signal.aborted)abort();
+      });
+    };
+    const until=async condition=>{for(let count=0;count<1000&&!condition();count++)await new Promise(setImmediate);assert.ok(condition(),'gated download reached the expected state')};
+    globalThis.fetch=gatedFetch;
+    const parallelAI=await import(pathToFileURL(path.join(temporary,'gift-lucida-ai.mjs'))+'?bounded-download');
+    const loading=[],parallelRun=parallelAI.remove(source,(phase,value)=>{if(phase==='loading')loading.push(value)});
+    await until(()=>pending.size===3);assert.deepEqual(started,[0,1,2]);
+    const completionOrder=[2,0,1,5,3,4,6];
+    for(let count=0;count<completionOrder.length;count++){
+      const index=completionOrder[count];await until(()=>pending.has(index));pending.get(index)(pieces[index]);
+      await until(()=>loading.filter(value=>value>0&&value<=.85).length===count+1);
+    }
+    await parallelRun;
+    assert.equal(peak,3);assert.equal(started.length,pieces.length);assert.equal(inFlight,0);
+    assert.deepEqual(state.model,Array.from(parallelPayload),'out-of-order blocks assemble the exact SHA-checked model');
+    let completedBytes=0;
+    assert.deepEqual(loading.filter(value=>value>0&&value<=.85),completionOrder.map(index=>.85*(completedBytes+=pieces[index].length)/parallelPayload.length));
+    assert.ok(loading.every((value,index)=>!index||value>=loading[index-1]),'loading progress is monotonic');
+    await parallelAI.release();
+
+    // Rejecting a block aborts peers and settles the queue before retry. Already
+    // verified cache entries survive and are not fetched again on that retry.
+    blockCache=new Map([['parallel-0.bin',pieces[0]]]);pending=new Map();started=[];inFlight=peak=aborted=0;
+    const failingAI=await import(pathToFileURL(path.join(temporary,'gift-lucida-ai.mjs'))+'?bounded-failure');
+    const failedProgress=[],failedRun=assert.rejects(failingAI.remove(source,(phase,value)=>failedProgress.push({phase,value})),/分块校验失败/);
+    await until(()=>pending.size===3);assert.deepEqual(started,[1,2,3]);
+    pending.get(2)(pieces[2]);await until(()=>blockCache.has('parallel-2.bin')&&pending.has(4));
+    pending.get(1)(new Uint8Array(pieces[1].length).fill(255));await failedRun;
+    assert.equal(inFlight,0);assert.equal(pending.size,0);assert.equal(aborted,2);assert.equal(peak,3);
+    assert.deepEqual(started,[1,2,3,4],'failed workers never schedule additional blocks');
+    const failedCount=failedProgress.length;await new Promise(setImmediate);assert.equal(failedProgress.length,failedCount,'a failed queue never emits late progress');
+    const retryFetches=[];
+    globalThis.fetch=async url=>{
+      const name=path.basename(new URL(url).pathname);if(name==='manifest.json')return new Response(JSON.stringify(parallelManifest));
+      retryFetches.push(name);return new Response(pieces[Number(name.match(/(\d+)\.bin$/)[1])]);
+    };
+    await failingAI.remove(source);assert.deepEqual(state.model,Array.from(parallelPayload));
+    assert.ok(!retryFetches.includes('parallel-0.bin')&&!retryFetches.includes('parallel-2.bin'),'retry reuses every previously verified block');
+    assert.equal(retryFetches.length,5);await failingAI.release();
+
     await checkInstalledAssets(fixture);
-    console.log('gift-lucida: inference manifest/chunk validation, float ImageNet/sigmoid math, corrupt-cache recovery, session retry/reuse/release, ordinary GPU getData without capture, changed-source output and tensor cleanup passed. Synthetic inference only.');
+    console.log('gift-lucida: bounded three-block downloads, out-of-order assembly/byte progress, abort/partial-cache retry, manifest/chunk integrity, float ImageNet/sigmoid math, session retry/reuse/release, ordinary GPU getData without capture and tensor cleanup passed. Synthetic inference only.');
   } finally {
     globalThis.fetch = originalFetch; globalThis.caches = originalCaches; delete globalThis.__lucidaTest;
     await fs.rm(temporary, {recursive: true, force: true});

@@ -7,7 +7,7 @@ async function loadAI() {
   return aiModulePromise;
 }
 async function loadLucida() {
-  if (!lucidaModulePromise) lucidaModulePromise = import('./gift-lucida-ai.mjs').catch(error => { lucidaModulePromise = null; throw error; });
+  if (!lucidaModulePromise) lucidaModulePromise = import('./gift-lucida-ai.mjs?v=20261026-lucida2').catch(error => { lucidaModulePromise = null; throw error; });
   return lucidaModulePromise;
 }
 

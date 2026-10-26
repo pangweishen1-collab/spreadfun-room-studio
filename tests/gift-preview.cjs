@@ -64,7 +64,7 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
 (async()=>{
   const markup=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   assert.match(markup,/id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具<\/h1>/);assert.equal(heading.textContent,'礼物&座驾预览图生产工具');assertMattingProgress(0,false);
-  assert.match(markup,/gift-preview\.js\?v=20261026-layout3/);assert.match(markup,/toolkit\.js\?v=20261025-gift-nav1/);
+  assert.match(markup,/gift-preview\.js\?v=20261026-layout4/);assert.match(markup,/toolkit\.js\?v=20261025-gift-nav1/);
   const edgeTag=markup.match(/<details\b[^>]*\bid="giftPreviewFeatherField"[^>]*>/)?.[0],colorTag=markup.match(/<details\b[^>]*\bid="giftPreviewColorField"[^>]*>/)?.[0],advancedTag=markup.match(/<details\b[^>]*\bid="giftPreviewAdvanced"[^>]*>/)?.[0];
   const compositionTag=markup.match(/<details\b[^>]*\bid="giftPreviewCompositionField"[^>]*>/)?.[0];
   assert.ok(compositionTag&&!/\sopen(?:\s|=|>)/.test(compositionTag),'position controls use a native disclosure and start collapsed');
@@ -73,6 +73,7 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
   const giftStage=markup.slice(markup.indexOf('id="giftPreviewStage"'),markup.indexOf('<div class="gift-preview-toolbar"'));
   assert.match(giftStage,/class="gift-canvas-pane"/);assert.match(giftStage,/id="giftPreviewCanvas"/);
   assert.match(giftStage,/id="giftPreviewContext"/,'the reused room preview shares the effect-preview frame with the editor');
+  assert.match(giftStage,/<div class="gift-room-panel"><div class="gift-room-screen">/,'the full gift panel keeps its own ratio inside the equal-height preview pane');
   assert.ok(!giftStage.includes('giftPreviewContextTitle')&&!giftStage.includes('gift-live-label'),'the app preview has no extra visible heading or badge');
   assert.ok(!giftAside.includes('id="giftPreviewContext"'),'the outer right card only holds adjustments and export');
   assert.ok(/<div\b[^>]*id="giftPreviewContext"[^>]*\bhidden/.test(giftStage),'the entire live preview stays hidden until an image has loaded');

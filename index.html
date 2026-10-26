@@ -51,12 +51,12 @@ body{min-width:320px}
 @media(max-width:540px){.topbar{padding:14px 16px;gap:14px}.brand{font-size:16px}.top-actions{width:100%;gap:8px}.language-switch{width:auto;min-width:112px;flex:1;height:40px}.top-actions #examplesButton,.top-actions #contactButton{width:auto;min-width:0;flex:1;font-size:12px;padding:5px 8px}main{padding:22px 16px 32px}.intro{margin-bottom:24px}.intro h1,.intro h1:lang(zh-CN){font-size:28px;letter-spacing:-.5px}.intro .eyebrow{font-size:9px;letter-spacing:1.4px;gap:8px}.intro .eyebrow:before,.intro .eyebrow:after{width:16px}.preview{padding:16px}.preview-head{gap:8px}.stage{height:450px}.upload-empty{padding:16px}.upload-empty strong{font-size:15px}.upload-empty span{display:block;line-height:1.6}.preview-grid{padding:12px;gap:10px}.preview-grid.count-2,.preview-grid.count-3{grid-template-columns:repeat(2,minmax(0,1fr))}.preview-grid.count-1 .batch-preview canvas{height:375px}.preview-grid.count-2 .batch-preview canvas,.preview-grid.count-3 .batch-preview canvas{height:210px}.delete-preview{width:30px;height:30px;line-height:30px}.preview-caption{font-size:11px}.exports{padding:16px}.file-actions button{min-height:36px}.examples-grid{grid-template-columns:1fr}.crop-dialog{padding:18px}.crop-dialog p{line-height:1.6}.crop-actions button{min-height:44px}.crop-control input{min-height:24px}.lifetime-stat{padding:16px}.site-footer{line-height:1.6}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
 </style>
-  <link rel="stylesheet" href="toolkit.css?v=20261026-layout3">
+  <link rel="stylesheet" href="toolkit.css?v=20261026-layout4">
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="hub.css?v=20261023-tool-sheen1">
   <link rel="stylesheet" href="home.css?v=20261023-tool-sheen1">
-  <link rel="stylesheet" href="gift-preview.css?v=20261026-layout3">
+  <link rel="stylesheet" href="gift-preview.css?v=20261026-layout4">
   <link rel="stylesheet" href="resource-library.css?v=20261026-brand1">
   <link rel="stylesheet" href="design-system/select.css?v=20261024-select1">
 </head>
@@ -175,7 +175,7 @@ body{min-width:320px}
 </div>
         </div>
           <div class="gift-room-context" id="giftPreviewContext" role="region" aria-label="礼物栏实时预览" hidden>
-            <div class="gift-room-screen"><img src="assets/gift-preview/room-reference.webp" alt="" width="720" height="1600" loading="lazy" decoding="async"><div class="gift-room-slot"><canvas id="giftPreviewContextCanvas" width="200" height="200" aria-hidden="true"></canvas></div></div>
+            <div class="gift-room-panel"><div class="gift-room-screen"><img src="assets/gift-preview/room-reference.webp" alt="" width="720" height="1600" loading="lazy" decoding="async"><div class="gift-room-slot"><canvas id="giftPreviewContextCanvas" width="200" height="200" aria-hidden="true"></canvas></div></div></div>
           </div>
       </div>
       <div class="gift-preview-toolbar"><div class="gift-toolbar-actions" role="group" id="giftPreviewAlignment">
@@ -617,7 +617,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="resource-library.js?v=20261024-release110"></script>
   <script src="gift-preview-render.js?v=20261025-quality1"></script>
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
-  <script src="gift-background.js?v=20261026-lucida1"></script>
-  <script src="gift-preview.js?v=20261026-layout3"></script>
+  <script src="gift-background.js?v=20261026-lucida2"></script>
+  <script src="gift-preview.js?v=20261026-layout4"></script>
   <script src="toolkit.js?v=20261025-gift-nav1"></script>
 </body></html>

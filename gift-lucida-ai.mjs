@@ -71,8 +71,12 @@ async function loadModel(progress) {
   let cache = null;
   try { cache = await globalThis.caches?.open('fun-toolkit-lucida-' + manifest.sha256.slice(0, 16)); } catch (ignored) {}
   const model = new Uint8Array(manifest.bytes);
-  let offset = 0;
-  for (const chunk of manifest.chunks) {
+  let offset = 0, next = 0, completed = 0, failure = null;
+  const chunks = manifest.chunks.map(chunk => {
+    const item = {chunk, offset}; offset += chunk.bytes; return item;
+  });
+  const controller = new AbortController();
+  async function downloadChunk({chunk, offset}) {
     const url = new URL(chunk.file, assetBase);
     let data = null;
     if (cache) try {
@@ -84,16 +88,29 @@ async function loadModel(progress) {
       }
     } catch (ignored) {}
     if (!data) {
-      const result = await fetch(url);
+      const result = await fetch(url, {signal: controller.signal});
       if (!result.ok) throw new Error('Lucida 抠图模型未能下载，请检查网络后重试。');
       data = await result.arrayBuffer();
       if (data.byteLength !== chunk.bytes || await checksum(data) !== chunk.sha256) throw new Error('Lucida 抠图模型分块校验失败，请重试。');
       if (cache) try { await cache.put(url, new Response(data, {headers: {'Content-Type': 'application/octet-stream'}})); } catch (ignored) {}
     }
-    model.set(new Uint8Array(data), offset); offset += data.byteLength;
-    progress('loading', .85 * offset / model.length);
+    if (failure) return;
+    model.set(new Uint8Array(data), offset); completed += data.byteLength;
+    progress('loading', .85 * completed / model.length);
   }
-  if (offset !== model.length || await checksum(model) !== manifest.sha256) throw new Error('Lucida 抠图模型完整性校验失败，请重试。');
+  // Three workers bound transient chunk memory and avoid serial cold downloads.
+  // Each verified block is written at its manifest offset, regardless of order.
+  async function download() {
+    while (!failure && next < chunks.length) {
+      const item = chunks[next++];
+      try { await downloadChunk(item); }
+      catch (error) { if (!failure) { failure = error; controller.abort(); } }
+    }
+  }
+  await Promise.all(Array.from({length: Math.min(3, chunks.length)}, download));
+  // Settle the bounded workers before allowing a retry or emitting a late update.
+  if (failure) throw failure;
+  if (completed !== model.length || await checksum(model) !== manifest.sha256) throw new Error('Lucida 抠图模型完整性校验失败，请重试。');
   progress('loading', .9);
   const executionProviders = await getExecutionProviders();
   const gpu = executionProviders.some(provider => (typeof provider === 'string' ? provider : provider.name) === 'webgpu');
