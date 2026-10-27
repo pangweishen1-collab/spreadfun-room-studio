@@ -15,6 +15,7 @@
   <link rel="stylesheet" href="disclosure.css">
   <script src="focus-modality.js" defer></script>
   <script src="feedback-motion.js" defer></script>
+  <script src="upload-paste.js" defer></script>
   <script src="tool-page.js" defer></script>
 </head>
 <body class="ft-ui">
@@ -74,6 +75,7 @@
             <img class="empty-art" src="assets/feedback/empty-upload.svg" width="120" height="90" alt="" aria-hidden="true">
             <h3 data-i18n="uploadTitle">点击上传或拖入图片</h3>
             <p data-i18n="uploadHint">PNG、JPG、WebP，仅在本地预览。</p>
+            <p data-i18n="pasteHint">支持复制粘贴，按 ⌘V / Ctrl+V 上传</p>
             <button class="button primary ft-motion-sheen" id="upload-button" type="button" data-i18n="upload">上传图片</button>
           </div>
           <div class="loaded-content" id="loaded-content" data-ft-reveal="fade" hidden>
@@ -127,7 +129,7 @@
   <dialog id="help-dialog" class="help-dialog ft-motion-dialog" aria-labelledby="help-title">
     <div class="dialog-heading"><h2 id="help-title" data-i18n="helpTitle">如何使用这个框架</h2><button id="close-help" class="button secondary" type="button" data-i18n="close">关闭</button></div>
     <p data-i18n="helpBody">先切换五种演示状态，检查预览、表单、按钮和结果反馈。也可以上传一张本地图片查看真实预览。</p>
-    <p class="dialog-note" data-i18n="helpNote">这是搭建新工具的起点，不是第四个线上工具。将模拟任务替换为实际业务函数，再接入校验、生成与真实下载。</p>
+    <p class="dialog-note" data-i18n="helpNote">这是搭建新工具的起点，不是线上生产工具。将模拟任务替换为实际业务函数，再接入校验、生成与真实下载。</p>
     <p class="field-hint" data-i18n="helpEscape">按 Esc 或点击关闭按钮返回。</p>
   </dialog>
 </body>

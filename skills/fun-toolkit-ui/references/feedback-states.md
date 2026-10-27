@@ -2,7 +2,7 @@
 
 适用范围：新工具页面、列表与结果区的统一反馈。作为设计规范目录 v1.4.1 的增补，配合工具页框架使用。当前三个生产工具已通过 `tool-feedback.css` / `tool-feedback.js` 接入共用空态、占位、加载与轻淡入；装饰视差等扩展保留为可选示例。
 
-[团队 Skill v1.0.4](https://fun-toolkit.pangweishen1.workers.dev/design-system/downloads/fun-toolkit-ui-1.0.4.zip) 已合并最新模板、8 个 SVG、反馈动效资源、接入说明与验收清单；解压添加并确认 Agent 识别 `SKILL.md` 后，用 `$fun-toolkit-ui` 调用。ZIP 是自包含交付包，下载不等于安装。在线规范及团队包为当前交付；PDF v1.2 是历史快照。
+[团队 Skill v1.0.6](https://fun-toolkit.pangweishen1.workers.dev/design-system/downloads/fun-toolkit-ui-1.0.6.zip) 已合并最新模板、8 个 SVG、反馈动效资源、接入说明与验收清单；解压添加并确认 Agent 识别 `SKILL.md` 后，用 `$fun-toolkit-ui` 调用。ZIP 是自包含交付包，下载不等于安装。在线规范及团队包为当前交付；PDF v1.2 是历史快照。
 
 ## 1. 先判断状态，再选图
 
@@ -89,7 +89,7 @@ Skeleton 内部形状 `aria-hidden="true"`，由区域名称与一个状态文�
 
 ## 7. 可复用资源与接入
 
-- `feedback-motion.css` / `feedback-motion.js` 为共用原生反馈基础，脚本 defer 后自动初始化。当前三个生产工具由根目录 `tool-feedback.css` / `tool-feedback.js` 映射业务状态，模板已复用相同基础；单独引入基础文件不会自动提供任务状态、编码或统计。
+- `feedback-motion.css` / `feedback-motion.js` 为共用原生反馈基础，脚本 defer 后自动初始化。历史三工具适配快照由根目录 `tool-feedback.css` / `tool-feedback.js` 映射业务状态，模板已复用相同基础；单独引入基础文件不会自动提供任务状态、编码或统计。
 - 公共对象 `window.FunToolkitFeedback`：`init(root)` 幂等扫描新节点；`refresh()` 重算环境；`setPaused(true|false)` 暂停持续装饰，不阻止主动入退场；`enter(el)` / `exit(el)` / `replay(el)` 返回 Promise；`destroy()` 释放监听、观察与动画帧。
 - `data-ft-activity` 标记需要可见性管理的 Spinner / Skeleton；`data-ft-reveal="fade"` 仅淡入淡出，`rise` 采用 6 / 3 px 位移。`data-ft-parallax="pointer|scroll"` 容器内以 `data-ft-layer` 标记专用装饰层，可用 `data-ft-depth="0..1"` 控制深度。
 - 150 ms 加载展示延迟、任务状态、进度和焦点移动由业务实现；演示按钮不提供编码、网络请求或统计。
@@ -116,7 +116,7 @@ Skeleton 内部形状 `aria-hidden="true"`，由区域名称与一个状态文�
 
 # Fun Toolkit · Feedback / Motion primitives
 
-这两个文件是规范演示、最新模板与三个生产工具共用的原生反馈基础。生产接入由 `tool-feedback.css` / `tool-feedback.js` 适配业务状态；基础本身不提供生成任务、文件下载、统计、存储或网络请求。
+这两个文件是规范演示、最新模板与历史三工具适配快照共用的原生反馈基础。生产接入由 `tool-feedback.css` / `tool-feedback.js` 适配业务状态；基础本身不提供生成任务、文件下载、统计、存储或网络请求。
 
 ## 直接接入
 
@@ -280,7 +280,7 @@ python3 scripts/check_package.py
 
 各场景的最小成品结构是：图形 → 12 px 间距 → 一行标题 → 6–8 px 间距 → 1–2 行原因或下一步 → 16 px 间距 → 至多一个主操作。图形内容不能替代按钮文字，也不能暗示已经上传或已经生成。
 
-当前三个工具已将所需图形、占位、加载与轻淡入接入真实流程；未使用的无匹配、离线与装饰视差等资源保留供后续场景选择。新工具仍需按实际任务接入状态、恢复操作与统计，不能仅凭引用图形宣称业务已经完成。
+2026-10-23记录中的三个工具已将所需图形、占位、加载与轻淡入接入真实流程；未使用的无匹配、离线与装饰视差等资源保留供后续场景选择。新工具仍需按实际任务接入状态、恢复操作与统计，不能仅凭引用图形宣称业务已经完成。
 
 ## 来源资产的检查记录
 

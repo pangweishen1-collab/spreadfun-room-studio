@@ -1,12 +1,12 @@
 {
   "schemaVersion": 1,
-  "skillVersion": "1.0.4",
-  "resourceVersion": "1.4.4",
+  "skillVersion": "1.0.6",
+  "resourceVersion": "1.4.6",
   "files": [
     {
       "path": "SKILL.md",
-      "sha256": "9fec518769b8741c07cd44aaa811616c85f096a6de812398456775a9dcfd1437",
-      "bytes": 7701
+      "sha256": "7360a7b1dd94df697c3956ad8657764ae177a97e3332a1df7060c0852f75a91c",
+      "bytes": 8147
     },
     {
       "path": "agents/openai.yaml",
@@ -70,8 +70,8 @@
     },
     {
       "path": "assets/tool-page-starter/README.md",
-      "sha256": "5e8a4e02820098e4872c171df67f1ea66348882305701270a5d04c3a143e0bff",
-      "bytes": 3125
+      "sha256": "d65bda88cff3f7aea890fc91be91062a0ff7f6dcaf651812b0ed8ff8e9fd636c",
+      "bytes": 4549
     },
     {
       "path": "assets/tool-page-starter/assets/author-profile.webp",
@@ -130,7 +130,7 @@
     },
     {
       "path": "assets/tool-page-starter/design-tokens.json",
-      "sha256": "d17e16e42af0b3bcd974439f02b7bf195586c151749ae922f33a520dd706660b",
+      "sha256": "daa63cd4b2cd542d6155adb29cd5e7f85c8e8f316744c6c8f84d5ec783b61d36",
       "bytes": 4299
     },
     {
@@ -155,8 +155,8 @@
     },
     {
       "path": "assets/tool-page-starter/index.html",
-      "sha256": "5ca61bc1c7ea2d0090c42373ce9e774230d81d33fb9b1a59f8a13e05ec754a9d",
-      "bytes": 9661
+      "sha256": "6aa3c301ee8d0cc9d95c20394d79b318bb41cc469b60a9f22a0dfd481939757a",
+      "bytes": 9793
     },
     {
       "path": "assets/tool-page-starter/motion-patterns.css",
@@ -175,8 +175,13 @@
     },
     {
       "path": "assets/tool-page-starter/tool-page.js",
-      "sha256": "7d61dc714a1ed6eadd4a9b61022f9b6cfb2b3f180a70fccccfc97f2af08e6bf8",
-      "bytes": 17119
+      "sha256": "5d40cc021d081c3d0d8674f07c73a2399adc86a05119e03414dd48f0d034fbde",
+      "bytes": 17395
+    },
+    {
+      "path": "assets/tool-page-starter/upload-paste.js",
+      "sha256": "4182019df373c11821cf1ce811972628ccbd6ca9332fc91f6b83d0b887764b2d",
+      "bytes": 3175
     },
     {
       "path": "assets/tool-page-starter/upload-surface.css",
@@ -195,13 +200,13 @@
     },
     {
       "path": "funskill.json",
-      "sha256": "e1694b1c9e95e0f9fbf9622601a0e9605cb943ce8dc1f69baa2f014733a63f5b",
+      "sha256": "a271137434cc8c0b0f10f6cd8013efc84c1ce22b50a8a6efe177a6f682f291e6",
       "bytes": 852,
-      "semanticSha256": "b55132499315c4e26601daffe47bdea6f48cfffcf19f099f629ad397d509c0e5"
+      "semanticSha256": "ab361eb8f98e59ce1509f062a91adcef08496b1017803df4465792a5d0226b82"
     },
     {
       "path": "governance.json",
-      "sha256": "c6133ed4f137279ac7736ef893563a495bfc5c29d4ee778bd50ff5d4b4563516",
+      "sha256": "70122a472170771a0ff628712edc0f014330b8d115d5df492a6187b2129d8045",
       "bytes": 1022
     },
     {
@@ -211,13 +216,13 @@
     },
     {
       "path": "references/acceptance.md",
-      "sha256": "05728b8069bcd0b12118da362a3c974a1402cf8e74985e5ae709a81bbb52ea49",
-      "bytes": 4177
+      "sha256": "30e80cd4917f30f2e866eadfadd87fbef0f122f08146688129bad2f0fd411f1d",
+      "bytes": 4820
     },
     {
       "path": "references/feedback-states.md",
-      "sha256": "7b3b0d81851e10f4624303220a94101f3859e4d8c4853d6b3e8716d13da8faa5",
-      "bytes": 29611
+      "sha256": "4efeefe4d46342bf34b42ea224e6f0dd25c61189f98a24c62a7638e954fa01a1",
+      "bytes": 29639
     },
     {
       "path": "references/first-task.md",
@@ -226,33 +231,33 @@
     },
     {
       "path": "references/foundations.md",
-      "sha256": "e21412f517731d5c55903963ffa3f840145268b0838bf53b7ccd85bf11405ac3",
-      "bytes": 9038
+      "sha256": "c6f726d220ae073f3844199d88dd6dc62395964a6a8871f2d3d1a19cf6ae44f0",
+      "bytes": 10775
     },
     {
       "path": "references/production-integration.md",
-      "sha256": "60a7ca47f5fcb43e81804def61699e682dea66af6af8ccb69279687fe49aa5c2",
-      "bytes": 1427
+      "sha256": "145c9c70638ac711a0ae43e278c3edd81369da64e876fa2d3bb3108b91f05ffd",
+      "bytes": 2358
     },
     {
       "path": "references/team-setup.md",
-      "sha256": "cae71557cbe8a2ca99c0210ae9fec71a1386a471bca9a24fc974d05a02f35583",
+      "sha256": "6a1fa767cb15bc826162fe377b2625e64a1f841fb1e25dc421752192b3b350fd",
       "bytes": 2852
     },
     {
       "path": "references/tool-page-framework.md",
-      "sha256": "ba2b3038dcd6fcd46afce37302d863b8450d81ac71a8ce25181088a46a952787",
-      "bytes": 16594
+      "sha256": "3a7632f72ceda79d7b367d8210e869d28c3d314a364536909bb50d59c1cc188d",
+      "bytes": 17269
     },
     {
       "path": "references/validation.md",
-      "sha256": "ef4c4fdee6b9a42966dd2feda9276c2af853568235e261947923aefb46719919",
-      "bytes": 5424
+      "sha256": "602cc2a21bc01b5710e2952596472f49a11d1dabb0587b2edebff15efec24f24",
+      "bytes": 7044
     },
     {
       "path": "scripts/check_package.py",
-      "sha256": "f3e085c3370364b975cd22c5860fc2fc5ed4295c0d70bc0c9ff467d569b0a1e0",
-      "bytes": 4729
+      "sha256": "9fd09ce90f2bb8a3ce1a2320fd4b642215da0af0c833ee2a802087f39b337780",
+      "bytes": 4789
     },
     {
       "path": "scripts/create_tool.py",
