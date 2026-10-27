@@ -1,4 +1,4 @@
-/* Company logos: local resizing and format export. No uploads or production events. */
+/* Company logos: local resizing and format export. Only aggregate output counts leave the device. */
 (() => {
   'use strict';
   const $=selector=>document.querySelector(selector);
@@ -39,7 +39,7 @@
     const receipt=$('#resourceReceipt');receipt.replaceChildren();receipt.classList.remove('hidden');
     const text=document.createElement('span');text.textContent=`${t('receipt')} · ${(state.download.blob.size/1024).toFixed(1)} KB`;
     const link=document.createElement('a');link.href=state.download.url;link.download=state.download.name;link.textContent=`${t('downloadAgain')} · ${state.download.name}`;
-    link.addEventListener('click',event=>{if(state.busy)event.preventDefault()});link.setAttribute('aria-disabled',String(state.busy));
+    link.addEventListener('click',event=>{if(state.busy)event.preventDefault();else window.Hub?.record('resources','download')});link.setAttribute('aria-disabled',String(state.busy));
     receipt.append(text,link);
   }
   function syncControls(){
@@ -148,12 +148,13 @@
     try{
       // Keep only the current receipt's Blob. Repeated downloads need no new
       // canvas or compression; any export setting change clears the receipt.
-      const blob=state.download?.cacheKey===cacheKey?state.download.blob:
+      const cached=state.download?.cacheKey===cacheKey;
+      const blob=cached?state.download.blob:
         await encodeLogo(await exportImage(project,side),side,format,target,radius);
       const name=markets[target]?`${project.id}-${markets[target].slug}-${side}x${side}.png`:`${project.id}-logo-${side}x${side}${radius?'-r'+radius+'pct':''}.${format}`;
       freshUrl=URL.createObjectURL(blob);const link=document.createElement('a');link.href=freshUrl;link.download=name;link.hidden=true;document.body.append(link);
       try{link.click()}catch(error){throw new Error('downloadError')}finally{link.remove()}
-      releaseDownload();state.download={name,url:freshUrl,blob,cacheKey};freshUrl=null;state.phase='success';syncReceipt();window.FunToolkitUI?.reveal($('#resourceReceipt'));
+      releaseDownload();state.download={name,url:freshUrl,blob,cacheKey};freshUrl=null;state.phase='success';if(!cached)window.Hub?.record('resources','generated');window.Hub?.record('resources','download');syncReceipt();window.FunToolkitUI?.reveal($('#resourceReceipt'));
     }catch(error){state.notice=strings.en[error.message]?error.message:'encodeError';state.phase='error'}
     finally{if(freshUrl)URL.revokeObjectURL(freshUrl);state.busy=false;syncControls()}
   }

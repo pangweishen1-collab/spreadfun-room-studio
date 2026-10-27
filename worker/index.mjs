@@ -1,5 +1,5 @@
 // First-party anonymous usage counts and private tool suggestions. No source assets are accepted.
-const TOOLS = ['room', 'avatar', 'banner'];
+const TOOLS = ['room', 'avatar', 'banner', 'gift', 'resources', 'vap'];
 const EVENT_TYPES = ['generated', 'download'];
 const MAX_BODY = 16 * 1024;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

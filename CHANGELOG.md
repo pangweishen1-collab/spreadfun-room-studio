@@ -1,5 +1,23 @@
 # 更新记录
 
+## 1.4.0 - 2026-10-27
+
+### Clipboard uploads
+
+- Paste images or supported files into the active upload area with Cmd+V / Ctrl+V across room backgrounds, avatar frames, banners, gift images, VAP conversion and VAP inspection. Existing import validation, busy guards and file replacement behavior are reused.
+- Keep normal paste behavior in editable fields and open dialogs. Add bilingual shortcut hints inside upload empty states.
+
+### Whole-site statistics
+
+- Record successful generation and valid download actions for all six tools: room backgrounds, avatar frames, banners, gift images, VAP and resources. Show every tool in the shared statistics page and include all records in home totals.
+- Cached or receipt downloads add downloads without generating another file. Previewing, loading, failed operations, and packaging a VAP JSON/ZIP do not inflate generation counts.
+- Apply migration 0002 before rollout to extend database constraints while preserving existing events, counter values, timestamps, suggestions and rate-limit records. Unrecorded historical output cannot be reconstructed.
+
+### UI kit and validation
+
+- Publish the updated reusable clipboard helper, starter, and versioned UI-kit downloads. Website publication does not update the separate FunSkill platform.
+- Verified 24 JavaScript regression suites, 9 Python backend tests, 8 isolated local Worker API tests, nonempty schema upgrades, desktop/mobile bilingual layouts, native Finder SVGA paste, and real gift/resource/VAP exports with shared counts.
+
 ## 1.3.1 - 2026-10-26
 
 ### VAP 连续羽化与真实成品验收

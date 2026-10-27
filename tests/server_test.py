@@ -69,7 +69,7 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(status, 200)
             self.assertEqual(headers["Cache-Control"], "no-store")
             self.assertEqual(first["totals"], {"generated": 0, "downloads": 0})
-            self.assertEqual(set(first["tools"]), {"room", "avatar", "banner"})
+            self.assertEqual(set(first["tools"]), {"room", "avatar", "banner", "gift", "resources", "vap"})
             self.assertTrue(first["startedAt"].endswith("Z"))
             self.assertEqual(request(server, "POST", "/api/events", event("room", "generated", 3))[0], 201)
             self.assertEqual(request(server, "POST", "/api/events", event("avatar", "download", 2))[0], 201)
@@ -80,6 +80,65 @@ class ServerTests(unittest.TestCase):
             self.assertEqual(shared["tools"]["avatar"], {"generated": 0, "downloads": 2})
         with running(self.database) as restarted:
             self.assertEqual(request(restarted, "GET", "/api/stats")[2], shared)
+
+    def test_added_tools_preserve_existing_counts_and_restart(self):
+        # The local preview has always accepted text tool keys at the SQLite layer;
+        # extending its API allowlist must not recreate its database or metadata.
+        store = APP.Store(self.database)
+        store.event(event("room", "generated", 7))
+        store.event(event("banner", "download", 2))
+        before = store.stats()
+        with running(self.database) as server:
+            for index, tool in enumerate(("gift", "resources", "vap"), start=1):
+                generated = event(tool, "generated", index)
+                self.assertEqual(request(server, "POST", "/api/events", generated)[0], 201)
+                self.assertEqual(request(server, "POST", "/api/events", generated)[0], 200)
+                self.assertEqual(request(server, "POST", "/api/events", event(tool, "download"))[0], 201)
+            after = request(server, "GET", "/api/stats")[2]
+            self.assertEqual(after["startedAt"], before["startedAt"])
+            for tool in ("room", "avatar", "banner"):
+                self.assertEqual(after["tools"][tool], before["tools"][tool])
+            for index, tool in enumerate(("gift", "resources", "vap"), start=1):
+                self.assertEqual(after["tools"][tool], {"generated": index, "downloads": 1})
+            self.assertEqual(after["totals"], {"generated": 13, "downloads": 5})
+        with running(self.database) as restarted:
+            self.assertEqual(request(restarted, "GET", "/api/stats")[2], after)
+
+    def test_d1_schema_upgrade_preserves_rows_metadata_and_atomic_counts(self):
+        def rows(db, table):
+            return db.execute("SELECT * FROM " + table + " ORDER BY 1, 2").fetchall()
+        initial = (ROOT / "migrations" / "0001_initial.sql").read_text()
+        upgrade = (ROOT / "migrations" / "0002_whole_site_statistics.sql").read_text()
+        for populated in (False, True):
+            with self.subTest(populated=populated), sqlite3.connect(":memory:") as db:
+                db.executescript(initial)
+                if populated:
+                    db.execute("INSERT INTO events VALUES (?, 'room', 'generated', 7, ?)",
+                               (str(uuid.uuid4()), "2026-10-01T00:00:00.000Z"))
+                    # A pre-existing counter is preserved exactly, not reconstructed.
+                    db.execute("UPDATE counters SET count = 17 WHERE tool = 'room'")
+                    db.execute("INSERT INTO requests VALUES ('request-1', 'private', 'keep me', 'private@example.test', 'earlier')")
+                    db.execute("INSERT INTO rate_limits VALUES ('events', 123, 2)")
+                    db.commit()
+                tables = ("events", "counters", "metadata", "requests", "rate_limits")
+                before = {table: rows(db, table) for table in tables}
+                db.executescript(upgrade)
+                self.assertEqual({table: rows(db, table) for table in tables}, before)
+                for tool in APP.TOOLS:
+                    identifier = str(uuid.uuid4())
+                    db.execute("INSERT INTO events VALUES (?, ?, 'generated', 2, ?)",
+                               (identifier, tool, "2026-10-27T00:00:00.000Z"))
+                    expected = 19 if populated and tool == "room" else 2
+                    self.assertEqual(db.execute("SELECT count FROM counters WHERE tool = ? AND type = 'generated'", (tool,)).fetchone()[0], expected)
+                    db.execute("INSERT INTO events VALUES (?, ?, 'generated', 2, ?) ON CONFLICT(id) DO NOTHING",
+                               (identifier, tool, "2026-10-27T00:00:00.000Z"))
+                    self.assertEqual(db.execute("SELECT count FROM counters WHERE tool = ? AND type = 'generated'", (tool,)).fetchone()[0], expected)
+                for table, values in (("events", (str(uuid.uuid4()), "unknown", "generated", 1, "now")),
+                                      ("counters", ("unknown", "download", 1))):
+                    with self.assertRaises(sqlite3.IntegrityError):
+                        db.execute("INSERT INTO " + table + " VALUES (" + ",".join("?" for _ in values) + ")", values)
+                self.assertEqual(db.execute("SELECT value FROM metadata WHERE key = 'updatedAt'").fetchone()[0],
+                                 "2026-10-27T00:00:00.000Z")
 
     def test_idempotency_and_concurrent_transactions(self):
         repeated = event(count=2)

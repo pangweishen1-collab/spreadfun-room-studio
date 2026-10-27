@@ -288,3 +288,6 @@ button.ft-motion-sheen[aria-busy=true]{cursor:progress}
 }
 @media(max-width:540px){.tool-navigation a{font-size:15px}}
 @media(max-width:360px){.topbar .tool-navigation{gap:0}.tool-navigation a{font-size:14px}}
+
+/* Keep the clipboard shortcut on its own secondary line in upload empty states. */
+.upload-paste-hint{display:block}

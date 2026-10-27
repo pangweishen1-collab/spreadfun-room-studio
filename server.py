@@ -18,7 +18,7 @@ import uuid
 
 
 SITE_ROOT = Path(__file__).resolve().parent
-TOOLS = ("room", "avatar", "banner")
+TOOLS = ("room", "avatar", "banner", "gift", "resources", "vap")
 EVENT_TYPES = ("generated", "download")
 MAX_BODY = 16 * 1024
 STATIC_EXTENSIONS = {

@@ -1,6 +1,6 @@
 {
   "name": "fun-toolkit",
-  "version": "1.3.1",
+  "version": "1.4.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -11,7 +11,7 @@
     "dev": "node scripts/build-site.mjs && wrangler dev --ip 127.0.0.1 --port 8787",
     "deploy": "npm run deploy:pages",
     "deploy:worker": "node scripts/build-site.mjs && wrangler deploy",
-    "test": "node tests/regression.cjs && node tests/toolkit.cjs && node tests/banner.cjs && node tests/hub.cjs && node tests/resources.cjs && node tests/market-icon-png.cjs && node tests/tool-feedback.cjs && node tests/gift-preview-render.cjs && node tests/gift-preview.cjs && node tests/gift-preview-history.cjs && node tests/gift-background.cjs && node tests/gift-background-matte.cjs && node tests/gift-quality-matte.cjs && node tests/gift-matting-refine.cjs && node tests/gift-uniform-matte.cjs && node tests/gift-matte-resample.cjs && node tests/gift-lucida.cjs && node tests/vap-matte.cjs && node tests/vap-engine.cjs && node tests/vap-source-detection.cjs && node tests/vap-tool.cjs && node tests/vap-player.cjs && node tests/vap-inspect.cjs"
+    "test": "node tests/regression.cjs && node tests/toolkit.cjs && node tests/banner.cjs && node tests/hub.cjs && node tests/resources.cjs && node tests/market-icon-png.cjs && node tests/tool-feedback.cjs && node tests/gift-preview-render.cjs && node tests/gift-preview.cjs && node tests/gift-preview-history.cjs && node tests/gift-background.cjs && node tests/gift-background-matte.cjs && node tests/gift-quality-matte.cjs && node tests/gift-matting-refine.cjs && node tests/gift-uniform-matte.cjs && node tests/gift-matte-resample.cjs && node tests/gift-lucida.cjs && node tests/vap-matte.cjs && node tests/vap-engine.cjs && node tests/vap-source-detection.cjs && node tests/vap-tool.cjs && node tests/vap-player.cjs && node tests/vap-inspect.cjs && node tests/upload-paste.cjs"
   },
   "devDependencies": {
     "wrangler": "4.151.3"

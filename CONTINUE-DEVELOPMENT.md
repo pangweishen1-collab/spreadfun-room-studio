@@ -1,6 +1,6 @@
 # Fun Toolkit 继续开发说明
 
-当前项目已从单一 Room Studio 升级为乐趣运营工作台，包含聚合首页、三个工具和共享统计页。最新说明见 `README.md`，验证记录见 `VERIFICATION.md`。
+当前项目已从单一 Room Studio 升级为乐趣运营工作台，包含聚合首页、五个生产工具、资源库和共享统计页。最新说明见 `README.md`，验证记录见 `VERIFICATION.md`。
 
 ## 当前唯一入口
 
@@ -12,7 +12,7 @@
 
 双击 `start-preview.command`，或在本目录运行 `python3 server.py --host 127.0.0.1 --port 8765`（Python 3.9+）。不要用普通静态服务器替代，否则统计与需求接口不可用。
 
-浏览器打开 `http://127.0.0.1:8765/index.html`。默认进入 `#home` 聚合首页（Logo 也进入首页）；`#statistics` 为共享统计。三个工具仍使用 `#room-backgrounds`、`#avatar-frames` 和 `#banners`，支持直接进入及浏览器前进/后退并保留工具会话。
+浏览器打开 `http://127.0.0.1:8765/index.html`。默认进入 `#home` 聚合首页（Logo 也进入首页）；`#statistics` 为共享统计。工具使用 `#room-backgrounds`、`#avatar-frames`、`#banners`、`#gift-previews`、`#vap-tools` 和 `#resources`，支持直接进入及浏览器前进/后退并保留工具会话。统计标识对应 `room`、`avatar`、`banner`、`gift`、`vap`、`resources`。
 
 运行 `node tests/regression.cjs`、`node tests/toolkit.cjs`、`node tests/banner.cjs`，并对 `toolkit.js`、`banner.js` 和 `banner-webp.js` 运行 `node --check`。无损编码变更另运行 `node tests/lossless-webp.cjs`（需要 Python / Pillow，路径可用 `BANNER_TEST_PYTHON` 指定）。有 UI 改动时再检查桌面和 `tests/responsive.html`，自动检查不能代替视觉检查。
 

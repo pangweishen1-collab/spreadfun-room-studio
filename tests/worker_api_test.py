@@ -24,6 +24,7 @@ import uuid
 BASE_URL = ""
 DATABASE = None
 MAX_BODY = 16 * 1024
+TOOLS = {"room", "avatar", "banner", "gift", "resources", "vap"}
 
 
 def call(method, path, payload=None, headers=None, raw=None):
@@ -81,7 +82,7 @@ class WorkerApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("Cache-Control"), "no-store")
         self.assertEqual(headers.get("X-Content-Type-Options"), "nosniff")
-        self.assertEqual(set(body["tools"]), {"room", "avatar", "banner"})
+        self.assertEqual(set(body["tools"]), TOOLS)
         self.assertTrue(body["startedAt"].endswith("Z"))
         self.assertTrue(body["updatedAt"].endswith("Z"))
         self.assertEqual(call("HEAD", "/api/stats")[0::2], (200, b""))
@@ -110,6 +111,23 @@ class WorkerApiTests(unittest.TestCase):
         self.assertEqual(current["totals"], {"generated": 95, "downloads": 2})
         self.assertEqual(current["tools"]["room"], {"generated": 3, "downloads": 0})
         self.assertEqual(current["tools"]["avatar"], {"generated": 0, "downloads": 2})
+
+    def test_02b_added_tools_have_independent_idempotent_counters(self):
+        before = stats()
+        for index, tool in enumerate(("gift", "resources", "vap"), start=1):
+            generated = event(tool, "generated", index)
+            download = event(tool, "download")
+            self.assertEqual(call("POST", "/api/events", generated)[0], 201)
+            self.assertEqual(call("POST", "/api/events", generated)[0], 200)
+            self.assertEqual(call("POST", "/api/events", download)[0], 201)
+            self.assertEqual(call("POST", "/api/events", dict(download, count=2))[0], 409)
+        after = stats()
+        for index, tool in enumerate(("gift", "resources", "vap"), start=1):
+            self.assertEqual(after["tools"][tool], {"generated": index, "downloads": 1})
+        for tool in ("room", "avatar", "banner"):
+            self.assertEqual(after["tools"][tool], before["tools"][tool])
+        self.assertEqual(after["totals"], {"generated": before["totals"]["generated"] + 6,
+                                           "downloads": before["totals"]["downloads"] + 3})
 
     def test_03_origin_content_type_and_validation(self):
         self.assertEqual(call("POST", "/api/events", event(), {"Origin": BASE_URL})[0], 201)

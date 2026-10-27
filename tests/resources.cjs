@@ -1,13 +1,13 @@
 // Behavior contracts; real Canvas/files and responsive layouts are verified in the browser.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-const elements=new Map(),downloads=[],urls=new Map(),revoked=[],cleanup=[],images=[],encodes=[],feedback=[],events=[];
-let serial=0,encodeFail=false,wrongMime=false,holdLoads=false,failSrc='',holdWebP=null,marketFail='',holdMarket=null,urlFail=false;
+const elements=new Map(),downloads=[],urls=new Map(),revoked=[],cleanup=[],images=[],encodes=[],feedback=[],events=[],committedBlobs=new Set();
+let serial=0,encodeFail=false,wrongMime=false,holdLoads=false,failSrc='',holdWebP=null,marketFail='',holdMarket=null,urlFail=false,downloadFail=false;
 function element(tag='div'){
   const classes=new Set(),listeners=new Map(),attributes=new Map();let value='512';
   const node={tagName:tag.toUpperCase(),dataset:{},children:[],style:{},textContent:'',hidden:false,disabled:false,width:0,height:0,
     get value(){return value},set value(x){value=String(x)},classList:{add(x){classes.add(x)},remove(x){classes.delete(x)},contains(x){return classes.has(x)},toggle(x,on){if(on)classes.add(x);else classes.delete(x)}},
     setAttribute(k,v){attributes.set(k,String(v))},getAttribute:k=>attributes.get(k),append(...xs){this.children.push(...xs)},replaceChildren(...xs){this.children=xs},remove(){},
-    addEventListener(k,fn){listeners.set(k,fn)},fire(k,e={}){return listeners.get(k)?.(e)},click(){if(this.download)downloads.push({name:this.download,url:this.href});listeners.get('click')?.({preventDefault(){}})},
+    addEventListener(k,fn){listeners.set(k,fn)},fire(k,e={}){return listeners.get(k)?.(e)},click(){if(this.download&&downloadFail)throw Error('download blocked');if(this.download)downloads.push({name:this.download,url:this.href});listeners.get('click')?.({preventDefault(){}})},
     querySelector(selector){return this.children.find(child=>'.'+child.className===selector)||null},querySelectorAll(selector){if(selector==='[data-project]')return get('#resourceCatalog').children;if(selector==='[data-resource-size]')return presets;if(selector==='input[name="resourceFormat"]')return formats;return [...get('#resourceCatalog').children,get('#resourceWidth'),get('#resourceHeight'),...presets,...formats]},
     getContext(){return this.context??={operations:[],save(){this.operations.push(['save'])},beginPath(){this.operations.push(['beginPath'])},roundRect(...args){this.operations.push(['roundRect',...args])},clip(){this.operations.push(['clip'])},restore(){this.operations.push(['restore'])},drawImage(...args){this.operations.push(['draw',...args])},fillRect(...args){this.operations.push(['fill',this.fillStyle,...args])}}},
     toBlob(callback,mime,quality){encodes.push({canvas:this,mime,quality});if(encodeFail)throw Error('failure');callback(new Blob(['pixels'],{type:wrongMime?'image/png':mime}))}};
@@ -23,26 +23,26 @@ class MockImage{
   get src(){return this._src}
 }
 const marketEncodes=[];
-const sandbox={Uint8Array,document,Image:MockImage,language:'zh',Blob,Error,String,Number,Math,Array,Object,Promise,URL:{createObjectURL(blob){if(urlFail)throw Error('downloadError');const url='blob:logo-'+ ++serial;urls.set(url,blob);return url},revokeObjectURL(url){revoked.push(url)}},setTimeout(fn){cleanup.push(fn)},window:{MarketIconPNG:{async encode(canvas,options){marketEncodes.push({canvas,options});if(holdMarket)await holdMarket;if(marketFail)throw Error(marketFail);return new Blob(['market'],{type:'image/png'})}},addEventListener(){},FunToolkitUI:{setState(tool,value){assert.equal(tool,'resources');feedback.push({...value})},reveal(){}},Hub:{record(...args){events.push(args)}}},canvasToWebP:async(canvas,quality)=>{assert.equal(quality,1);encodes.push({canvas,mime:'image/webp'});if(holdWebP)await holdWebP;if(encodeFail)throw Error('encodeError');return new Blob(['webp'],{type:'image/webp'})}};
+const sandbox={Uint8Array,document,Image:MockImage,language:'zh',Blob,Error,String,Number,Math,Array,Object,Promise,URL:{createObjectURL(blob){if(urlFail)throw Error('downloadError');const url='blob:logo-'+ ++serial;urls.set(url,blob);return url},revokeObjectURL(url){revoked.push(url)}},setTimeout(fn){cleanup.push(fn)},window:{MarketIconPNG:{async encode(canvas,options){marketEncodes.push({canvas,options});if(holdMarket)await holdMarket;if(marketFail)throw Error(marketFail);return new Blob(['market'],{type:'image/png'})}},addEventListener(){},FunToolkitUI:{setState(tool,value){assert.equal(tool,'resources');feedback.push({...value})},reveal(node){if(node===get('#resourceReceipt'))committedBlobs.add(urls.get(node.children[1].href))}},Hub:{record(...args){assert.equal(args[0],'resources');assert.ok(['generated','download'].includes(args[1]));events.push(args)}}},canvasToWebP:async(canvas,quality)=>{assert.equal(quality,1);encodes.push({canvas,mime:'image/webp'});if(holdWebP)await holdWebP;if(encodeFail)throw Error('encodeError');return new Blob(['webp'],{type:'image/webp'})}};
 let source=fs.readFileSync(path.join(__dirname,'../resource-library.js'),'utf8').replace('window.ResourceLibrary={activate,syncLanguage};','window.ResourceLibrary={activate,syncLanguage};window.resourceTest={state,projects,selectProject,changeDimension,chooseFormat,downloadLogo,encodeLogo,sourceFor,chooseTarget,changeCorner};');
 vm.createContext(sandbox);vm.runInContext(fs.readFileSync(path.join(__dirname,'../project-selector.js'),'utf8'),sandbox);vm.runInContext(source,sandbox);const api=sandbox.window.resourceTest,flush=()=>new Promise(setImmediate);
 const encodeCount=()=>encodes.length+marketEncodes.length;
 async function freshDownload(){
- const before=encodeCount(),count=downloads.length,previous=api.state.download;
+ const before=encodeCount(),count=downloads.length,previous=api.state.download,statBefore=events.length;
  await api.downloadLogo();
  assert.equal(encodeCount(),before+1,'an export setting change must create a new encoded file');
  assert.equal(downloads.length,count+1);assert.ok(api.state.download);
- if(previous)assert.notEqual(api.state.download.blob,previous.blob);
+ if(previous)assert.notEqual(api.state.download.blob,previous.blob);assert.deepEqual(events.slice(statBefore),[['resources','generated'],['resources','download']]);
  return api.state.download;
 }
 async function cachedDownload(){
- const previous=api.state.download,before=encodeCount(),imageCount=images.length,count=downloads.length;
+ const previous=api.state.download,before=encodeCount(),imageCount=images.length,count=downloads.length,statBefore=events.length;
  assert.ok(previous);await api.downloadLogo();
  assert.equal(encodeCount(),before,'unchanged exports must reuse the encoded Blob');
  assert.equal(images.length,imageCount,'unchanged exports must not decode a source again');
  assert.equal(api.state.download.blob,previous.blob);assert.equal(downloads.length,count+1);
  assert.notEqual(api.state.download.url,previous.url,'each download owns a fresh receipt URL');
- assert.equal(urls.get(api.state.download.url),previous.blob);
+ assert.equal(urls.get(api.state.download.url),previous.blob);assert.deepEqual(events.slice(statBefore),[['resources','download']]);
  assert.ok(!revoked.includes(previous.url),'old receipt URLs are released only after the grace period');
  return api.state.download;
 }
@@ -55,18 +55,21 @@ async function cachedDownload(){
  get('#resourceWidth').value='384';api.changeDimension(get('#resourceWidth'));assert.equal(get('#resourceHeight').value,'384');
  for(const value of ['',0,4097,1.5]){get('#resourceWidth').value=value;api.changeDimension(get('#resourceWidth'));assert.equal(api.state.valid,false);assert.equal(get('#resourceDownload').disabled,true);assert.equal(get('#resourceWidth').getAttribute('aria-invalid'),'true')}
  get('#resourceHeight').value='256';api.changeDimension(get('#resourceHeight'));assert.equal(get('#resourceWidth').value,'256');
+ assert.equal(events.length,0,'catalogue previews and invalid parameters do not count');
  await freshDownload();assert.equal(downloads.length,1);assert.equal(api.state.download.name,'yari-logo-256x256.png');assert.equal(api.state.download.blob.type,'image/png');
  assert.deepEqual(encodes.at(-1).canvas.getContext().operations[0].slice(2),[0,0,256,256]);
  await cachedDownload();
+ const receiptLink=get('#resourceReceipt').children[1],beforeReceipt=events.length;receiptLink.click();assert.deepEqual(events.slice(beforeReceipt),[['resources','download']]);let blockedReceipt=false;api.state.busy=true;receiptLink.fire('click',{preventDefault(){blockedReceipt=true}});api.state.busy=false;assert.equal(blockedReceipt,true);assert.equal(events.length,beforeReceipt+1);
  const cachedBeforeLanguage=api.state.download;sandbox.language='en';sandbox.window.ResourceLibrary.syncLanguage();
  assert.equal(api.state.download,cachedBeforeLanguage,'language changes must preserve the cached file');
  await cachedDownload();sandbox.language='zh';sandbox.window.ResourceLibrary.syncLanguage();
  const previous=api.state.download,previousImages=images.length;await api.selectProject(api.projects[0]);assert.equal(api.state.download,previous);assert.equal(images.length,previousImages,'selecting the current project preserves its valid receipt');
- const beforeDownloadFailure=downloads.length,beforeFailedEncode=encodeCount();
- urlFail=true;await api.downloadLogo();urlFail=false;
+ const beforeDownloadFailure=downloads.length,beforeFailedEncode=encodeCount(),beforeFailedStats=events.length;
+ urlFail=true;await api.downloadLogo();urlFail=false,downloadFail=false;
  assert.equal(api.state.download,previous,'a failed download must retain the last valid receipt');
  assert.equal(downloads.length,beforeDownloadFailure);assert.equal(encodeCount(),beforeFailedEncode);
- assert.equal(api.state.notice,'downloadError');assert.equal(api.state.phase,'error');
+ assert.equal(api.state.notice,'downloadError');assert.equal(api.state.phase,'error');assert.equal(events.length,beforeFailedStats);
+ downloadFail=true;await api.downloadLogo();downloadFail=false;assert.equal(events.length,beforeFailedStats,'native download failures do not count');assert.equal(api.state.download,previous);
  await cachedDownload();
  api.chooseFormat('jpg');assert.equal(api.state.download,null);assert.equal(get('#resourceReceipt').classList.contains('hidden'),true);await freshDownload();assert.equal(api.state.download.name,'yari-logo-256x256.jpg');assert.equal(api.state.download.blob.type,'image/jpeg');assert.equal(encodes.at(-1).quality,.96);assert.deepEqual(encodes.at(-1).canvas.getContext().operations[0],['fill','#fff',0,0,256,256]);
  const beforeWebP=downloads.length;api.chooseFormat('webp');let finish;holdWebP=new Promise(resolve=>finish=resolve);const pending=api.downloadLogo();await flush();assert.equal(api.state.busy,true);assert.equal(get('#resourceWidth').disabled,true);const locked=api.state.project;await api.selectProject(api.projects[1]);assert.equal(api.state.project,locked);await api.downloadLogo();assert.equal(downloads.length,beforeWebP,'double clicks must not start a second export');finish();await pending;holdWebP=null;assert.equal(api.state.download.blob.type,'image/webp');assert.equal(downloads.length,beforeWebP+1);await cachedDownload();
@@ -125,7 +128,7 @@ async function cachedDownload(){
  api.chooseTarget('custom');const restoredCustom=await freshDownload();assert.notEqual(restoredCustom.blob,androidSquare.blob);
  get('#resourceCornerNumber').value='10';api.changeCorner(get('#resourceCornerNumber'));
  const roundedCustom=await freshDownload();assert.notEqual(roundedCustom.blob,restoredCustom.blob);await cachedDownload();
- assert.equal(events.length,0,'resource downloads must not be misattributed to the three tool counters');
+ assert.equal(events.filter(x=>x[1]==='generated').length,committedBlobs.size,'only new committed logo files count');assert.equal(events.filter(x=>x[1]==='download').length,downloads.length,'native, cached and receipt downloads count exactly once');
  const activeUrl=api.state.download.url;cleanup.forEach(fn=>fn());
  assert.ok(!revoked.includes(activeUrl),'active receipt URL must survive delayed cleanup');
  for(const url of urls.keys())if(url!==activeUrl)assert.ok(revoked.includes(url),'every replaced receipt URL must eventually be released');

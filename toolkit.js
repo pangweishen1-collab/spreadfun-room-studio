@@ -14,7 +14,7 @@
       vapNav:'VAP tools',vapTitle:'MP4 to VAP',resourcesNav:'Assets',navResourcesTitle:'Asset library',giftPreviewNav:'Gift images',giftPreviewTitle:'Gift & vehicle preview maker',
       roomNav:'Room backgrounds',roomNavShort:'Room BG',avatarNav:'Avatar frames',avatarNavShort:'Avatar',examplesNav:'Examples',bannerNav:'Banner',navBannerTitle:'Banner maker',homeTitle:'Operations workspace',statisticsTitle:'Usage statistics',homeLink:'Fun Toolkit home',statisticsLink:'Statistics',designGuidelines:'Design guidelines',designGuidelinesLabel:'Design guidelines (opens in a new tab)',footerResources:'Footer resources',navLabel:'Tools',roomSubtitle:'Create room backgrounds in two sizes, ready to use.',
       avatarTitle:'Avatar frame preview maker',avatarSubtitle:'Drop an SVGA, find your frame, export a transparent WebP.',animationPreview:'Animation preview',
-      noFile:'No file selected',loading:'Loading animation…',playing:'Playing',paused:'Paused',dropSvga:'Click or drop an SVGA file',svgaHint:'Preview the animation and export the exact frame you want.',uploadSvga:'Upload SVGA',replaceSvga:'Replace file',
+      noFile:'No file selected',loading:'Loading animation…',playing:'Playing',paused:'Paused',dropSvga:'Click, drop or paste an SVGA file',svgaHint:'Preview the animation and export the exact frame you want.',pasteHint:'Paste with ⌘V / Ctrl+V to upload',uploadSvga:'Upload SVGA',replaceSvga:'Replace file',
       play:'Play',pause:'Pause',previousFrame:'Previous frame',nextFrame:'Next frame',frameTimeline:'Frame timeline',scrubHint:'Drag to pause at a frame',currentFrame:'Current frame',localPrivacy:'Processed locally. Your files never leave this device.',
       exportTitle:'Export current frame',exportEmpty:'Your frame will appear here',outputDimensions:'Output dimensions',lockedRatio:'1:1 locked',width:'Width',height:'Height',dimensionError:'Enter a whole number from 16 to 2048.',
       downloadFrame:'Export WebP',exporting:'Exporting…',
@@ -24,7 +24,7 @@
       vapNav:'VAP工具',vapTitle:'MP4 转 VAP',resourcesNav:'资源库',navResourcesTitle:'资源库',giftPreviewNav:'礼物图',giftPreviewTitle:'礼物&座驾预览图生产工具',
       roomNav:'房间背景',roomNavShort:'房间背景',avatarNav:'头像框',avatarNavShort:'头像框',examplesNav:'案例图片',bannerNav:'Banner',navBannerTitle:'Banner 生产工具',homeTitle:'乐趣运营工作台',statisticsTitle:'使用统计',homeLink:'Fun Toolkit 首页',statisticsLink:'使用统计',designGuidelines:'设计规范',designGuidelinesLabel:'设计规范（在新标签页打开）',footerResources:'页脚资源',navLabel:'工具导航',roomSubtitle:'一次上传，生成两种尺寸的房间背景。',
       avatarTitle:'头像框预览图生产工具',avatarSubtitle:'拖入 SVGA，停在喜欢的一帧，导出透明 WebP。',animationPreview:'动态预览',
-      noFile:'尚未选择文件',loading:'正在读取动画…',playing:'播放中',paused:'已暂停',dropSvga:'点击或拖入 SVGA 文件',svgaHint:'预览动态效果，选中需要的那一帧。',uploadSvga:'上传 SVGA',replaceSvga:'替换文件',
+      noFile:'尚未选择文件',loading:'正在读取动画…',playing:'播放中',paused:'已暂停',dropSvga:'点击、拖入或粘贴 SVGA 文件',svgaHint:'预览动态效果，选中需要的那一帧。',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',uploadSvga:'上传 SVGA',replaceSvga:'替换文件',
       play:'播放',pause:'暂停',previousFrame:'上一帧',nextFrame:'下一帧',frameTimeline:'帧时间轴',scrubHint:'拖动即可停在指定帧',currentFrame:'当前帧',localPrivacy:'文件仅在本地处理，不会上传至服务器。',
       exportTitle:'导出当前帧',exportEmpty:'选择文件后显示当前帧',outputDimensions:'输出尺寸',lockedRatio:'1:1 比例锁定',width:'宽度',height:'高度',dimensionError:'请输入 16–2048 之间的整数。',
       downloadFrame:'导出 WebP',exporting:'正在导出…',
@@ -206,6 +206,7 @@
   }
   for(const id of ['#svgaUpload','#svgaReplace'])$(id).addEventListener('click',event=>{event.stopPropagation();input.click()});
   input.addEventListener('change',event=>{loadSvga(event.target.files);event.target.value=''});
+  window.UploadPaste?.register({zone:$('#svgaDropzone'),isActive:()=>state.active==='avatar',isBusy:()=>state.loading||state.exporting,onFiles:loadSvga});
   $('#svgaDropzone').addEventListener('click',()=>{if(!state.video&&!state.loading)input.click()});
   $('#svgaDropzone').addEventListener('keydown',event=>{if(event.target===$('#svgaDropzone')&&!state.video&&(event.key==='Enter'||event.key===' ')){event.preventDefault();if(!state.loading)input.click()}});
   let dragDepth=0;

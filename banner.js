@@ -15,8 +15,9 @@
       "helpFollowup": "选择项目并上传图片，工具会自动居中裁切，导出对应尺寸的无损 WebP 文件。",
       "title": "Banner 生产工具",
       "preview": "Banner 预览",
-      "drop": "点击或拖入 Banner 图片",
+      "drop": "点击、拖入或粘贴 Banner 图片",
       "hint": "支持 PNG、JPG、WebP，按项目自动生成对应尺寸",
+      "pasteHint": "支持复制粘贴，按 ⌘V / Ctrl+V 上传",
       "upload": "上传图片",
       "replace": "替换文件",
       "room": "房间 Banner",
@@ -59,8 +60,9 @@
       "helpFollowup": "Choose a project and upload an image. The tool crops it centrally and exports the project’s sizes as lossless WebP files.",
       "title": "Banner maker",
       "preview": "Banner preview",
-      "drop": "Click or drop a banner image",
+      "drop": "Click, drop or paste a banner image",
       "hint": "PNG, JPG or WebP · Automatically create the selected project’s sizes",
+      "pasteHint": "Paste with ⌘V / Ctrl+V to upload",
       "upload": "Upload image",
       "replace": "Replace file",
       "room": "Room banner",
@@ -259,6 +261,7 @@
   dropzone.addEventListener('click',()=>{if(!state.image&&!state.busy)input.click()});
   dropzone.addEventListener('keydown',event=>{if(event.target===dropzone&&!state.image&&(event.key==='Enter'||event.key===' ')){event.preventDefault();if(!state.busy)input.click()}});
   const active=()=>location.hash==='#banners';
+  window.UploadPaste?.register({zone:dropzone,isActive:active,isBusy:()=>state.busy,onFiles:loadFiles});
   document.addEventListener('dragover',event=>{if(active()&&Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();dropzone.classList.add('drag')}});
   document.addEventListener('dragleave',event=>{if(!event.relatedTarget)dropzone.classList.remove('drag')});
   document.addEventListener('drop',event=>{dropzone.classList.remove('drag');if(active()&&event.dataTransfer?.files.length){event.preventDefault();return loadFiles(event.dataTransfer.files)}});

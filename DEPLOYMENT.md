@@ -25,11 +25,13 @@ Commit and push the matching source to GitHub. A GitHub push alone does not publ
 
 `dist/` is generated from an explicit public-file list. `build:pages` copies it to `dist-pages/public`, adds `_worker.js` and limits Worker execution to `/api` and `/api/*`. The generated Pages configuration stays outside the public asset directory. Python code, migrations, tests, documentation, databases, local tool state and credentials stay out of the website assets. Third-party licences remain alongside their libraries. The local matting model is split into chunks of at most 20 MiB for static hosting.
 
-This release does not change the database schema. Do not migrate, initialize, import or reset the shared production database for a routine Pages release. Only a release containing a reviewed schema change should apply its new migrations.
+Version 1.4.0 includes the reviewed six-tool statistics migration described below. Apply only its pending migrations before publishing this version. Do not initialize, import or reset the shared production database. Routine releases without schema changes must not run unrelated migrations.
 
 ## Data and requests
 
 The production Pages site, test Pages site and legacy Worker share the existing D1 database; local test records are not imported. Events use UUID idempotency and an SQLite trigger so an event and its cumulative count commit atomically. The production rate limits are global fixed windows: 600 event submissions per minute, 30 suggestions per 10 minutes. Window boundaries may permit adjacent bursts. No IP address or browser identifier is stored by this application.
+
+The six-tool statistics update requires `migrations/0002_whole_site_statistics.sql` before publishing its API and frontend. It extends the allowed tools to room backgrounds, avatar frames, banners, gift images, resources and VAP. The migration copies existing events and counters exactly, preserves metadata, suggestions and rate-limit rows, and restores the atomic counter trigger; it does not reset totals or infer unrecorded historical usage. Apply migrations locally first. Production migration and deployment remain explicit release actions; after authorization, run `wrangler d1 migrations apply fun-toolkit-production --remote` before deploying the new code.
 
 Suggestions have no public list API. The owner can read them through their authenticated Cloudflare dashboard or CLI:
 
@@ -52,4 +54,4 @@ The Worker suite refuses non-local URLs and writes synthetic events and suggesti
 
 ## Rollback
 
-Use the `fun-toolkit` Pages project's deployment history to restore a previous production deployment. This does not revert D1 data or schema. The original GitHub source history remains available. The legacy Worker's deployment history applies only to that compatibility address. Do not delete or reset production tables as part of a code rollback.
+D1 schema and data are not reverted by a Pages or Worker rollback. After six-tool counters exist, the old three-tool API cannot read them safely and may return an error. To roll back the UI, bundle the prior frontend with the current compatible six-tool API on every shared-D1 origin, including the Pages test site and legacy Worker. Do not restore a complete old deployment, reverse migration `0002`, delete new-tool rows, reset tables, or rebuild historical counters from event sums. The matching GitHub source history remains available.
