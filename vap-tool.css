@@ -13,6 +13,7 @@
 #vapTool .vap-fieldset{margin:0;padding:0;border:0;min-width:0}
 #vapTool .vap-fieldset>legend{padding:0;margin-bottom:10px;color:var(--tool-heading);font-size:14px;line-height:22px;font-weight:500}
 #vapTool .vap-segments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+#vapTool .vap-input-modes{margin-bottom:16px}
 #vapTool .vap-segments button,#vapTool .vap-view-toolbar button,#vapTool .vap-view-modes button{min-height:44px;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tool-muted);font:inherit;font-size:14px;line-height:20px;cursor:pointer}
 #vapTool .vap-segments button[aria-pressed=true],#vapTool .vap-view-toolbar button[aria-pressed=true],#vapTool .vap-view-modes button[aria-pressed=true]{border-color:#a8d0ff;background:#eaf3ff;color:var(--blue)}
 #vapTool .vap-input-settings{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:end;margin-bottom:16px}
@@ -99,6 +100,7 @@
 #vapTool .vap-size-presets{grid-template-columns:repeat(3,minmax(0,1fr))}
 #vapTool .vap-size-presets button,#vapTool .vap-volume-presets button{min-height:36px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--tool-muted);font:inherit;font-size:12px;line-height:20px;cursor:pointer}
 #vapTool .vap-size-presets button{padding-inline:4px;white-space:nowrap}
+#vapTool .vap-budget-presets button{min-height:44px;white-space:normal}
 #vapTool .vap-size-presets button[aria-pressed=true],#vapTool .vap-volume-presets button[aria-pressed=true]{border-color:#a8d0ff;background:#eaf3ff;color:var(--blue)}
 @media(hover:hover) and (pointer:fine){#vapTool .vap-size-presets button:hover:not(:disabled),#vapTool .vap-volume-presets button:hover:not(:disabled){background:#f2f7ff;border-color:#a8cfff;color:var(--blue)}}
 @media(max-width:540px){#vapTool .vap-size-presets button,#vapTool .vap-volume-presets button{min-height:44px}}

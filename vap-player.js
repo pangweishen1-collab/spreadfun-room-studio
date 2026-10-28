@@ -1,7 +1,33 @@
 /* Thin lifecycle adapter around the unmodified Tencent VAP Web player. */
 (() => {
   'use strict';
-  let player=null, active=location.hash==='#vap-tools', requested=false, version=0, sdkPromise, playerState='empty';
+  let player=null, active=location.hash==='#vap-tools', requested=false, version=0, sdkPromise, playerState='empty', currentResult=null;
+  const own=(object,key)=>Object.prototype.hasOwnProperty.call(object||{},key);
+  function resourceBindings(config,tags={}){
+    const sources=config?.src||[],bindings=Object.create(null),missing=[];
+    if(!Array.isArray(sources)||sources.length>8)throw new Error('Unsupported VAP resource list');
+    const defaults=config?.funToolkit?.resourceDefaults||{},seen=new Set();
+    for(const source of sources){
+      const tag=source?.srcTag;
+      if(typeof tag!=='string'||!tag||tag.length>128||!['img','txt'].includes(source.srcType))throw new Error('Invalid VAP resource tag');
+      const short=tag.replace(/^\[(.*)\]$/,'$1');
+      if(seen.has(short))throw new Error('Duplicate VAP resource tag');seen.add(short);
+      let value=own(tags,tag)?tags[tag]:own(tags,short)?tags[short]:source.srcType==='txt'&&(own(defaults,tag)||own(defaults,short))?(own(defaults,tag)?defaults[tag]:defaults[short]):undefined;
+      if(source.srcType==='txt'&&typeof value==='string'&&value.length<=2000)bindings[tag]=value||'\u200b';
+      else if(source.srcType==='img'&&typeof value==='string'&&/^(blob:|data:image\/(?:png|jpe?g|webp);base64,)/i.test(value))bindings[tag]=value;
+      else missing.push(tag);
+    }
+    return {bindings,missing};
+  }
+  function sdkResourceOptions(config,tags){
+    const {bindings,missing}=resourceBindings(config,tags);
+    if(missing.length)throw new Error('Missing VAP resource bindings: '+missing.join(', '));
+    // SDK resources share the options object. Bracketed aliases keep even a tag
+    // named src/container from replacing player control fields.
+    const copy=JSON.parse(JSON.stringify(config)),options=Object.create(null);
+    for(const source of copy.src||[]){const original=source.srcTag,alias='['+original.replace(/^\[(.*)\]$/,'$1')+']';source.srcTag=alias;options[alias]=bindings[original];}
+    return {config:copy,options};
+  }
   const host=()=>document.querySelector('#vapResultPlayer');
   const button=()=>document.querySelector('#vapResultPlay');
   const chinese=()=>document.documentElement.lang.startsWith('zh');
@@ -24,13 +50,14 @@
     const el=host();if(el){el.replaceChildren();el.dataset.frames='0';delete el.dataset.sdk;delete el.dataset.alphaMode;delete el.dataset.playerError;}
     if(!setState('empty',token))return false;sync();return true;
   }
-  function destroy(){reset(++version);}
+  function destroy(){currentResult=null;reset(++version);}
   function loadSDK(){
     if(window.Vap?.default)return Promise.resolve(window.Vap.default);
     if(!sdkPromise)sdkPromise=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='vendor/tencent-vap/vap.min.js';const failed=()=>{script.remove();sdkPromise=null;reject(new Error('VAP player unavailable'));};script.onload=()=>window.Vap?.default?resolve(window.Vap.default):failed();script.onerror=failed;document.head.append(script);});
     return sdkPromise;
   }
-  async function mount({url,config}={}){
+  async function mount({url,config,tags={}}={}){
+    currentResult={url,config,tags:{...tags}};
     const token=++version;if(!reset(token))return;const el=host();if(!el)return;
     if(!setState('loading',token))return;sync();let candidate=null,failed=false;
     function fail(error){
@@ -41,6 +68,7 @@
       if(setState('error',token))sync();
     }
     try{
+      const resources=(config.src||[]).length?sdkResourceOptions(config,tags):null;
       const Vap=await loadSDK();if(token!==version)return;
       // Native buffer dimensions preserve the output ratio; CSS fits it beside the editing canvas.
       const width=config.info.w,height=config.info.h;
@@ -57,7 +85,16 @@
       el.dataset.sdk='Tencent VAP Web 1.0.5';
       el.dataset.alphaMode=premultiplied?'premultiplied':'straight';
       // initVideo creates the native video and clears SDK listeners; shader/frame startup follows asynchronously.
-      candidate.play({container:el,src:url,config,width,height,fps:config.info.fps,mute:true,loop:true,accurate:true,onLoadError:fail});
+      if(resources&&typeof candidate.drawFrame==='function'){
+        const original=candidate.drawFrame,zeros=new Float32Array(resources.config.src.length*9);
+        candidate.drawFrame=function(...args){
+          // Tencent 1.0.5 retains the preceding image_pos when a sparse frame
+          // has no objects. Clear it before rendering so timed slots disappear.
+          const gl=this.gl;if(gl&&this.program){const loc=gl.getUniformLocation(this.program,'image_pos');if(loc!==null)gl.uniform1fv(loc,zeros);}
+          return original.apply(this,args);
+        };
+      }
+      candidate.play({...resources?.options,container:el,src:url,config:resources?.config||config,width,height,fps:config.info.fps,mute:true,loop:true,accurate:true,onLoadError:fail});
       if(token!==version||failed){canvas.remove();if(token===version&&failed){el.replaceChildren();sync();}return;}
       candidate.on('frame',()=>{
         if(token!==version||player!==candidate||playerState==='error')return;
@@ -76,5 +113,5 @@
   document.addEventListener('click',event=>{if(event.target.closest?.('#vapResultPlay'))toggle();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&player){requested=false;player.pause();sync();}});
   window.addEventListener('pagehide',destroy);
-  window.VapResultPlayer={mount,destroy,setLanguage:sync};
+  window.VapResultPlayer={mount,destroy,setLanguage:sync,getMissingTags:(config,tags)=>resourceBindings(config,tags).missing,updateTags:tags=>currentResult?mount({...currentResult,tags:{...currentResult.tags,...tags}}):Promise.resolve()};
 })();

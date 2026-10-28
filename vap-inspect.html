@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VAP 透明验收 · Fun Toolkit</title><link rel="icon" href="assets/spreadfun-mark.webp"><link rel="stylesheet" href="vap-inspect.css?v=20261027-paste-copy1"><link rel="stylesheet" href="design-system/upload-surface.css?v=1.4.4"><link rel="stylesheet" href="vap-player.css?v=20261026-play-icon1"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>VAP 透明验收 · Fun Toolkit</title><link rel="icon" href="assets/spreadfun-mark.webp"><link rel="stylesheet" href="vap-inspect.css?v=20261028-resources1"><link rel="stylesheet" href="design-system/upload-surface.css?v=1.4.4"><link rel="stylesheet" href="vap-player.css?v=20261026-play-icon1"></head>
 <body>
 <header><a class="brand" href="index.html#vap-tools"><img src="assets/spreadfun-mark.webp" width="40" height="40" alt=""><strong>Fun Toolkit</strong></a><a id="backLink" href="index.html#vap-tools">返回 VAP 工具</a><button id="language" type="button" aria-label="Switch language">EN</button></header>
 <main>
@@ -13,9 +13,10 @@
 <div id="vapResultPlayer" data-state="empty" hidden></div>
 </div>
 <div class="toolbar"><button id="vapResultPlay" type="button" class="primary" disabled>透明播放</button><div id="backgrounds" role="group" aria-label="预览背景"><button type="button" data-background="checker" aria-pressed="true">透明</button><button type="button" data-background="black" aria-pressed="false">黑</button><button type="button" data-background="white" aria-pressed="false">白</button></div></div>
+<section id="resourceBindings" class="resource-bindings" aria-labelledby="resourceTitle" hidden><div class="card-head"><h2 id="resourceTitle">替换播放资源</h2><button id="applyResources" type="button">应用资源</button></div><div id="resourceFields"></div><p id="resourceHint"></p></section>
 <p id="status" role="status" aria-live="polite">读取内嵌 Alpha，在本机播放，不会重新编码或上传文件。</p><p id="fileMeta" hidden></p>
 </section>
 <input id="fileInput" type="file" accept="video/mp4,.mp4" hidden>
 </main>
-<script src="upload-paste.js?v=20261027-paste-copy1"></script><script src="vap-player.js?v=20261026-rgb-feather1"></script><script type="module" src="vap-inspect.mjs?v=20261027-paste-copy1"></script>
+<script src="upload-paste.js?v=20261027-paste-copy1"></script><script src="vap-player.js?v=20261028-resources1"></script><script type="module" src="vap-inspect.mjs?v=20261028-resources1"></script>
 </body></html>

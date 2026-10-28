@@ -1,0 +1,66 @@
+/* Resource editing shares the VAP workbench controls and disclosure pattern. */
+#vapTool .vap-resources{min-width:0}
+#vapTool .vap-resource-mode,#vapTool .vap-resource-add,#vapTool .vap-resource-grid,#vapTool .vap-resource-choice-row,#vapTool .vap-resource-align{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+#vapTool .vap-resource-mode{margin-top:10px}
+#vapTool .vap-resource-add{margin-top:12px}
+#vapTool .vap-resource-add svg{fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+#vapTool .vap-resource-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:12px}
+#vapTool .vap-resource-list:empty{margin-top:0}
+#vapTool .vap-resource-item{display:flex;align-items:center;gap:8px;min-width:0;min-height:58px;padding:8px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tool-muted);font:inherit;text-align:left;cursor:pointer}
+#vapTool .vap-resource-item[aria-pressed=true]{border-color:#a8d0ff;background:#eaf3ff;color:var(--blue)}
+#vapTool .vap-resource-item>span:last-child{display:grid;gap:2px;min-width:0}
+#vapTool .vap-resource-item strong{font-size:12px;line-height:18px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#vapTool .vap-resource-item span span{font-size:11px;line-height:16px}
+#vapTool .vap-resource-thumb{display:flex;align-items:center;justify-content:center;width:32px;height:32px;flex:none;border-radius:6px;background:#edf2f8;color:#6787ad;font-weight:600;font-size:20px;overflow:hidden}
+#vapTool .vap-resource-thumb[data-shape=circle]{border-radius:50%}
+#vapTool .vap-resource-thumb img{width:100%;height:100%;object-fit:cover}
+#vapTool .vap-resource-fields{margin-top:14px;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--tool-bg,#f8fafc)}
+#vapTool .vap-resource-field-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;min-width:0}
+#vapTool .vap-resource-field-head>strong{min-width:0;overflow-wrap:anywhere;font-size:13px;line-height:20px;font-weight:600}
+#vapTool .vap-resource-field-head>.vap-button{min-height:36px;padding:6px 10px;font-size:12px;flex:none}
+#vapTool .vap-resource-field{display:grid;gap:7px;min-width:0}
+#vapTool .vap-resource-field>span{font-size:12px;line-height:20px;color:var(--tool-muted)}
+#vapTool .vap-resource-field input[type=text]{box-sizing:border-box;min-width:0;width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--tool-field-border,#8b95a5);border-radius:10px;background:#fff;color:var(--tool-heading);font:inherit;font-size:16px;line-height:22px}
+#vapTool .vap-resource-field input[type=color]{box-sizing:border-box;min-width:0;width:100%;height:44px;padding:6px;border:1px solid var(--tool-field-border,#8b95a5);border-radius:10px;background:#fff;cursor:pointer}
+#vapTool .vap-resource-field input[type=text]:focus{outline:2px solid var(--blue);outline-offset:2px}
+#vapTool .vap-resource-field input[type=text]:disabled{background:#edf0f4;color:#647083;cursor:not-allowed}
+#vapTool .vap-resource-image-fields,#vapTool .vap-resource-text-fields{margin-top:12px}
+#vapTool .vap-resource-image-fields>.vap-replace{width:100%;min-width:0}
+#vapTool .vap-resource-choice-row{margin-top:12px}
+#vapTool .vap-resource-choice-row>.vap-segments{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+#vapTool .vap-resource-choice-row button{padding-inline:8px}
+#vapTool .vap-resource-choice-row>.ft-select{align-self:stretch}
+#vapTool .vap-resource-choice-row select{height:100%;padding-left:10px;font-size:13px}
+#vapTool .vap-resource-image-fields .upload-paste-hint{display:block;margin-top:4px;color:var(--tool-muted);font-size:11px;line-height:18px}
+#vapTool .vap-resource-image-fields>.vap-hint{display:block;margin-top:8px;font-size:11px}
+#vapTool .vap-resource-grid{margin-top:12px}
+#vapTool .vap-resource-align{margin-top:10px}
+#vapTool .vap-resource-align button{font-size:12px}
+#vapTool .vap-resource-opacity{display:grid;grid-template-columns:minmax(0,1fr) auto;margin-top:12px;gap:4px 12px;align-items:center}
+#vapTool .vap-resource-opacity label,#vapTool .vap-resource-opacity output{font-size:12px;line-height:20px}
+#vapTool .vap-resource-opacity output{color:var(--blue);font-variant-numeric:tabular-nums}
+#vapTool .vap-resource-opacity input{grid-column:1/-1;margin-top:0}
+#vapTool .vap-resource-bound{margin:0 0 12px;color:#287647;font-size:11px;line-height:18px}
+#vapTool .vap-resource-overlay{position:absolute;z-index:4;pointer-events:none;box-sizing:border-box}
+#vapTool .vap-resource-box{position:absolute;box-sizing:border-box;min-height:0;min-width:0;padding:0;border:1px dashed #76b5ff;border-radius:0;background:transparent;pointer-events:auto;touch-action:none;cursor:move}
+#vapTool .vap-resource-box[aria-pressed=true]{border:2px solid #0071e3;box-shadow:0 0 0 1px #ffffffaa}
+#vapTool .vap-resource-box[data-shape=circle]{border-radius:50%}
+#vapTool .vap-resource-box[data-bound=true]{cursor:move}
+#vapTool .vap-resource-box:focus-visible{outline:2px solid #fff;outline-offset:3px;box-shadow:0 0 0 4px #0071e3}
+#vapTool .vap-resource-resize{position:absolute;z-index:5;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border:0;background:transparent;transform:translate(-50%,-50%);pointer-events:auto;touch-action:none;cursor:nwse-resize}
+#vapTool .vap-resource-resize[data-corner=ne],#vapTool .vap-resource-resize[data-corner=sw]{cursor:nesw-resize}
+#vapTool .vap-resource-resize:after{content:"";position:absolute;left:calc(50% + var(--pin-x,0px));top:calc(50% + var(--pin-y,0px));width:9px;height:9px;border:2px solid #fff;border-radius:2px;background:#0071e3;box-shadow:0 0 0 1px #0071e3;transform:translate(-50%,-50%);pointer-events:none}
+#vapTool .vap-resource-resize:focus-visible{outline:2px solid #0071e3;outline-offset:-7px;border-radius:7px}
+#vapTool .vap-resource-quickbar{position:absolute;z-index:6;display:flex;justify-content:center;flex-wrap:wrap;gap:4px;box-sizing:border-box;padding:5px;border:1px solid #d3e2f5;border-radius:12px;background:#ffffffed;backdrop-filter:blur(8px);box-shadow:0 4px 16px #19354e1a;pointer-events:auto}
+#vapTool .vap-resource-quickbar button,#vapTool .vap-resource-inline button{min-width:44px;min-height:44px;padding:8px;border:0;border-radius:7px;background:transparent;color:#526780;font:inherit;font-size:12px;line-height:20px;cursor:pointer}
+#vapTool .vap-resource-quickbar button:disabled{background:transparent;opacity:1;color:#a7b0bf}
+#vapTool .vap-resource-quickbar button[data-action=delete]{color:#b74132}
+#vapTool .vap-resource-preview-help{position:absolute;z-index:1;inset:auto 10px 5px;margin:0;padding:4px 6px;pointer-events:none;color:#566b85;background:#ffffffe3;border-radius:5px;font-size:10px;line-height:16px;text-align:center}
+#vapTool .vap-resource-inline{position:absolute;z-index:7;display:flex;gap:4px;box-sizing:border-box;padding:5px;border:1px solid #0071e3;border-radius:10px;background:#fff;box-shadow:0 5px 20px #163b6724;pointer-events:auto}
+#vapTool .vap-resource-inline input{min-width:0;flex:1;width:100%;min-height:44px;padding:7px;border:0;border-radius:6px;color:var(--tool-heading);background:#f1f6fd;font:inherit;font-size:16px;line-height:22px}
+#vapTool .vap-resource-inline button:first-of-type{background:#eaf3ff;color:#0071e3}
+#vapTool .vap-resource-inline input:focus-visible{outline:2px solid #0071e3;outline-offset:-2px}
+@media(hover:hover) and (pointer:fine){#vapTool .vap-resource-quickbar button:hover:not(:disabled),#vapTool .vap-resource-inline button:hover{background:#eaf3ff;color:#0071e3}}
+@media(hover:hover) and (pointer:fine){#vapTool .vap-resource-item:hover{border-color:#a8cfff;background:#f2f7ff;color:var(--blue)}#vapTool .vap-resource-field input[type=text]:hover:not(:disabled){border-color:#6296d0}}
+@media(max-width:540px){#vapTool .vap-resource-list{grid-template-columns:repeat(2,minmax(0,1fr))}#vapTool .vap-resource-fields{padding:12px}#vapTool .vap-resource-field-head>.vap-button{min-height:44px}#vapTool .vap-resource-choice-row{grid-template-columns:minmax(0,1fr)}#vapTool .vap-resource-mode button,#vapTool .vap-resource-add button{font-size:12px;padding-inline:8px}}
+@media(max-width:540px){#vapTool .vap-resource-quickbar{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))}#vapTool .vap-resource-quickbar button{min-width:44px;min-height:44px;padding:4px;font-size:11px;line-height:16px;overflow-wrap:anywhere}}

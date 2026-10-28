@@ -59,11 +59,11 @@ export function computeVapLayout({
 
 export function makeVapc({
   width = 720, height = 1560, fps = 24, frames = 240,
-  alphaScale = 0.5, gap = 8, orientation = 'horizontal',
+  alphaScale = 0.5, gap = 8, orientation = 'horizontal', packedLayout,
 } = {}) {
   checkInt('fps', fps, 1, 120);
   checkInt('frames', frames, 1, 100_000);
-  const layout = computeVapLayout({width, height, alphaScale, gap, orientation});
+  const layout = packedLayout || computeVapLayout({width, height, alphaScale, gap, orientation});
   const vapc = {
     info: {
       v: 2,
@@ -104,8 +104,8 @@ export function validateVapc(config) {
   if (i.videoW % 16 !== 0 || i.videoH % 16 !== 0) {
     throw new Error('reference exporter expects packed dimensions aligned to 16');
   }
-  if (i.isVapx !== 0 || i.orien !== 0) {
-    throw new Error('reference exporter supports simple non-Vapx / default orientation only');
+  if (![0, 1].includes(i.isVapx) || i.orien !== 0) {
+    throw new Error('VAP requires isVapx 0/1 and default orientation');
   }
   for (const key of ['rgbFrame', 'aFrame']) {
     const r = i[key];
@@ -119,6 +119,31 @@ export function validateVapc(config) {
     throw new Error('RGB rectangle must match visible content dimensions');
   }
   if (rectsOverlap(i.rgbFrame, i.aFrame)) throw new Error('RGB/alpha rectangles overlap');
+  if(i.isVapx===1){
+    if(!Array.isArray(config.src)||!config.src.length||config.src.length>64||!Array.isArray(config.frame)||config.frame.length>i.f) throw new Error('Vapx source/frame declarations missing or too large');
+    const ids=new Set(),tags=new Set();
+    for(const src of config.src){
+      if(!src||typeof src.srcId!=='string'||!src.srcId||src.srcId.length>64||ids.has(src.srcId)||typeof src.srcTag!=='string'||!src.srcTag||src.srcTag.length>200||tags.has(src.srcTag))throw new Error('Vapx source IDs and tags must be unique strings');
+      if(!['img','txt'].includes(src.srcType)||!['net','local'].includes(src.loadType))throw new Error('Unknown Vapx resource type');
+      checkInt('source.w',src.w,1,8192);checkInt('source.h',src.h,1,8192);ids.add(src.srcId);tags.add(src.srcTag);
+    }
+    const seen=new Set();
+    for(const frame of config.frame){
+      checkInt('frame.i',frame?.i,0,i.f-1);if(seen.has(frame.i))throw new Error('Duplicate Vapx frame index');seen.add(frame.i);
+      if(!Array.isArray(frame.obj)||frame.obj.length>config.src.length)throw new Error('Invalid Vapx frame objects');
+      const frameIds=new Set();
+      for(const obj of frame.obj){
+        if(!ids.has(obj?.srcId)||frameIds.has(obj.srcId))throw new Error('Unknown or duplicate Vapx source in frame');frameIds.add(obj.srcId);
+        checkInt('object.z',obj.z,0,100000);if(![0,90].includes(obj.mt))throw new Error('Unsupported Vapx mask transform');
+        for(const key of ['frame','mFrame']){
+          const r=obj[key];if(!Array.isArray(r)||r.length!==4)throw new Error('Invalid Vapx rectangle');
+          r.forEach((value,index)=>checkInt(`object.${key}[${index}]`,value,index<2?(key==='frame'?-16384:0):1,16384));
+        }
+        const m=obj.mFrame;
+        if(m[0]+m[2]>i.videoW||m[1]+m[3]>i.videoH||rectsOverlap(m,i.rgbFrame)||rectsOverlap(m,i.aFrame))throw new Error('Vapx resource mask overlaps base planes or exceeds video');
+      }
+    }
+  }
   return true;
 }
 
@@ -182,5 +207,33 @@ export function extractVapcBox(mp4Bytes) {
   const payload = mp4Bytes.subarray(box.offset + box.headerSize, box.offset + box.size);
   const config = JSON.parse(utf8Decoder.decode(payload));
   validateVapc(config);
+  return config;
+}
+
+/** Inspect only MP4 atom headers and the bounded vapc payload, not video bytes. */
+export async function readSourceVapConfig(blob,{maxJsonBytes=1_000_000}={}){
+  if(!(blob instanceof Blob)||!Number.isSafeInteger(blob.size)||blob.size<8||blob.size>200*1024*1024)throw new TypeError('Invalid MP4 source');
+  checkInt('maxJsonBytes',maxJsonBytes,1,1_000_000);
+  let offset=0,config=null;
+  while(offset<blob.size){
+    if(offset+8>blob.size)throw new Error('truncated MP4 box header');
+    const head=new Uint8Array(await blob.slice(offset,Math.min(blob.size,offset+16)).arrayBuffer());
+    const view=new DataView(head.buffer,head.byteOffset,head.byteLength);
+    let size=view.getUint32(0,false),headerSize=8;
+    const type=String.fromCharCode(...head.subarray(4,8));
+    if(size===1){
+      if(head.byteLength<16)throw new Error('truncated extended MP4 box');
+      const extended=view.getBigUint64(8,false);if(extended>BigInt(Number.MAX_SAFE_INTEGER))throw new Error('MP4 box too large');
+      size=Number(extended);headerSize=16;
+    }else if(size===0)size=blob.size-offset;
+    if(size<headerSize||size>blob.size-offset)throw new Error('invalid MP4 box size');
+    if(type==='vapc'){
+      if(config)throw new Error('duplicate vapc box');
+      if(size-headerSize>maxJsonBytes)throw new Error('vapc JSON exceeds configured limit');
+      config=JSON.parse(utf8Decoder.decode(await blob.slice(offset+headerSize,offset+size).arrayBuffer()));
+      validateVapc(config);
+    }
+    offset+=size;
+  }
   return config;
 }

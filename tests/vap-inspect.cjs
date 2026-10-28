@@ -9,6 +9,8 @@ const fs=require('node:fs/promises');
   const blob=new Blob([bytes],{type:'video/mp4'}),result=await readVapFile(blob);
   assert.strictEqual(result.blob,blob,'inspection preserves original encoded bytes');
   assert.deepEqual(result.config,extractVapcBox(new Uint8Array(bytes)));
+  const native=makeVapc({width:720,height:1560,fps:24,frames:48,alphaScale:.5});native.info.isVapx=1;native.src=[{srcId:'0',srcType:'img',srcTag:'tag1',w:64,h:64,loadType:'net',fitType:'fitXY'},{srcId:'1',srcType:'txt',srcTag:'[name]',w:140,h:32,color:'#ffffff',style:'b',loadType:'local',fitType:'fitXY'}];native.frame=[{i:0,obj:[{srcId:'0',z:0,frame:[40,80,64,64],mFrame:[728,800,64,64],mt:0}]}];native.funToolkit={resourceDefaults:{name:'测试昵称'}};
+  const nativeBytes=appendVapcBox(new Uint8Array(plain),native),nativeFile=new Blob([nativeBytes],{type:'video/mp4'}),nativeRead=await readVapFile(nativeFile);assert.equal(nativeRead.config.info.isVapx,1);assert.deepEqual(nativeRead.config.src,native.src);assert.deepEqual(nativeRead.config.frame,native.frame);assert.equal(nativeRead.config.funToolkit.resourceDefaults.name,'测试昵称');assert.strictEqual(nativeRead.blob,nativeFile,'inspection does not flatten animated resource tags or replace encoded source');
   for(const value of [null,{size:0},{size:200*1024*1024+1}])await assert.rejects(readVapFile(value),/file/);
   for(const value of [new Blob(['not mp4']),new Blob([bytes.subarray(0,bytes.length-20)])])await assert.rejects(readVapFile(value),/format/);
   await assert.rejects(readVapFile(new Blob([plain])),/format/);

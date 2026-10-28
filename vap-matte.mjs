@@ -1,3 +1,4 @@
+import {SCREEN_COLORS, classifyScreenColor, detectFrameScreen} from './vap-source-detection.mjs?v=20261028-anycolor1';
 // Local frame-to-alpha providers. No image, frame, or mask leaves this device.
 const clamp = value => Math.max(0, Math.min(1, value));
 const byte = value => Math.max(0, Math.min(255, Math.round(value)));
@@ -41,24 +42,34 @@ function recover(out,offset,r,g,b,alpha,background,originalAlpha){
   const rgb=[r,g,b];for(let c=0;c<3;c++)out[offset+c]=alpha>=.999?rgb[c]:byte((rgb[c]-(1-alpha)*background[c])/alpha);
   out[offset+3]=byte(alpha*originalAlpha);
 }
+function screenRgb(value){
+  if(!Array.isArray(value)||value.length!==3||!value.every(v=>Number.isInteger(v)&&v>=0&&v<=255))throw new Error('幕布颜色须为有效的 RGB 颜色。');
+  return value.slice();
+}
+const namedScreens=Object.freeze({red:[255,0,0],orange:[255,128,0],yellow:[255,255,0],green:[0,255,0],cyan:[0,255,255],blue:[0,0,255],magenta:[255,0,255]});
+function screenOption(color,background){
+  if(color!=='auto'&&!SCREEN_COLORS.includes(color))throw new Error('请选择有效的幕布颜色。');
+  if(background!==undefined){const rgb=screenRgb(background);return {color:color==='auto'||color==='custom'?classifyScreenColor(rgb):color,background:rgb,confidence:1};}
+  if(color==='custom')throw new Error('自定义幕布需要提供 RGB 颜色。');
+  return null;
+}
 function chromaPixels(data,width,height,screen,tolerance,softness,despill){
-  const count=width*height,bg=screen.background,keyChannel=screen.color==='green'?1:2;
+  const count=width*height,bg=screen.background,mean=(bg[0]+bg[1]+bg[2])/3,hue=bg.map(v=>v-mean),hueLength=Math.hypot(...hue),unit=hue.map(v=>hueLength?v/hueLength:0);
   const alpha=new Float32Array(count),reference=new Int32Array(count),distance=new Uint16Array(count),out=new Uint8ClampedArray(data.length);
   reference.fill(-1);distance.fill(65535);
   const noise=.001+tolerance*.008,noiseBytes=1+tolerance*8;
   for(let p=0;p<count;p++){
     const o=p*4,r=data[o],g=data[o+1],b=data[o+2];let minimum=0;
-    // The small red/blue components of a green plate can move by several codec
-    // levels. Dividing their downward noise by a near-zero plate channel would
-    // invent a high-alpha rectangle. Use the dominant channel's downward bound
-    // and the other channels' upward bounds instead.
-    for(let c=0;c<3;c++){const value=data[o+c];if(c===keyChannel&&bg[c]>0)minimum=Math.max(minimum,1-(value+noiseBytes)/bg[c]);else if(c!==keyChannel&&bg[c]<255)minimum=Math.max(minimum,(value-noiseBytes-bg[c])/(255-bg[c]));}minimum=clamp(minimum);
+    // Every well-conditioned channel constrains the same compositing equation.
+    // Ignore only tiny denominators: codec noise in a near-zero plate channel
+    // must not invent an opaque patch. This also supports two-high-channel hues.
+    for(let c=0;c<3;c++){const value=data[o+c];if(bg[c]>=32)minimum=Math.max(minimum,1-(value+noiseBytes)/bg[c]);if(255-bg[c]>=32)minimum=Math.max(minimum,(value-noiseBytes-bg[c])/(255-bg[c]));}minimum=clamp(minimum);
     if(minimum<=noise||data[o+3]===0)continue;
     alpha[p]=minimum;
-    const channel=data[o+keyChannel],other=keyChannel===1?Math.max(r,b):Math.max(r,g),spread=Math.max(r,g,b)-Math.min(r,g,b);
-    // Confident non-screen colours anchor the colour of nearby mixed pixels.
-    // Neutral dark material is an opaque foreground anchor too.
-    if(minimum>=.85||(channel-other< -65&&minimum>.3)||(spread<10&&Math.max(r,g,b)<80&&minimum>.4)){reference[p]=p;distance[p]=0;}
+    const spread=Math.max(r,g,b)-Math.min(r,g,b),average=(r+g+b)/3,projection=(r-average)*unit[0]+(g-average)*unit[1]+(b-average)*unit[2],chroma=Math.hypot(r-average,g-average,b-average);
+    // Distinct hues and solid neutrals anchor nearby mixed pixels. A red plate
+    // must preserve a green subject just as a blue plate preserves a red one.
+    if(minimum>=.85||(spread>40&&projection<chroma*.2&&minimum>.3)||(spread<10&&minimum>.4)||(Math.max(r,g,b)<80&&minimum>.4)){reference[p]=p;distance[p]=0;}
   }
   // ponytail: bound colour propagation to 64 pixels. Detached effects retain
   // physical alpha; a wider/GPU distance field needs its own quality baseline.
@@ -70,25 +81,25 @@ function chromaPixels(data,width,height,screen,tolerance,softness,despill){
     if(a>0){
       if(reference[p]===p)a=1;
       else if(reference[p]>=0){const r=reference[p]*4;let numerator=0,denominator=0;for(let c=0;c<3;c++){const foreground=data[r+c]-bg[c];numerator+=(data[o+c]-bg[c])*foreground;denominator+=foreground*foreground;}if(denominator>16)a=Math.max(a,clamp(numerator/denominator));}
-      // Suppress codec-level screen noise, without widening the cut into the
-      // visible soft ribbon, hair, or independent coloured particles.
+      // Suppress only codec-level screen noise. Soft ribbons and independent
+      // particles retain continuous alpha instead of a binary colour cut.
       a*=smooth(noise,noise*2,a);a=Math.pow(a,1+softness*.5);
     }
     recover(out,o,data[o],data[o+1],data[o+2],a,bg,data[o+3]);
-    if(a>0&&a<.999){const other=keyChannel===1?Math.max(out[o],out[o+2]):Math.max(out[o],out[o+1]);out[o+keyChannel]=byte(out[o+keyChannel]-Math.max(0,out[o+keyChannel]-other)*despill*(1-a));}
+    if(a>0&&a<.999&&hueLength>0){
+      const average=(out[o]+out[o+1]+out[o+2])/3,excess=Math.max(0,(out[o]-average)*unit[0]+(out[o+1]-average)*unit[1]+(out[o+2]-average)*unit[2]);
+      for(let c=0;c<3;c++)out[o+c]=byte(out[o+c]-unit[c]*excess*despill*(1-a));
+    }
   }
   return out;
 }
 
-/** Estimate from the outer border only; a manual green/blue selection stays authoritative. */
+/** Estimate the actual border RGB; manual hue overrides remain authoritative. */
 export function detectScreenColor(data,width,height,requested='auto'){
-  pixels(data,width,height);if(!['auto','green','blue'].includes(requested))throw new Error('请选择自动、绿色或蓝色幕。');
-  const samples=[],step=Math.max(1,Math.floor(Math.min(width,height)/32));let green=0,blue=0;
-  for(let y=0;y<height;y+=step)for(let x=0;x<width;x+=step){if(x>width*.08&&x<width*.92&&y>height*.08&&y<height*.92)continue;const o=(y*width+x)*4;if(data[o+3]<16)continue;const r=data[o],g=data[o+1],b=data[o+2];samples.push([r,g,b]);green+=Math.max(0,g-Math.max(r,b));blue+=Math.max(0,b-Math.max(r,g));}
-  const color=requested==='auto'?(blue>green?'blue':'green'):requested,channel=color==='green'?1:2;
-  const matching=samples.filter(rgb=>rgb[channel]-Math.max(...rgb.filter((_,i)=>i!==channel))>12);
-  const background=matching.length<3?(color==='green'?[0,255,0]:[0,0,255]):[0,1,2].map(c=>{const values=matching.map(rgb=>rgb[c]).sort((a,b)=>a-b);return values[Math.floor(values.length/2)];});
-  return {color,background,confidence:matching.length/Math.max(1,samples.length)};
+  pixels(data,width,height);screenOption(requested);
+  const detected=detectFrameScreen({data,width,height});
+  if(detected&&(requested==='auto'||detected.color===requested))return detected;
+  return requested==='auto'?null:{color:requested,background:namedScreens[requested].slice(),confidence:0};
 }
 
 /** Straight RGB + alpha, shared by live preview and the exported packed frame. */
@@ -96,7 +107,8 @@ export function keyPixels(data,width,height,{matteMethod='black_luma',keyToleran
   pixels(data,width,height);if(!['black_luma','white_luma','chroma_key','opaque'].includes(matteMethod))throw new Error('此抠像方式需要独立的本地模型或遮罩。');
   const out=new Uint8ClampedArray(data.length),tolerance=setting(keyTolerance,.25),softness=setting(edgeSoftness,.08),despill=setting(spill,.7);
   if(matteMethod==='opaque'){out.set(data);return out;}
-  const screen=matteMethod==='chroma_key'?(background?{color:screenColor==='blue'?'blue':'green',background}:detectScreenColor(data,width,height,screenColor)):null;
+  const screen=matteMethod==='chroma_key'?(screenOption(screenColor,background)||detectScreenColor(data,width,height,screenColor)):null;
+  if(matteMethod==='chroma_key'&&!screen)return data.slice();
   const bg=screen?.background||(matteMethod==='white_luma'?[255,255,255]:[0,0,0]);
   if(screen)return chromaPixels(data,width,height,screen,tolerance,softness,despill);
   for(let o=0;o<data.length;o+=4){
@@ -162,13 +174,14 @@ async function personSegmenter(options){
 export async function createMatteProcessor(options={}){
   const method=options.sourceKind==='chroma_mp4'?'chroma_key':options.matteMethod||'black_luma';
   if(!methods.has(method))throw new Error('请选择有效的抠像方式。');
-  if(options.sourceKind==='chroma_mp4'&&options.matteMethod&&options.matteMethod!=='chroma_key')throw new Error('绿蓝幕输入需要使用色键抠像。');
+  if(options.sourceKind==='chroma_mp4'&&options.matteMethod&&options.matteMethod!=='chroma_key')throw new Error('纯色幕输入需要使用色键抠像。');
   if(method==='opaque'&&options.confirmedOpaque!==true)throw new Error('保留原背景会生成不透明 VAP，请先确认。');
+  const suppliedScreen=method==='chroma_key'?screenOption(options.screenColor||'auto',options.background):null;
   const verticalMask=normalizeVerticalMask(options.verticalMask);
-  const input=canvas(1,1),maskSurface=canvas(1,1);let mask=null,ai=null,disposed=false,lastTime=-1,screen=null,previous=null,previousTime=-1;
+  const input=canvas(1,1),maskSurface=canvas(1,1);let mask=null,ai=null,disposed=false,lastTime=-1,screen=suppliedScreen,previous=null,previousTime=-1;
   try{if(method==='manual_mask')mask=await maskSource(options.maskFile);if(method==='ai_foreground')ai=await personSegmenter(options);abort(options.signal);}
   catch(error){mask?.dispose();ai?.task?.close();throw error;}
-  const processor={backend:ai?.backend||'cpu',scope:method==='ai_foreground'?'person':null,detectedScreen:null,
+  const processor={backend:ai?.backend||'cpu',scope:method==='ai_foreground'?'person':null,detectedScreen:suppliedScreen,
     async process(source,{timestamp=0,width=source.width||source.videoWidth,height=source.height||source.videoHeight,verticalMask:frameMask}={}){
       if(disposed)throw new Error('抠像任务已结束。');abort(options.signal);dimensions(width,height);if(!Number.isFinite(timestamp)||timestamp<0)throw new Error('视频帧时间无效。');
       const activeVerticalMask=frameMask===undefined?verticalMask:normalizeVerticalMask(frameMask);

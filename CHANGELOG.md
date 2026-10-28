@@ -1,5 +1,24 @@
 # 更新记录
 
+## 1.5.0 - 2026-10-28
+
+### VAP resources and direct preview editing
+
+- Add avatar and text resources for runtime tag replacement or fixed composition. Import native VAP slots while retaining their animated positions and masks.
+- Drag resources and resize from corner handles; preserve aspect ratio by default or hold Shift for free resize. Double-click to edit text or replace an image, with centering, duplication, deletion, undo and redo directly in the preview.
+
+### Colored screens and image sequences
+
+- Detect solid red, orange, yellow, green, cyan, blue, magenta and other colored plates. Preview and export share the sampled RGB; uncertain scenes retain their original pixels.
+- Import PNG, WebP or JPG frames, or one ZIP, in numeric filename order. Preserve native alpha with optional vertical fades and encode on-device without an intermediate MP4.
+- Add 1, 2 and 3 MB presets plus custom limits. Enforce the selected cap during encoding and MP4/ZIP download while retaining output dimensions, frame rate and alpha settings.
+
+### Validation and limits
+
+- Passed 27 JavaScript regression suites and the production build, plus real dynamic/baked-resource, colored-screen and main-page sequence import/export checks.
+- On this Mac, a 72-frame, three-second PNG sequence at 720x1560, 24 FPS and half-resolution alpha converted in approximately 1.64, 1.47 and 1.45 seconds across the three caps. Actual downloads passed 138 decoded-media and five ZIP consistency checks.
+- Timing applies to the measured fixture, not every input or device. Smaller budgets constrain image quality. Web playback does not certify mobile SDK compatibility, and a composited plate cannot uniquely reveal identical-color subject details or the original semitransparent RGBA.
+
 ## 1.4.0 - 2026-10-27
 
 ### Clipboard uploads
