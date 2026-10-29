@@ -67,12 +67,23 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
   const unknown=new TestFile(['svga'],'animation',{type:'application/octet-stream'});
   const namedWrongExtension=new TestFile(['image'],'original.txt',{type:'image/png'});
   names.paste({files:[unnamed,emptyName,unknown,namedWrongExtension]});
-  assert.equal(received[0].name,'pasted-image.png');assert.equal(received[0].type,'image/png');assert.equal(received[0].lastModified,9876);assert.deepEqual(new Uint8Array(await received[0].arrayBuffer()),new Uint8Array(await unnamed.arrayBuffer()));
-  assert.equal(received[1].name,'pasted-video.mp4');assert.equal(received[1].lastModified,8765);assert.equal(await received[1].text(),'video');
+  assert.equal(received[0].name,'pasted-image-001.png');assert.equal(received[0].type,'image/png');assert.equal(received[0].lastModified,9876);assert.deepEqual(new Uint8Array(await received[0].arrayBuffer()),new Uint8Array(await unnamed.arrayBuffer()));
+  assert.equal(received[1].name,'pasted-video-002.mp4');assert.equal(received[1].lastModified,8765);assert.equal(await received[1].text(),'video');
   assert.equal(received[2],unknown,'unknown MIME and unnamed SVGA are not relabelled');assert.equal(received[3],namedWrongExtension,'an existing extension is preserved for the tool validator');
+  names.paste({files:[unnamed]});assert.equal(received.at(-1).name,'pasted-image.png','single image paste retains the existing generated name');
+  names.paste({files:[emptyName]});assert.equal(received.at(-1).name,'pasted-video.mp4','single video paste retains the existing generated name');
   for(const [type,ext] of [['image/jpeg','jpg'],['image/webp','webp']]){names.paste({files:[new TestFile(['x'],'image',{type})]});assert.equal(received.at(-1).name,'pasted-image.'+ext);}
+  const frames=harness(),batches=[];frames.api.register({zone:new Element(),onFiles:files=>batches.push(files)});
+  const pngFrames=[new TestFile(['first'],'image',{type:'image/png',lastModified:301}),new TestFile(['second'],'',{type:'image/png',lastModified:302}),new TestFile(['third'],'frame3',{type:'image/png',lastModified:303})];
+  frames.paste({files:pngFrames});
+  assert.deepEqual(Array.from(batches[0],file=>file.name),['pasted-image-001.png','pasted-image-002.png','pasted-image-003.png'],'multiple generated PNG names are distinct and preserve clipboard order');
+  assert.equal(new Set(batches[0].map(file=>file.name)).size,pngFrames.length);
+  for(let index=0;index<pngFrames.length;index++){assert.equal(await batches[0][index].text(),await pngFrames[index].text());assert.equal(batches[0][index].lastModified,pngFrames[index].lastModified);assert.equal(pngFrames[index].name,['image','','frame3'][index],'original clipboard objects are unchanged');}
+  frames.paste({items:pngFrames.map(file=>({kind:'file',getAsFile:()=>file}))});
+  assert.deepEqual(Array.from(batches[1],file=>file.name),Array.from(batches[0],file=>file.name),'item fallback uses the same stable generated names');
+  frames.paste({files:[png,png]});assert.equal(batches[2][0],png);assert.equal(batches[2][1],png);assert.deepEqual(Array.from(batches[2],file=>file.name),['known.png','known.png'],'genuine named duplicates remain unchanged for sequence validation');
   const failures=harness();failures.api.register({zone:new Element(),onFiles(){throw Error('sync failure');}});failures.paste({files:[png]});assert.equal(failures.errors.length,1);
   const rejected=harness();rejected.api.register({zone:new Element(),onFiles:()=>Promise.reject(Error('async failure'))});rejected.paste({files:[png]});await flush();assert.equal(rejected.errors.length,1,'async failures are reported without unhandled rejections');
   assert.throws(()=>h.api.register({zone:first,onFiles:null}),/requires/);
-  console.log('upload-paste: file/item snapshots, route/focus/nested-zone selection, editable/shadow/modal/hidden guards, busy/unregister, safe clipboard filenames/bytes and callback failures passed. Native clipboard availability requires browser checks.');
+  console.log('upload-paste: file/item snapshots, route/focus/nested-zone selection, editable/shadow/modal/hidden guards, busy/unregister, single generated-name compatibility, stable distinct multi-file generated names with byte/order/date preservation, genuine named duplicate identity and callback failures passed. Native clipboard availability requires browser checks.');
 })().catch(error=>{console.error(error);process.exitCode=1});

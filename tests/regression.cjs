@@ -11,6 +11,8 @@ const events = [], feedback = [], reveals = [], preparedImages = [];
 const latestFeedback = () => feedback.at(-1);
 const recorded = type => events.filter(event=>event.tool==='room'&&event.type===type).reduce((total,event)=>total+event.count,0);
 let serial = 0, clicks = 0;
+const losslessEncodes = [];
+let losslessEncode = async()=>new Blob([new Uint8Array(100)],{type:'image/webp'});
 const cleanupTimers=[];
 function element() {
   const classes = new Set(), listeners = new Map();
@@ -21,7 +23,7 @@ function element() {
     setAttribute(k,v){this[k]=v}, removeAttribute(k){delete this[k]}, addEventListener(k,fn){listeners.set(k,fn)}, append(...xs){this.children.push(...xs)}, replaceChildren(...xs){this.innerHTML='';this.children=xs}, remove(){}, click(){clicks++;listeners.get('click')?.({button:0,defaultPrevented:false,target:this})},
     querySelectorAll(){return []}, showModal(){this.open=true}, close(){this.open=false},
     getContext(){return {clearRect(){},drawImage(){}}},
-    toBlob(callback,type){callback(new Blob([new Uint8Array(100)],{type}))}
+    toBlob(){throw Error('Room WebP exports must use the shared lossless encoder')}
   };
 }
 const document = {documentElement:{}, body:element(), querySelector(selector){if(!elements.has(selector))elements.set(selector,element());return elements.get(selector)}, querySelectorAll(){return []},createElement:element};
@@ -29,7 +31,7 @@ class MockImage {
   constructor(){this.width=900;this.height=1600;this.naturalWidth=900;this.naturalHeight=1600;this.complete=true}
   set src(value){this.url=value;queueMicrotask(()=>{if(urls.get(value)?.name==='broken.png')this.onerror?.();else this.onload?.()})}
 }
-const sandbox = {window:{FunToolkitUI:{setState(tool,value){assert.equal(tool,'room');feedback.push({...value})},reveal(target){reveals.push(target)},prepareImages(target){preparedImages.push(target)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},document, Image:MockImage, Blob, TextEncoder, Uint8Array, DataView, Set, Promise, Math, Number, String, Array,
+const sandbox = {canvasToLosslessWebP:async(...args)=>{assert.equal(args.length,1,'lossless exports must not pass a lossy quality setting');losslessEncodes.push(args[0]);return losslessEncode(...args)},window:{FunToolkitUI:{setState(tool,value){assert.equal(tool,'room');feedback.push({...value})},reveal(target){reveals.push(target)},prepareImages(target){preparedImages.push(target)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},document, Image:MockImage, Blob, TextEncoder, Uint8Array, DataView, Set, Promise, Math, Number, String, Array,
   localStorage:{getItem:key=>stats.get(key),setItem:(key,value)=>stats.set(key,value)},
   URL:{createObjectURL(blob){const value='blob:'+ ++serial;urls.set(value,blob);return value},revokeObjectURL(value){urls.delete(value)}},
   setTimeout(fn,delay){if(delay<60000)queueMicrotask(fn);else cleanupTimers.push(fn)}, console};
@@ -38,27 +40,18 @@ const run = source => vm.runInContext(source,sandbox);
 (async()=>{
   await run('fgReady');
   assert.equal(latestFeedback().phase,'empty','the untouched room tool starts in the shared empty state');
-  // A small WebP needs one maximum-quality encode; complex images keep the full search.
-  const maxBytes=120*1024,qualities=[];
-  sandbox.limitCanvas={toBlob(callback,type,quality){qualities.push(quality);callback(new Blob([new Uint8Array(maxBytes)],{type}))}};
-  const exactLimit=await run(`encodeUnderLimit(limitCanvas,${maxBytes})`);
-  assert.equal(exactLimit.size,maxBytes,'the exact 120 KiB boundary is valid');
-  assert.deepEqual(qualities,[.92],'an already-small image must skip all 11 search encodes');
-  qualities.length=0;
-  sandbox.limitCanvas={toBlob(callback,type,quality){qualities.push(quality);callback(new Blob([new Uint8Array(Math.round(1000+quality*200000))],{type}))}};
-  const complex=await run(`encodeUnderLimit(limitCanvas,${maxBytes})`);
-  assert.equal(qualities.length,12,'an oversized maximum-quality image keeps all 11 binary-search encodes');
-  assert.equal(qualities[0],.92);
-  assert.ok(complex.size<=maxBytes,'binary-search output must satisfy the strict byte limit');
-  assert.equal(complex.size,Math.max(...qualities.map(quality=>Math.round(1000+quality*200000)).filter(size=>size<=maxBytes)),'keep the highest successful quality from the search');
-  qualities.length=0;
-  sandbox.limitCanvas={toBlob(callback,type,quality){qualities.push(quality);callback(new Blob([new Uint8Array(maxBytes+1)],{type}))}};
-  await assert.rejects(run(`encodeUnderLimit(limitCanvas,${maxBytes})`),/120 KB/,'an image that cannot fit must fail instead of exceeding the limit');
-  assert.equal(qualities.length,13);assert.equal(qualities.at(-1),.001,'retain the last-resort lowest-quality check');
-  sandbox.limitCanvas={toBlob(){throw Error('encoder unavailable')}};
-  await assert.rejects(run(`encodeUnderLimit(limitCanvas,${maxBytes})`),/encoder unavailable/);
-  sandbox.limitCanvas={toBlob(callback){callback(new Blob(['wrong format'],{type:'image/png'}))}};
-  await assert.rejects(run(`encodeUnderLimit(limitCanvas,${maxBytes})`),/WebP encoding unavailable/);
+  // Both room sizes preserve pixels through the shared lossless encoder, even above the former byte cap.
+  assert.doesNotMatch(code,/canvasToWebP|encodeUnderLimit|120 KB/,'room exports must not expose the former lossy byte-cap path');
+  const oversizedLossless=new Blob([new Uint8Array(120*1024+1)],{type:'image/webp'});
+  losslessEncode=async()=>oversizedLossless;
+  assert.equal(await run('exportCanvas(new Image(),720,1560)'),oversizedLossless,'full-size exports must retain the lossless result above the former cap');
+  assert.equal(await run('exportCanvas(new Image(),300,480)'),oversizedLossless,'small-size exports must retain the lossless result');
+  assert.deepEqual(losslessEncodes.map(canvas=>[canvas.width,canvas.height]),[[720,1560],[300,480]],'encode each requested size exactly once');
+  losslessEncode=async()=>{throw Error('encoder unavailable')};
+  await assert.rejects(run('exportCanvas(new Image(),720,1560)'),/encoder unavailable/,'encoding failure must not fall back to native lossy WebP');
+  assert.equal(losslessEncodes.length,3);
+  losslessEncode=async()=>new Blob([new Uint8Array(100)],{type:'image/webp'});
+  losslessEncodes.length=0;
   run('downloadAll()');assert.equal(run('downloadNotice.state'),'empty');
   assert.equal(events.length,0,'empty downloads and initial previews must not count');
   // FileList is live: clearing the input after onchange must not truncate an async import.
@@ -172,5 +165,5 @@ const run = source => vm.runInContext(source,sandbox);
   assert.equal(new DataView(crcVector.buffer).getUint32(14,true),0xcbf43926,'CRC32 must match the standard 123456789 check vector');
   const emptyVector=new Uint8Array(await run('zipBytes([{name:"empty.webp",bytes:new Uint8Array()}])').arrayBuffer());
   assert.equal(new DataView(emptyVector.buffer).getUint32(14,true),0,'an empty payload has CRC32 zero');
-  console.log('PASS: bounded parallel workers/drain on failure, ordered commits and retry counts, unchanged-output/crop cache reuse, WebP fast path/byte limit, live FileList, loading/processing/success and durable errors, corrupt files, crop rollback, shared thumbnail/reveal hooks, language phase retention, downloads, empty reset, ZIP and generation/download count boundaries.');
+  console.log('PASS: bounded parallel workers/drain on failure, ordered commits and retry counts, unchanged-output/crop cache reuse, shared lossless WebP without a lossy byte cap, live FileList, loading/processing/success and durable errors, corrupt files, crop rollback, shared thumbnail/reveal hooks, language phase retention, downloads, empty reset, ZIP and generation/download count boundaries.');
 })().catch(error=>{console.error(error);process.exitCode=1});

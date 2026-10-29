@@ -9,6 +9,6 @@ Pinned source: `@jsquash/webp` 1.5.0, from the npm registry.
 Only the non-SIMD encoder, its Wasm binary and option defaults are included.
 `webp_enc.js` and `meta.js` have been renamed to `.mjs` without changing their contents.
 The local wrapper uses lossless mode, no near-lossless preprocessing, exact transparent RGB and lossless alpha.
-No CDN or external upload is used at runtime. The codec is loaded on the first Banner upload.
+No CDN or external upload is used at runtime. The shared codec is loaded on the first image export, with a local module worker when available. All image tools use the same exact-lossless settings. A bounded search compares three compression-effort presets and retains the smallest actual result; it never lowers image fidelity or silently falls back to a lossy browser encoder. This optimizes the rendered output pixels; source decoding and crop/resize happen first.
 
 Licenses: Apache-2.0 in `LICENSE`; Google codec license in `LICENSE.codec.md`.

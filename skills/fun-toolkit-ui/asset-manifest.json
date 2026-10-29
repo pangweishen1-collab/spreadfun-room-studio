@@ -70,8 +70,8 @@
     },
     {
       "path": "assets/tool-page-starter/README.md",
-      "sha256": "d65bda88cff3f7aea890fc91be91062a0ff7f6dcaf651812b0ed8ff8e9fd636c",
-      "bytes": 4549
+      "sha256": "bf14e23311bb5aac0401de05cde3676a794f85b29b97d7bb4043a5030a76ddbd",
+      "bytes": 4489
     },
     {
       "path": "assets/tool-page-starter/assets/author-profile.webp",
@@ -155,8 +155,8 @@
     },
     {
       "path": "assets/tool-page-starter/index.html",
-      "sha256": "6aa3c301ee8d0cc9d95c20394d79b318bb41cc469b60a9f22a0dfd481939757a",
-      "bytes": 9793
+      "sha256": "fe163daaed3b1a0dfce99932ddb2d48b12b03b27afab3adef02c5c93164a8c26",
+      "bytes": 9706
     },
     {
       "path": "assets/tool-page-starter/motion-patterns.css",
@@ -216,8 +216,8 @@
     },
     {
       "path": "references/acceptance.md",
-      "sha256": "30e80cd4917f30f2e866eadfadd87fbef0f122f08146688129bad2f0fd411f1d",
-      "bytes": 4820
+      "sha256": "03cc5c0a5698b8c45a5009cec47bfcdcad35cebadfe55217699affd5460f8d11",
+      "bytes": 5107
     },
     {
       "path": "references/feedback-states.md",
@@ -246,8 +246,8 @@
     },
     {
       "path": "references/tool-page-framework.md",
-      "sha256": "3a7632f72ceda79d7b367d8210e869d28c3d314a364536909bb50d59c1cc188d",
-      "bytes": 17269
+      "sha256": "e5e4ffd6013d8a889c4c9cc6acecc960363a03ea6e61a343a1a94b422c4ee974",
+      "bytes": 18923
     },
     {
       "path": "references/validation.md",

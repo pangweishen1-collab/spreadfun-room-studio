@@ -9,10 +9,14 @@ const natural=new Intl.Collator('en',{numeric:true,sensitivity:'base'});
 function fpsCheck(fps){if(!Number.isInteger(fps)||fps<1||fps>60)throw fail('invalid','帧率须为 1–60 的整数。');return fps;}
 function sizeCheck(width,height){if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||width>4096||height>4096||width*height>8388608)throw fail('limits','序列帧最长边不能超过 4096px，单帧不能超过 800 万像素。');}
 function imageType(name){const ext=name.split('.').pop().toLowerCase();return ext==='png'?'image/png':ext==='webp'?'image/webp':'image/jpeg';}
-async function imageDimensions(file,name){
-  // ponytail: cap header probing at 256 KiB; unusually large JPEG metadata must
-  // be stripped before import instead of scanning an unbounded image header.
-  const bytes=new Uint8Array(await file.slice(0,262144).arrayBuffer()),view=new DataView(bytes.buffer);let w=0,h=0;
+async function imageDimensions(file,name,signal){
+  // PNG/WebP dimensions fit in 32 bytes. Sniff the actual magic before falling
+  // back to a bounded JPEG scan, including files with a mistaken extension.
+  let bytes=new Uint8Array(await file.slice(0,32).arrayBuffer());abort(signal);
+  // Unusually large JPEG metadata must be stripped rather than scanned without
+  // a bound. Only JPEG needs the larger read.
+  if(bytes.length>=2&&bytes[0]===0xff&&bytes[1]===0xd8&&file.size>32){bytes=new Uint8Array(await file.slice(0,262144).arrayBuffer());abort(signal);}
+  const view=new DataView(bytes.buffer);let w=0,h=0;
   if(bytes.length>=24&&view.getUint32(0)===0x89504e47&&view.getUint32(4)===0x0d0a1a0a&&view.getUint32(12)===0x49484452){w=view.getUint32(16);h=view.getUint32(20);}
   else if(bytes.length>=30&&view.getUint32(0)===0x52494646&&view.getUint32(8)===0x57454250){
     const kind=view.getUint32(12);
@@ -96,7 +100,7 @@ export async function inspectImageSequence(files,{fps=24,signal,Zip,onProgress=(
   const seen=new Set();let dimensions;
   for(let i=0;i<frames.length;i++){
     abort(signal);const frame=frames[i],key=frame.name.normalize('NFC').toLowerCase();if(seen.has(key))throw fail('file','序列帧文件名重复：'+frame.name);seen.add(key);
-    const shape=await imageDimensions(frame.file,frame.name);abort(signal);dimensions ||= shape;
+    const shape=await imageDimensions(frame.file,frame.name,signal);abort(signal);dimensions ||= shape;
     if(shape.width!==dimensions.width||shape.height!==dimensions.height)throw fail('file','所有序列帧的宽高必须一致：'+frame.name);
     onProgress({phase:'loading',progress:(fromZip?.5:0)+(fromZip?.5:1)*(i+1)/frames.length});
   }

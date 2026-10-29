@@ -71,6 +71,16 @@ const {pathToFileURL}=require('node:url');
     const straight=structuredClone(native);straight.funToolkit={rgbAlphaMode:'straight'};assert.equal(R.unpackVapFrame(packed,{width:4,height:4,sourceVapConfig:straight}).data[0],100);
     const renderer=await R.createResourceRenderer(bound,{width:4,height:4,duration:2,sourceVapConfig:native});
     const zero=new Data(new Uint8ClampedArray(4*4*4),4,4),result=renderer.apply(zero,0,{sourceCanvas:packed});assert.equal(result.data[(1*4+1)*4+3],64,'bound source mask x layer opacity are applied exactly once');assert.equal(result.data[3],0);
+    for(const [resourceOpacity,expected] of [[0,0],[.5,32],[1,64]]){
+      const faded=renderer.apply(zero,0,{sourceCanvas:packed,resourceOpacity});
+      assert.equal(faded.data[(1*4+1)*4+3],expected,'per-call opacity multiplies the native resource mask without changing its source or slot');
+      assert.equal(faded.data[3],0);
+      if(resourceOpacity)assert.deepEqual([...faded.data.slice((1*4+1)*4,(1*4+1)*4+3)],[240,180,100],'resource fade changes alpha, not texture color');
+    }
+    const fadedDraw=new Canvas(4,4);renderer.draw(fadedDraw.getContext('2d'),0,{sourceCanvas:packed,resourceOpacity:.5});assert.equal(fadedDraw.data[(1*4+1)*4+3],32,'draw accepts the same scalar used by apply');
+    for(const resourceOpacity of [NaN,Infinity,-.01,1.01,null,'0.5'])assert.throws(()=>renderer.apply(zero,0,{sourceCanvas:packed,resourceOpacity}),/opacity/);
+    assert.equal(renderer.apply(zero,0,{sourceCanvas:packed}).data[(1*4+1)*4+3],64,'per-call fade does not persist into later resource previews');
+    const preservedMask=new Canvas(layout.videoW,layout.videoH);renderer.drawMasks(preservedMask.getContext('2d'),layout,0,packed);const [mx,my]=layout.resourceMasks.name;assert.equal(preservedMask.data[(my*preservedMask.width+mx)*4],64,'packed resource masks retain their existing default opacity for the engine to fade after drawing');
     const absent=renderer.apply(zero,1/24,{sourceCanvas:packed});assert(absent.data.every(v=>v===0),'no slot content leaks into inactive frames');assert.deepEqual(await renderer.getPlayerTags(),{userName:'你好'});renderer.dispose();
     const copiesRenderer=await R.createResourceRenderer(nativeCopies,{width:8,height:8,duration:2,sourceVapConfig:native}),copiesPacked=new Canvas(copiesLayout.videoW,copiesLayout.videoH);copiesRenderer.drawMasks(copiesPacked.getContext('2d'),copiesLayout,0,packed);const [cx,cy]=copiesLayout.resourceMasks[nativeCopies[0].id],[dx,dy]=copiesLayout.resourceMasks[nativeCopies[1].id];assert.equal(copiesPacked.data[(cy*copiesPacked.width+cx)*4],64);assert.equal(copiesPacked.data[(dy*copiesPacked.width+dx)*4],32,'duplicate native slots sample their source mask independently with their own opacity');copiesRenderer.dispose();
     const imageNative=structuredClone(native);imageNative.src[0].srcType='img';const scaledImage={...text,sourceId:'old',end:null,type:'image',file:new Blob(['fake'],{type:'image/png'}),shape:'square',scaleX:2,scaleY:1.5};
@@ -79,5 +89,5 @@ const {pathToFileURL}=require('node:url');
     const avatar={id:'avatar',tag:'avatar',type:'image',file:new Blob(['fake'],{type:'image/png'}),x:0,y:0,width:1,height:1,shape:'circle',opacity:1};
     const circle=await R.createResourceRenderer([avatar],{width:16,height:16,duration:2});const circleResult=circle.apply(new Data(new Uint8ClampedArray(16*16*4),16,16),0);assert.equal(circleResult.data[3],0);assert.equal(circleResult.data[(8*16+8)*4+3],255);const files=await circle.getPackageFiles();assert.equal(files[0].name,'resources/avatar.png');assert.equal(files[0].blob.type,'image/png');const tags=await circle.getPlayerTags();assert(tags.avatar.startsWith('blob:'));circle.dispose();
   }finally{for(const [k,d]of oldGlobals)d?Object.defineProperty(globalThis,k,d):delete globalThis[k];}
-  console.log('vap-resources: native src/frame/mask validation, tag uniqueness, timing/animated source binding, real packed-plane unpack math, mask-opacity composition, circular avatar alpha, safe package defaults, metadata-aware size budget and premultiplied dynamic output passed. Browser codec and SDK playback are separate acceptance checks.');
+  console.log('vap-resources: native src/frame/mask validation, tag uniqueness, timing/animated source binding, real packed-plane unpack math, per-call resource fade/default reset, mask-opacity composition, circular avatar alpha, safe package defaults, metadata-aware size budget and premultiplied dynamic output passed. Browser codec and SDK playback are separate acceptance checks.');
 })().catch(error=>{console.error(error);process.exitCode=1});

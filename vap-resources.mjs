@@ -43,6 +43,7 @@ function surface(width,height){
   const canvas=typeof OffscreenCanvas==='function'?new OffscreenCanvas(width,height):Object.assign(document.createElement('canvas'),{width,height});
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
   if(!ctx) throw new Error('Cannot create resource canvas');
+  ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   return {canvas,ctx};
 }
 function sourceGeometry(sourceVapConfig,width,height){
@@ -161,7 +162,7 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       }finally{bitmap?.close?.();}
     }
     let disposed=false,tagsPromise,filesPromise;
-    function active(entry,timestamp,sourceCanvas){
+    function active(entry,timestamp,sourceCanvas,resourceOpacity=1){
       const {r,w,h,mask}=entry,geometry=resourceFrame(r,{width,height,sourceVapConfig,timestamp});
       mask.ctx.fillStyle='#000';mask.ctx.fillRect(0,0,w,h);
       if(!geometry)return null;
@@ -177,15 +178,16 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       for(let py=0;py<h;py++)for(let px=0;px<w;px++){
         const p=(py*w+px)*4;
         const shape=r.shape==='circle'?clamp((.5-Math.hypot((px+.5)/w-.5,(py+.5)/h-.5))*Math.min(w,h)+.5):1;
-        const weight=shape*r.opacity*fade(y+py/Math.max(1,h-1)*(fh-1),height,verticalMask);
+        const weight=shape*r.opacity*resourceOpacity*fade(y+py/Math.max(1,h-1)*(fh-1),height,verticalMask);
         const value=Math.round(pixels.data[p]*weight);pixels.data[p]=pixels.data[p+1]=pixels.data[p+2]=value;pixels.data[p+3]=255;
       }
       mask.ctx.putImageData(pixels,0,0);return geometry;
     }
-    function draw(ctx,timestamp,{sourceCanvas}={}){
+    function draw(ctx,timestamp,{sourceCanvas,resourceOpacity=1}={}){
       if(disposed)throw new Error('Resource renderer was disposed');
+      if(!finite(resourceOpacity)||resourceOpacity<0||resourceOpacity>1)throw new TypeError('Resource opacity must be between 0 and 1.');
       for(const e of entries){
-        const geometry=active(e,timestamp,sourceCanvas);if(!geometry)continue;
+        const geometry=active(e,timestamp,sourceCanvas,resourceOpacity);if(!geometry)continue;
         e.layer.ctx.clearRect(0,0,e.w,e.h);e.layer.ctx.drawImage(e.texture.canvas,0,0);
         const data=e.layer.ctx.getImageData(0,0,e.w,e.h),mask=e.mask.ctx.getImageData(0,0,e.w,e.h).data;
         for(let p=0;p<data.data.length;p+=4)data.data[p+3]=Math.round(data.data[p+3]*mask[p]/255);

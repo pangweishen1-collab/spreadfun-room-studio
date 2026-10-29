@@ -15,13 +15,15 @@
   function visible(zone){
     return zone.isConnected!==false&&!zone.closest?.('[hidden],.hidden')&&(!zone.getClientRects||zone.getClientRects().length>0);
   }
-  function namedFile(file){
+  function namedFile(file,index,total){
     const name=typeof file.name==='string'?file.name:'';
     const extension=extensions[String(file.type||'').toLowerCase()];
     if(!extension||/\.[^./\\]+$/.test(name)||typeof File!=='function')return file;
     const options={type:file.type};
     if(Number.isFinite(file.lastModified))options.lastModified=file.lastModified;
-    return new File([file],`pasted-${extension==='mp4'?'video':'image'}.${extension}`,options);
+    // Sequence imports sort filenames, so generated names need a stable order.
+    const suffix=total>1?'-'+String(index+1).padStart(3,'0'):'';
+    return new File([file],`pasted-${extension==='mp4'?'video':'image'}${suffix}.${extension}`,options);
   }
   function clipboardFiles(data){
     const files=Array.from(data?.files||[]);
@@ -30,7 +32,7 @@
       if(item.kind!=='file')continue;
       const file=item.getAsFile();if(file)files.push(file);
     }
-    return files.map(namedFile);
+    return files.map((file,index)=>namedFile(file,index,files.length));
   }
   function closestTarget(candidates,nodes){
     for(const node of nodes){

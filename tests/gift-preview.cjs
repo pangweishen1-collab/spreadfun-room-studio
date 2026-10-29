@@ -64,7 +64,7 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
 (async()=>{
   const markup=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   assert.match(markup,/id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具<\/h1>/);assert.equal(heading.textContent,'礼物&座驾预览图生产工具');assertMattingProgress(0,false);
-  assert.match(markup,/gift-preview\.js\?v=20261027-all-tool-stats1/);assert.match(markup,/toolkit\.js\?v=20261028-sequence1/);
+  assert.match(markup,/gift-preview\.js\?v=20261027-all-tool-stats1/);assert.match(markup,/toolkit\.js\?v=20261029-lossless1/);
   const edgeTag=markup.match(/<details\b[^>]*\bid="giftPreviewFeatherField"[^>]*>/)?.[0],colorTag=markup.match(/<details\b[^>]*\bid="giftPreviewColorField"[^>]*>/)?.[0],advancedTag=markup.match(/<details\b[^>]*\bid="giftPreviewAdvanced"[^>]*>/)?.[0];
   const compositionTag=markup.match(/<details\b[^>]*\bid="giftPreviewCompositionField"[^>]*>/)?.[0];
   assert.ok(compositionTag&&!/\sopen(?:\s|=|>)/.test(compositionTag),'position controls use a native disclosure and start collapsed');

@@ -195,8 +195,8 @@
         const source=renderExportFrame(side);canvas=document.createElement('canvas');canvas.width=side;canvas.height=side;
         const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(source,0,0,side,side);
       }
-      // Encode once at a balanced quality while retaining alpha and the selected size.
-      const blob=await canvasToWebP(canvas,.85);
+      // Share exact-lossless WebP encoding with the other image tools.
+      const blob=await canvasToLosslessWebP(canvas);
       releaseDownload();const base=state.file.name.replace(/\.svga$/i,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'avatar-frame';
       state.download=`${base}-frame-${String(state.frame+1).padStart(3,'0')}-${side}x${side}.webp`;state.downloadUrl=URL.createObjectURL(blob);
       window.Hub?.record('avatar','generated');

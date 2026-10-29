@@ -134,9 +134,8 @@
       return blob;
     }
     const mime={png:'image/png',jpg:'image/jpeg',webp:'image/webp'}[format];
-    // Reuse the asynchronous native encoder so large logo exports do not
-    // run the Banner WASM compressor on the main thread. WebP uses max quality.
-    const blob=format==='webp'?await canvasToWebP(canvas,1):await new Promise((resolve,reject)=>{try{canvas.toBlob(value=>value?resolve(value):reject(new Error('encodeError')),mime,.96)}catch(error){reject(new Error('encodeError'))}});
+    // WebP shares the exact-lossless worker; PNG/JPEG retain their own encoders.
+    const blob=format==='webp'?await canvasToLosslessWebP(canvas):await new Promise((resolve,reject)=>{try{canvas.toBlob(value=>value?resolve(value):reject(new Error('encodeError')),mime,.96)}catch(error){reject(new Error('encodeError'))}});
     if(!blob||blob.type!==mime)throw new Error('formatError');
     return blob;
   }

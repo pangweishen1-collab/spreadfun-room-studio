@@ -1,6 +1,7 @@
 const assert=require('node:assert/strict');
 const {pathToFileURL}=require('node:url');
 const path=require('node:path');
+const fs=require('node:fs'),{inflateSync}=require('node:zlib');
 const sample=(paint,width=96,height=128)=>{
   const data=new Uint8ClampedArray(width*height*4);
   for(let y=0;y<height;y++)for(let x=0;x<width;x++)data.set(paint(x,y,width,height),(y*width+x)*4);
@@ -37,10 +38,48 @@ const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*
   assert.deepEqual(detectVideoSource([red1,red1,red2]),plain,'different actual RGB plates are contradictory even within the same red family');
   const tanRoom=sample((x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[14,210,30,255]:[100,83,70,255]);
   assert.deepEqual(detectVideoSource([tanRoom,tanRoom,tanRoom]),plain,'a flat neutral brown room stays regular despite a colored subject');
-  for(const neutral of [[0,0,0],[125,125,125],[255,255,255]]){
+  for(const neutral of [[12,12,12],[125,125,125],[244,244,244],[255,253,250]]){
     const frame=sample(plate(neutral));
-    assert.deepEqual(detectVideoSource([frame,frame,frame]),plain,'achromatic plates require explicit black/white modes');
+    assert.deepEqual(detectVideoSource([frame,frame,frame]),plain,'gray, off-white and tinted walls remain ordinary MP4');
   }
+  const blackPlate=sample(plate([0,0,0])),whitePlate=sample(plate([255,255,255]));
+  for(const [frame,method,background] of [[blackPlate,'black_luma',[0,0,0]],[whitePlate,'white_luma',[255,255,255]]]){
+    const before=frame.data.slice(),result=detectVideoSource([frame,frame,frame]);
+    assert.equal(result.sourceKind,'plain_mp4');assert.equal(result.screenColor,'auto');
+    assert.equal(result.matteMethod,method);assert.deepEqual(result.background,background);assert.ok(result.confidence>=.965);
+    assert.deepEqual(frame.data,before,'neutral classification cannot change source pixels');
+    assert.deepEqual(detectVideoSource([frame]),plain,'neutral auto removal requires at least two nonblank samples');
+  }
+  for(const [base,method] of [[2,'black_luma'],[253,'white_luma']]){
+    const frame=sample((x,y,w,h)=>{
+      if(x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89)return [45,70,100,255];
+      const noise=(x*7+y*11)%5-2;return [base+noise,base+noise,base+noise,255];
+    }),before=frame.data.slice(),result=detectVideoSource([frame,frame,frame]);
+    assert.equal(result.matteMethod,method,'minor codec noise on a near-pure neutral plate');
+    assert.deepEqual(result.background,[base,base,base]);assert.deepEqual(frame.data,before);
+  }
+  const particles=sample((x,y,w,h)=>{
+    if(x>w*.27&&x<w*.73&&y>h*.14&&y<h*.86)return [55+x,32+y,12,255];
+    if((x===3&&y===18)||(x===w-3&&y===h-17))return [255,185,60,255];
+    const glow=Math.max(0,18-Math.hypot((x-w/2)*.7,(y-h/2)*.55));
+    return [glow,glow*.6,glow*.2,255];
+  });
+  assert.equal(detectVideoSource([particles,particles,particles]).matteMethod,'black_luma','use original perimeter before cropping a black gift with glow and isolated particles');
+  assert.deepEqual(detectVideoSource([blackPlate,whitePlate,blackPlate]),plain,'mixed black and white removal methods are contradictory');
+  assert.deepEqual(detectVideoSource([blackPlate,g,blackPlate]),plain,'mixed neutral and chroma methods are contradictory');
+  assert.deepEqual(detectVideoSource([blackPlate,blackPlate,sample(regular)]),plain,'ordinary frame evidence prevents automatic neutral removal');
+  const elevatedBlack=sample(plate([4,4,4]));
+  assert.deepEqual(detectVideoSource([blackPlate,elevatedBlack,elevatedBlack]),plain,'changing neutral RGB is not a stable shared plate');
+  const whiteObject=sample((x,y,w,h)=>x>w*.15&&x<w*.85&&y>h*.1&&y<h*.9?[255,255,255,255]:[148,140,126,255]);
+  const blackObject=sample((x,y,w,h)=>x>w*.15&&x<w*.85&&y>h*.1&&y<h*.9?[0,0,0,255]:[148,140,126,255]);
+  for(const frame of [whiteObject,blackObject])assert.deepEqual(detectVideoSource([frame,frame,frame]),plain,'a neutral foreground object is not a neutral backdrop');
+  const grayGradient=sample((x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[190,120,80,255]:[Math.min(24,x/3),Math.min(24,x/3),Math.min(24,x/3),255]);
+  const whiteGradient=sample((x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[190,120,80,255]:[255-x/4,255-x/4,255-x/4,255]);
+  for(const frame of [grayGradient,whiteGradient])assert.deepEqual(detectVideoSource([frame,frame,frame]),plain,'varied dark and white surroundings are not uniform plates');
+  const sparse=sample((x,y)=>x===48&&y===64?[255,255,255,255]:[0,0,0,255]);
+  assert.deepEqual(detectVideoSource([sparse,sparse,sparse]),plain,'a few bright pixels do not establish a foreground subject');
+  const alphaPlate=sample((x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[64,64,64,255]:[0,0,0,0]);
+  assert.deepEqual(detectVideoSource([alphaPlate,alphaPlate,alphaPlate]),plain,'existing transparent RGB padding does not imply a new black removal operation');
   const small=sample(plate([223,24,34]),5,5);
   assert.deepEqual(detectFrameScreen(small).background,[223,24,34],'shared frame estimator supports small matte tests');
   const padded=sample((x,y)=>y>=8&&y<12?[25,40,228,255]:[0,0,0,0],10,20);
@@ -52,8 +91,14 @@ const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*
   assert.ok(noisyRed.background.every((v,i)=>Math.abs(v-[222,24,35][i])<=1),'codec noise returns a stable measured red');
 
   const blank=sample(()=>[0,0,0,255]);
+  const whiteBlank=sample(()=>[255,255,255,255]);
   assert.equal(detectVideoSource([blank,g,g]).screenColor,'green','black intros do not force a chroma asset to regular');
   assert.deepEqual(detectVideoSource([blank,blank,blank]),plain);
+  assert.deepEqual(detectVideoSource([whiteBlank,whiteBlank,whiteBlank]),plain);
+  assert.deepEqual(detectVideoSource([blank,whiteBlank,blank]),plain,'blank frames never establish a removal method');
+  assert.equal(detectVideoSource([blank,blackPlate,blackPlate]).matteMethod,'black_luma');
+  assert.equal(detectVideoSource([whiteBlank,whitePlate,whitePlate]).matteMethod,'white_luma');
+  assert.deepEqual(detectVideoSource([blank,whiteBlank,blackPlate]),plain,'blank intros do not count toward the two-foreground-frame requirement');
   assert.deepEqual(detectVideoSource([sample(regular),sample(regular),sample(regular)]),plain,'sky and foliage are not one coherent screen');
   const greenObject=sample((x,y,w,h)=>x>w*.15&&x<w*.85&&y>h*.1&&y<h*.9?[10,230,10,255]:[155,140,105,255]);
   assert.deepEqual(detectVideoSource([greenObject,greenObject,greenObject]),plain,'a large green subject does not imply green background');
@@ -65,8 +110,26 @@ const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*
   assert.deepEqual(detectVideoSource([split,split,split]),plain);
   const letterbox=sample((x,y,w,h)=>y<h*.18||y>h*.82?[0,0,0,255]:green(x,y-h*.18,w,h*.64));
   assert.equal(detectVideoSource([letterbox,letterbox,letterbox]).screenColor,'green','contiguous black letterbox bands are excluded');
+  const regularLetterbox=sample((x,y,w,h)=>y<h*.18||y>h*.82?[0,0,0,255]:regular(x,y-h*.18,w,h*.64));
+  assert.deepEqual(detectVideoSource([regularLetterbox,regularLetterbox,regularLetterbox]),plain,'black bars around a nonuniform ordinary scene are not a black plate');
   const clear=sample(()=>[0,255,0,0]);assert.deepEqual(detectVideoSource([clear,clear]),plain);
   const noisy=sample((x,y,w,h)=>{const rgb=green(x,y,w,h),noise=(x*7+y*11)%9-4;return rgb.map((v,i)=>i===3?v:v+noise);});
   assert.equal(detectVideoSource([noisy,noisy]).screenColor,'green','minor codec noise should keep uniform-screen detection');
-  console.log('vap-source-detection: measured arbitrary-color RGB, red/orange/yellow/green/cyan/blue/magenta/muted plates, small-frame/transparent-padding fallback, conservative perimeter/side/plate consistency and multi-frame RGB consensus, black intro/letterbox, ordinary/brown/colored-subject/varied-room rejection, malformed/transparent inputs and pixel preservation passed. Synthetic classification evidence only.');
+  // Real 720x1280 green gift video: the first sampled frame contains a yellow
+  // light burst whose downsampled edge pixels narrowly miss the old consistency
+  // gate. Two later frames retain the same RGB plate. Use frame-at-or-before
+  // sampling (11/48/82), not seek-to-next-frame (12/49/83), which hid the bug.
+  // This optional, ignored fixture contains pixels derived from a private user
+  // clip. Public checkouts retain the synthetic assertions above without it.
+  const fixturePath=path.join(__dirname,'fixtures/green-glow-lowres.json');
+  if(fs.existsSync(fixturePath)){
+    const fixture=JSON.parse(fs.readFileSync(fixturePath,'utf8'));
+    assert.equal(fixture.encoding,'zlib-base64-rgba');assert.deepEqual(fixture.samples.map(frame=>frame.frameIndex),[11,48,82]);
+    const captured=fixture.samples.map(({pixels})=>{const data=new Uint8ClampedArray(inflateSync(Buffer.from(pixels,'base64')));assert.equal(data.length,fixture.width*fixture.height*4);return {width:fixture.width,height:fixture.height,data};}),capturedBefore=captured.map(frame=>frame.data.slice());
+    assert.equal(detectFrameScreen(captured[0])?.color,'green','low-resolution glow-contaminated perimeter still provides strong green-plate evidence');
+    const detectedGift=detectVideoSource(captured);assert.equal(detectedGift.sourceKind,'chroma_mp4','the actual low-resolution sampled gift must not fall back to ordinary MP4');assert.equal(detectedGift.screenColor,'green');assert.ok(detectedGift.background.every((value,index)=>Math.abs(value-[60,193,60][index])<=3),'retain the measured green rather than replacing it with a pure green preset');assert.ok(detectedGift.confidence>=.85);
+    for(let index=0;index<captured.length;index++)assert.deepEqual(captured[index].data,capturedBefore[index],'real-sample classification cannot mutate source pixels');
+    console.log('vap-source-detection: optional real-clip probe passed: real72x128 green gift frames11/48/82 retain stable plate detection under downsampled yellow glow.');
+  }else console.log('vap-source-detection: optional real-clip probe skipped (private fixture is not available).');
+  console.log('vap-source-detection: measured arbitrary-color RGB; near-pure black/white and noisy plates with two-foreground-frame consensus; original-perimeter glow/particle sampling; blank intro, contradictory method/RGB, letterbox, varied wall, neutral foreground, sparse/transparent/malformed input rejection and pixel preservation passed. Detector evidence only; encoded/playback quality is separate.');
 })().catch(error=>{console.error(error);process.exitCode=1});

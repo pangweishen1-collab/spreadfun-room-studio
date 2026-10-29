@@ -9,3 +9,4 @@ __pycache__/
 *.db
 .env*
 .dev.vars*
+/tests/fixtures/green-glow-lowres.json
