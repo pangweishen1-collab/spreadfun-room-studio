@@ -1,5 +1,31 @@
 # 更新记录
 
+## 1.6.0 - 2026-10-29
+
+### Exact-lossless image exports
+
+- Share one local WebP encoder across room backgrounds, avatar frames, banners, gift images and WebP resource exports. Preserve the rendered canvas RGBA exactly, compare three lossless search settings and retain the smallest actual result; do not reduce fidelity to meet the former room-image size target.
+- Run encoding in a dedicated worker, serialize jobs and fall back to the same lossless codec when workers are unavailable. PNG/JPEG resource exports keep their existing encoders.
+
+### VAP quality and performance
+
+- Try H.264 High, Main and Baseline profiles in order, probing the actual dimensions and bitrate. Ultra/quality presets may use one headroom-driven quality boost within the existing four-pass ceiling; retain an earlier valid result if the optional refinement fails or exceeds the byte budget.
+- Add bounded chroma-key workers, reusable working buffers and ordered frame processing. Prefetch a small number of sequence bitmaps and release them after use; keep native-alpha Canvas packing without caching an entire decoded animation.
+- The same local 72-frame sequence benchmark showed approximately 40–45% less conversion time with prefetching. This measures that input and machine, not a universal speed guarantee.
+- Unify MP4, loose image-sequence and ZIP uploads, including stable names for pasted frames. Auto-detect strong black/white plate evidence as well as colored screens; keep uncertain scenes unchanged and place manual overrides in advanced settings.
+- Add optional light-transparency recovery for colored screens. It is off by default; same-color solid details and original semitransparent colors remain ambiguous and require visual inspection or a source mask.
+
+### Gift fade in and out
+
+- Enable one-second entrance and exit fades by default. Adjust either duration, set an end to zero or disable the effect. Preview and export share the same time-based opacity, including dynamic resource masks.
+- Proportionally shorten overlapping fades for short clips; preserve one- and two-frame inputs instead of making the entire sequence transparent. Record the selected settings inside the VAP configuration.
+
+### Validation and limits
+
+- Passed 30 JavaScript regression suites, existing local 72-frame exports and Tencent Web SDK playback checks. Independently decoded actual sequence and MP4 export files frame by frame; transparent endpoints and linear fades passed within H.264 quantization tolerance. Files were captured from the local page's exported Blobs; the macOS system save dialog was not tested.
+- Production verification follows deployment. H.264 output remains lossy and byte-budget constrained; exact-lossless WebP applies to rendered image pixels, not recovery of source detail lost during resizing or matting. Web SDK checks do not certify iOS/Android devices.
+- Keep the existing API, production D1 bindings and migration history unchanged.
+
 ## 1.5.0 - 2026-10-28
 
 ### VAP resources and direct preview editing
