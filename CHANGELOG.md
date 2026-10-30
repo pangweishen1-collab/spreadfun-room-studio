@@ -1,5 +1,28 @@
 # 更新记录
 
+## 1.7.0 - 2026-10-30
+
+### Image production
+
+- Default all WebP tools to high-quality compression, with a synchronized strict-lossless option. Compare actual high-quality and lossless candidates while retaining exact output alpha; use a bounded two-worker queue and regenerate from original canvases when changing modes.
+- Import multiple SVGA avatar frames through selection, drop or paste. Keep independent frame choices, isolate invalid files and export a size-consistent batch ZIP with collision-safe names.
+- Name small room-background exports with the `- preview` suffix.
+
+### VAP keys and canvas editing
+
+- Default new avatar keys to 144 output pixels, with a matching matching gold question-mark frame and a key label that follows movement and resizing. The gold question-mark frame stays in encoded RGB and base alpha and follows the key and gift fades. Remove the default portrait; transparent avatar placeholders retain replaceable slots in previews and packages.
+- Keep avatar/text resources independent of the vertical video mask while applying the gift entrance/exit fade to their resource masks. Preserve native source masks, resource timing and individual opacity.
+- Animate new avatar keys by default with a spring scale entrance, a 10-output-pixel vertical float and an ending fade. Share the same frame geometry with editor labels, gold artwork and runtime-replaced avatars; preserve existing native animations.
+- Drag video content vertically inside the output canvas with matching preview and export placement. Keep canvas size, mask boundaries and manual resource coordinates fixed.
+- Fix incremental runtime replacement across `tag1` and `[tag1]` aliases without overwriting unrelated tags or SDK control options.
+- Simplify the workbench controls and show accessible play/pause icons at the lower-right of the current and completed output canvases. Display output only after a successful conversion.
+
+### Validation and limits
+
+- Validate exported ID/frame/mask metadata, real Web SDK avatar and text replacement, temporal alpha and on-canvas positioning before publication; keep local test media and state out of the static build and Git source.
+- H.264 remains lossy and subject to the selected file-size budget. Runtime tag replacement is verified in the Web SDK; target iOS/Android SDK integration still requires device testing.
+- Preserve the existing API, D1 bindings and migration history.
+
 ## 1.6.0 - 2026-10-29
 
 ### Exact-lossless image exports
