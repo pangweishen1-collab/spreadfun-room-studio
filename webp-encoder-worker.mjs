@@ -1,11 +1,11 @@
-import {prepareLosslessWebP,encodeLosslessWebP} from './webp-encode.mjs?v=20261029-lossless1';
+import {prepareLosslessWebP,encodeWebP} from './webp-encode.mjs?v=20261030-webp2';
 
 self.onmessage=async({data:message})=>{
-  const {id,type,width,height,pixels}=message;
+  const {id,type,width,height,pixels,mode}=message;
   try{
     if(type==='prepare'){await prepareLosslessWebP();self.postMessage({id});return}
     if(type!=='encode')throw new Error('exportError');
-    const encoded=await encodeLosslessWebP(new Uint8ClampedArray(pixels),width,height);
+    const encoded=await encodeWebP(new Uint8ClampedArray(pixels),width,height,{mode});
     self.postMessage({id,encoded:encoded.buffer},[encoded.buffer]);
   }catch(error){self.postMessage({id,error:error?.message||'exportError'})}
 };

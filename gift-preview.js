@@ -7,8 +7,8 @@
   const defaults={zoom:1,offsetX:0,offsetY:0,saturation:100,brightness:100,contrast:100,feather:10,radius:22,rotation:0,flipX:false,flipY:false};
   const rangeFields=[['Zoom','zoom'],['Feather','feather'],['Radius','radius'],['Saturation','saturation'],['Brightness','brightness'],['Contrast','contrast'],['Rotation','rotation']];
   const copy={
-    zh:{title:'礼物&座驾预览图生产工具',preview:'效果预览',modeLabel:'处理方式',modeFeather:'场景羽化',modeTransparent:'透明素材',uploadTitle:'点击、拖入或粘贴礼物图片',uploadHint:'支持 PNG、JPG、WebP',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',upload:'上传图片',dragHint:'拖动图片调整位置，双击居中；方向键微调',previewBackground:'预览背景',backgroundBlack:'黑色',backgroundTransparent:'透明',replace:'替换图片',privacy:'图片仅在本地处理，不会上传至服务器。',adjustments:'调整与导出',outputSize:'输出尺寸',lockedRatio:'1:1 比例锁定',width:'宽度',height:'高度',sizeError:'请输入 16–2048 之间的整数。',composition:'画面位置',center:'居中',zoom:'缩放',edges:'边缘处理',feather:'羽化',radius:'圆角',color:'色彩调整',saturation:'饱和度',brightness:'亮度',contrast:'对比度',reset:'重置调整',download:'导出 WebP',reading:'正在读取图片…',encoding:'正在生成 WebP…',saved:'已发起下载',again:'再次下载',fileCount:'一次请选择一张图片。',typeError:'请选择 PNG、JPG 或 WebP 图片。',fileSizeError:'请选择 30 MB 以内的图片。',loadError:'图片无法读取，请更换文件。',pixelError:'请使用 4000 万像素以内的图片。',exportError:'导出失败，请重试。',downloadError:'未能发起下载，请重试。',encoderError:'无损编码组件未能加载，请刷新后重试。',canvasLabel:'礼物预览图；可拖动或用方向键调整位置'},
-    en:{title:'Gift & vehicle preview maker',preview:'Preview',modeLabel:'Treatment',modeFeather:'Feathered scene',modeTransparent:'Transparent artwork',uploadTitle:'Click, drop or paste gift artwork',uploadHint:'PNG, JPG or WebP',pasteHint:'Paste with ⌘V / Ctrl+V to upload',upload:'Upload image',dragHint:'Drag to position. Double-click to center. Arrow keys to nudge.',previewBackground:'Preview background',backgroundBlack:'Black',backgroundTransparent:'Transparent',replace:'Replace image',privacy:'Processed locally. Your image never leaves this device.',adjustments:'Adjust and export',outputSize:'Output size',lockedRatio:'1:1 locked',width:'Width',height:'Height',sizeError:'Enter a whole number from 16 to 2048.',composition:'Position',center:'Center',zoom:'Zoom',edges:'Edges',feather:'Feather',radius:'Corners',color:'Color',saturation:'Saturation',brightness:'Brightness',contrast:'Contrast',reset:'Reset adjustments',download:'Export WebP',reading:'Reading image…',encoding:'Creating WebP…',saved:'Download requested',again:'Download again',fileCount:'Choose one image at a time.',typeError:'Choose a PNG, JPG or WebP image.',fileSizeError:'Choose an image under 30 MB.',loadError:'Could not read this image. Try another file.',pixelError:'Choose an image with no more than 40 million pixels.',exportError:'Could not export. Please retry.',downloadError:'Could not start the download. Please retry.',encoderError:'Could not load the lossless encoder. Refresh and try again.',canvasLabel:'Gift preview. Drag or use arrow keys to position the image'}
+    zh:{title:'礼物&座驾预览图生产工具',preview:'效果预览',modeLabel:'处理方式',modeFeather:'场景羽化',modeTransparent:'透明素材',uploadTitle:'点击、拖入或粘贴礼物图片',uploadHint:'支持 PNG、JPG、WebP',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',upload:'上传图片',dragHint:'拖动图片调整位置，双击居中；方向键微调',previewBackground:'预览背景',backgroundBlack:'黑色',backgroundTransparent:'透明',replace:'替换图片',privacy:'图片仅在本地处理，不会上传至服务器。',adjustments:'调整与导出',outputSize:'输出尺寸',lockedRatio:'1:1 比例锁定',width:'宽度',height:'高度',sizeError:'请输入 16–2048 之间的整数。',composition:'画面位置',center:'居中',zoom:'缩放',edges:'边缘处理',feather:'羽化',radius:'圆角',color:'色彩调整',saturation:'饱和度',brightness:'亮度',contrast:'对比度',reset:'重置调整',download:'导出 WebP',reading:'正在读取图片…',encoding:'正在生成 WebP…',saved:'已发起下载',again:'再次下载',fileCount:'一次请选择一张图片。',typeError:'请选择 PNG、JPG 或 WebP 图片。',fileSizeError:'请选择 30 MB 以内的图片。',loadError:'图片无法读取，请更换文件。',pixelError:'请使用 4000 万像素以内的图片。',exportError:'导出失败，请重试。',downloadError:'未能发起下载，请重试。',encoderError:'WebP 编码组件未能加载，请刷新后重试。',canvasLabel:'礼物预览图；可拖动或用方向键调整位置'},
+    en:{title:'Gift & vehicle preview maker',preview:'Preview',modeLabel:'Treatment',modeFeather:'Feathered scene',modeTransparent:'Transparent artwork',uploadTitle:'Click, drop or paste gift artwork',uploadHint:'PNG, JPG or WebP',pasteHint:'Paste with ⌘V / Ctrl+V to upload',upload:'Upload image',dragHint:'Drag to position. Double-click to center. Arrow keys to nudge.',previewBackground:'Preview background',backgroundBlack:'Black',backgroundTransparent:'Transparent',replace:'Replace image',privacy:'Processed locally. Your image never leaves this device.',adjustments:'Adjust and export',outputSize:'Output size',lockedRatio:'1:1 locked',width:'Width',height:'Height',sizeError:'Enter a whole number from 16 to 2048.',composition:'Position',center:'Center',zoom:'Zoom',edges:'Edges',feather:'Feather',radius:'Corners',color:'Color',saturation:'Saturation',brightness:'Brightness',contrast:'Contrast',reset:'Reset adjustments',download:'Export WebP',reading:'Reading image…',encoding:'Creating WebP…',saved:'Download requested',again:'Download again',fileCount:'Choose one image at a time.',typeError:'Choose a PNG, JPG or WebP image.',fileSizeError:'Choose an image under 30 MB.',loadError:'Could not read this image. Try another file.',pixelError:'Choose an image with no more than 40 million pixels.',exportError:'Could not export. Please retry.',downloadError:'Could not start the download. Please retry.',encoderError:'Could not load the WebP encoder. Refresh and try again.',canvasLabel:'Gift preview. Drag or use arrow keys to position the image'}
   };
   Object.assign(copy.zh,{alignment:'画布对齐',alignHorizontal:'水平对齐',alignVertical:'垂直对齐',contextTitle:'礼物栏实时预览',contextLabel:'礼物栏实时预览',live:'实时',sizePresets:'常用尺寸',dragHint:'拖动图片定位，滚轮缩放，双击居中；方向键微调'});
   Object.assign(copy.en,{alignment:'Canvas alignment',alignHorizontal:'Horizontal align',alignVertical:'Vertical align',contextTitle:'Live gift panel preview',contextLabel:'Live gift panel preview',live:'Live',sizePresets:'Common sizes',dragHint:'Drag to position, scroll to zoom, double-click to center. Arrow keys to nudge.'});
@@ -19,6 +19,7 @@
   const state={image:null,file:null,settings:{...defaults},strokes:[],baseMask:null,removing:false,removeProgress:null,tool:'move',brush:{size:20,hardness:70,opacity:100},safe:{enabled:false,inset:10},mode:'feather',modeChosen:false,side:200,valid:true,loading:false,exporting:false,notice:null,background:'black',download:null,revision:0};
   const t=key=>(copy[language]||copy.en)[key]||copy.en[key]||key;
   let renderRequest=0,drag=null,loadToken=0,editGroup=null,wheelTimer=0,hoverPoint=null,mattingTimer=0,mattingPresentation=0,mattingPercent=0,mattingVisible=false;
+  const webpMode=()=>window.FunWebP?.getMode?.()||'high';
   const busy=()=>state.loading||state.exporting||state.removing;
   const snapshot=()=>({settings:{...state.settings},strokes:state.strokes,baseMask:state.baseMask,mode:state.mode,side:state.side});
   const history=window.GiftPreviewHistory.create(snapshot());
@@ -220,16 +221,17 @@
   async function download(){
     if(busy()||!state.image||!state.valid)return;
     prepareEdit();state.exporting=true;state.notice=null;syncControls();let freshUrl;
-    const key=state.revision+':'+state.side;
+    const mode=webpMode(),key=state.revision+':'+state.side+':'+mode;
     try{
       const cached=state.download?.key===key;let blob=cached?state.download.blob:null;
       if(!blob){
         await new Promise(resolve=>requestAnimationFrame(resolve));
         const output=document.createElement('canvas');output.width=output.height=state.side;
         window.GiftPreviewRenderer.render(output,state.image,renderSettings());
-        try{blob=await canvasToLosslessWebP(output)}finally{output.width=output.height=1}
+        try{blob=await canvasToWebP(output,{mode})}finally{output.width=output.height=1}
         if(!blob||blob.type!=='image/webp')throw new Error('exportError');
       }
+      if(mode!==webpMode())return;
       const base=state.file.name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'gift';
       const name=`${base}-gift-preview-${state.side}x${state.side}.webp`;
       freshUrl=URL.createObjectURL(blob);const link=document.createElement('a');link.href=freshUrl;link.download=name;link.hidden=true;document.body.append(link);
@@ -253,7 +255,8 @@
   function syncLanguage(){
     root.querySelectorAll('[data-gift-i18n]').forEach(node=>node.textContent=t(node.dataset.giftI18n));syncControls();setBackground(state.background);
   }
-  function activate(){syncControls();if(state.image)scheduleRender()}
+  function activate(){if(state.download&&!state.download.key.endsWith(':'+webpMode()))releaseDownload();syncControls();if(state.image)scheduleRender()}
+  document.addEventListener('webp:mode-change',()=>{releaseDownload();syncControls()});
   for(const id of ['Upload','Replace'])$('#giftPreview'+id).addEventListener('click',event=>{event.stopPropagation();if(!busy())$('#giftPreviewInput').click()});
   $('#giftPreviewInput').addEventListener('change',event=>{loadFiles(event.target.files);event.target.value=''});
   stage.addEventListener('click',()=>{if(!state.image&&!busy())$('#giftPreviewInput').click()});

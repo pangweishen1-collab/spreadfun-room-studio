@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 const root=fileURLToPath(new URL('../',import.meta.url));
 const target=path.join(root,'dist');
 const entries=['index.html','upload-paste.js','Room BG Studio.html','toolkit.css','toolkit.js','banner.js','banner-webp.js','hub.css','hub.js','home.css','tokens.css','tool-feedback.css','tool-feedback.js','gift-preview.css','gift-preview.js','gift-preview-render.js','gift-preview-history.js','gift-background.js','gift-background-worker.js','gift-lucida-ai.mjs','gift-lucida-runtime.mjs','gift-matte-resample.mjs','gift-uniform-matte.mjs','gift-background-ai.mjs','gift-background-matte.mjs','gift-quality-matte.mjs','gift-matting-refine.mjs','gift-matting-runtime.mjs','project-selector.css','project-selector.js','resource-library.css','resource-library.js','market-icon-png.js','vap-tool.css','vap-tool.js','vap-resources.mjs','vap-resources.css','vap-resource-editor.js','vap-player.js','vap-player.css','vap-inspect.html','vap-inspect.css','vap-inspect.mjs','vap-engine.mjs','vap-sequence.mjs','vap-protocol.mjs','vap-matte.mjs','vap-matte-workers.mjs','vap-matte-worker.mjs','vap-source-detection.mjs'];
-entries.push('webp-encode.mjs','webp-encoder-worker.mjs','vap-gift-fade.mjs');
+entries.push('webp-encode.mjs','webp-encoder-worker.mjs','vap-gift-fade.mjs','webp-settings.js','webp-settings.css');
 await rm(target,{recursive:true,force:true});
 await mkdir(target,{recursive:true});
 for(const name of entries)await copyFile(path.join(root,name),path.join(target,name));

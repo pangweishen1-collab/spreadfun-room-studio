@@ -2,7 +2,7 @@ import {computeVapLayout, makeVapc, appendVapcBox, extractVapcBox, validateVapc}
 import {detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261029-auto-method2';
 import {inspectImageSequence, sequenceMetadata, decodeSequenceFrame} from './vap-sequence.mjs?v=20261029-sequence-speed1';
 export {inspectImageSequence, sequenceMetadata, decodeSequenceFrame};
-import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261029-gift-fade1';
+import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261030-avatar-motion1';
 import {normalizeGiftFade, giftFadeOpacity, applyGiftFade} from './vap-gift-fade.mjs?v=20261029-gift-fade1';
 
 export const LIMITS = Object.freeze({fileBytes:200*1024*1024,outputBytes:3000000,durationSeconds:120,sourceMaxSide:4096,outputMinSide:16,outputMaxSide:2048,fps:60,packedMaxSide:4096});
@@ -22,7 +22,8 @@ function fileCheck(file){
 }
 
 export function normalizeOptions(options={},metadata={}){
-  const o={sourceKind:'plain_mp4',matteMethod:'black_luma',screenColor:'auto',alphaScale:.5,width:720,height:1560,fps:24,targetBytes:3000000,quality:'balanced',rgbAlphaMode:'straight',keepAudio:true,audioGain:1,confirmedOpaque:false,lightRecovery:false,...options};
+  const o={sourceKind:'plain_mp4',matteMethod:'black_luma',screenColor:'auto',alphaScale:.5,width:720,height:1560,fps:24,targetBytes:3000000,quality:'balanced',rgbAlphaMode:'straight',keepAudio:true,audioGain:1,confirmedOpaque:false,lightRecovery:false,videoOffsetY:0,...options};
+  if(!finite(o.videoOffsetY)||o.videoOffsetY< -1||o.videoOffsetY>1)throw new VapError('invalid','视频位置须在画布高度的 -100%–100% 内。');
   try{o.giftFade=normalizeGiftFade(o.giftFade)}catch(error){throw new VapError('invalid',error.message,error)}
   if(o.verticalMask===undefined)o.verticalMask={enabled:false};
   else{
@@ -126,7 +127,7 @@ function prepareNativeOpaque(o,info,matteModule,images){
   if(info.codec!=='avc')return {enabled:false,reason:'source-alpha-not-proven'};
   if(info.nativeOpaqueSource!==true)return {enabled:false,reason:'source-geometry-alpha-not-proven'};
   if(typeof matteModule.applyVerticalMask!=='function')return {enabled:false,reason:'mask-helper-unavailable'};
-  const scale=Math.min(o.width/info.width,o.height/info.height),w=info.width*scale,h=info.height*scale,x=(o.width-w)/2,y=(o.height-h)/2;
+  const scale=Math.min(o.width/info.width,o.height/info.height),w=info.width*scale,h=info.height*scale,x=(o.width-w)/2,y=(o.height-h)/2+o.videoOffsetY*o.height;
   const white=canvas(info.width,info.height),coverage=canvas(o.width,o.height);
   images.push(white.canvas,coverage.canvas);white.ctx.fillStyle='#fff';white.ctx.fillRect(0,0,info.width,info.height);
   // Use the original readback canvas settings once to preserve contain coverage
@@ -277,7 +278,7 @@ function prepareSequenceRgba(o,info,matteModule,images){
     mask=canvas(1,o.height);images.push(mask.canvas);const rgba=new Uint8ClampedArray(o.height*4);rgba.fill(255);
     mask.ctx.putImageData(new ImageData(matteModule.applyVerticalMask(rgba,1,o.height,o.verticalMask),1,o.height),0,0);
   }
-  const scale=Math.min(o.width/info.width,o.height/info.height),w=info.width*scale,h=info.height*scale,rect=[(o.width-w)/2,(o.height-h)/2,w,h];
+  const scale=Math.min(o.width/info.width,o.height/info.height),w=info.width*scale,h=info.height*scale,rect=[(o.width-w)/2,(o.height-h)/2+o.videoOffsetY*o.height,w,h];
   return {enabled:true,draw(source,packed,layout){
     frame.ctx.clearRect(0,0,o.width,o.height);frame.ctx.drawImage(source,...rect);
     if(mask){frame.ctx.globalCompositeOperation='destination-in';frame.ctx.drawImage(mask.canvas,0,0,o.width,o.height);frame.ctx.globalCompositeOperation='source-over';}
@@ -338,10 +339,7 @@ function fadePackedFrame(ctx,layout,opacity,mode){
   ctx.save();ctx.fillStyle='#000';ctx.globalAlpha=1-opacity;
   ctx.fillRect(...layout.aFrame);
   if(mode==='premultiplied'||opacity===0){ctx.globalAlpha=mode==='premultiplied'?1-opacity:1;ctx.fillRect(...layout.rgbFrame);}
-  // Tencent resources composite independently of the video's alpha, so their
-  // native mask atlas must fade too. Unrelated padding remains untouched.
-  ctx.globalAlpha=1-opacity;
-  for(const rect of Object.values(layout.resourceMasks||{}))ctx.fillRect(...rect);
+  // Resource masks are independent top layers and are drawn after this fade.
   ctx.restore();
 }
 
@@ -355,7 +353,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses})
   try{
     cancelled(signal);
     let matteModule;
-    try{matteModule=await import('./vap-matte.mjs?v=20261029-detail1');processor=await matteModule.createMatteProcessor({...o,signal,onProgress:event=>progress({phase:'loading',progress:.03,detail:event})})}
+    try{matteModule=await import('./vap-matte.mjs?v=20261030-vap-position2');processor=await matteModule.createMatteProcessor({...o,signal,onProgress:event=>progress({phase:'loading',progress:.03,detail:event})})}
     catch(error){if(signal?.aborted)throw new VapError('cancelled','转换已取消。',error);throw new VapError('matte',error.message||'本地去背景组件未能加载，请重试。',error)}
     cancelled(signal);
     // Only independent chroma frames with a fixed measured plate enter the
@@ -366,8 +364,8 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses})
       catch(error){if(signal?.aborted||error?.code==='cancelled')throw new VapError('cancelled','转换已取消。',error);workerPool=null;}
     }
     cancelled(signal);
-    if(o.sourceVapConfig)unpacker=createVapUnpacker({width:o.width,height:o.height,sourceVapConfig:o.sourceVapConfig,verticalMask:o.verticalMask});
-    if(o.resources.length)try{resourceRenderer=await createResourceRenderer(o.resources,{width:o.width,height:o.height,duration:info.duration,verticalMask:o.verticalMask,sourceVapConfig:o.sourceVapConfig,signal})}catch(error){if(signal?.aborted)throw new VapError('cancelled','转换已取消。',error);throw new VapError('invalid',error.message,error)}
+    if(o.sourceVapConfig)unpacker=createVapUnpacker({width:o.width,height:o.height,sourceVapConfig:o.sourceVapConfig,verticalMask:o.verticalMask,videoOffsetY:o.videoOffsetY});
+    if(o.resources.length)try{resourceRenderer=await createResourceRenderer(o.resources,{width:o.width,height:o.height,duration:info.duration,fps:o.fps,verticalMask:o.verticalMask,sourceVapConfig:o.sourceVapConfig,signal,includeDefaultAvatars:false})}catch(error){if(signal?.aborted)throw new VapError('cancelled','转换已取消。',error);throw new VapError('invalid',error.message,error)}
     const prepareStart=clock(),native=prepareNativeOpaque(o,info,matteModule,images),sequenceRgba=prepareSequenceRgba(o,info,matteModule,images);
     if(o.matteMethod==='opaque'&&o.sourceKind==='plain_mp4')times.opaquePrepareMs=clock()-prepareStart;
     if(native.enabled||sequenceRgba.enabled)times.matteMs=null;
@@ -451,7 +449,10 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses})
           const wantsPreview=onPreview&&(frame===0||frame%o.fps===0||frame===frameCount-1),visible=frame/o.fps>=Math.max(0,videoStart);
           if((!fast||wantsPreview)&&!workerPool){
             t=clock();
-            try{matte=unpacker?unpacker.process(decoded.value.canvas):await processor.process(decoded.value.canvas,{timestamp:Math.max(0,Math.min(frame/o.fps,videoEnd-1e-6)),width:o.width,height:o.height});if(resourceRenderer&&o.resourceMode==='baked')matte=resourceRenderer.apply(matte,frame/o.fps,{sourceCanvas:decoded.value.canvas})}
+            try{
+              matte=unpacker?unpacker.process(decoded.value.canvas):await processor.process(decoded.value.canvas,{timestamp:Math.max(0,Math.min(frame/o.fps,videoEnd-1e-6)),width:o.width,height:o.height});
+              if(resourceRenderer&&o.resourceMode==='baked')matte=resourceRenderer.apply(matte,frame/o.fps,{sourceCanvas:decoded.value.canvas,includeStatic:true,includeDefaults:false});
+            }
             catch(error){if(signal?.aborted)throw new VapError('cancelled','转换已取消。',error);throw new VapError('matte',error.message||'该帧去背景失败，请检查处理方式或遮罩。',error)}
             times.matteMs=(times.matteMs??0)+clock()-t;
             if(!matte||matte.width!==o.width||matte.height!==o.height)throw new VapError('matte','去背景画布与输出尺寸不匹配。');
@@ -473,11 +474,14 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses})
             splitPlanes(matte.data,o.width,o.height,rgbPixels,alphaPixels,o.rgbAlphaMode);rgb.ctx.putImageData(rgbData,0,0);alpha.ctx.putImageData(alphaData,0,0);
             packed.ctx.drawImage(rgb.canvas,0,0);packed.ctx.drawImage(alpha.canvas,ax,ay,aw,ah);
           }
-          if(resourceRenderer&&o.resourceMode==='dynamic')resourceRenderer.drawMasks(packed.ctx,plan.layout,frame/o.fps,decoded.value.canvas);
           const opacity=giftFadeOpacity(frame/o.fps,info.duration,o.fps,o.giftFade);
           fadePackedFrame(packed.ctx,plan.layout,opacity,o.rgbAlphaMode);
+          if(resourceRenderer&&o.resourceMode==='dynamic'){
+            if(resourceRenderer.hasStaticLayers)resourceRenderer.drawStaticPlanes(packed.ctx,plan.layout,frame/o.fps,{resourceOpacity:opacity});
+            resourceRenderer.drawMasks(packed.ctx,plan.layout,frame/o.fps,decoded.value.canvas,{resourceOpacity:opacity});
+          }
           times.packMs+=clock()-t;
-          if(wantsPreview){t=clock();const faded=applyGiftFade(matte,opacity);await onPreview(resourceRenderer&&o.resourceMode==='dynamic'?resourceRenderer.apply(faded,frame/o.fps,{sourceCanvas:decoded.value.canvas,resourceOpacity:opacity}):faded);times.previewMs=(times.previewMs??0)+clock()-t;}
+          if(wantsPreview){t=clock();const faded=applyGiftFade(matte,opacity);await onPreview(resourceRenderer&&o.resourceMode==='dynamic'?resourceRenderer.apply(faded,frame/o.fps,{sourceCanvas:decoded.value.canvas,resourceOpacity:opacity,includeStatic:true,includeDefaults:false}):faded);times.previewMs=(times.previewMs??0)+clock()-t;}
           t=clock();await videoSource.add(frame/o.fps,Math.min(1/o.fps,info.duration-frame/o.fps),{keyFrame:frame%(o.fps*2)===0});times.encodeMs+=clock()-t;
           progress({phase:'encoding',progress:.05+.90*((pass-1+(frame+1)/frameCount)/totalPasses),frame:frame+1,totalFrames:frameCount,pass});
         }
@@ -491,7 +495,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses})
     progress({phase:'packaging',progress:totalPasses===1?.97:.05+.90*pass/totalPasses,frame:frameCount,totalFrames:frameCount,pass});
     let t=clock();await output.finalize();times.muxMs=clock()-t;
     const config=makeVapc({width:o.width,height:o.height,fps:o.fps,frames:frameCount,alphaScale:o.alphaScale,packedLayout:plan.layout});
-    config.funToolkit={exportRevision:'rgb-feather-v1',rgbAlphaMode:o.rgbAlphaMode,verticalMask:{...o.verticalMask},giftFade:{...o.giftFade}};
+    config.funToolkit={exportRevision:'rgb-feather-v1',rgbAlphaMode:o.rgbAlphaMode,verticalMask:{...o.verticalMask},videoOffsetY:o.videoOffsetY,giftFade:{...o.giftFade}};
     if(o.lightRecovery&&o.matteMethod==='chroma_key')config.funToolkit.lightRecovery=true;
     if(o.resources.length&&o.resourceMode==='dynamic')addResourceConfig(config,{resources:o.resources,layout:plan.layout,fps:o.fps,frames:frameCount,duration:info.duration,sourceVapConfig:o.sourceVapConfig});
     else if(o.resources.length)config.funToolkit.resourceMode='baked';

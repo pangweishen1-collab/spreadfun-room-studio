@@ -14,15 +14,15 @@
 
 浏览器打开 `http://127.0.0.1:8765/index.html`。默认进入 `#home` 聚合首页（Logo 也进入首页）；`#statistics` 为共享统计。工具使用 `#room-backgrounds`、`#avatar-frames`、`#banners`、`#gift-previews`、`#vap-tools` 和 `#resources`，支持直接进入及浏览器前进/后退并保留工具会话。统计标识对应 `room`、`avatar`、`banner`、`gift`、`vap`、`resources`。
 
-运行 `node tests/regression.cjs`、`node tests/toolkit.cjs`、`node tests/banner.cjs`，并对 `toolkit.js`、`banner.js` 和 `banner-webp.js` 运行 `node --check`。无损编码变更另运行 `node tests/lossless-webp.cjs`（需要 Python / Pillow，路径可用 `BANNER_TEST_PYTHON` 指定）。有 UI 改动时再检查桌面和 `tests/responsive.html`，自动检查不能代替视觉检查。
+运行 `node tests/regression.cjs`、`node tests/toolkit.cjs`、`node tests/banner.cjs`，并对 `toolkit.js`、`banner.js` 和 `banner-webp.js` 运行 `node --check`。WebP 编码模式变更另运行 `node tests/lossless-webp.cjs` 与 `node tests/webp-settings.cjs`（前者需要 Python / Pillow，路径可用 `BANNER_TEST_PYTHON` 指定）。有 UI 改动时再检查桌面和 `tests/responsive.html`，自动检查不能代替视觉检查。
 
 首页、统计或需求改动另运行 `node tests/hub.cjs`、`node --check hub.js` 和 `python3 tests/server_test.py`。后端测试与浏览器验收使用独立数据库，不向正式累计写入样本。默认 macOS 数据位于 `~/Library/Application Support/Fun Toolkit/`；不要将其打包或放入网站目录。作者可双击 `view-requests.command` 查看需求。
 
 ## 当前功能
 
-- 房间背景：两种 WebP 尺寸、独立裁切、120 KiB 大图限制、单图和 ZIP。
+- 房间背景：两种 WebP 尺寸、独立裁切、单图和 ZIP；图片不沿用旧版 120 KiB 硬限制，使用全站压缩模式。
 - 头像框：SVGA 动画、本地文件选择或整页拖放、暂停、帧号/时间轴/逐帧控制；当前帧导出透明 WebP，默认 240 × 240，正方形比例锁定，16–2048 px。
-- Banner：772 × 200 房间图、684 × 240 游戏图，游戏内图 645 × 201，使用 `assets/game-banner-frame.webp` 保留外框；通过本地 `vendor/webp/` 编码器生成无损 WebP 和两图 ZIP。原图尺寸不足时提示放大可能模糊。`tests/lossless-webp.cjs` 可核验生产 helper 的实际 RGBA 保真。
+- Banner：772 × 200 房间图、684 × 240 游戏图，游戏内图 645 × 201，使用 `assets/game-banner-frame.webp` 保留外框；通过本地 `vendor/webp/` 编码器按全站模式生成 WebP 和两图 ZIP。原图尺寸不足时提示放大可能模糊。全站默认高清压缩，保留严格无损切换；两者无损保留目标画布 Alpha，只有严格无损保证全部 RGBA 不变，高清压缩不能称为像素无损。`tests/lossless-webp.cjs` 可核验模式、Alpha 和严格无损 RGBA；不以压缩替代原图细节。
 - 统一语言与工具导航，工具切换保留当前会话的工作。
 - 首页文案围绕“专为乐趣运营而生”，提供工具入口、真实统计与私有需求提交。生成按成功文件数计，下载按有效发起操作计，ZIP 计一次；不迁移本机历史，不推算用户人数。
 

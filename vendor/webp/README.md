@@ -8,7 +8,8 @@ Pinned source: `@jsquash/webp` 1.5.0, from the npm registry.
 
 Only the non-SIMD encoder, its Wasm binary and option defaults are included.
 `webp_enc.js` and `meta.js` have been renamed to `.mjs` without changing their contents.
-The local wrapper uses lossless mode, no near-lossless preprocessing, exact transparent RGB and lossless alpha.
-No CDN or external upload is used at runtime. The shared codec is loaded on the first image export, with a local module worker when available. All image tools use the same exact-lossless settings. A bounded search compares three compression-effort presets and retains the smallest actual result; it never lowers image fidelity or silently falls back to a lossy browser encoder. This optimizes the rendered output pixels; source decoding and crop/resize happen first.
+The shared wrapper defaults to the high-quality profile and retains an explicit exact-lossless profile. High quality compares fixed high-quality lossy RGB and lossless candidates by actual size; it may change RGB pixels and must not be described as pixel-lossless. Both profiles keep alpha lossless. Exact lossless uses `lossless=1`, `near_lossless=100`, `exact=1` and `alpha_quality=100`, preserving all rendered RGBA, including transparent RGB. Its bounded search compares compression-effort presets and retains the smallest actual result.
+
+No CDN or external upload is used at runtime. All image tools use the shared preference. A bounded local worker pool handles independent jobs; worker fallback uses the same codec and selected profile. Errors do not silently change profiles or fall back to a browser encoder. Rendering, source decoding and crop/resize happen first; neither profile restores detail already lost there. Candidate comparison does not guarantee the globally smallest file.
 
 Licenses: Apache-2.0 in `LICENSE`; Google codec license in `LICENSE.codec.md`.

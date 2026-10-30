@@ -22,12 +22,14 @@
   Object.assign(copy.en,{vapPlaybackNotice:'Use Play transparent on this page. Regular video players show RGB and grayscale alpha side by side.'});
   Object.assign(copy.zh,{inspectVap:'查看 VAP 成品'});
   Object.assign(copy.en,{inspectVap:'Check VAP output'});
+  Object.assign(copy.zh,{moveVideo:'上下拖动调整视频位置；方向键微调，Shift 加速'});
+  Object.assign(copy.en,{moveVideo:'Drag vertically to position the video. Arrow keys nudge; Shift moves faster.'});
   Object.assign(copy.zh,{rgbFeather:'RGB 羽化',rgbFeatherReference:'同步羽化（参考效果）',rgbFeatherStraight:'标准 Alpha（兼容直通）',rgbFeatherHint:'同步羽化会把渐隐写入 RGB 与 Alpha，系统播放器也能看到柔和边缘。本站按文件标记播放；接入要求直通 RGB 的 SDK 时，请选择标准 Alpha。'});
   Object.assign(copy.en,{rgbFeather:'RGB feathering',rgbFeatherReference:'Feather RGB and Alpha',rgbFeatherStraight:'Straight RGB compatibility',rgbFeatherHint:'Feathered RGB also shows soft edges in regular video players. This site reads the embedded mode. Choose straight RGB for SDKs that require it.'});
   Object.assign(copy.zh,{rgbFeatherApplied:'RGB 同步羽化',errorFeather:'羽化组件版本不一致，请刷新页面后重新转换。'});
   Object.assign(copy.en,{rgbFeatherApplied:'RGB + Alpha feathered',errorFeather:'The feathering component is outdated. Refresh this page and convert again.'});
-  Object.assign(copy.zh,{nativeVap:'VAP · 已识别资源与透明通道',resourceInvalid:'请补齐头像和文字，并检查资源标签、位置与时间。',errorVapSource:'VAP 配置与视频不匹配，无法读取资源与透明通道。',dynamicResources:'动态资源',bakedResources:'固定合成',resourceBundleHint:'动态头像按标签替换，请下载完整包 ZIP，内含默认头像与接入示例。'});
-  Object.assign(copy.en,{nativeVap:'VAP · Resources and alpha detected',resourceInvalid:'Complete the avatar and text, then check tags, position and timing.',errorVapSource:'The VAP configuration does not match the video.',dynamicResources:'Dynamic resources',bakedResources:'Baked resources',resourceBundleHint:'Dynamic avatars use tag bindings. Download the ZIP for default assets and integration examples.'});
+  Object.assign(copy.zh,{nativeVap:'VAP · 已识别资源与透明通道',resourceInvalid:'请补齐头像和文字，并检查资源标签、位置与时间。',errorVapSource:'VAP 配置与视频不匹配，无法读取资源与透明通道。',dynamicResources:'动态资源',bakedResources:'固定合成',resourceBundleHint:'头像按Key替换，完整包 ZIP 包含占位资源与接入示例。'});
+  Object.assign(copy.en,{nativeVap:'VAP · Resources and alpha detected',resourceInvalid:'Complete the avatar and text, then check tags, position and timing.',errorVapSource:'The VAP configuration does not match the video.',dynamicResources:'Dynamic resources',bakedResources:'Baked resources',resourceBundleHint:'Avatars use key bindings. The ZIP includes placeholders and integration examples.'});
   copy.zh.errorResourceLimit='原 VAP 超过 6 个资源位，请先减少资源后导入。';copy.en.errorResourceLimit='This VAP has more than 6 resource slots. Reduce its resources before importing.';
   Object.assign(copy.zh,{screenRed:'红色',screenOrange:'橙色',screenYellow:'黄色',screenCyan:'青色',screenMagenta:'紫 / 品红',screenCustom:'其他纯色'});
   Object.assign(copy.en,{screenRed:'Red',screenOrange:'Orange',screenYellow:'Yellow',screenCyan:'Cyan',screenMagenta:'Purple / magenta',screenCustom:'Other solid color'});
@@ -56,7 +58,7 @@
   }
   let lang=typeof language!=='undefined'&&language==='en'?'en':'zh';
   const t=key=>(copy[lang]||copy.zh)[key]||key;
-  const state={active:false,file:null,meta:null,sourceUrl:null,inputMode:'video',sequenceTime:0,maskFile:null,sourceKind:'plain_mp4',detectedMethod:'opaque',detectedScreen:'auto',detectedBackground:null,alphaScale:.5,outputRatio:720/1560,sizePreset:'default',view:'original',background:'checker',loading:false,converting:false,packing:false,playing:false,revision:0,result:null,notice:null,errorTone:'error',progress:0,phase:'loading',previewError:false};
+  const state={active:false,file:null,meta:null,sourceUrl:null,inputMode:'video',sequenceTime:0,videoOffsetY:0,maskFile:null,sourceKind:'plain_mp4',detectedMethod:'opaque',detectedScreen:'auto',detectedBackground:null,alphaScale:.5,outputRatio:720/1560,sizePreset:'default',view:'original',background:'checker',loading:false,converting:false,packing:false,playing:false,revision:0,result:null,notice:null,errorTone:'error',progress:0,phase:'loading',previewError:false};
   state.verticalMask=savedMask();state.giftFade={enabled:true,fadeIn:1,fadeOut:1};state.playerState='empty';state.sourceFrameReady=false;state.previewReady=false;
   const maxOutputBytes=3000000;
   $('Quality').value='ultra';$('Method').value='auto';$('Width').value='720';$('Height').value='1560';$('Target').value='3';$('Volume').value='60';$('VerticalMask').open=true;
@@ -67,12 +69,12 @@
   const activeMethod=()=>isSequence()||state.sourceVapConfig?'opaque':$('Method').value==='auto'?state.detectedMethod:$('Method').value;
   const sourceTime=()=>isSequence()?state.sequenceTime:video.currentTime||0;
   function seekSource(time){const next=Math.max(0,Math.min(state.meta?.duration||0,time));if(isSequence()){state.sequenceTime=next;sync();requestPreview()}else video.currentTime=next}
-  let enginePromise=null,loadVersion=0,controller=null,animation=0,previewVersion=0,previewProcessor=null,previewJob=null,previewQueued=false,lastPreviewTime=-1,maskDrag=null;
+  let enginePromise=null,loadVersion=0,controller=null,animation=0,previewVersion=0,previewProcessor=null,previewJob=null,previewQueued=false,lastPreviewTime=-1,maskDrag=null,videoDrag=null;
   const sourceFrame=document.createElement('canvas');
   let resourceModulePromise=null,resourcePreview=null,resourcePreviewRevision=-1;
   let giftFadeModulePromise=null;
   const getGiftFadeModule=()=>giftFadeModulePromise||(giftFadeModulePromise=import('./vap-gift-fade.mjs?v=20261029-gift-fade1').catch(error=>{giftFadeModulePromise=null;throw error}));
-  const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261029-gift-fade1').catch(error=>{resourceModulePromise=null;throw error}));
+  const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261030-avatar-motion1').catch(error=>{resourceModulePromise=null;throw error}));
   const resourceEditor=window.VapResourceEditor?.create({root,stage,canvas,onChange(event={}){
     if(state.loading||state.converting||state.packing)return;
     if(event.reason==='interaction-start'){pause();return}
@@ -88,7 +90,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[];
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261029-gift-fade1').catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261030-avatar-motion1').catch(error=>{enginePromise=null;throw error}));
   function errorKey(error,fallback='errorConvert'){
     const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',budget:'errorBudget',cancelled:'cancelled'};
     return codes[error?.code]||fallback;
@@ -102,11 +104,11 @@
     const verticalMask=state.verticalMask;if(!validVerticalMask(verticalMask))throw Object.assign(new Error('invalid vertical mask'),{code:'invalid'});
     const giftFade=state.giftFade;if(!validGiftFade(giftFade))throw Object.assign(new Error('invalid gift fade'),{code:'invalid'});
     const audioGain=Number($('Volume').value)/100;if(!Number.isFinite(audioGain)||audioGain<0||audioGain>2)throw Object.assign(new Error('invalid volume'),{code:'invalid'});
-    const resourceOptions=resourceEditor?.getOptions()||{resourceMode:'dynamic',resources:[]};
+    const resourceOptions={...(resourceEditor?.getOptions()||{resources:[]}),resourceMode:'dynamic'};
     if(!preview&&resourceEditor?.hasErrors())throw Object.assign(new Error('invalid resources'),{uiKey:'resourceInvalid'});
     // Incomplete slots may be edited while the source and valid slots remain visible.
     if(preview)resourceOptions.resources=resourceOptions.resources.filter(r=>r.type==='image'?r.file instanceof Blob&&r.file.size:r.text?.trim());
-    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,rgbAlphaMode:resourceOptions.resourceMode==='dynamic'&&resourceOptions.resources.length?'premultiplied':$('RgbAlphaMode').value||'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(matteMethod==='chroma_key'&&$('Screen').value==='auto'&&state.sourceKind==='chroma_mp4'&&state.detectedBackground?{background:state.detectedBackground.slice()}:{}),alphaScale:state.alphaScale,width,height,fps,targetBytes:Math.round(target*1e6),quality:$('Quality').value,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
+    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,rgbAlphaMode:resourceOptions.resourceMode==='dynamic'&&resourceOptions.resources.length?'premultiplied':$('RgbAlphaMode').value||'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(matteMethod==='chroma_key'&&$('Screen').value==='auto'&&state.sourceKind==='chroma_mp4'&&state.detectedBackground?{background:state.detectedBackground.slice()}:{}),alphaScale:state.alphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:Math.round(target*1e6),quality:$('Quality').value,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
   }
   function syncPreviewVolume(){
     const gain=$('KeepAudio').checked?Math.max(0,Math.min(2,Number($('Volume').value)/100||0)):0;
@@ -147,6 +149,8 @@
   function positionMaskOverlay(){
     const overlay=$('MaskOverlay');if(overlay.hidden)return;const r=canvas.getBoundingClientRect(),s=stage.getBoundingClientRect();
     overlay.style.left=(r.left-s.left-(stage.clientLeft||0))+'px';overlay.style.top=(r.top-s.top-(stage.clientTop||0))+'px';overlay.style.width=(r.width||r.right-r.left)+'px';overlay.style.height=(r.height||r.bottom-r.top)+'px';
+    const play=$('Play'),p=play.getBoundingClientRect();
+    for(const [id] of maskFields){const label=$('MaskHandle'+id).querySelector('span');label.style.marginRight='0px';const q=label.getBoundingClientRect();if(!play.hidden&&q.bottom>p.top-6&&q.top<p.bottom+6&&q.right>p.left-8&&q.left<p.right+8)label.style.marginRight=Math.max(0,q.right-p.left+8)+'px';}
   }
   function syncMaskControls(){
     const locked=busy()||!state.file,valid=validVerticalMask(state.verticalMask),m=state.verticalMask;
@@ -171,6 +175,15 @@
     if(Object.is(state.verticalMask[key],value))return;state.verticalMask[key]=value;maskChanged();
   }
   function endMaskDrag(){const drag=maskDrag;maskDrag=null;if(drag)try{drag.handle.releasePointerCapture?.(drag.id)}catch(ignored){}}
+  function endVideoDrag(event){if(!videoDrag||event?.pointerId!==undefined&&event.pointerId!==videoDrag.id)return;const drag=videoDrag;videoDrag=null;stage.classList.remove('is-positioning');try{stage.releasePointerCapture?.(drag.id)}catch(ignored){}}
+  function setVideoOffsetY(value){
+    if(busy()||!state.file||!Number.isFinite(value))return;
+    const next=Math.round(Math.max(-1,Math.min(1,value))*1e6)/1e6;if(next===state.videoOffsetY)return;
+    pause();const revision=state.revision;state.videoOffsetY=next;invalidateResult();
+    // Video movement does not change the independent Key textures or their positions.
+    if(resourcePreviewRevision===revision)resourcePreviewRevision=state.revision;
+    state.previewError=false;previewVersion++;lastPreviewTime=-1;state.view='transparent';sync();requestPreview();
+  }
   function validOptions(){try{options();return true}catch(error){return false}}
   function showNotice(key,tone='error'){state.notice=key;state.errorTone=tone;sync()}
   function cleanupProcessor(){
@@ -193,8 +206,10 @@
     state.previewError=false;cleanupProcessor();sync();requestPreview();
   }
   function sync(){
-    const locked=busy(),ready=!!state.file,sequence=isSequence(),sequenceInput=state.inputMode==='sequence',valid=validOptions();
-    resourceEditor?.setContext({ready,busy:locked,width:Number($('Width').value)||720,height:Number($('Height').value)||1560,duration:state.meta?.duration||0,time:sourceTime(),view:state.view,language:lang});
+    let locked=busy();const ready=!!state.file,sequence=isSequence(),sequenceInput=state.inputMode==='sequence';
+    resourceEditor?.setContext({ready,busy:locked,width:Number($('Width').value)||720,height:Number($('Height').value)||1560,duration:state.meta?.duration||0,fps:Number($('Fps').value)||24,time:sourceTime(),view:state.view,language:lang});
+    // A native avatar slot may start loading its default portrait during context sync.
+    locked=busy();const valid=validOptions();if(locked)endVideoDrag();
     root.dataset.state=state.loading?'loading':state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'idle';
     root.setAttribute('aria-busy',String(locked));stage.setAttribute('aria-busy',String(locked));stage.classList.toggle('has-file',ready);stage.classList.toggle('upload-ready',!ready);
     for(const id of ['Upload','Replace','Input','SequenceInput','InputVideo','InputSequence','Budget1','Budget2','Budget3','Method','Screen','MaskPick','MaskInput','Width','Height','Fps','Target','Quality','RgbAlphaMode','KeepAudio','Tolerance','Softness','Spill','LightRecovery','AlphaHalf','AlphaFull','SizeDefault','Size750'])$(id).disabled=locked;
@@ -202,17 +217,17 @@
     for(const id of ['BgChecker','BgBlack','BgWhite'])$(id).disabled=locked;
     $('Empty').hidden=ready;$('Sourcebar').hidden=!ready;$('Playback').hidden=!ready;$('ViewToolbar').hidden=false;
     $('SourceVideo').hidden=sequence||!ready||(state.view!=='original'&&state.previewReady);$('PreviewCanvas').hidden=!ready||(!sequence&&state.view==='original')||!state.previewReady;
-    $('InputVideo').setAttribute('aria-pressed',String(!sequenceInput));$('InputSequence').setAttribute('aria-pressed',String(sequenceInput));$('InputModes').setAttribute('aria-label',t('inputModes'));
+    $('InputVideo').setAttribute('aria-pressed',String(!sequenceInput));$('InputSequence').setAttribute('aria-pressed',String(sequenceInput));$('InputModes').setAttribute('aria-label',t('inputModes'));$('InputModes').hidden=true;$('DetectedType').hidden=true;
     root.querySelector('[data-vap-i18n="uploadTitle"]').textContent=t('uploadTitle');root.querySelector('[data-vap-i18n="uploadHint"]').textContent=t('uploadHint');$('Upload').textContent=t('upload');$('Replace').textContent=t('replace');
-    $('BudgetPresets').setAttribute('aria-label',t('budgetPresets'));for(const amount of [1,2,3])$('Budget'+amount).setAttribute('aria-pressed',String(Number($('Target').value)===amount));
-    root.querySelector('[data-vap-i18n="fps"]').textContent=t(sequence||!ready&&sequenceInput?'sequenceFps':'fps');$('Mute').hidden=sequence;
+    $('BudgetPresets').setAttribute('aria-label',t('budgetPresets'));$('BudgetPresets').hidden=true;for(const amount of [1,2,3])$('Budget'+amount).setAttribute('aria-pressed',String(Number($('Target').value)===amount));
+    root.querySelector('[data-vap-i18n="fps"]').textContent=t(sequence||!ready&&sequenceInput?'sequenceFps':'fps');$('Mute').hidden=true;
 
     root.dataset.sourceFrameReady=String(state.sourceFrameReady);root.dataset.previewReady=String(state.previewReady);
     const method=activeMethod(),chroma=method==='chroma_key';
     $('DetectedType').textContent=t(state.loading?'sourceDetecting':!ready?(sequenceInput?'sequenceType':'sourceAuto'):sequence?'sequenceType':state.sourceVapConfig?'nativeVap':({chroma_key:'chroma',black_luma:'blackLuma',white_luma:'whiteLuma',opaque:'plain'}[method]||'plain'));
     if(ready&&!state.loading&&chroma)$('DetectedType').textContent=t('chroma')+' · '+($('Screen').value==='auto'?screenLabel(state.detectedScreen):screenLabel($('Screen').value));
     $('MethodWrap').hidden=(!ready&&sequenceInput)||sequence||!!state.sourceVapConfig;$('ScreenWrap').hidden=!chroma;
-    const dynamicResources=resourceEditor?.getOptions();if(dynamicResources?.resourceMode==='dynamic'&&dynamicResources.resources.length){$('RgbAlphaMode').value='premultiplied';$('RgbAlphaMode').disabled=true}
+    const dynamicResources=resourceEditor?.getOptions();if(dynamicResources?.resources.length){$('RgbAlphaMode').value='premultiplied';$('RgbAlphaMode').disabled=true}
     $('MaskRow').hidden=sequence||chroma||method!=='manual_mask';
     $('KeySettings').hidden=sequence||!chroma&&!['black_luma','white_luma'].includes(method);$('LightRecoveryRow').hidden=!chroma;$('LightRecovery').title=t('lightRecoveryHint');
     $('MethodHint').textContent=t(sequence?'sequenceHelp':$('Method').value==='auto'&&!state.sourceVapConfig?'autoMethodHint':chroma?'chromaHint':method==='opaque'&&state.verticalMask.enabled?'frameMaskHint':({black_luma:'blackHint',white_luma:'whiteHint',ai_foreground:'aiHint',manual_mask:'maskHint',opaque:'opaqueHint'}[method]||'opaqueHint'));
@@ -225,7 +240,7 @@
     for(const [id,value] of [['Original','original'],['Transparent','transparent'],['Alpha','alpha']])$('View'+id).setAttribute('aria-pressed',String(state.view===value));
     for(const [id,value] of [['Checker','checker'],['Black','black'],['White','white']])$('Bg'+id).setAttribute('aria-pressed',String(state.background===value));
     stage.dataset.background=state.background;$('ResultFrame').dataset.background=state.background;
-    $('Play').textContent=t(state.playing?'pause':'play');$('Mute').textContent=t(video.muted?'soundOff':'soundOn');$('Mute').setAttribute('aria-pressed',String(!video.muted));
+    $('Play').hidden=!ready;$('Play').textContent='';$('Play').setAttribute('aria-label',t(state.playing?'pause':'play'));$('Play').title=t(state.playing?'pause':'play');$('Play').setAttribute('aria-pressed',String(state.playing));$('Mute').textContent=t(video.muted?'soundOff':'soundOn');$('Mute').setAttribute('aria-pressed',String(!video.muted));
     $('Volume').closest('.vap-volume').hidden=sequence||!ready&&sequenceInput;$('KeepAudio').closest('label').hidden=sequence||!ready&&sequenceInput;
     $('Volume').disabled=locked||!state.meta?.hasAudio||!$('KeepAudio').checked;$('VolumeValue').textContent=state.meta&&!state.meta.hasAudio?t('noAudioLabel'):!$('KeepAudio').checked?t('audioOffLabel'):$('Volume').value+'%';$('Volume').setAttribute('aria-valuetext',$('Volume').value+'%');
     $('VolumeHint').textContent=t(state.meta&&!state.meta.hasAudio?'noAudioHint':!$('KeepAudio').checked?'disabledAudioHint':'volumeHint');$('Volume').title=$('VolumeHint').textContent;syncPreviewVolume();
@@ -242,9 +257,9 @@
     $('ProgressRow').hidden=!state.loading&&!state.converting;$('Phase').textContent=t(state.loading?'reading':state.phase);$('Percent').textContent=Math.round(state.progress*100)+'%';$('Progress').value=state.progress;
     $('Notice').hidden=!state.notice;$('Notice').textContent=state.notice?t(state.notice):'';$('Notice').dataset.tone=state.errorTone;
     $('PreviewError').hidden=!state.previewError;$('PreviewError').textContent=t('previewFailed');
-    $('Result').hidden=!state.result;$('ResultPreview').hidden=!ready;$('CompareSourceLabel').hidden=!ready;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(Number($('Width').value)/Number($('Height').value)||720/1560));syncOutputPlaceholder();
+    $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareSourceLabel').hidden=!ready;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(Number($('Width').value)/Number($('Height').value)||720/1560));syncOutputPlaceholder();
     for(const id of ['DownloadMp4','DownloadJson','DownloadZip'])$(id).disabled=locked||!state.result;
-    $('ResultPlay').disabled=locked||!state.result||state.playerState!=='ready';$('ResultPlay').title=t('vapPlaybackNotice');$('DownloadMp4').title=t('vapPlaybackNotice');
+    $('ResultPlay').hidden=!state.result;$('ResultPlay').disabled=locked||!state.result||state.playerState!=='ready';$('DownloadMp4').title=t('vapPlaybackNotice');
     $('ResourceBundleHint').hidden=state.result?.config?.info?.isVapx!==1;$('ResourceBundleHint').textContent=t('resourceBundleHint');
     if(state.result){
       const {blob,config,report}=state.result,info=config.info;const seconds=Number(report.timings?.wallMs)/1000;
@@ -253,7 +268,7 @@
       $('BudgetNotice').hidden=!report.budgetExceeded;
     }
     for(const [id,field] of [['Tolerance','keyTolerance'],['Softness','edgeSoftness'],['Spill','spill']])$(''+id+'Value').textContent=Math.round(Number($(id).value)*100)+'%';
-    stage.setAttribute('aria-label',t(ready?'preview':'uploadTitle'));$('Progress').setAttribute('aria-label',t('converting'));root.querySelector('.vap-view-modes').setAttribute('aria-label',t('preview'));root.querySelector('.vap-view-background').setAttribute('aria-label',t('previewBackground'));$('Screen').setAttribute('aria-label',t('chroma'));$('Timeline').setAttribute('aria-label',t('timeline'));canvas.setAttribute('aria-label',t(state.view==='alpha'?'alphaView':'transparent'));
+    stage.setAttribute('aria-label',t(ready?'moveVideo':'uploadTitle'));stage.title=ready?t('moveVideo'):'';stage.setAttribute('tabindex',ready?'0':'-1');stage.dataset.videoOffsetY=String(state.videoOffsetY);$('Progress').setAttribute('aria-label',t('converting'));root.querySelector('.vap-view-modes').setAttribute('aria-label',t('preview'));root.querySelector('.vap-view-background').setAttribute('aria-label',t('previewBackground'));$('Screen').setAttribute('aria-label',t('chroma'));$('Timeline').setAttribute('aria-label',t('timeline'));canvas.setAttribute('aria-label',t(state.view==='alpha'?'alphaView':'transparent'));
     syncMaskControls();syncGiftFadeControls();
     window.FunToolkitUI?.setState('vap',{phase:state.loading?'loading':state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'empty',message:state.loading?t('reading'):t(state.phase)});
   }
@@ -273,7 +288,7 @@
     try{await video.play();if(!current()){video.pause();return}state.playing=true;sync();loop()}catch(error){if(current())showNotice('errorDecode')}
   }
   function getPreviewProcessor(opts){
-    if(!previewProcessor)previewProcessor=import('./vap-matte.mjs?v=20261029-detail1').then(module=>module.createMatteProcessor(opts)).catch(error=>{previewProcessor=null;throw error});
+    if(!previewProcessor)previewProcessor=import('./vap-matte.mjs?v=20261030-avatar-motion1').then(module=>module.createMatteProcessor(opts)).catch(error=>{previewProcessor=null;throw error});
     return previewProcessor;
   }
   function cancelSourceFrameWait(){
@@ -313,12 +328,12 @@
       }
       const module=opts.sourceVapConfig||opts.resources.length?await getResourceModule():null;
       const processor=opts.sourceVapConfig?null:await getPreviewProcessor(opts);
-      let pixels=opts.sourceVapConfig?module.unpackVapFrame(sourceFrame,{width,height,sourceVapConfig:opts.sourceVapConfig,verticalMask:opts.verticalMask}):await processor.process(sourceFrame,{timestamp:time,width,height,verticalMask:opts.verticalMask});
+      let pixels=opts.sourceVapConfig?module.unpackVapFrame(sourceFrame,{width,height,sourceVapConfig:opts.sourceVapConfig,verticalMask:opts.verticalMask,videoOffsetY:opts.videoOffsetY}):await processor.process(sourceFrame,{timestamp:time,width,height,verticalMask:opts.verticalMask,videoOffsetY:opts.videoOffsetY});
       const fadeModule=await getGiftFadeModule(),opacity=fadeModule.giftFadeOpacity(time,duration,opts.fps,opts.giftFade),dynamic=opts.resources.length&&opts.resourceMode==='dynamic';
       if(dynamic)pixels=fadeModule.applyGiftFade(pixels,opacity);
       if(opts.resources.length){
         if(resourcePreviewRevision!==revision){
-          const next=await module.createResourceRenderer(opts.resources,{width,height,duration:state.meta.duration,sourceVapConfig:opts.sourceVapConfig,verticalMask:opts.verticalMask});
+          const next=await module.createResourceRenderer(opts.resources,{width,height,duration:state.meta.duration,fps:opts.fps,sourceVapConfig:opts.sourceVapConfig,verticalMask:opts.verticalMask});
           if(version!==previewVersion||revision!==state.revision){next.dispose();return}
           resourcePreview?.dispose();resourcePreview=next;resourcePreviewRevision=revision;
         }
@@ -326,6 +341,7 @@
       }
       if(!dynamic)pixels=fadeModule.applyGiftFade(pixels,opacity);
       if(version!==previewVersion||revision!==state.revision||state.converting||!state.file)return;
+      if(typeof module?.resourceFrame==='function')resourceEditor?.setContext({frameResolver:module.resourceFrame,resourceOpacity:dynamic?opacity:1,fps:opts.fps,time});
       drawPixels(pixels,state.view==='alpha');
     })().catch(error=>{if(version===previewVersion){root.dataset.previewError=String(error?.message||error);state.previewError=true;sync()}}).finally(()=>{
       previewJob=null;$('PreviewBusy').hidden=true;
@@ -431,7 +447,7 @@
     try{
       let tags={},resourceFiles=[];
       if(opts.resources.length&&opts.resourceMode==='dynamic'){
-        const module=await getResourceModule();resultResources=await module.createResourceRenderer(opts.resources,{width:opts.width,height:opts.height,duration:state.meta.duration,sourceVapConfig:opts.sourceVapConfig,verticalMask:opts.verticalMask,signal:job.signal});
+        const module=await getResourceModule();resultResources=await module.createResourceRenderer(opts.resources,{width:opts.width,height:opts.height,duration:state.meta.duration,fps:opts.fps,sourceVapConfig:opts.sourceVapConfig,verticalMask:opts.verticalMask,signal:job.signal,includeDefaultAvatars:false});
         [tags,resourceFiles]=await Promise.all([resultResources.getPlayerTags(),resultResources.getPackageFiles()]);
         opts.packageReserveBytes=resourceFiles.reduce((sum,file)=>sum+file.blob.size,0)+8192;
       }
@@ -486,7 +502,7 @@
     return zipPromise;
   }
   function setActive(active){
-    state.active=!!active;if(!state.active){endMaskDrag();pause();cleanupProcessor();if(state.converting)cancel()}else{sync();requestPreview()}
+    state.active=!!active;if(!state.active){endMaskDrag();endVideoDrag();pause();cleanupProcessor();if(state.converting)cancel()}else{sync();requestPreview()}
     document.dispatchEvent(new CustomEvent('vap:active',{detail:{active:state.active}}));
   }
   function setLanguage(value){
@@ -538,6 +554,14 @@
     handle.addEventListener('pointerup',stop);handle.addEventListener('pointercancel',stop);handle.addEventListener('lostpointercapture',()=>{if(maskDrag?.handle===handle)maskDrag=null});
     handle.addEventListener('keydown',event=>{if(busy()||!state.file||!state.verticalMask.enabled||!validVerticalMask(state.verticalMask))return;const step=event.shiftKey ? .02 : .005,[min,max]=maskBounds(key);let value=state.verticalMask[key];if(['ArrowUp','ArrowLeft'].includes(event.key))value-=step;else if(['ArrowDown','ArrowRight'].includes(event.key))value+=step;else if(event.key==='Home')value=min;else if(event.key==='End')value=max;else return;event.preventDefault();setMaskBoundary(key,value,{clamp:true})});
   }
+  stage.addEventListener('pointerdown',event=>{
+    if(event.defaultPrevented||event.isPrimary===false||event.button!==undefined&&event.button!==0||videoDrag||busy()||!state.active||!state.file||!state.previewReady||![stage,canvas,video].includes(event.target))return;
+    pause();state.view='transparent';sync();const rect=canvas.getBoundingClientRect(),height=rect.height||rect.bottom-rect.top;if(!(height>0))return;
+    videoDrag={id:event.pointerId,y:event.clientY,offset:state.videoOffsetY,height};stage.classList.add('is-positioning');stage.focus?.({preventScroll:true});stage.setPointerCapture?.(event.pointerId);event.preventDefault();
+  });
+  stage.addEventListener('pointermove',event=>{if(!videoDrag||event.pointerId!==videoDrag.id)return;setVideoOffsetY(videoDrag.offset+(event.clientY-videoDrag.y)/videoDrag.height);event.preventDefault()});
+  stage.addEventListener('pointerup',endVideoDrag);stage.addEventListener('pointercancel',endVideoDrag);stage.addEventListener('lostpointercapture',endVideoDrag);
+  stage.addEventListener('keydown',event=>{if(busy()||!state.file||![stage,canvas,video].includes(event.target)||event.altKey||event.ctrlKey||event.metaKey)return;if(event.key==='Escape'){endVideoDrag();return}if(!['ArrowUp','ArrowDown'].includes(event.key))return;const step=(event.shiftKey?10:1)/Number($('Height').value);setVideoOffsetY(state.videoOffsetY+(event.key==='ArrowUp'?-step:step));event.preventDefault();event.stopPropagation?.()});
   $('VerticalMask').addEventListener('toggle',()=>{syncMaskControls();if($('VerticalMask').open&&state.verticalMask.enabled)requestPreview()});
   if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(positionMaskOverlay);observer.observe(canvas);observer.observe(stage)}else window.addEventListener('resize',positionMaskOverlay);
   $('Convert').addEventListener('click',convert);$('Cancel').addEventListener('click',cancel);
@@ -546,10 +570,10 @@
   document.addEventListener('dragover',event=>{if(state.active&&Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();stage.classList.add('is-dragging')}});
   document.addEventListener('dragleave',event=>{if(!event.relatedTarget)stage.classList.remove('is-dragging')});
   document.addEventListener('drop',event=>{stage.classList.remove('is-dragging');if(state.active&&event.dataTransfer?.files.length&&!event.defaultPrevented){event.preventDefault();loadFiles(event.dataTransfer.files)}});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden)pause()});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){endVideoDrag();pause()}});
   document.addEventListener('vap:player-state',event=>{if(!['empty','loading','ready','error'].includes(event.detail?.state))return;state.playerState=event.detail.state;sync()});
-  window.addEventListener('blur',endMaskDrag);
-  window.addEventListener('pagehide',event=>{sourceNonce++;cancelSourceFrameWait();pause();cleanupProcessor();cancel();if(!event.persisted){if(state.sourceUrl)URL.revokeObjectURL(state.sourceUrl);if(state.result)URL.revokeObjectURL(state.result.url);state.result?.resourceRenderer?.dispose();resourcePreview?.dispose();resourceEditor?.dispose();void previewAudioContext?.close()}});
+  window.addEventListener('blur',()=>{endMaskDrag();endVideoDrag()});
+  window.addEventListener('pagehide',event=>{sourceNonce++;endVideoDrag();cancelSourceFrameWait();pause();cleanupProcessor();cancel();if(!event.persisted){if(state.sourceUrl)URL.revokeObjectURL(state.sourceUrl);if(state.result)URL.revokeObjectURL(state.result.url);state.result?.resourceRenderer?.dispose();resourcePreview?.dispose();resourceEditor?.dispose();void previewAudioContext?.close()}});
   window.addEventListener('pageshow',event=>{if(event.persisted&&state.file&&!state.sourceFrameReady){waitForSourceFrame();if(video.readyState>=2)sourceDataLoaded()}});
   window.VapTool={setActive,setLanguage};setLanguage(lang);
 })();

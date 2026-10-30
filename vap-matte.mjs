@@ -6,6 +6,7 @@ const smooth = (low, high, value) => { const t=clamp((value-low)/(high-low));ret
 const methods = new Set(['chroma_key','black_luma','white_luma','manual_mask','ai_foreground','opaque']);
 const vendorBase = new URL('./vendor/vap-matte/', import.meta.url);
 export const AI_SCOPE = 'person';
+export function normalizeVideoOffsetY(value=0){if(typeof value!=='number'||!Number.isFinite(value)||Math.abs(value)>1)throw new Error('视频位置须在画布高度的 -100%–100% 内。');return value;}
 const defaultVerticalMask = Object.freeze({enabled:false,topStart:0,topEnd:.15,bottomStart:.85,bottomEnd:1});
 
 function dimensions(width,height){
@@ -181,11 +182,11 @@ export function applyMaskPixels(source,mask,width,height,{useAlpha=false}={}){
 
 function canvas(width,height){const target=typeof OffscreenCanvas==='function'?new OffscreenCanvas(width,height):document.createElement('canvas');target.width=width;target.height=height;const context=target.getContext('2d',{willReadFrequently:true});if(!context)throw new Error('此浏览器无法读取视频帧。');return {target,context};}
 function abort(signal){if(signal?.aborted)throw new DOMException('操作已取消。','AbortError');}
-function framePixels(source,width,height,surface){
+function framePixels(source,width,height,surface,videoOffsetY=0){
   if(surface.target.width!==width||surface.target.height!==height){surface.target.width=width;surface.target.height=height;}
   surface.context.imageSmoothingEnabled=true;surface.context.imageSmoothingQuality='high';surface.context.clearRect(0,0,width,height);
   const sw=source.videoWidth||source.width,sh=source.videoHeight||source.height;dimensions(sw,sh);
-  const scale=Math.min(width/sw,height/sh),w=sw*scale,h=sh*scale,x=(width-w)/2,y=(height-h)/2;
+  const scale=Math.min(width/sw,height/sh),w=sw*scale,h=sh*scale,x=(width-w)/2,y=(height-h)/2+videoOffsetY*height;
   if(typeof ImageData==='function'&&source instanceof ImageData){const temporary=canvas(source.width,source.height);temporary.context.putImageData(source,0,0);surface.context.drawImage(temporary.target,x,y,w,h);}
   else surface.context.drawImage(source,x,y,w,h);
   return surface.context.getImageData(0,0,width,height);
@@ -227,20 +228,20 @@ export async function createMatteProcessor(options={}){
   if(options.sourceKind==='chroma_mp4'&&options.matteMethod&&options.matteMethod!=='chroma_key')throw new Error('纯色幕输入需要使用色键抠像。');
   if(method==='opaque'&&options.confirmedOpaque!==true)throw new Error('保留原背景会生成不透明 VAP，请先确认。');
   const suppliedScreen=method==='chroma_key'?screenOption(options.screenColor||'auto',options.background):null;
-  const verticalMask=normalizeVerticalMask(options.verticalMask);
+  const verticalMask=normalizeVerticalMask(options.verticalMask),videoOffsetY=normalizeVideoOffsetY(options.videoOffsetY);
   const input=canvas(1,1),maskSurface=canvas(1,1),chromaWorkspace={};let mask=null,ai=null,disposed=false,lastTime=-1,screen=suppliedScreen,previous=null,previousTime=-1;
   try{if(method==='manual_mask')mask=await maskSource(options.maskFile);if(method==='ai_foreground')ai=await personSegmenter(options);abort(options.signal);}
   catch(error){mask?.dispose();ai?.task?.close();throw error;}
   const processor={backend:ai?.backend||'cpu',scope:method==='ai_foreground'?'person':null,detectedScreen:suppliedScreen,
-    readFrame(source,{width=source.width||source.videoWidth,height=source.height||source.videoHeight}={}){
+    readFrame(source,{width=source.width||source.videoWidth,height=source.height||source.videoHeight,videoOffsetY:frameOffset}={}){
       if(disposed)throw new Error('抠像任务已结束。');abort(options.signal);dimensions(width,height);
-      return framePixels(source,width,height,input);
+      return framePixels(source,width,height,input,frameOffset===undefined?videoOffsetY:normalizeVideoOffsetY(frameOffset));
     },
-    async process(source,{timestamp=0,width=source.width||source.videoWidth,height=source.height||source.videoHeight,verticalMask:frameMask}={}){
+    async process(source,{timestamp=0,width=source.width||source.videoWidth,height=source.height||source.videoHeight,verticalMask:frameMask,videoOffsetY:frameOffset}={}){
       if(disposed)throw new Error('抠像任务已结束。');abort(options.signal);dimensions(width,height);if(!Number.isFinite(timestamp)||timestamp<0)throw new Error('视频帧时间无效。');
-      const activeVerticalMask=frameMask===undefined?verticalMask:normalizeVerticalMask(frameMask);
-      const image=processor.readFrame(source,{width,height});let data;
-      if(mask){await mask.seek?.(timestamp);abort(options.signal);const mw=mask.source.videoWidth||mask.source.width,mh=mask.source.videoHeight||mask.source.height,sw=source.videoWidth||source.width,sh=source.videoHeight||source.height;if(Math.abs((mw/mh)/(sw/sh)-1)>.01)throw new Error('遮罩比例必须与原片一致。');const frame=framePixels(mask.source,width,height,maskSurface);data=applyMaskPixels(image.data,frame.data,width,height,{useAlpha:mask.useAlpha===true});}
+      const activeVerticalMask=frameMask===undefined?verticalMask:normalizeVerticalMask(frameMask),activeOffset=frameOffset===undefined?videoOffsetY:normalizeVideoOffsetY(frameOffset);
+      const image=processor.readFrame(source,{width,height,videoOffsetY:activeOffset});let data;
+      if(mask){await mask.seek?.(timestamp);abort(options.signal);const mw=mask.source.videoWidth||mask.source.width,mh=mask.source.videoHeight||mask.source.height,sw=source.videoWidth||source.width,sh=source.videoHeight||source.height;if(Math.abs((mw/mh)/(sw/sh)-1)>.01)throw new Error('遮罩比例必须与原片一致。');const frame=framePixels(mask.source,width,height,maskSurface,activeOffset);data=applyMaskPixels(image.data,frame.data,width,height,{useAlpha:mask.useAlpha===true});}
       else if(ai){
         const time=Math.max(timestamp*1000,lastTime+1);lastTime=time;const result=ai.task.segmentForVideo(input.target,time);
         try{const confidence=result.confidenceMasks;if(!confidence?.length)throw new Error('人像模型未返回有效透明度。');const person=confidence[confidence.length-1],values=person.getAsFloat32Array(),mw=person.width,mh=person.height;if(values.length!==mw*mh)throw new Error('人像模型透明度尺寸无效。');

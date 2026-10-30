@@ -48,8 +48,18 @@
 #vapTool [data-background=black].vap-stage.has-file,#vapTool [data-background=black].vap-result-frame{background:#000;--vap-empty-heading:#f3f7ff;--vap-empty-muted:#bac9dc}
 #vapTool [data-background=white].vap-stage.has-file,#vapTool [data-background=white].vap-result-frame{background:#fff}
 #vapTool .vap-stage.is-dragging{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue);background-color:#deedff}
+#vapTool .vap-stage.has-file{cursor:ns-resize;touch-action:pan-x}
+#vapTool .vap-stage.is-positioning{cursor:grabbing}
+#vapTool .vap-stage.has-file:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 #vapTool .vap-stage>video,#vapTool .vap-stage>canvas{display:block;width:auto;height:auto;max-width:100%;max-height:520px;object-fit:contain}
 #vapTool .vap-stage>canvas{max-height:520px}
+#vapTool .vap-canvas-play{position:absolute;right:12px;bottom:12px;z-index:10;display:flex;align-items:center;justify-content:center;box-sizing:border-box;width:44px;height:44px;min-width:44px;min-height:44px;padding:0;border:1px solid #b7d7ff;border-radius:12px;background:#fffffff0;color:var(--blue);box-shadow:0 2px 8px #163b671a;cursor:pointer;touch-action:manipulation;transition:background-color .18s ease,border-color .18s ease,box-shadow .18s ease}
+#vapTool .vap-canvas-play::before{content:"";display:block;flex:none;width:20px;height:20px;background:currentColor;clip-path:polygon(25% 10%,85% 50%,25% 90%)}
+#vapTool .vap-canvas-play[aria-pressed=true]::before{clip-path:polygon(18% 10%,40% 10%,40% 90%,18% 90%,18% 10%,60% 10%,82% 10%,82% 90%,60% 90%,60% 10%)}
+#vapTool .vap-canvas-play:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
+#vapTool .vap-canvas-play:disabled{color:#9daabe;background:#f0f3f7;box-shadow:none;cursor:not-allowed}
+#vapTool .vap-canvas-play[hidden]{display:none}
+@media(hover:hover) and (pointer:fine){#vapTool .vap-canvas-play:hover:not(:disabled){background:#eaf3ff;border-color:#7fb8ff;box-shadow:0 3px 10px #0071e326}}
 #vapTool .vap-empty{display:flex;align-items:center;flex-direction:column;padding:24px;text-align:center;width:100%;box-sizing:border-box}
 #vapTool .vap-empty img{display:block;margin-bottom:16px;object-fit:contain}
 #vapTool .vap-empty strong{font-size:16px;line-height:24px;font-weight:600;color:var(--vap-empty-heading,var(--tool-heading))}
@@ -146,7 +156,7 @@
 @media(hover:hover) and (pointer:fine){#vapTool .vap-primary:hover:not(:disabled){background:#0065cd}#vapTool .vap-secondary:hover:not(:disabled),#vapTool .vap-help:hover{background:#e4efff;border-color:#a8cfff;color:var(--blue)}#vapTool .vap-replace:hover:not(:disabled){background:#207a3f}#vapTool .vap-segments button:hover:not(:disabled),#vapTool .vap-view-toolbar button:hover:not(:disabled),#vapTool .vap-view-modes button:hover:not(:disabled){border-color:#a8cfff;color:var(--blue);background:#f2f7ff}#vapTool input[type=number]:hover:not(:disabled){border-color:#6296d0}}
 @media(max-width:900px){#vapTool .vap-workspace{grid-template-columns:minmax(0,1fr)}#vapTool .vap-stage{min-height:400px}}
 @media(max-width:540px){#vapTool .vap-workspace{gap:14px}#vapTool .vap-card{padding:16px;border-radius:18px}#vapTool .vap-intro{gap:10px}#vapTool .vap-intro h1{font-size:22px}#vapTool .vap-stage{min-height:clamp(280px,48svh,360px)}#vapTool .vap-stage.has-file{min-height:240px}#vapTool .vap-stage>video,#vapTool .vap-stage>canvas{max-height:440px}#vapTool .vap-empty{padding:20px 12px}#vapTool .vap-empty strong{font-size:15px}#vapTool .vap-view-toolbar button,#vapTool .vap-view-modes button{min-height:44px;min-width:44px}#vapTool .vap-help{min-height:44px}#vapTool .vap-view-toolbar{width:100%}#vapTool .vap-keep-frame{min-height:44px}#vapTool .vap-view-modes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));width:100%}#vapTool .vap-view-background{margin-left:auto}#vapTool .ft-select>select{font-size:16px}#vapTool .vap-range-row{grid-template-columns:82px minmax(0,1fr) 35px;gap:8px}#vapTool input[type=range]{min-height:44px}#vapTool .vap-sourcebar{align-items:flex-start;flex-wrap:wrap}#vapTool .vap-sourcebar .vap-replace{margin-left:auto}#vapTool .vap-playback-top .vap-hint{font-size:11px}#vapTool .vap-privacy{font-size:11px}#vapTool .vap-card-heading{gap:8px}#vapTool .vap-result-preview .vap-card-heading{align-items:flex-start;flex-wrap:wrap}}
-@media(prefers-reduced-motion:reduce){#vapTool .vap-button,#vapTool .vap-stage,#vapTool .vap-disclosure-chevron,#vapTool .vap-switch,#vapTool .vap-switch:before{transition:none}}
+@media(prefers-reduced-motion:reduce){#vapTool .vap-canvas-play,#vapTool .vap-button,#vapTool .vap-stage,#vapTool .vap-disclosure-chevron,#vapTool .vap-switch,#vapTool .vap-switch:before{transition:none}}
 @media(forced-colors:active){#vapTool .vap-switch{appearance:auto;-webkit-appearance:auto}#vapTool .vap-switch:before{display:none}}
 
 /* The guide layer follows the rendered output canvas; only its handles capture input. */
@@ -168,9 +178,9 @@
 
 @media(max-width:540px){#vapTool .vap-mask-fields{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}#vapTool .vap-mask-handle>span{font-size:9px;padding-inline:4px}}
 
-/* After upload, input and output retain equally sized frames across processing states. */
+/* Reveal the output comparison only after a valid conversion is committed. */
 #vapTool .vap-preview-comparison{container-type:inline-size;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;min-width:0;gap:8px 16px;--vap-preview-ratio:.4615384615}
-#vapTool .vap-preview-comparison:not(.has-source){grid-template-columns:minmax(0,1fr)}
+#vapTool .vap-preview-comparison:not(.has-result){grid-template-columns:minmax(0,1fr)}
 #vapTool .vap-preview-comparison:not(.has-source) #vapStage{grid-row:1}
 #vapTool .vap-compare-source-label{display:flex;align-items:center;min-height:44px;grid-column:1;grid-row:1;font-size:13px;font-weight:500;color:var(--tool-muted)}
 #vapTool #vapStage{grid-column:1;grid-row:2}
@@ -179,6 +189,7 @@
 #vapTool .vap-result-preview>.vap-card-heading .vap-button{min-height:36px;padding:6px 10px;font-size:12px}
 #vapTool #vapResultFrame{grid-column:2;grid-row:2}
 #vapTool #vapStage,#vapTool #vapResultFrame{box-sizing:border-box;width:100%;height:min(520px,calc((100cqw - 16px)/2/var(--vap-preview-ratio)));min-height:0;max-height:520px;aspect-ratio:var(--vap-preview-ratio)}
+#vapTool .vap-preview-comparison:not(.has-result) #vapStage{height:min(520px,calc(100cqw/var(--vap-preview-ratio)))}
 #vapTool #vapStage,#vapTool #vapResultPlayer{display:flex;align-items:center;justify-content:center}
 #vapTool #vapStage>video,#vapTool #vapStage>canvas,#vapTool #vapResultPlayer>canvas{min-width:0;min-height:0;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain}
 @media(max-width:640px){#vapTool .vap-preview-comparison{grid-template-columns:minmax(0,1fr);row-gap:8px}#vapTool .vap-result-preview>.vap-card-heading{grid-column:1;grid-row:4;margin-top:12px}#vapTool #vapResultFrame{grid-column:1;grid-row:5}#vapTool .vap-result-preview>.vap-card-heading .vap-button{min-height:44px}#vapTool #vapStage,#vapTool #vapResultFrame{height:min(440px,calc(100cqw/var(--vap-preview-ratio)));max-height:440px}#vapTool .vap-empty img{width:96px;height:72px}}

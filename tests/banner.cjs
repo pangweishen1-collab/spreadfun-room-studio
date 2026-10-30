@@ -8,6 +8,7 @@ const events=[],uiStates=[],reveals=[];
 const feedback=()=>uiStates.at(-1);
 const recorded=type=>events.filter(event=>event.tool==='banner'&&event.type===type).reduce((total,event)=>total+event.count,0);
 const docListeners=new Map(),windowListeners=new Map();
+let compressionMode='high';
 let serial=0,encodeFails=false,failEncodeAt=0,zipFails=false,holdEncode=null;
 function element(tag='div'){
   const classes=new Set(),listeners=new Map(),attributes=new Map();
@@ -50,10 +51,10 @@ class MockZip{
   file(name,blob){this.files.push({name,blob});return this}
   async generateAsync(options){this.options=options;if(zipFails)throw Error('zip failed');return new Blob(['zip'],{type:'application/zip'})}
 }
-const sandbox={window:{addEventListener(k,fn){windowListeners.set(k,fn)},Hub:{record(tool,type,count=1){events.push({tool,type,count})}},FunToolkitUI:{setState(tool,state){uiStates.push({tool,...state})},reveal(node){reveals.push(node)}}},document,Image:MockImage,JSZip:MockZip,language:'en',Blob,TextEncoder,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,Set,console,
+const sandbox={location:{hash:'#banners'},window:{FunWebP:{getMode:()=>compressionMode},addEventListener(k,fn){windowListeners.set(k,fn)},Hub:{record(tool,type,count=1){events.push({tool,type,count})}},FunToolkitUI:{setState(tool,state){uiStates.push({tool,...state})},reveal(node){reveals.push(node)}}},document,Image:MockImage,JSZip:MockZip,language:'en',Blob,TextEncoder,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,Set,console,
   URL:{createObjectURL(blob){const url='blob:banner-'+ ++serial;urls.set(url,blob);return url},revokeObjectURL(url){revoked.add(url);urls.delete(url)}},
   setTimeout(fn,delay){if(delay<60000)queueMicrotask(fn);else timers.push(fn);return serial},clearTimeout(){},
-  prepareBannerWebP:async()=>{},canvasToLosslessWebP:async(canvas)=>{assert.equal(feedback().phase,'processing','real encoding uses processing feedback');encodes.push({canvas,width:canvas.width,height:canvas.height});if(holdEncode)await holdEncode;if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['webp-'+encodes.length],{type:'image/webp'})}};
+  prepareBannerWebP:async()=>{},canvasToWebP:async(canvas,options)=>{assert.ok(['high','lossless'].includes(options.mode));assert.equal(feedback().phase,'processing','real encoding uses processing feedback');encodes.push({canvas,width:canvas.width,height:canvas.height,mode:options.mode});if(holdEncode)await holdEncode;if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['webp-'+encodes.length],{type:'image/webp'})}};
 sandbox.window.JSZip=MockZip;
 let source=fs.readFileSync(path.join(__dirname,'../banner.js'),'utf8');
 const marker='window.BannerTool={syncLanguage};';
@@ -225,6 +226,12 @@ function assertPreviewBackground(value){
   assert.equal(get('#bannerStatus').textContent,'2 files ready');assert.ok(get('#bannerProjectCatalog').children.every(button=>!button.disabled));
   assert.equal(recorded('generated'),beforeFailure+2);assert.equal(revoked.has(fourfunOutput.url),true);
   await api.downloadAll();assert.equal(zips.at(-1).files.length,2);
+  compressionMode='lossless';docListeners.get('webp:mode-change')();
+  for(let i=0;i<10&&api.state.busy;i++)await new Promise(setImmediate);
+  assert.equal(api.state.outputs.length,2);assert.ok(api.state.outputs.every(file=>file.mode==='lossless'),'active Banner results regenerate from the source in the new profile');
+  const strictSource=api.state.image,strictEncodes=encodes.length;sandbox.location.hash='#resources';compressionMode='high';docListeners.get('webp:mode-change')();assert.equal(api.state.outputs.length,0,'inactive Banner downloads are invalidated immediately');assert.equal(encodes.length,strictEncodes,'inactive Banner does not do hidden encoding');
+  sandbox.location.hash='#banners';windowListeners.get('hashchange')();for(let i=0;i<10&&api.state.busy;i++)await new Promise(setImmediate);
+  assert.ok(api.state.outputs.every(file=>file.mode==='high'));assert.equal(api.state.image,strictSource,'mode changes retain and reuse the source image');
   const last=Array.from(api.state.outputs);windowListeners.get('pagehide')({persisted:false});for(const output of last)assert.equal(urls.has(output.url),false);
-  console.log('PASS: loading/processing/committed-success/error feedback and localization; reveal only on a new committed result; centered cover crop including extreme ratios, live FileList, two exact lossless WebP canvas sizes, game overlay/rounded inner crop, CSS-only black/transparent preview switch, source-resolution warning boundaries and language, invalid/decode/encode rollback, URL cleanup, language URL reuse, four shared project cards and preupload dimensions, transactional regeneration and project-specific WebP dimensions, retained source, one/two-file ZIP, busy locks, project rollback, committed-only generation and single/ZIP download counts.');
+  console.log('PASS: loading/processing/committed-success/error feedback and localization; reveal only on a new committed result; centered cover crop including extreme ratios, live FileList, two profile-aware WebP canvas sizes, game overlay/rounded inner crop, CSS-only black/transparent preview switch, source-resolution warning boundaries and language, invalid/decode/encode rollback, URL cleanup, language URL reuse, four shared project cards and preupload dimensions, transactional regeneration and project-specific WebP dimensions, retained source, one/two-file ZIP, busy locks, project rollback, committed-only generation and single/ZIP download counts.');
 })().catch(error=>{console.error(error);process.exitCode=1});

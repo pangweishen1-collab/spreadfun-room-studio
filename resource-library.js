@@ -15,6 +15,7 @@
     zh:{corners:'圆角',cornerHint:'0% 直角 · 50% 圆形',cornerMarket:'商店预设固定为直角',cornerError:'请输入 0–50 之间的整数。',square:'直角',circle:'圆形',target:'输出用途',custom:'自定义尺寸',ios:'iOS · App Store',android:'Android · Google Play',iosHint:'1024 × 1024 · RGB PNG · 无透明通道，透明区域填白。',androidHint:'512 × 512 · RGBA PNG · sRGB · 不超过 1024 KB。',marketGuide:'商店图标规范',marketScope:'商店主图预设；不裁圆角、不加外部阴影。',marketEngineering:'仅导出平面商店图标，不包含 Adaptive 分层或 Icon Composer 工程。',iosSpec:'App Store：1024 × 1024，PNG，不透明。',androidSpec:'Google Play：512 × 512，32 位 PNG，≤ 1024 KB。',official:'官方规范',marketUnsupported:'浏览器暂不支持商店 PNG 编码，请更新浏览器后重试。',marketSizeError:'Google Play 图标超过 1024 KB，未发起下载。',marketExportError:'商店图标未能生成，请重试。',title:'资源库',projects:'选择项目',export:'导出 Logo',preview:'Logo 预览',original:'原图',size:'输出尺寸',width:'宽度',height:'高度',locked:'1:1 比例锁定',presets:'常用尺寸',format:'文件格式',reading:'正在读取 Logo…',encoding:'正在生成文件…',download:'下载',downloading:'正在导出…',dimensionError:'请输入 16–4096 之间的整数。',upscale:'所选尺寸超过原图，放大后可能变模糊。',jpgNote:'JPG 不支持透明背景，透明区域会填充为白色。',loadError:'Logo 读取失败，请重试。',retry:'重新加载',encodeError:'文件生成失败，请重试。',formatError:'浏览器未能生成所选格式，请更换格式后重试。',downloadError:'未能发起下载，请重试。',receipt:'已发起下载',downloadAgain:'再次下载',middleEast:'中东 Hapi',select:'选择'},
     en:{corners:'Corner radius',cornerHint:'0% square · 50% circle',cornerMarket:'Store presets stay square.',cornerError:'Enter a whole number from 0 to 50.',square:'Square',circle:'Circle',target:'Export for',custom:'Custom size',ios:'iOS · App Store',android:'Android · Google Play',iosHint:'1024 × 1024 · RGB PNG · No alpha; transparent areas become white.',androidHint:'512 × 512 · RGBA PNG · sRGB · Up to 1024 KB.',marketGuide:'Store icon guidelines',marketScope:'Flat store icons. No added rounded corners or outer shadows.',marketEngineering:'Flat store artwork only; no Adaptive layers or Icon Composer project.',iosSpec:'App Store: 1024 × 1024, opaque PNG.',androidSpec:'Google Play: 512 × 512, 32-bit PNG, ≤ 1024 KB.',official:'Official guidelines',marketUnsupported:'Store PNG encoding is unavailable. Update your browser and retry.',marketSizeError:'The Google Play icon exceeds 1024 KB. No download started.',marketExportError:'Could not create the store icons. Please retry.',title:'Asset library',projects:'Choose a project',export:'Export logo',preview:'Logo preview',original:'Original',size:'Output size',width:'Width',height:'Height',locked:'1:1 locked',presets:'Quick sizes',format:'File format',reading:'Loading logo…',encoding:'Creating file…',download:'Download',downloading:'Exporting…',dimensionError:'Enter a whole number from 16 to 4096.',upscale:'This size exceeds the original and may look softer.',jpgNote:'JPG uses white for transparent areas.',loadError:'Could not load this logo. Please retry.',retry:'Reload logo',encodeError:'Could not create the file. Please retry.',formatError:'This browser could not create the selected format. Try another format.',downloadError:'Could not start the download. Please retry.',receipt:'Download requested',downloadAgain:'Download again',middleEast:'Middle East Hapi',select:'Select'}
   };
+  const webpMode=()=>window.FunWebP?.getMode?.()||'high';
   const state={radius:0,radiusValid:true,target:'custom',custom:{side:512,format:'png'},project:projects[0],side:512,format:'png',ready:false,busy:false,valid:true,phase:'empty',notice:null,download:null};
   const t=key=>(strings[language]||strings.en)[key];
   const projectName=project=>project.regional?t('middleEast'):project.name;
@@ -116,7 +117,7 @@
     if(state.busy||state.target!=='custom'||!['png','jpg','webp'].includes(format))return;
     state.format=format;state.notice=null;releaseDownload();if(state.ready)state.phase='ready';syncControls();
   }
-  async function encodeLogo(image,side,format,target='custom',radius=0){
+  async function encodeLogo(image,side,format,target='custom',radius=0,mode=webpMode()){
     if(!Number.isInteger(side)||side<16||side>4096||!['png','jpg','webp'].includes(format))throw new Error('dimensionError');
     radius=markets[target]?0:radius;
     if(!Number.isInteger(radius)||radius<0||radius>50)throw new Error('cornerError');
@@ -134,22 +135,23 @@
       return blob;
     }
     const mime={png:'image/png',jpg:'image/jpeg',webp:'image/webp'}[format];
-    // WebP shares the exact-lossless worker; PNG/JPEG retain their own encoders.
-    const blob=format==='webp'?await canvasToLosslessWebP(canvas):await new Promise((resolve,reject)=>{try{canvas.toBlob(value=>value?resolve(value):reject(new Error('encodeError')),mime,.96)}catch(error){reject(new Error('encodeError'))}});
+    // WebP shares the selected profile; PNG/JPEG retain their own encoders.
+    const blob=format==='webp'?await canvasToWebP(canvas,{mode}):await new Promise((resolve,reject)=>{try{canvas.toBlob(value=>value?resolve(value):reject(new Error('encodeError')),mime,.96)}catch(error){reject(new Error('encodeError'))}});
     if(!blob||blob.type!==mime)throw new Error('formatError');
     return blob;
   }
   async function downloadLogo(){
     if(state.busy||!state.ready||!state.valid||!state.radiusValid)return;
-    const project=state.project,side=state.side,format=state.format,target=state.target,radius=state.radius;
-    const cacheKey=[project.id,side,format,target,markets[target]?0:radius].join(':');
+    const project=state.project,side=state.side,format=state.format,target=state.target,radius=state.radius,mode=webpMode();
+    const cacheKey=[project.id,side,format,target,markets[target]?0:radius,format==='webp'?mode:''].join(':');
     state.busy=true;state.notice=null;syncControls();let freshUrl;
     try{
       // Keep only the current receipt's Blob. Repeated downloads need no new
       // canvas or compression; any export setting change clears the receipt.
       const cached=state.download?.cacheKey===cacheKey;
       const blob=cached?state.download.blob:
-        await encodeLogo(await exportImage(project,side),side,format,target,radius);
+        await encodeLogo(await exportImage(project,side),side,format,target,radius,mode);
+      if(format==='webp'&&mode!==webpMode())return;
       const name=markets[target]?`${project.id}-${markets[target].slug}-${side}x${side}.png`:`${project.id}-logo-${side}x${side}${radius?'-r'+radius+'pct':''}.${format}`;
       freshUrl=URL.createObjectURL(blob);const link=document.createElement('a');link.href=freshUrl;link.download=name;link.hidden=true;document.body.append(link);
       try{link.click()}catch(error){throw new Error('downloadError')}finally{link.remove()}
@@ -166,6 +168,7 @@
     syncControls();
   }
   function activate(){if(!initialized){initialized=true;renderCatalog();selectProject(state.project)}else syncControls()}
+  document.addEventListener?.('webp:mode-change',()=>{if(state.format==='webp'){releaseDownload();if(state.ready)state.phase='ready';syncControls()}});
   for(const id of ['#resourceWidth','#resourceHeight'])$(id).addEventListener('input',event=>{if(!state.busy)changeDimension(event.target)});
   document.querySelectorAll('[data-resource-size]').forEach(button=>button.addEventListener('click',()=>{if(state.busy)return;$('#resourceWidth').value=button.dataset.resourceSize;changeDimension($('#resourceWidth'))}));
   document.querySelectorAll('input[name="resourceFormat"]').forEach(input=>input.addEventListener('change',()=>chooseFormat(input.value)));

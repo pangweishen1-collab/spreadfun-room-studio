@@ -13,12 +13,14 @@ const recorded = type => events.filter(event=>event.tool==='room'&&event.type===
 let serial = 0, clicks = 0;
 const losslessEncodes = [];
 let losslessEncode = async()=>new Blob([new Uint8Array(100)],{type:'image/webp'});
+let webpMode='high';
+const documentListeners=new Map(),toolStates=[];
 const cleanupTimers=[];
 function element() {
   const classes = new Set(), listeners = new Map();
   return {
     tagName: 'DIV', textContent: '', innerHTML: '', value: '50', width: 720, height: 1560, disabled: false, children: [],
-    childNodes: [{nodeValue: ''}], previousElementSibling: {firstChild: {nodeValue: ''}}, style: {},
+    childNodes: [{nodeValue: ''}], previousElementSibling: {firstChild: {nodeValue: ''}}, style: {},dataset:{},
     classList: {add(...xs){xs.forEach(x=>classes.add(x))}, remove(...xs){xs.forEach(x=>classes.delete(x))}, toggle(x,on){if(on)classes.add(x);else classes.delete(x)}, contains(x){return classes.has(x)}},
     setAttribute(k,v){this[k]=v}, removeAttribute(k){delete this[k]}, addEventListener(k,fn){listeners.set(k,fn)}, append(...xs){this.children.push(...xs)}, replaceChildren(...xs){this.innerHTML='';this.children=xs}, remove(){}, click(){clicks++;listeners.get('click')?.({button:0,defaultPrevented:false,target:this})},
     querySelectorAll(){return []}, showModal(){this.open=true}, close(){this.open=false},
@@ -26,12 +28,12 @@ function element() {
     toBlob(){throw Error('Room WebP exports must use the shared lossless encoder')}
   };
 }
-const document = {documentElement:{}, body:element(), querySelector(selector){if(!elements.has(selector))elements.set(selector,element());return elements.get(selector)}, querySelectorAll(){return []},createElement:element};
+const document = {documentElement:{}, body:element(), querySelector(selector){if(!elements.has(selector))elements.set(selector,element());return elements.get(selector)}, querySelectorAll(){return []},createElement:element,addEventListener(type,handler){if(!documentListeners.has(type))documentListeners.set(type,[]);documentListeners.get(type).push(handler)},dispatchEvent(event){if(event.type==='webp:tool-state')toolStates.push(event.detail);for(const handler of documentListeners.get(event.type)||[])handler(event)}};
 class MockImage {
   constructor(){this.width=900;this.height=1600;this.naturalWidth=900;this.naturalHeight=1600;this.complete=true}
   set src(value){this.url=value;queueMicrotask(()=>{if(urls.get(value)?.name==='broken.png')this.onerror?.();else this.onload?.()})}
 }
-const sandbox = {canvasToLosslessWebP:async(...args)=>{assert.equal(args.length,1,'lossless exports must not pass a lossy quality setting');losslessEncodes.push(args[0]);return losslessEncode(...args)},window:{FunToolkitUI:{setState(tool,value){assert.equal(tool,'room');feedback.push({...value})},reveal(target){reveals.push(target)},prepareImages(target){preparedImages.push(target)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},document, Image:MockImage, Blob, TextEncoder, Uint8Array, DataView, Set, Promise, Math, Number, String, Array,
+const sandbox = {canvasToWebP:async(canvas,options)=>{assert.ok(['high','lossless'].includes(options.mode),'each room output captures an explicit compression mode');losslessEncodes.push({canvas,width:canvas.width,height:canvas.height,mode:options.mode});return losslessEncode(canvas,options)},window:{FunWebP:{getMode:()=>webpMode},FunToolkitUI:{setState(tool,value){assert.equal(tool,'room');feedback.push({...value})},reveal(target){reveals.push(target)},prepareImages(target){preparedImages.push(target)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},document,CustomEvent:class CustomEvent{constructor(type,{detail}={}){this.type=type;this.detail=detail}}, Image:MockImage, Blob, TextEncoder, Uint8Array, DataView, Set, Promise, Math, Number, String, Array,
   localStorage:{getItem:key=>stats.get(key),setItem:(key,value)=>stats.set(key,value)},
   URL:{createObjectURL(blob){const value='blob:'+ ++serial;urls.set(value,blob);return value},revokeObjectURL(value){urls.delete(value)}},
   setTimeout(fn,delay){if(delay<60000)queueMicrotask(fn);else cleanupTimers.push(fn)}, console};
@@ -40,16 +42,20 @@ const run = source => vm.runInContext(source,sandbox);
 (async()=>{
   await run('fgReady');
   assert.equal(latestFeedback().phase,'empty','the untouched room tool starts in the shared empty state');
-  // Both room sizes preserve pixels through the shared lossless encoder, even above the former byte cap.
-  assert.doesNotMatch(code,/canvasToWebP|encodeUnderLimit|120 KB/,'room exports must not expose the former lossy byte-cap path');
+  // Strict mode retains the exact encoder result above the former hard cap;
+  // the default high-quality mode is explicit instead of pretending to be lossless.
+  assert.doesNotMatch(code,/encodeUnderLimit|120 KB/,'room exports must not expose the former lossy byte-cap path');
   const oversizedLossless=new Blob([new Uint8Array(120*1024+1)],{type:'image/webp'});
   losslessEncode=async()=>oversizedLossless;
-  assert.equal(await run('exportCanvas(new Image(),720,1560)'),oversizedLossless,'full-size exports must retain the lossless result above the former cap');
-  assert.equal(await run('exportCanvas(new Image(),300,480)'),oversizedLossless,'small-size exports must retain the lossless result');
+  assert.equal(await run('exportCanvas(new Image(),720,1560,{x:.5,y:.5},"lossless")'),oversizedLossless,'full-size exports must retain the lossless result above the former cap');
+  assert.equal(await run('exportCanvas(new Image(),300,480,{x:.5,y:.5},"lossless")'),oversizedLossless,'small-size exports must retain the lossless result');
   assert.deepEqual(losslessEncodes.map(canvas=>[canvas.width,canvas.height]),[[720,1560],[300,480]],'encode each requested size exactly once');
+  assert.ok(losslessEncodes.every(record=>record.mode==='lossless'));
+  assert.ok(losslessEncodes.every(record=>record.canvas.width===1&&record.canvas.height===1),'temporary export canvases release their backing stores after encoding');
   losslessEncode=async()=>{throw Error('encoder unavailable')};
   await assert.rejects(run('exportCanvas(new Image(),720,1560)'),/encoder unavailable/,'encoding failure must not fall back to native lossy WebP');
   assert.equal(losslessEncodes.length,3);
+  assert.equal(losslessEncodes.at(-1).mode,'high','default high-quality output uses the shared mode');assert.equal(losslessEncodes.at(-1).canvas.width,1,'failed encodes release temporary canvases too');
   losslessEncode=async()=>new Blob([new Uint8Array(100)],{type:'image/webp'});
   losslessEncodes.length=0;
   run('downloadAll()');assert.equal(run('downloadNotice.state'),'empty');
@@ -84,7 +90,7 @@ const run = source => vm.runInContext(source,sandbox);
   assert.match(document.querySelector('#uploadNotice').textContent,/broken.png/);
   assert.equal(run('readLifetimeImages()'),4);
   assert.equal(recorded('generated'),4,'two new backgrounds produce four countable files');assert.equal(recorded('download'),0);
-  assert.deepEqual(Array.from(run('generatedOutputs.map(file=>file.name)')),['Bg01.webp','Bg01-s.webp','Bg02.webp','Bg02-s.webp']);
+  assert.deepEqual(Array.from(run('generatedOutputs.map(file=>file.name)')),['Bg01.webp','Bg01- preview.webp','Bg02.webp','Bg02- preview.webp']);
   run('openCropEditor("large",1)');assert.equal(run('cropImage===batchJobs[1].image'),true);assert.match(document.querySelector('#cropTitle').textContent,/Bg02.webp/);
   run('before=generatedOutputs.map(file=>file.blob)');
   document.querySelector('#cropX').value='0';await run('applyCrop()');
@@ -154,8 +160,30 @@ const run = source => vm.runInContext(source,sandbox);
   assert.equal(run('exportBusy'),true);assert.equal(recorded('generated'),7);
   run('pendingFirst(new Blob(["0-720"],{type:"image/webp"}))');await recovered;
   assert.deepEqual(Array.from(run('generatedOutputs.map(file=>file.job.image.id)')),[0,0,1,1,2,2],'output order follows upload order, not completion order');
-  assert.deepEqual(Array.from(run('generatedOutputs.map(file=>file.name)')),['Bg01.webp','Bg01-s.webp','Bg02.webp','Bg02-s.webp','Bg03.webp','Bg03-s.webp']);
+  assert.deepEqual(Array.from(run('generatedOutputs.map(file=>file.name)')),['Bg01.webp','Bg01- preview.webp','Bg02.webp','Bg02- preview.webp','Bg03.webp','Bg03- preview.webp']);
   assert.equal(recorded('generated'),13);assert.equal(run('readLifetimeImages()'),13,'first successful commit counts cached partial work too');run('exportCanvas=originalExport');
+  // A global mode change regenerates from the retained source image. Cached
+  // outputs from the other mode cannot be downloaded under a misleading label.
+  const modeEncodeStart=losslessEncodes.length;
+  webpMode='lossless';document.dispatchEvent(new sandbox.CustomEvent('webp:mode-change',{detail:{mode:'lossless',previous:'high'}}));await new Promise(setImmediate);
+  assert.equal(losslessEncodes.length-modeEncodeStart,6,'a changed compression mode regenerates both sizes for every source');
+  assert.equal(run('generatedOutputs.every(file=>file.mode==="lossless")'),true);assert.match(document.querySelector('#outputList').innerHTML,/Exact-lossless WebP/);assert.doesNotMatch(document.querySelector('#outputList').innerHTML,/High-quality WebP/);
+  assert.equal(run('batchJobs.every(job=>Object.values(job.outputCache).every(cache=>cache.mode==="lossless"))'),true);
+  assert.equal(recorded('generated'),13,'automatic mode synchronization does not recount existing logical image sizes');
+  const sameModeCount=losslessEncodes.length;await run('generateAllOutputs()');assert.equal(losslessEncodes.length,sameModeCount,'regenerating an unchanged mode reuses exact cached output bytes');
+  document.querySelector('#roomTool').classList.add('hidden');webpMode='high';document.dispatchEvent(new sandbox.CustomEvent('webp:mode-change',{detail:{mode:'high',previous:'lossless'}}));await new Promise(setImmediate);
+  assert.equal(losslessEncodes.length,sameModeCount,'an inactive tool does not compete for the shared encoder');assert.equal(run('roomModePending'),true);assert.match(document.querySelector('#outputList').innerHTML,/Exact-lossless WebP/,'retained outputs describe their actual bytes, not the newly selected global mode');
+  document.querySelector('#roomTool').classList.remove('hidden');await sandbox.window.RoomWebP.activate();assert.equal(losslessEncodes.length-sameModeCount,6);assert.equal(run('generatedOutputs.every(file=>file.mode==="high")'),true);assert.match(document.querySelector('#outputList').innerHTML,/High-quality WebP/);
+  // Even a programmatic request at an otherwise impossible in-flight point
+  // cannot mix modes within one batch. Finish the snapshot, then synchronize.
+  const snapshotStart=losslessEncodes.length;let switchedDuringEncode=false;
+  losslessEncode=async()=>{if(!switchedDuringEncode){switchedDuringEncode=true;assert.equal(sandbox.window.RoomWebP.isBusy(),true);webpMode='lossless';document.dispatchEvent(new sandbox.CustomEvent('webp:mode-change',{detail:{mode:'lossless',previous:'high'}}));}return new Blob([new Uint8Array(100)],{type:'image/webp'})};
+  run('batchJobs.forEach(job=>job.outputCache={})');await run('generateAllOutputs()');
+  assert.deepEqual(losslessEncodes.slice(snapshotStart).map(record=>record.mode),[...Array(6).fill('high'),...Array(6).fill('lossless')],'every output captures its batch mode even when completion overlaps a mode change');assert.equal(run('generatedOutputs.every(file=>file.mode==="lossless")'),true);assert.equal(sandbox.window.RoomWebP.isBusy(),false);assert.equal(toolStates.at(-1).busy,false,'the global controls are notified when the room batch fully unlocks');
+  assert.ok(losslessEncodes.slice(snapshotStart).every(record=>record.canvas.width===1&&record.canvas.height===1),'all temporary canvases are freed after their actual encode has settled');
+  const timing=document.querySelector('#roomTool').dataset;for(const key of ['roomGenerateMs','roomEncodeWaitMs','roomZipMs','roomBatchMs'])assert.ok(Number.isFinite(Number(timing[key]))&&Number(timing[key])>=0,key+' exposes a bounded DOM-backed timing');assert.equal(timing.roomMode,'lossless');assert.equal(timing.roomOutputs,'6');assert.equal(recorded('generated'),13);
+  losslessEncode=async()=>new Blob([new Uint8Array(100)],{type:'image/webp'});
+  const strictCropStart=losslessEncodes.length;run('openCropEditor("small",2)');document.querySelector('#cropX').value='75';await run('applyCrop()');assert.equal(losslessEncodes.length,strictCropStart+1,'a strict-mode crop changes exactly one requested output');assert.equal(losslessEncodes.at(-1).mode,'lossless');assert.equal(run('batchJobs[2].outputCache.small.mode'),'lossless');assert.equal(run('batchJobs[2].outputCache.small.x'),.75);assert.equal(run('generatedOutputs[5].mode'),'lossless');assert.equal(recorded('generated'),14,'the explicit crop remains a newly produced file');
   const zip=run('zipBytes([{name:"same.webp",bytes:new Uint8Array([1,2])},{name:"same.webp",bytes:new Uint8Array([3])},{name:"背景.webp",bytes:new Uint8Array([4])},{name:"empty.webp",bytes:new Uint8Array()},{name:"../bad:name.webp",bytes:Uint8Array.from({length:256},(_,i)=>i)},{name:"SAME.webp",bytes:new TextEncoder().encode("123456789")}])');
   const bytes=new Uint8Array(await zip.arrayBuffer());assert.equal(new DataView(bytes.buffer).getUint32(0,true),0x04034b50);
   // Golden hash captured from the original bit-at-a-time serializer. It covers
@@ -165,5 +193,5 @@ const run = source => vm.runInContext(source,sandbox);
   assert.equal(new DataView(crcVector.buffer).getUint32(14,true),0xcbf43926,'CRC32 must match the standard 123456789 check vector');
   const emptyVector=new Uint8Array(await run('zipBytes([{name:"empty.webp",bytes:new Uint8Array()}])').arrayBuffer());
   assert.equal(new DataView(emptyVector.buffer).getUint32(14,true),0,'an empty payload has CRC32 zero');
-  console.log('PASS: bounded parallel workers/drain on failure, ordered commits and retry counts, unchanged-output/crop cache reuse, shared lossless WebP without a lossy byte cap, live FileList, loading/processing/success and durable errors, corrupt files, crop rollback, shared thumbnail/reveal hooks, language phase retention, downloads, empty reset, ZIP and generation/download count boundaries.');
+  console.log('PASS: bounded parallel workers/drain on failure, ordered commits and retry counts, mode-aware unchanged-output/crop caches, high-quality/exact-lossless shared WebP, consistent batch mode snapshots/deferred activation, temporary-canvas cleanup and DOM timings, live FileList, durable errors/crop rollback, shared thumbnail/reveal hooks, language phase retention, downloads, empty reset, unchanged ZIP and generation/download count boundaries.');
 })().catch(error=>{console.error(error);process.exitCode=1});

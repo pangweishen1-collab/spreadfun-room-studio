@@ -216,8 +216,8 @@
     },
     {
       "path": "references/acceptance.md",
-      "sha256": "03cc5c0a5698b8c45a5009cec47bfcdcad35cebadfe55217699affd5460f8d11",
-      "bytes": 5107
+      "sha256": "17ac10c3d9e52fd1c452dacceb8f995412a9c567ba6645faa039b4910e71643b",
+      "bytes": 5402
     },
     {
       "path": "references/feedback-states.md",
@@ -246,8 +246,8 @@
     },
     {
       "path": "references/tool-page-framework.md",
-      "sha256": "e5e4ffd6013d8a889c4c9cc6acecc960363a03ea6e61a343a1a94b422c4ee974",
-      "bytes": 18923
+      "sha256": "f94f1f06b85b8a0f4dec8687b646cd413bf5cc7a6f3cf9a9d30c01d4a5ac658d",
+      "bytes": 19561
     },
     {
       "path": "references/validation.md",

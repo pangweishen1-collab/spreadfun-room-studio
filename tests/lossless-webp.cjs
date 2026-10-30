@@ -28,7 +28,7 @@ if(!process.execArgv.includes('--experimental-vm-modules')){
   encoderSource=encoderSource.replace(factoryImport,'import factory from '+JSON.stringify(nodeCodec)+';').replace(metaImport,'from '+JSON.stringify(pathToFileURL(path.join(project,'vendor/webp/meta.mjs')).href));
   const nodeEncoder='data:text/javascript,'+encodeURIComponent(encoderSource);
   const sandbox=vm.createContext({Blob});
-  const helper=new vm.Script(fs.readFileSync(path.join(project,'banner-webp.js'),'utf8')+'\nthis.encode=canvasToLosslessWebP;',{
+  const helper=new vm.Script(fs.readFileSync(path.join(project,'banner-webp.js'),'utf8')+'\nthis.encode=canvasToLosslessWebP;this.encodeHigh=canvasToWebP;this.settings=webpSettings;',{
     filename:'banner-webp.js',
     importModuleDynamically:specifier=>{
       assert.match(specifier,/^\.\/webp-encode\.mjs\?v=/,'the no-worker fallback uses the shared lossless encoder');
@@ -36,6 +36,7 @@ if(!process.execArgv.includes('--experimental-vm-modules')){
     }
   });
   helper.runInContext(sandbox);
+  assert.equal(sandbox.settings.getMode(),'high','generic output defaults to high quality while the explicit alias remains exact');
   const alpha=[0,1,64,127,128,200,254,255];
   // Cover every static tool: full/small room, avatar, both Banner shapes,
   // gift and resource output. A noisy patch in the full room exceeds the
@@ -80,10 +81,34 @@ if(!process.execArgv.includes('--experimental-vm-modules')){
     fs.writeFileSync(path.join(out,test.raw),pixels);
   }
   fs.writeFileSync(path.join(out,'lossless-cases.json'),JSON.stringify(cases));
+  // A camera-like texture exercises perceptual coding without any private
+  // source image. Alpha is independent of the RGB quality tradeoff.
+  const highCases=[{name:'high-small-detail',raw:'lossless-source.rgba',width:17,height:9,exact:true},{name:'high-textured-photo',raw:'high-textured-photo.rgba',width:384,height:512,maximumRatio:.8,minimumPsnr:35}];
+  for(const test of highCases){
+    const {width,height}=test;let pixels;
+    if(test.exact)pixels=new Uint8ClampedArray(fs.readFileSync(path.join(out,test.raw)));
+    else{
+      pixels=new Uint8ClampedArray(width*height*4);let seed=0x5f3759df;
+      for(let y=0;y<height;y++)for(let x=0;x<width;x++){
+        const i=(y*width+x)*4;seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
+        const texture=((seed>>>16)&15)-7,tone=115+38*Math.sin(x/37)+27*Math.cos(y/53);
+        pixels.set([tone+x*.09+texture,tone+16*Math.sin((x+y)/61)+texture,tone+28*Math.cos((x-y)/79)+texture,y<64?alpha[x%alpha.length]:255],i);
+      }
+      fs.writeFileSync(path.join(out,test.raw),pixels);
+    }
+    const original=Buffer.from(pixels),canvas={width,height,getContext(){return {getImageData(){return {data:pixels}}}}};
+    const exactBytes=test.exact?fs.statSync(path.join(out,'lossless-helper.webp')).size:(await sandbox.encode(canvas)).size;
+    const started=process.hrtime.bigint(),blob=await sandbox.encodeHigh(canvas,{mode:'high'});test.encodingMs=Number(process.hrtime.bigint()-started)/1e6;
+    assert.equal(blob.type,'image/webp');assert.deepEqual(Buffer.from(pixels),original,'high-quality encoding retains caller-owned source pixels');
+    test.exactBytes=exactBytes;test.bytes=blob.size;
+    if(test.maximumRatio)assert.ok(blob.size<=exactBytes*test.maximumRatio,'the textured photograph must materially shrink relative to the exact output');
+    fs.writeFileSync(path.join(out,test.name+'.webp'),Buffer.from(await blob.arrayBuffer()));
+  }
+  fs.writeFileSync(path.join(out,'high-cases.json'),JSON.stringify(highCases));
   const check=spawnSync(process.env.BANNER_TEST_PYTHON||'python3',['-c',`
-from PIL import Image
+from PIL import Image, ImageChops
 from pathlib import Path
-import json, sys
+import json, math, sys
 p=Path(sys.argv[1])
 reports=[]
 for test in json.loads((p/'lossless-cases.json').read_text()):
@@ -95,7 +120,25 @@ for test in json.loads((p/'lossless-cases.json').read_text()):
     assert actual==expected, test['name']+' changed RGBA pixels'
     reports.append({'name':test['name'],'dimensions':list(im.size),'bytes':encoded.stat().st_size,'previous_search_bytes':test.get('previousSearchBytes'),'encoding_ms':round(test['encodingMs'],2),'exact_rgba':True,'tested_alpha_values':sorted(set(actual[3::4]))})
 (p/'lossless-roundtrip.json').write_text(json.dumps(reports,indent=2))
-print('PASS: shared production helper + encoder + pinned WASM preserve every RGBA byte across room, avatar, Banner, gift and resource dimensions, including transparent RGB and partial alpha; full-room output exceeds the retired 120 KiB cap; encoded files are no larger than the prior exact-lossless search.')
+high_reports=[]
+for test in json.loads((p/'high-cases.json').read_text()):
+    im=Image.open(p/(test['name']+'.webp')).convert('RGBA')
+    expected=Image.frombytes('RGBA',(test['width'],test['height']),(p/test['raw']).read_bytes())
+    assert im.size==expected.size
+    assert im.getchannel('A').tobytes()==expected.getchannel('A').tobytes(), test['name']+' changed alpha'
+    if test.get('exact'): assert im.tobytes()==expected.tobytes(), test['name']+' lost small-image details'
+    psnrs={}
+    for color in [(0,0,0,255),(255,255,255,255)]:
+        bg=Image.new('RGBA',im.size,color)
+        actual=Image.alpha_composite(bg,im).convert('RGB');reference=Image.alpha_composite(bg,expected).convert('RGB')
+        histogram=ImageChops.difference(actual,reference).histogram()
+        mse=sum((i%256)**2*n for i,n in enumerate(histogram))/(im.width*im.height*3)
+        psnr=99 if mse==0 else 10*math.log10(255**2/mse)
+        assert psnr>=test.get('minimumPsnr',99), (test['name'],color,psnr)
+        psnrs['black' if color[0]==0 else 'white']=round(psnr,4)
+    high_reports.append({'name':test['name'],'dimensions':list(im.size),'bytes':test['bytes'],'exact_bytes':test['exactBytes'],'ratio':round(test['bytes']/test['exactBytes'],4),'encoding_ms':round(test['encodingMs'],2),'alpha_exact':True,'psnr':psnrs,'exact_rgba':im.tobytes()==expected.tobytes()})
+(p/'high-roundtrip.json').write_text(json.dumps(high_reports,indent=2))
+print('PASS: explicit exact-lossless output preserves every RGBA byte across all tool dimensions; generic high-quality output materially reduces a textured photograph while preserving alpha and composited PSNR, and retains exact small-image detail. Source pixels remain unchanged.')
 `,out],{encoding:'utf8'});
   if(check.stdout)process.stdout.write(check.stdout);
   if(check.stderr)process.stderr.write(check.stderr);

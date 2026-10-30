@@ -291,3 +291,33 @@ button.ft-motion-sheen[aria-busy=true]{cursor:progress}
 
 /* Upload empty states keep two text lines; clipboard support remains active. */
 .upload-paste-hint{display:none!important}
+
+/* One active SVGA preview, with an independent frame selection per batch item. */
+.svga-batch-panel{margin-top:22px;padding-top:20px;border-top:1px solid var(--line)}
+.svga-batch-heading,.svga-batch-heading>div{display:flex;align-items:center;gap:8px}
+.svga-batch-heading{justify-content:space-between;gap:12px;margin-bottom:12px}
+.svga-batch-heading h3{font-size:14px;line-height:20px;margin:0;color:var(--tool-heading)}
+.svga-batch-add{min-height:44px;padding:10px 16px;border:1px solid var(--tool-blue-line);border-radius:10px;background:var(--tool-blue-soft);color:var(--blue);font:inherit;font-size:12px;line-height:20px;font-weight:600;white-space:nowrap;cursor:pointer}
+.svga-batch-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.svga-batch-list>[role="listitem"],.svga-batch-item{display:grid;grid-template-columns:minmax(0,1fr) 44px;align-items:stretch;min-width:0;border:1px solid var(--line);border-radius:12px;background:var(--tool-surface);overflow:hidden}
+.svga-batch-select{display:flex;align-items:center;gap:12px;min-width:0;min-height:76px;padding:11px;border:0;border-radius:0;background:transparent;color:var(--tool-heading);text-align:left;font:inherit;cursor:pointer}
+.svga-batch-copy{min-width:0;flex:1}
+.svga-batch-thumb-wrap{display:block;flex:0 0 52px;width:52px;height:52px}
+.svga-batch-select strong{display:block;min-width:0;font-size:12px;line-height:18px;font-weight:600;overflow-wrap:anywhere}
+.svga-batch-select[aria-pressed="true"]{background:var(--tool-blue-soft);color:var(--blue);box-shadow:inset 3px 0 var(--blue)}
+.svga-batch-thumb{display:grid;place-items:center;flex:0 0 52px;width:52px;height:52px;border-radius:8px;background:var(--tool-bg);color:var(--tool-muted);font:600 10px/1.2 -apple-system,BlinkMacSystemFont,"PingFang SC",sans-serif}
+canvas.svga-batch-thumb{display:block;object-fit:contain;background:var(--tool-bg)}
+.svga-batch-meta,.svga-batch-select .svga-batch-error{display:block;margin-top:5px;font-size:11px;line-height:16px;color:var(--tool-muted);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.svga-batch-error,.svga-batch-select .svga-batch-error{color:var(--tool-error)}
+.svga-batch-list>.svga-batch-error{border-color:#f0d8cd}
+.svga-batch-remove{display:flex;align-items:center;justify-content:center;min-width:44px;min-height:44px;padding:0;border:0;border-left:1px solid var(--line);border-radius:0;background:transparent;color:var(--tool-muted);font:inherit;font-size:20px;line-height:1;cursor:pointer}
+.frame-batch-progress{margin-top:12px;font-size:12px;line-height:18px;font-variant-numeric:tabular-nums;color:var(--tool-muted);overflow-wrap:anywhere}
+#avatarTool[data-avatar-batch="true"] #frameDownload:not(:disabled):not([aria-busy="true"]){border:1px solid var(--tool-blue-line);background:var(--tool-blue-soft);color:var(--blue);box-shadow:none}
+@media(hover:hover) and (pointer:fine){
+ .svga-batch-add:hover:not(:disabled),.svga-batch-select:hover:not(:disabled){background:#f0f6ff;color:var(--blue)}
+ .svga-batch-remove:hover:not(:disabled){background:#fff2ef;color:#b3472c}
+ #avatarTool[data-avatar-batch="true"] #frameDownload:not(:disabled):not([aria-busy="true"]):hover{border-color:#9dc9ff;background:#dcecff;box-shadow:0 3px 9px #0071e316}
+}
+.svga-batch-select:focus-visible,.svga-batch-remove:focus-visible{outline-offset:-3px}
+@media(max-width:1100px){.svga-batch-list{grid-template-columns:minmax(0,1fr)}}
+@media(min-width:701px) and (max-width:900px){.svga-batch-list{grid-template-columns:repeat(2,minmax(0,1fr))}}

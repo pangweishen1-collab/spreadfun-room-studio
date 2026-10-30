@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
 const elements=new Map(),urls=new Map(),downloads=[],revoked=[],images=[],renders=[],encodes=[],feedback=[],reveals=[],cleanup=[],contextDraws=[],contextClears=[],stats=[],committedBlobs=new Set();
 const documentListeners=new Map(),windowListeners=new Map(),timers=new Map(),mattingCalls=[];
+let compressionMode='high';
 let serial=0,holdLoads=false,holdEncode=null,encodeError=false,wrongMime=false,downloadError=false;
 let mattingRun=async()=>({width:2,height:2,data:new Uint8ClampedArray([0,255,255,0])});
 function element(tag='div'){
@@ -28,7 +29,8 @@ Object.defineProperty(mattingControl,'textContent',{get(){return this.children.m
 mattingControl.querySelector=selector=>selector==='[data-gift-matting-label]'?mattingControl.children.find(child=>'giftMattingLabel' in child.dataset):null;
 const presetControls=[200,240,400,500].map(size=>{const button=get('#giftPreviewSize'+size);button.dataset.giftSize=String(size);return button});
 const heading=element();heading.dataset.giftI18n='title';get('#giftPreviewTool').querySelectorAll=selector=>selector==='[data-gift-size]'?presetControls:[heading];
-const document={body:element('body'),querySelector:get,createElement:element,addEventListener(name,handler){documentListeners.set(name,handler)}};
+const documentListenerCounts=new Map();
+const document={body:element('body'),querySelector:get,createElement:element,addEventListener(name,handler){documentListenerCounts.set(name,(documentListenerCounts.get(name)||0)+1);documentListeners.set(name,handler)}};
 class MockImage {
   constructor(){images.push(this)}
   set src(url){this.url=url;this.file=urls.get(url);if(!holdLoads)queueMicrotask(()=>this.complete())}
@@ -37,8 +39,8 @@ class MockImage {
 const sandbox={document,language:'zh',location:{hash:'#gift-previews'},Image:MockImage,Blob,Uint8ClampedArray,
   URL:{createObjectURL(value){const url='blob:gift-'+(++serial);urls.set(url,value);return url},revokeObjectURL(url){revoked.push(url)}},
   requestAnimationFrame(callback){const id=++serial;queueMicrotask(()=>callback(1));return id},cancelAnimationFrame(){},setTimeout(callback,delay){const id=++serial;timers.set(id,{callback,delay});cleanup.push(()=>{if(timers.has(id)){timers.delete(id);callback()}});return id},clearTimeout(id){timers.delete(id)},
-  canvasToLosslessWebP:async canvas=>{encodes.push({width:canvas.width,height:canvas.height});if(holdEncode)await holdEncode;if(encodeError)throw Error('encode failed');return new Blob(['gift pixels'],{type:wrongMime?'image/png':'image/webp'})},
-  window:{Hub:{record(...args){assert.equal(args[0],'gift');assert.ok(['generated','download'].includes(args[1]));stats.push(args)}},addEventListener(name,handler){windowListeners.set(name,handler)},GiftBackground:{remove(image,options){mattingCalls.push({image,options});return mattingRun(image,options)}},FunToolkitUI:{setState(tool,value){assert.equal(tool,'gift-preview');feedback.push({...value})},reveal(node){reveals.push(node);if(node===get('#giftPreviewReceipt'))committedBlobs.add(urls.get(node.children[1].href))}}}
+  canvasToWebP:async(canvas,options)=>{assert.ok(['high','lossless'].includes(options.mode));encodes.push({width:canvas.width,height:canvas.height,mode:options.mode});if(holdEncode)await holdEncode;if(encodeError)throw Error('encode failed');return new Blob(['gift pixels'],{type:wrongMime?'image/png':'image/webp'})},
+  window:{FunWebP:{getMode:()=>compressionMode},Hub:{record(...args){assert.equal(args[0],'gift');assert.ok(['generated','download'].includes(args[1]));stats.push(args)}},addEventListener(name,handler){windowListeners.set(name,handler)},GiftBackground:{remove(image,options){mattingCalls.push({image,options});return mattingRun(image,options)}},FunToolkitUI:{setState(tool,value){assert.equal(tool,'gift-preview');feedback.push({...value})},reveal(node){reveals.push(node);if(node===get('#giftPreviewReceipt'))committedBlobs.add(urls.get(node.children[1].href))}}}
 };
 let source=fs.readFileSync(path.join(__dirname,'../gift-preview.js'),'utf8');
 const marker='window.GiftPreviewTool={activate,syncLanguage};';assert.ok(source.includes(marker),'test injection point must match the public API');
@@ -64,7 +66,7 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
 (async()=>{
   const markup=fs.readFileSync(path.join(__dirname,'../index.html'),'utf8');
   assert.match(markup,/id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具<\/h1>/);assert.equal(heading.textContent,'礼物&座驾预览图生产工具');assertMattingProgress(0,false);
-  assert.match(markup,/gift-preview\.js\?v=20261027-all-tool-stats1/);assert.match(markup,/toolkit\.js\?v=20261029-lossless1/);
+  assert.match(markup,/gift-preview\.js\?v=[\w-]+/);assert.match(markup,/toolkit\.js\?v=[\w-]+/);
   const edgeTag=markup.match(/<details\b[^>]*\bid="giftPreviewFeatherField"[^>]*>/)?.[0],colorTag=markup.match(/<details\b[^>]*\bid="giftPreviewColorField"[^>]*>/)?.[0],advancedTag=markup.match(/<details\b[^>]*\bid="giftPreviewAdvanced"[^>]*>/)?.[0];
   const compositionTag=markup.match(/<details\b[^>]*\bid="giftPreviewCompositionField"[^>]*>/)?.[0];
   assert.ok(compositionTag&&!/\sopen(?:\s|=|>)/.test(compositionTag),'position controls use a native disclosure and start collapsed');
@@ -313,5 +315,8 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
   const retainedReceipt=api.state.download,beforeFailure=encodes.length,beforeBlockedStats=stats.length;downloadError=true;await api.download();downloadError=false;assert.equal(api.state.notice,'downloadError');assert.equal(api.state.download,retainedReceipt,'a blocked cached download preserves its valid receipt');assert.equal(encodes.length,beforeFailure);assert.equal(stats.length,beforeBlockedStats,'a blocked native request does not count');count=downloads.length;await cachedDownload();assert.equal(downloads.length,count+1);
   sandbox.location.hash='#resources';canvas.fire('pointerdown',pointer());windowListeners.get('hashchange')();assert.equal(canvas.pointer,null);assert.equal(context.hidden,false);assert.equal(api.state.download!==null,true);const activeUrl=api.state.download.url;cleanup.forEach(fn=>fn());assert.ok(!revoked.includes(activeUrl),'delayed cleanup does not revoke the active receipt');
   assert.equal(stats.filter(x=>x[1]==='generated').length,committedBlobs.size,'only new successfully committed WebP files count once');assert.equal(stats.filter(x=>x[1]==='download').length,downloads.length,'every effective download action counts once');
+  assert.equal(documentListenerCounts.get('webp:mode-change'),1,'quality listener is registered once, outside repeated control synchronization');
+  const beforeModeDownloads=downloads.length;compressionMode='lossless';documentListeners.get('webp:mode-change')();assert.equal(api.state.download,null);assert.equal(downloads.length,beforeModeDownloads,'changing quality never starts an on-demand download');await freshDownload();assert.equal(encodes.at(-1).mode,'lossless');assert.ok(api.state.download.key.endsWith(':lossless'));await cachedDownload();
+  input('Contrast',90);let finishMode;holdEncode=new Promise(resolve=>finishMode=resolve);const beforeStaleDownload=downloads.length,staleExport=api.download();await flush();compressionMode='high';documentListeners.get('webp:mode-change')();finishMode();await staleExport;holdEncode=null;assert.equal(downloads.length,beforeStaleDownload,'an old-profile asynchronous result cannot download after a global switch');assert.equal(api.state.download,null);
   console.log('PASS: gift controller upload/alpha/persistent-size-presets/download/cache/live-context/alignment/wheel/focus; grouped history, source-anchored retouch, multi-pointer isolation, immediate clear availability, transforms, safe guides and busy locks; collapsed composition, bilingual matting progress, reversible local masks, protected inference and failure/cache preservation.');
 })().catch(error=>{console.error(error);process.exitCode=1});

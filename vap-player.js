@@ -34,7 +34,7 @@
   function dispose(value){try{value?.destroy();}catch(ignored){}}
   function sync(){
     const canvas=host()?.querySelector('canvas');if(canvas){canvas.style.maxWidth='100%';canvas.style.objectFit='contain';canvas.setAttribute('aria-label',chinese()?'腾讯 VAP 播放器效果':'Tencent VAP playback');}
-    const b=button();if(b){b.disabled=!player||playerState!=='ready';b.textContent=chinese()?(requested?'暂停透明播放':'透明播放'):(requested?'Pause preview':'Play transparent');b.setAttribute('aria-pressed',String(requested));}
+    const b=button();if(b){b.disabled=!player||playerState!=='ready';const label=chinese()?(requested?'暂停透明播放':'透明播放'):(requested?'Pause preview':'Play transparent');b.textContent='';b.setAttribute('aria-label',label);b.title=label;b.setAttribute('aria-pressed',String(requested));}
   }
   function setState(next,token=version){
     if(token!==version)return false;
@@ -107,11 +107,25 @@
     }catch(error){fail(error);}
   }
   function toggle(){if(!player||playerState!=='ready')return;requested=!requested;if(requested&&active&&!document.hidden)player.play();else player.pause();sync();}
+  function updateTags(tags){
+    if(!currentResult)return Promise.resolve();
+    const result=currentResult,merged={...result.tags,...tags};
+    for(const source of Array.isArray(result.config?.src)?result.config.src:[]){
+      const tag=source?.srcTag;if(typeof tag!=='string')continue;
+      const short=tag.replace(/^\[(.*)\]$/,'$1'),aliases=[...new Set([tag,short,'['+short+']'])],key=aliases.find(alias=>own(tags,alias));
+      if(key===undefined)continue;
+      // New values win across calls even when callers alternate tag1/[tag1].
+      // Within one update the declared srcTag keeps the usual precedence.
+      for(const alias of aliases)delete merged[alias];
+      Object.defineProperty(merged,tag,{value:tags[key],enumerable:true,configurable:true,writable:true});
+    }
+    return mount({...result,tags:merged});
+  }
   document.addEventListener('vap:result',event=>mount(event.detail));
   document.addEventListener('vap:result-invalidated',destroy);
   document.addEventListener('vap:active',event=>{active=event.detail.active;if(!active&&player){requested=false;player.pause();}sync();});
   document.addEventListener('click',event=>{if(event.target.closest?.('#vapResultPlay'))toggle();});
   document.addEventListener('visibilitychange',()=>{if(document.hidden&&player){requested=false;player.pause();sync();}});
   window.addEventListener('pagehide',destroy);
-  window.VapResultPlayer={mount,destroy,setLanguage:sync,getMissingTags:(config,tags)=>resourceBindings(config,tags).missing,updateTags:tags=>currentResult?mount({...currentResult,tags:{...currentResult.tags,...tags}}):Promise.resolve()};
+  window.VapResultPlayer={mount,destroy,setLanguage:sync,getMissingTags:(config,tags)=>resourceBindings(config,tags).missing,updateTags};
 })();

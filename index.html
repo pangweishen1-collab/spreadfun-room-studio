@@ -51,14 +51,15 @@ body{min-width:320px}
 @media(max-width:540px){.topbar{padding:14px 16px;gap:14px}.brand{font-size:16px}.top-actions{width:100%;gap:8px}.language-switch{width:auto;min-width:112px;flex:1;height:40px}.top-actions #examplesButton,.top-actions #contactButton{width:auto;min-width:0;flex:1;font-size:12px;padding:5px 8px}main{padding:22px 16px 32px}.intro{margin-bottom:24px}.intro h1,.intro h1:lang(zh-CN){font-size:28px;letter-spacing:-.5px}.intro .eyebrow{font-size:9px;letter-spacing:1.4px;gap:8px}.intro .eyebrow:before,.intro .eyebrow:after{width:16px}.preview{padding:16px}.preview-head{gap:8px}.stage{height:450px}.upload-empty{padding:16px}.upload-empty strong{font-size:15px}.upload-empty span{display:block;line-height:1.6}.preview-grid{padding:12px;gap:10px}.preview-grid.count-2,.preview-grid.count-3{grid-template-columns:repeat(2,minmax(0,1fr))}.preview-grid.count-1 .batch-preview canvas{height:375px}.preview-grid.count-2 .batch-preview canvas,.preview-grid.count-3 .batch-preview canvas{height:210px}.delete-preview{width:30px;height:30px;line-height:30px}.preview-caption{font-size:11px}.exports{padding:16px}.file-actions button{min-height:36px}.examples-grid{grid-template-columns:1fr}.crop-dialog{padding:18px}.crop-dialog p{line-height:1.6}.crop-actions button{min-height:44px}.crop-control input{min-height:24px}.lifetime-stat{padding:16px}.site-footer{line-height:1.6}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
 </style>
-  <link rel="stylesheet" href="toolkit.css?v=20261029-upload-copy2">
+  <link rel="stylesheet" href="toolkit.css?v=20261030-avatar-batch2">
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="hub.css?v=20261023-tool-sheen1">
   <link rel="stylesheet" href="home.css?v=20261023-tool-sheen1">
   <link rel="stylesheet" href="gift-preview.css?v=20261026-upload1">
-  <link rel="stylesheet" href="vap-resources.css?v=20261028-resize2">
-  <link rel="stylesheet" href="vap-tool.css?v=20261029-gift-fade1">
+  <link rel="stylesheet" href="vap-resources.css?v=20261030-avatar-motion1">
+  <link rel="stylesheet" href="vap-tool.css?v=20261030-avatar-motion1">
+  <link rel="stylesheet" href="webp-settings.css?v=20261030-webp2">
   <link rel="stylesheet" href="project-selector.css?v=20261026-projects1">
   <link rel="stylesheet" href="resource-library.css?v=20261026-projects1">
   <link rel="stylesheet" href="design-system/select.css?v=20261024-select1">
@@ -124,10 +125,10 @@ body{min-width:320px}
     <section class="workspace avatar-workspace">
       <section class="preview card frame-preview">
         <div class="preview-head"><h2 data-i18n="animationPreview">Animation preview</h2><span class="frame-status" id="svgaPlaybackStatus">No file selected</span></div>
-        <span class="tool-feedback-status" data-feedback-status role="status" aria-live="polite"></span><div class="stage frame-stage upload-ready ft-upload-zone" id="svgaDropzone" role="button" tabindex="0" aria-label="Upload an SVGA file" data-feedback-stage><div class="tool-stage-busy" data-ft-activity aria-hidden="true"><span class="ft-spinner" data-size="16"></span><span data-feedback-message></span></div>
+        <span class="tool-feedback-status" data-feedback-status role="status" aria-live="polite"></span><div class="stage frame-stage upload-ready ft-upload-zone" id="svgaDropzone" role="button" tabindex="0" aria-label="Upload SVGA files" data-feedback-stage><div class="tool-stage-busy" data-ft-activity aria-hidden="true"><span class="ft-spinner" data-size="16"></span><span data-feedback-message></span></div>
           <div class="upload-empty" id="svgaEmpty">
             <img class="tool-empty-art" data-feedback-art="empty-upload" src="design-system/assets/feedback/empty-upload.svg" alt="" width="120" height="90">
-            <strong data-i18n="dropSvga">Click, drop or paste an SVGA file</strong><span data-i18n="svgaHint">Preview the animation and export the exact frame you want.</span><span class="upload-paste-hint" data-i18n="pasteHint">Paste with ⌘V / Ctrl+V to upload</span>
+            <strong data-i18n="dropSvga">Click, drop or paste SVGA files</strong><span data-i18n="svgaHint">Select multiple files, choose their frames and export together.</span><span class="upload-paste-hint" data-i18n="pasteHint">Paste with ⌘V / Ctrl+V to upload</span>
             <button class="preview-upload ft-motion-sheen" type="button" id="svgaUpload" data-i18n="uploadSvga" aria-busy="false" data-feedback-button data-ft-activity>Upload SVGA</button>
           </div>
           <div id="svgaPlayer" class="svga-player checkerboard hidden" aria-label="SVGA animation preview"></div>
@@ -140,6 +141,10 @@ body{min-width:320px}
           <input id="svgaTimeline" type="range" min="1" max="1" value="1" step="1" disabled>
           <div class="frame-position"><label for="svgaFrameNumber" data-i18n="currentFrame">Current frame</label><div class="frame-number-group"><input id="svgaFrameNumber" type="number" min="1" max="1" value="1" step="1" disabled><span id="svgaFrameTotal">/ 0</span></div><span class="frame-fps" id="svgaFps">— FPS</span></div>
         </div>
+        <section class="svga-batch-panel hidden" id="svgaBatchPanel" aria-labelledby="svgaBatchTitle">
+          <div class="svga-batch-heading"><div><h3 id="svgaBatchTitle" data-i18n="batchTitle">Batch files</h3><span class="badge" id="svgaBatchCount">0</span></div><button type="button" class="svga-batch-add" id="svgaAdd" data-i18n="addSvga" data-feedback-button>Add SVGA</button></div>
+          <div class="svga-batch-list" id="svgaBatchList" role="list"></div>
+        </section>
         <p class="local-privacy"><span class="privacy-dot" aria-hidden="true"></span><span data-i18n="localPrivacy">Processed locally. Your files never leave this device.</span></p>
       </section>
       <aside class="exports card frame-export">
@@ -150,10 +155,12 @@ body{min-width:320px}
         <div class="dimension-fields"><label for="frameWidth"><span data-i18n="width">Width</span><div class="dimension-input"><input id="frameWidth" type="number" min="16" max="2048" step="1" value="240" inputmode="numeric"><span>px</span></div></label><span class="dimension-times" aria-hidden="true">×</span><label for="frameHeight"><span data-i18n="height">Height</span><div class="dimension-input"><input id="frameHeight" type="number" min="16" max="2048" step="1" value="240" inputmode="numeric"><span>px</span></div></label></div>
         <p class="dimension-error hidden" id="frameSizeError" role="status" data-i18n="dimensionError">Enter a whole number from 16 to 2048.</p>
         <button type="button" class="batch-download frame-download ft-motion-sheen" id="frameDownload" disabled data-i18n="downloadFrame" aria-busy="false" data-feedback-button data-ft-activity>Export WebP</button>
+        <button type="button" class="batch-download frame-download ft-motion-sheen hidden" id="frameDownloadAll" disabled data-i18n="downloadAllFrames" aria-busy="false" data-feedback-button data-ft-activity>Export all · ZIP</button>
+        <div class="frame-batch-progress hidden" id="frameBatchProgress" role="status" aria-live="polite"></div>
         <div class="frame-download-result hidden" id="frameDownloadResult" role="status"></div>
       </aside>
     </section>
-    <input type="file" id="svgaInput" accept=".svga" hidden>
+    <input type="file" id="svgaInput" accept=".svga" multiple hidden>
   </main>
   <main id="giftPreviewTool" class="hidden" data-tool="gift-preview" aria-labelledby="giftPreviewTitle">
   <div class="intro tool-intro"><div><h1 id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具</h1></div></div>
@@ -270,12 +277,12 @@ body{min-width:320px}
     <div class="vap-workspace">
       <section class="card vap-card" aria-labelledby="vapPreviewTitle">
         <div class="vap-card-heading vap-preview-heading"><h2 id="vapPreviewTitle" data-vap-i18n="preview">效果预览</h2></div>
-        <div class="vap-segments vap-input-modes" id="vapInputModes" role="group" aria-label="输入来源"><button id="vapInputVideo" type="button" aria-pressed="true" data-vap-i18n="inputVideo">MP4</button><button id="vapInputSequence" type="button" aria-pressed="false" data-vap-i18n="inputSequence">序列帧</button></div>
-        <span id="vapDetectedType" class="vap-sr-only" role="status" aria-live="polite">自动识别</span>
+        <div class="vap-segments vap-input-modes" id="vapInputModes" hidden role="group" aria-label="输入来源"><button id="vapInputVideo" type="button" aria-pressed="true" data-vap-i18n="inputVideo">MP4</button><button id="vapInputSequence" type="button" aria-pressed="false" data-vap-i18n="inputSequence">序列帧</button></div>
+        <span id="vapDetectedType" class="vap-sr-only" hidden role="status" aria-live="polite">自动识别</span>
 
         <div class="vap-preview-comparison" id="vapComparison">
           <h3 class="vap-compare-source-label" id="vapCompareSourceLabel" hidden data-vap-i18n="compareSource">当前效果</h3>
-        <div class="vap-stage ft-upload-zone upload-ready" id="vapStage" data-background="checker" data-feedback-stage role="group" aria-label="视频预览">
+        <div class="vap-stage ft-upload-zone upload-ready" id="vapStage" tabindex="-1" data-background="checker" data-feedback-stage role="group" aria-label="视频预览">
           <div class="vap-empty" id="vapEmpty"><img class="tool-empty-art" src="design-system/assets/feedback/empty-upload.svg" width="120" height="90" alt=""><strong data-vap-i18n="uploadTitle">点击、拖入或粘贴 MP4 / 序列帧</strong><span data-vap-i18n="uploadHint">MP4 / PNG / WebP / JPG / ZIP · 200 MB 内 · 本机处理</span><span class="upload-paste-hint" data-vap-i18n="pasteHint">支持复制粘贴，按 ⌘V / Ctrl+V 上传</span><button id="vapUpload" class="vap-button vap-primary ft-motion-sheen" type="button" data-vap-i18n="upload">上传文件</button></div>
           <video id="vapSourceVideo" playsinline preload="auto" muted hidden></video>
           <canvas id="vapPreviewCanvas" width="400" height="400" role="img" aria-label="透明效果预览" hidden></canvas>
@@ -285,18 +292,19 @@ body{min-width:320px}
             <div class="vap-mask-boundary" id="vapMaskLineBottomStart"><button type="button" id="vapMaskHandleBottomStart" class="vap-mask-handle" role="slider" aria-orientation="vertical" aria-label="下方渐变开始" aria-valuemin="15" aria-valuemax="99.9" aria-valuenow="85"><span></span></button></div>
             <div class="vap-mask-boundary" id="vapMaskLineBottomEnd"><button type="button" id="vapMaskHandleBottomEnd" class="vap-mask-handle" role="slider" aria-orientation="vertical" aria-label="下方全透明边界" aria-valuemin="85.1" aria-valuemax="100" aria-valuenow="100"><span></span></button></div>
           </div>
+          <button id="vapPlay" class="vap-canvas-play" type="button" aria-label="播放" title="播放" aria-pressed="false" hidden></button>
           <div id="vapPreviewBusy" class="vap-preview-busy" role="status" hidden><span class="ft-spinner" aria-hidden="true"></span><span data-vap-i18n="previewProcessing">正在生成当前帧预览…</span></div>
         </div>
-        <div class="vap-result-preview" id="vapResultPreview" hidden><div class="vap-card-heading"><h3 data-vap-i18n="resultPreview">输出效果</h3><button id="vapResultPlay" class="vap-button vap-secondary" type="button" disabled data-vap-i18n="playResult">透明播放</button></div><div class="vap-result-frame" id="vapResultFrame" data-background="checker"><div id="vapResultPlayer" data-state="empty"></div><div class="vap-empty vap-output-placeholder" id="vapResultPlaceholder" role="status"><img id="vapOutputArt" class="tool-empty-art" src="design-system/assets/feedback/empty-output.svg" width="120" height="90" alt=""><span class="ft-spinner" id="vapOutputSpinner" aria-hidden="true" hidden></span><strong id="vapOutputEmptyTitle">输出效果将在这里显示</strong><span id="vapOutputEmptyHint">上传视频并完成转换后，在这里查看成品。</span></div></div></div>
+        <div class="vap-result-preview" id="vapResultPreview" hidden><div class="vap-card-heading"><h3 data-vap-i18n="resultPreview">输出效果</h3></div><div class="vap-result-frame" id="vapResultFrame" data-background="checker"><div id="vapResultPlayer" data-state="empty"></div><button id="vapResultPlay" class="vap-canvas-play" type="button" aria-label="透明播放" title="透明播放" aria-pressed="false" hidden disabled></button><div class="vap-empty vap-output-placeholder" id="vapResultPlaceholder" role="status"><img id="vapOutputArt" class="tool-empty-art" src="design-system/assets/feedback/empty-output.svg" width="120" height="90" alt=""><span class="ft-spinner" id="vapOutputSpinner" aria-hidden="true" hidden></span><strong id="vapOutputEmptyTitle">输出效果将在这里显示</strong><span id="vapOutputEmptyHint">上传视频并完成转换后，在这里查看成品。</span></div></div></div>
         </div>
         <div class="vap-view-toolbar" id="vapViewToolbar"><div class="vap-view-modes" hidden role="group" aria-label="预览方式"><button id="vapViewOriginal" type="button" aria-pressed="true" data-vap-i18n="original">原片</button><button id="vapViewTransparent" type="button" aria-pressed="false" data-vap-i18n="transparent">透明效果</button><button id="vapViewAlpha" type="button" aria-pressed="false" data-vap-i18n="alphaView">Alpha</button></div><div class="vap-view-background" role="group" aria-label="预览背景"><button id="vapBgChecker" type="button" aria-pressed="true" data-vap-i18n="checker">透明</button><button id="vapBgBlack" type="button" aria-pressed="false" data-vap-i18n="black">黑</button><button id="vapBgWhite" type="button" aria-pressed="false" data-vap-i18n="white">白</button></div></div>
         <p id="vapPreviewError" class="vap-notice" role="status" hidden></p>
-        <div class="vap-playback" id="vapPlayback" hidden><div class="vap-playback-top"><button id="vapPlay" class="vap-button vap-secondary" type="button" data-vap-i18n="play">播放</button><button id="vapMute" class="vap-button vap-secondary" type="button" aria-pressed="false" data-vap-i18n="soundOff">静音预览</button><span id="vapTime" class="vap-hint">0.00 / 0.00 s</span></div><label for="vapTimeline" class="vap-sr-only" data-vap-i18n="timeline">视频时间轴</label><input id="vapTimeline" type="range" min="0" max="0" step="0.001" value="0"></div>
+        <div class="vap-playback" id="vapPlayback" hidden><div class="vap-playback-top"><button id="vapMute" class="vap-button vap-secondary" type="button" hidden aria-pressed="false" data-vap-i18n="soundOff">静音预览</button><span id="vapTime" class="vap-hint">0.00 / 0.00 s</span></div><label for="vapTimeline" class="vap-sr-only" data-vap-i18n="timeline">视频时间轴</label><input id="vapTimeline" type="range" min="0" max="0" step="0.001" value="0"></div>
         <div class="vap-sourcebar" id="vapSourcebar" hidden><div><strong id="vapFileName"></strong><span id="vapFileMeta"></span></div><button id="vapReplace" class="vap-button vap-replace" type="button" data-vap-i18n="replace">替换视频</button></div>
         <details class="vap-disclosure vap-resources" id="vapResourcePanel">
-          <summary><span class="vap-disclosure-title" data-vap-resource-i18n="title">头像与文字资源</span><span class="vap-disclosure-meta"><span id="vapResourceCount" class="vap-mask-status">0 / 6</span><svg class="vap-disclosure-chevron" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></summary>
+          <summary><span class="vap-disclosure-title" data-vap-resource-i18n="title">创建文字/头像Key</span><span class="vap-disclosure-meta"><span id="vapResourceCount" class="vap-mask-status">0 / 6</span><svg class="vap-disclosure-chevron" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></span></summary>
           <div id="vapResourceEditor">
-            <div class="vap-resource-mode vap-segments" role="group" aria-label="资源合成方式"><button id="vapResourceDynamic" type="button" aria-pressed="true" data-vap-resource-i18n="dynamic">按标签替换</button><button id="vapResourceBaked" type="button" aria-pressed="false" data-vap-resource-i18n="baked">固定合成</button></div>
+            <div class="vap-resource-mode vap-segments" role="group" aria-label="资源合成方式" hidden><button id="vapResourceDynamic" type="button" aria-pressed="true" data-vap-resource-i18n="dynamic">按标签替换</button><button id="vapResourceBaked" type="button" aria-pressed="false" data-vap-resource-i18n="baked">固定合成</button></div>
             <div class="vap-resource-add"><button id="vapResourceAddImage" type="button" class="vap-button vap-secondary"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><circle cx="10" cy="6" r="3"/><path d="M4 17v-2a6 6 0 0 1 12 0v2M16 3h4m-2-2v4"/></svg><span data-vap-resource-i18n="addImage">添加头像</span></button><button id="vapResourceAddText" type="button" class="vap-button vap-secondary"><svg viewBox="0 0 20 20" width="18" height="18" aria-hidden="true"><path d="M3 5V3h14v2M10 3v14M7 17h6"/></svg><span data-vap-resource-i18n="addText">添加文字</span></button></div>
             <p id="vapResourceEmpty" class="vap-hint" data-vap-resource-i18n="empty">添加头像或文字，在画面中拖动定位。</p>
             <div id="vapResourceList" class="vap-resource-list" role="group" aria-label="资源列表"></div>
@@ -306,7 +314,7 @@ body{min-width:320px}
               <label class="vap-resource-field"><span data-vap-resource-i18n="tag">资源标签</span><input id="vapResourceTag" type="text" maxlength="40" autocomplete="off" spellcheck="false" aria-describedby="vapResourceError"></label>
               <div id="vapResourceImageFields" class="vap-resource-image-fields" role="group" tabindex="0" aria-label="头像图片"><button id="vapResourceReplace" type="button" class="vap-button vap-replace" data-vap-resource-i18n="pickImage">选择头像图片</button><div class="vap-resource-choice-row"><div class="vap-segments" role="group" aria-label="头像形状"><button id="vapResourceCircle" type="button" aria-pressed="true" data-vap-resource-i18n="circle">圆形</button><button id="vapResourceSquare" type="button" aria-pressed="false" data-vap-resource-i18n="square">方形</button></div><div class="ft-select"><select id="vapResourceFit" aria-label="图片适配"><option value="cover" data-vap-resource-i18n="cover">填满裁剪</option><option value="contain" data-vap-resource-i18n="contain">完整显示</option></select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div></div><span id="vapResourceFileName" class="vap-hint"></span><span class="upload-paste-hint" data-vap-resource-i18n="paste">PNG、JPG、WebP · 可在此粘贴</span></div>
               <div id="vapResourceTextFields" class="vap-resource-text-fields" hidden><label class="vap-resource-field"><span data-vap-resource-i18n="text">文字内容</span><input id="vapResourceText" type="text" maxlength="80" autocomplete="off"></label><div class="vap-resource-grid"><label class="vap-resource-field"><span data-vap-resource-i18n="fontSize">字号 px</span><input id="vapResourceFont" type="number" min="8" max="256" step="1" value="48"></label><label class="vap-resource-field"><span data-vap-resource-i18n="color">文字颜色</span><input id="vapResourceColor" type="color" value="#ffffff"></label></div></div>
-              <div class="vap-resource-grid vap-resource-position"><label class="vap-resource-field"><span data-vap-resource-i18n="x">水平位置 %</span><input id="vapResourceX" type="number" min="0" max="99.9" step="0.1"></label><label class="vap-resource-field"><span data-vap-resource-i18n="y">垂直位置 %</span><input id="vapResourceY" type="number" min="0" max="99.9" step="0.1"></label><label class="vap-resource-field"><span data-vap-resource-i18n="width">宽度 %</span><input id="vapResourceWidth" type="number" min="1" max="100" step="0.1"></label><label class="vap-resource-field"><span data-vap-resource-i18n="height">高度 %</span><input id="vapResourceHeight" type="number" min="1" max="100" step="0.1"></label></div>
+              <div class="vap-resource-grid vap-resource-position"><label class="vap-resource-field" hidden><span data-vap-resource-i18n="x">水平位置 %</span><input id="vapResourceX" type="number" min="0" max="99.9" step="0.1"></label><label class="vap-resource-field" hidden><span data-vap-resource-i18n="y">垂直位置 %</span><input id="vapResourceY" type="number" min="0" max="99.9" step="0.1"></label><label class="vap-resource-field"><span data-vap-resource-i18n="width">宽度 %</span><input id="vapResourceWidth" type="number" min="1" max="100" step="0.1"></label><label class="vap-resource-field"><span data-vap-resource-i18n="height">高度 %</span><input id="vapResourceHeight" type="number" min="1" max="100" step="0.1"></label></div>
               <div class="vap-resource-align vap-segments"><button id="vapResourceAlignX" type="button" data-vap-resource-i18n="alignX">水平居中</button><button id="vapResourceAlignY" type="button" data-vap-resource-i18n="alignY">垂直居中</button></div>
               <div class="vap-resource-grid vap-resource-timing"><label class="vap-resource-field"><span data-vap-resource-i18n="start">开始时间 s</span><input id="vapResourceStart" type="number" min="0" step="0.1" value="0"></label><label class="vap-resource-field"><span data-vap-resource-i18n="end">结束时间 s</span><input id="vapResourceEnd" type="number" min="0" step="0.1" placeholder="全程"></label></div>
               <div class="vap-resource-opacity"><label for="vapResourceOpacity" data-vap-resource-i18n="opacity">不透明度</label><output id="vapResourceOpacityValue" for="vapResourceOpacity">100%</output><input id="vapResourceOpacity" type="range" min="0" max="100" step="1" value="100"></div>
@@ -341,11 +349,11 @@ body{min-width:320px}
       </section>
       <aside class="card vap-card vap-output" aria-labelledby="vapOutputTitle">
         <div class="vap-card-heading"><h2 id="vapOutputTitle" data-vap-i18n="output">调整与导出</h2><span class="vap-format">MP4</span></div>
-        <fieldset class="vap-fieldset"><legend data-vap-i18n="dimensions">输出尺寸</legend><div class="vap-dimensions"><label><span data-vap-i18n="width">宽度</span><input id="vapWidth" type="number" min="16" max="2048" step="1" value="720" inputmode="numeric"></label><span aria-hidden="true">×</span><label><span data-vap-i18n="height">高度</span><input id="vapHeight" type="number" min="16" max="2048" step="1" value="1560" inputmode="numeric"></label></div><div class="vap-size-presets" role="group" aria-label="尺寸快捷项"><button id="vapSizeDefault" type="button" aria-pressed="true">720 × 1560</button><button id="vapSize750" type="button" aria-pressed="false">750 × 1624</button><button id="vapSizeSource" type="button" aria-pressed="false" disabled data-vap-i18n="sourceSize">原片尺寸</button></div><p id="vapSizeError" class="vap-field-error" hidden data-vap-i18n="invalidSize">宽高需为 16–2048 的整数。</p></fieldset>
+        <fieldset class="vap-fieldset"><legend class="vap-sr-only" data-vap-i18n="dimensions">输出尺寸</legend><div class="vap-dimensions"><label><span data-vap-i18n="width">宽度</span><input id="vapWidth" type="number" min="16" max="2048" step="1" value="720" inputmode="numeric"></label><span aria-hidden="true">×</span><label><span data-vap-i18n="height">高度</span><input id="vapHeight" type="number" min="16" max="2048" step="1" value="1560" inputmode="numeric"></label></div><div class="vap-size-presets" role="group" aria-label="尺寸快捷项"><button id="vapSizeDefault" type="button" aria-pressed="true">720 × 1560</button><button id="vapSize750" type="button" aria-pressed="false">750 × 1624</button><button id="vapSizeSource" type="button" aria-pressed="false" disabled data-vap-i18n="sourceSize">原片尺寸</button></div><p id="vapSizeError" class="vap-field-error" hidden data-vap-i18n="invalidSize">宽高需为 16–2048 的整数。</p></fieldset>
         <fieldset class="vap-fieldset vap-separator"><legend data-vap-i18n="alphaResolution">Alpha 分辨率</legend><div class="vap-segments"><button id="vapAlphaHalf" type="button" aria-pressed="true">0.5</button><button id="vapAlphaFull" type="button" aria-pressed="false">1.0</button></div></fieldset>
         <div class="vap-two-fields vap-separator"><label><span data-vap-i18n="fps">帧率 FPS</span><input id="vapFps" aria-describedby="vapFpsError" type="number" min="1" max="60" step="1" value="24" inputmode="numeric"></label><label><span data-vap-i18n="targetSize">体积上限 MB</span><input id="vapTarget" type="number" min="0.1" max="3" step="0.1" value="3" inputmode="decimal"></label></div>
         <p id="vapFpsError" class="vap-field-error" role="alert" hidden></p>
-        <div class="vap-size-presets vap-budget-presets" id="vapBudgetPresets" role="group" aria-label="体积上限快捷项"><button id="vapBudget1" type="button" aria-pressed="false" data-vap-i18n="budget1">1 MB 以内</button><button id="vapBudget2" type="button" aria-pressed="false" data-vap-i18n="budget2">2 MB 以内</button><button id="vapBudget3" type="button" aria-pressed="true" data-vap-i18n="budget3">3 MB 以内</button></div>
+        <div class="vap-size-presets vap-budget-presets" id="vapBudgetPresets" hidden role="group" aria-label="体积上限快捷项"><button id="vapBudget1" type="button" aria-pressed="false" data-vap-i18n="budget1">1 MB 以内</button><button id="vapBudget2" type="button" aria-pressed="false" data-vap-i18n="budget2">2 MB 以内</button><button id="vapBudget3" type="button" aria-pressed="true" data-vap-i18n="budget3">3 MB 以内</button></div>
         <label class="vap-field-label" for="vapQuality" data-vap-i18n="compression">压缩预设</label><div class="ft-select"><select id="vapQuality"><option value="ultra" selected data-vap-i18n="ultraQuality">超清优先</option><option value="quality" data-vap-i18n="qualityFirst">高清优先</option><option value="balanced" data-vap-i18n="balanced">智能均衡</option><option value="size" data-vap-i18n="sizeFirst">体积优先</option></select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div>
 
         <div class="vap-volume vap-separator"><div class="vap-volume-heading"><label for="vapVolume" data-vap-i18n="volume">视频音量</label><output id="vapVolumeValue" for="vapVolume">60%</output></div><input id="vapVolume" type="range" min="0" max="200" step="1" value="60" disabled aria-describedby="vapVolumeHint"><div class="vap-volume-presets" id="vapVolumePresets" role="group" aria-label="音量预设"><button id="vapVolumeMobile" type="button" aria-pressed="true" disabled data-vap-i18n="volumeMobile">移动端 60%</button><button id="vapVolumeOriginal" type="button" aria-pressed="false" disabled data-vap-i18n="volumeOriginal">原声 100%</button></div></div>
@@ -460,7 +468,17 @@ body{min-width:320px}
     const canvases = {main:document.querySelector('#mainCanvas'), large:document.querySelector('#largeCanvas'), small:document.querySelector('#smallCanvas')};
     let language=typeof location!=='undefined'&&location.hash==='#vap-tools'?'zh':'en';
     let zipFile=null, exportBusy=false, downloadNotice=null, importBusy=false;
-    let roomFeedbackPhase="empty";
+    let roomFeedbackPhase="empty",roomModePending=false;
+    const roomNow=()=>typeof performance!=='undefined'?performance.now():Date.now();
+    const roomWebPMode=()=>window.FunWebP?.getMode?.()||'high';
+    const roomIsActive=()=>!document.querySelector('#roomTool').classList.contains('hidden');
+    function ensureRoomWebPMode(){
+      if(!batchJobs.length){roomModePending=false;return}
+      const mode=roomWebPMode();
+      if(!roomModePending&&(!generatedOutputs.length||generatedOutputs.every(file=>file.mode===mode)))return;
+      if(exportBusy||importBusy||!roomIsActive()){roomModePending=true;return}
+      roomModePending=false;return generateAllOutputs();
+    }
     function pickRoomFiles(){if(!exportBusy&&!importBusy)document.querySelector('#batchInput').click()}
     function syncRoomFeedback(){const message=roomFeedbackPhase==="loading"?ui("正在读取图片…","Reading images…"):roomFeedbackPhase==="processing"?ui("正在生成并打包…","Generating and packaging…"):undefined;window.FunToolkitUI?.setState("room",{phase:roomFeedbackPhase,message})}
     function setRoomFeedback(phase){roomFeedbackPhase=phase;syncRoomFeedback()}
@@ -501,38 +519,39 @@ body{min-width:320px}
     }
     async function applyCrop(){
       if(exportBusy||importBusy)return;
-      const job=batchJobs[activeCropJob],size=activeCropSize,width=size==='large'?720:300,height=size==='large'?1560:480;
+      const job=batchJobs[activeCropJob],size=activeCropSize,width=size==='large'?720:300,height=size==='large'?1560:480,mode=roomWebPMode();
       if(!job)return;
       const next={x:Number(document.querySelector('#cropX').value)/100,y:Number(document.querySelector('#cropY').value)/100};
       const previous=job.crops[size];
       if(previous.x===next.x&&previous.y===next.y){closeCropEditor();return}
       exportBusy=true;setRoomFeedback("processing");closeCropEditor();showDownloadNotice('busy');refreshDownloadControls();
       try{
-        const blob=await exportCanvas(job.image,width,height,next),index=generatedOutputs.findIndex(file=>file.job===job&&file.width===width);
+        const blob=await exportCanvas(job.image,width,height,next,mode),index=generatedOutputs.findIndex(file=>file.job===job&&file.width===width);
         if(index<0)throw new Error('Output missing');
-        job.crops[size]=next;(job.outputCache||={})[size]={image:job.image,x:next.x,y:next.y,blob};clearDownloads();generatedOutputs[index]={...generatedOutputs[index],blob,downloadUrl:null};renderOutputList();
+        job.crops[size]=next;(job.outputCache||={})[size]={image:job.image,x:next.x,y:next.y,mode,blob};clearDownloads();generatedOutputs[index]={...generatedOutputs[index],blob,mode,downloadUrl:null};renderOutputList();
         if(size==='large')await renderBatchPreviews();
         try{await prepareZip();showDownloadNotice('ready')}catch(error){showDownloadNotice('zipError')}
         addLifetimeImages(1);window.Hub?.record('room','generated');document.querySelector('#renderMeta').textContent=ui('WebP · 生成完成','WebP · Ready');setRoomFeedback(downloadNotice?.state==='zipError'?'error':'success');window.FunToolkitUI?.reveal(document.querySelector('#outputList'));
       }catch(error){setRoomFeedback('error');showDownloadNotice('cropError')}
-      finally{exportBusy=false;refreshDownloadControls()}
+      finally{exportBusy=false;refreshDownloadControls();await ensureRoomWebPMode()}
     }
     document.querySelector('#cropX').oninput=updateCropPreview;document.querySelector('#cropY').oninput=updateCropPreview;
     document.querySelector('#cropModal').addEventListener('click',event=>{if(event.target.id==='cropModal'){const r=event.target.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)closeCropEditor()}});
     document.querySelectorAll('.download').forEach(b=>b.onclick=()=>download(b.dataset.size));
-    async function exportCanvas(image,width,height,setting={x:.5,y:.5}){
+    async function exportCanvas(image,width,height,setting={x:.5,y:.5},mode=roomWebPMode()){
       const out=document.createElement('canvas');out.width=width;out.height=height;
       const x=out.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawCrop(x,image,width,height,setting.x,setting.y);
-      return canvasToLosslessWebP(out);
+      try{return await canvasToWebP(out,{mode})}finally{out.width=out.height=1}
     }
-    function outputNames(index){const base=`Bg${String(index+1).padStart(2,'0')}`;return [`${base}.webp`,`${base}-s.webp`]}
+    function outputNames(index){const base=`Bg${String(index+1).padStart(2,'0')}`;return [`${base}.webp`,`${base}- preview.webp`]}
     function refreshJobs(){document.querySelector('#jobList').innerHTML=batchJobs.map((j,index)=>`<div class="job"><i></i><span>${outputNames(index).join('<br>')}</span><em>${ui(j.status||'待生成',j.status==='已完成'?'Completed':j.status==='生成中'?'Generating':'Pending')}</em></div>`).join('')}
     function downloadGenerated(index){const file=generatedOutputs[index];if(exportBusy||importBusy){showDownloadNotice('busy');return}if(!file){showDownloadNotice('empty');return}saveDownload(file)}
-    function renderOutputList(){const list=document.querySelector('#outputList');list.innerHTML=generatedOutputs.map((file,index)=>{const isLarge=file.width===720,url=downloadUrl(file),meta=isLarge?ui('720 × 1560 · 铺满 · 无损 WebP','720 × 1560 · Fill · Lossless WebP'):ui('300 × 480 · 铺满 · 无损 WebP','300 × 480 · Fill · Lossless WebP');return `<div class="output"><div class="output-img"><img src="${url}" alt=""></div><div class="output-row"><div><strong>${file.name}</strong><small>${meta}</small><small class="file-size">${ui('大小：','Size: ')}${formatSize(file.blob.size)}</small></div><div class="file-actions"><button class="edit" onclick="openCropEditor('${isLarge?'large':'small'}',${batchJobs.indexOf(file.job)})">${ui('编辑范围','Edit crop')}</button><button class="download" onclick="downloadGenerated(${index})">${ui('下载','Download')}</button></div></div></div>`}).join('');document.querySelector('#outputCount').textContent=generatedOutputs.length;window.FunToolkitUI?.prepareImages(list)}
+    function renderOutputList(){const list=document.querySelector('#outputList');list.innerHTML=generatedOutputs.map((file,index)=>{const isLarge=file.width===720,url=downloadUrl(file),quality=file.mode==='lossless'?ui('严格无损 WebP','Exact-lossless WebP'):ui('高清 WebP','High-quality WebP'),meta=`${file.width} × ${file.height} · ${ui('铺满','Fill')} · ${quality}`;return `<div class="output"><div class="output-img"><img src="${url}" alt=""></div><div class="output-row"><div><strong>${file.name}</strong><small>${meta}</small><small class="file-size">${ui('大小：','Size: ')}${formatSize(file.blob.size)}</small></div><div class="file-actions"><button class="edit" onclick="openCropEditor('${isLarge?'large':'small'}',${batchJobs.indexOf(file.job)})">${ui('编辑范围','Edit crop')}</button><button class="download" onclick="downloadGenerated(${index})">${ui('下载','Download')}</button></div></div></div>`}).join('');document.querySelector('#outputCount').textContent=generatedOutputs.length;window.FunToolkitUI?.prepareImages(list)}
     // Keep at most two encoded Blobs with each queue item. A changed crop replaces
     // only that size; names and download URLs are rebuilt when the queue changes.
     async function generateAllOutputs(){
       if(!batchJobs.length||exportBusy)return;
+      const started=roomNow(),mode=roomWebPMode();let encodeWaitMs=0,zipMs=0;roomModePending=false;
       exportBusy=true;setRoomFeedback('processing');clearDownloads();showDownloadNotice('busy');refreshDownloadControls();
       const wrap=document.querySelector('#progressWrap'),bar=document.querySelector('#progressBar'),text=document.querySelector('#progressText'),percent=document.querySelector('#progressPercent');
       wrap.classList.remove('hidden');bar.style.width='0%';bar.setAttribute('aria-valuenow','0');percent.textContent='0%';text.textContent=ui('准备生成…','Preparing…');
@@ -547,12 +566,12 @@ body{min-width:320px}
             for(const [outputIndex,w,h,sizeId] of [[0,720,1560,'largeSize'],[1,300,480,'smallSize']]){
               const size=w===720?'large':'small',setting=job.crops[size],cached=job.outputCache?.[size];
               let blob;
-              if(cached&&cached.image===job.image&&cached.x===setting.x&&cached.y===setting.y){blob=cached.blob}
+              if(cached&&cached.image===job.image&&cached.x===setting.x&&cached.y===setting.y&&cached.mode===mode){blob=cached.blob}
               else{
-                blob=await exportCanvas(job.image,w,h,setting);
-                (job.outputCache||={})[size]={image:job.image,x:setting.x,y:setting.y,blob};
+                const encodeStart=roomNow();blob=await exportCanvas(job.image,w,h,setting,mode);encodeWaitMs+=roomNow()-encodeStart;
+                (job.outputCache||={})[size]={image:job.image,x:setting.x,y:setting.y,mode,blob};
               }
-              files.push({name:names[outputIndex],blob,width:w,height:h,job});
+              files.push({name:names[outputIndex],blob,width:w,height:h,mode,job});
               if(i===0)document.querySelector('#'+sizeId).textContent=`${ui('大小：','Size: ')}${formatSize(blob.size)}`;
               done++;const value=Math.round(done/total*100);
               bar.style.width=value+'%';bar.setAttribute('aria-valuenow',String(value));percent.textContent=value+'%';text.textContent=ui(`正在生成 ${done}/${total} 个文件`,`Generating ${done} of ${total} files`);
@@ -568,7 +587,7 @@ body{min-width:320px}
         await Promise.all(Array.from({length:Math.min(2,jobs.length)},()=>drain()));
         if(failure)throw failure;
         generatedOutputs=groups.flat();renderOutputList();
-        try{await prepareZip();showDownloadNotice('ready')}catch(zipError){showDownloadNotice('zipError')}
+        const zipStart=roomNow();try{await prepareZip();showDownloadNotice('ready')}catch(zipError){showDownloadNotice('zipError')}finally{zipMs=roomNow()-zipStart}
         text.textContent=ui(`已完成，共 ${total} 个文件`,`Completed · ${total} files`);document.querySelector('#renderMeta').textContent=ui('WebP · 生成完成','WebP · Ready');
         document.querySelector('#exportEmpty').classList.add('hidden');document.querySelector('#exportContent').classList.remove('hidden');
         addLifetimeImages(recordRoomOutputs(generatedOutputs));setRoomFeedback(downloadNotice?.state==='zipError'?'error':'success');window.FunToolkitUI?.reveal(document.querySelector('#exportContent'));
@@ -576,12 +595,14 @@ body{min-width:320px}
         generatedOutputs=[];zipFile=null;document.querySelector('#outputList').replaceChildren();document.querySelector('#outputCount').textContent='0';
         document.querySelector('#exportContent').classList.add('hidden');document.querySelector('#exportEmpty').classList.remove('hidden');
         setRoomFeedback('error');showDownloadNotice('generationError');text.textContent=ui('生成失败，请重新上传图片后重试','Generation failed. Upload the images again and retry.');document.querySelector('#renderMeta').textContent=ui('WebP · 生成失败','WebP · Generation failed');
-      }finally{exportBusy=false;refreshDownloadControls()}
+      }finally{const data=document.querySelector('#roomTool').dataset;data.roomGenerateMs=String(roomNow()-started);data.roomEncodeWaitMs=String(encodeWaitMs);data.roomZipMs=String(zipMs);data.roomMode=mode;data.roomOutputs=String(generatedOutputs.length);exportBusy=false;refreshDownloadControls();await ensureRoomWebPMode()}
     }
     function downloadAll(){if(exportBusy||importBusy){showDownloadNotice('busy');return}if(zipFile){saveDownload(zipFile);return}if(!batchJobs.length){showDownloadNotice('empty');return}showDownloadNotice('prepare');generateAllOutputs()}
     document.querySelector('#generate').onclick=()=>pickRoomFiles();
     const dz=document.querySelector('#dropZone');dz.addEventListener('click',()=>pickRoomFiles());dz.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();pickRoomFiles()}});['dragenter','dragover'].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.add('drag')}));['dragleave','drop'].forEach(n=>dz.addEventListener(n,e=>{e.preventDefault();dz.classList.remove('drag')}));dz.addEventListener('drop',e=>batch(e.dataTransfer.files));document.querySelector('#batchInput').onchange=e=>{batch(e.target.files);e.target.value=''};const previewStage=document.querySelector('#previewStage');document.querySelector('#previewUploadButton').addEventListener('click',e=>{e.stopPropagation();pickRoomFiles()});previewStage.addEventListener('click',()=>{if(!batchJobs.length)pickRoomFiles()});previewStage.addEventListener('keydown',e=>{if(!batchJobs.length&&(e.key==='Enter'||e.key===' ')){e.preventDefault();pickRoomFiles()}});['dragenter','dragover'].forEach(n=>previewStage.addEventListener(n,e=>{e.preventDefault();if(!batchJobs.length)previewStage.classList.add('drag')}));['dragleave','drop'].forEach(n=>previewStage.addEventListener(n,e=>{e.preventDefault();previewStage.classList.remove('drag')}));previewStage.addEventListener('drop',e=>batch(e.dataTransfer.files));
     window.UploadPaste?.register({zone:previewStage,isActive:()=>!document.querySelector('#roomTool').classList.contains('hidden'),isBusy:()=>exportBusy||importBusy,onFiles:batch});
+    window.RoomWebP={activate:ensureRoomWebPMode,isBusy:()=>exportBusy||importBusy};
+    document.addEventListener('webp:mode-change',()=>{roomModePending=true;void ensureRoomWebPMode()});
     async function renderBatchPreviews(){
       await fgReady;
       const grid=document.querySelector('#previewGrid');grid.replaceChildren();grid.classList.remove('count-1','count-2','count-3');grid.classList.add(`count-${Math.min(batchJobs.length,3)}`);
@@ -616,7 +637,7 @@ body{min-width:320px}
       importBusy=true;setRoomFeedback("loading");refreshDownloadControls();
       try{bg=batchJobs[0].image;await renderBatchPreviews();await generateAllOutputs()}
       catch(error){setRoomFeedback('error');showDownloadNotice('generationError')}
-      finally{importBusy=false;refreshDownloadControls()}
+      finally{importBusy=false;refreshDownloadControls();await ensureRoomWebPMode()}
     }
     let rejectedUploads=[];
     function renderUploadNotice(){
@@ -625,6 +646,7 @@ body{min-width:320px}
     }
     async function batch(files){
       if(exportBusy||importBusy)return;
+      const started=roomNow();
       importBusy=true;setRoomFeedback("loading");refreshDownloadControls();const additions=[],selectedFiles=Array.from(files);rejectedUploads=[];
       try{
         for(const file of selectedFiles){
@@ -640,7 +662,7 @@ body{min-width:320px}
         await fgReady;clearDownloads();batchJobs.push(...additions);generatedOutputs=[];batchJobs.forEach(job=>job.status='待生成');syncBatchState();
         bg=batchJobs[0].image;await renderBatchPreviews();await generateAllOutputs();
       }catch(error){setRoomFeedback('error');showDownloadNotice('generationError')}
-      finally{importBusy=false;refreshDownloadControls()}
+      finally{document.querySelector('#roomTool').dataset.roomBatchMs=String(roomNow()-started);importBusy=false;refreshDownloadControls();await ensureRoomWebPMode()}
     }
     function localizeExtra(){document.querySelector('#cropDescription').textContent=ui('图片会铺满整个画面；默认截取中间区域。','The image fills the frame. The crop is centered by default.');document.querySelector('#cropX').previousElementSibling.firstChild.nodeValue=ui('水平位置 ','Horizontal position ');document.querySelector('#cropY').previousElementSibling.firstChild.nodeValue=ui('垂直位置 ','Vertical position ');document.querySelector('.cancel').textContent=ui('取消','Cancel');document.querySelector('.apply').textContent=ui('应用范围','Apply crop');document.querySelector('#cropTitle').textContent=cropTitle();document.querySelector('#mainCanvas').setAttribute('aria-label',ui('房间背景合成预览','Room background composite preview'));document.querySelectorAll('.delete-preview').forEach(b=>{b.title=ui('删除这张图片','Remove this image');b.setAttribute('aria-label',b.title)});const n=batchJobs.length;document.querySelector('#previewMeta').textContent=ui(`${n} 张预览`,`${n} preview${n===1?'':'s'}`);if(n){document.querySelector('#bgName').textContent=ui(`已添加 ${n} 张背景图`,`${n} background${n===1?'':'s'} added`);document.querySelector('#bgInfo').textContent=ui('批量队列 · 可继续添加','Batch queue · Add more anytime');document.querySelector('#fileCount').textContent=ui(`${n} 个文件`,`${n} file${n===1?'':'s'}`);document.querySelector('#previewTitle').textContent=ui(`批量合成预览 · ${n} 张`,`Batch preview · ${n} image${n===1?'':'s'}`)}document.querySelector('#renderMeta').textContent=generatedOutputs.length?ui('WebP · 生成完成','WebP · Ready'):n?ui('WebP · 自动转换中','WebP · Converting automatically'):ui('WebP · 就绪','WebP · Ready');const progress=document.querySelector('#progressText'),numbers=progress.textContent.match(/\d+/g)||[];if(numbers.length===2)progress.textContent=ui(`正在生成 ${numbers[0]}/${numbers[1]} 个文件`,`Generating ${numbers[0]} of ${numbers[1]} files`);else if(numbers.length===1)progress.textContent=ui(`已完成，共 ${numbers[0]} 个文件`,`Completed · ${numbers[0]} files`);else progress.textContent=/失败|failed/i.test(progress.textContent)?ui('生成失败，请重新上传图片后重试','Generation failed. Upload the images again and retry.'):ui('准备生成…','Preparing…')}
 // Store-mode ZIP: WebP is already compressed. No CDN or network is needed.
@@ -689,7 +711,7 @@ function renderDownloadNotice(){
   };const text=document.createElement('p');text.style.margin='0';text.textContent=copy[state];box.append(text);
   if(file){try{const retry=document.createElement('a');retry.href=downloadUrl(file);retry.download=file.name;retry.addEventListener('click',()=>window.Hub?.record('room','download'));retry.textContent=ui('再次下载：','Retry download: ')+file.name;retry.style.cssText='display:block;color:#0071e3;margin-top:8px';box.append(retry);if(file.blob.type.startsWith('image/')){const preview=document.createElement('a');preview.href=retry.href;preview.target='_blank';preview.rel='noopener';preview.textContent=ui('打开图片，右键或长按保存','Open image to save with right-click or long-press');preview.style.cssText='display:block;color:#0071e3;margin-top:8px';box.append(preview)}}catch(error){text.textContent=ui('当前环境不支持保存，请用 Chrome、Edge 或 Safari 打开此 HTML。','Saving is unavailable here. Open this HTML in Chrome, Edge or Safari.')}}
 }
-function refreshDownloadControls(){const busy=exportBusy||importBusy;for(const id of ['#downloadAllText']){const button=document.querySelector(id);button.textContent=busy?ui('正在准备…','Preparing…'):ui('下载全部 ZIP','Download all ZIP');button.disabled=busy;button.setAttribute('aria-busy',String(busy))}const upload=document.querySelector('#previewUploadButton');upload.disabled=busy;upload.setAttribute('aria-busy',String(busy));document.querySelectorAll('.delete-preview,.file-actions button,#addBackgrounds').forEach(button=>button.disabled=exportBusy||importBusy);renderDownloadNotice();syncRoomFeedback()}
+function refreshDownloadControls(){const busy=exportBusy||importBusy;for(const id of ['#downloadAllText']){const button=document.querySelector(id);button.textContent=busy?ui('正在准备…','Preparing…'):ui('下载全部 ZIP','Download all ZIP');button.disabled=busy;button.setAttribute('aria-busy',String(busy))}const upload=document.querySelector('#previewUploadButton');upload.disabled=busy;upload.setAttribute('aria-busy',String(busy));document.querySelectorAll('.delete-preview,.file-actions button,#addBackgrounds').forEach(button=>button.disabled=exportBusy||importBusy);renderDownloadNotice();syncRoomFeedback();document.dispatchEvent(new CustomEvent('webp:tool-state',{detail:{tool:'room',busy}}))}
 function updateContactLanguage(){document.querySelector('#contactTitle').textContent=ui('联系作者','Contact author');document.querySelector('#contactNameLabel').textContent=ui('姓名','Name');document.querySelector('#contactName').textContent='庞伟深 · Winsome';document.querySelector('#contactCompanyLabel').textContent=ui('公司','Company');document.querySelector('#contactClose').textContent=ui('关闭','Close')}
 function openContact(){updateContactLanguage();document.querySelector('#contactDialog').showModal()}
 document.querySelector('#contactDialog').addEventListener('click',event=>{if(event.target.id==='contactDialog'){const r=event.target.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)event.target.close()}});
@@ -710,18 +732,19 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   </script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
   <script src="vendor/svga-2.3.2.min.js"></script>
-  <script src="banner-webp.js?v=20261029-lossless1"></script>
+  <script src="banner-webp.js?v=20261030-webp2"></script>
+  <script src="webp-settings.js?v=20261030-webp2"></script>
   <script src="project-selector.js?v=20261026-projects1"></script>
-  <script src="banner.js?v=20261027-paste-copy1"></script>
+  <script src="banner.js?v=20261030-webp2"></script>
   <script src="hub.js?v=20261027-all-tool-stats1"></script>
   <script src="market-icon-png.js?v=20261024-resources-nav1"></script>
-  <script src="resource-library.js?v=20261029-lossless1"></script>
+  <script src="resource-library.js?v=20261030-webp2"></script>
   <script src="gift-preview-render.js?v=20261025-quality1"></script>
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
   <script src="gift-background.js?v=20261026-lucida2"></script>
-  <script src="gift-preview.js?v=20261027-all-tool-stats1"></script>
-  <script src="vap-player.js?v=20261028-resources1"></script>
-  <script src="vap-resource-editor.js?v=20261029-quality2"></script>
-  <script src="vap-tool.js?v=20261029-gift-fade1"></script>
-  <script src="toolkit.js?v=20261029-lossless1"></script>
+  <script src="gift-preview.js?v=20261030-webp2"></script>
+  <script src="vap-player.js?v=20261030-key-replace1"></script>
+  <script src="vap-resource-editor.js?v=20261030-avatar-motion1"></script>
+  <script src="vap-tool.js?v=20261030-avatar-motion1"></script>
+  <script src="toolkit.js?v=20261030-avatar-batch2"></script>
 </body></html>

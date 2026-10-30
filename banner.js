@@ -12,7 +12,7 @@
       "close": "关闭",
       "helpDescription": "在 GPT 生图时，请写明图片的宽高比为 {ratio}:1。",
       "helpPrompt": "请生成一张 Banner 图片，宽高比为 {ratio}:1。",
-      "helpFollowup": "选择项目并上传图片，工具会自动居中裁切，导出对应尺寸的无损 WebP 文件。",
+      "helpFollowup": "选择项目并上传图片，工具会自动居中裁切，导出对应尺寸的WebP 文件。",
       "title": "Banner 生产工具",
       "preview": "Banner 预览",
       "drop": "点击、拖入或粘贴 Banner 图片",
@@ -24,16 +24,16 @@
       "game": "游戏 Banner",
       "privacy": "文件仅在本地处理，不会上传至服务器。",
       "output": "输出文件",
-      "compression": "无损 WebP · 保留画面细节",
+      "compression": "高清压缩 WebP · 小体积优先",
       "smallSource": "原图较小，放大后可能变模糊。建议上传至少 {width} × {height} px 的原图。",
-      "encoderError": "无损压缩组件未能加载，请刷新后重试。",
+      "encoderError": "WebP 编码组件未能加载，请刷新后重试。",
       "empty": "上传图片后自动生成",
       "downloadAll": "下载全部 · ZIP",
       "download": "下载",
       "noFile": "尚未选择文件",
       "loading": "正在生成…",
       "importing": "正在读取图片…",
-      "processing": "正在生成并无损压缩…",
+      "processing": "正在生成并压缩…",
       "packaging": "正在打包…",
       "ready": "已生成 {count} 个文件",
       "typeError": "请选择 PNG、JPG 或 WebP 图片。",
@@ -57,7 +57,7 @@
       "close": "Close",
       "helpDescription": "When generating a banner in GPT, specify a {ratio}:1 aspect ratio (width:height).",
       "helpPrompt": "Generate a banner image with a {ratio}:1 aspect ratio.",
-      "helpFollowup": "Choose a project and upload an image. The tool crops it centrally and exports the project’s sizes as lossless WebP files.",
+      "helpFollowup": "Choose a project and upload an image. The tool crops it centrally and exports the project’s sizes as WebP files.",
       "title": "Banner maker",
       "preview": "Banner preview",
       "drop": "Click, drop or paste a banner image",
@@ -69,16 +69,16 @@
       "game": "Game banner",
       "privacy": "Processed locally. Your files never leave this device.",
       "output": "Output files",
-      "compression": "Lossless WebP · Original detail preserved",
+      "compression": "High-quality WebP · Smaller files",
       "smallSource": "This image needs enlarging and may look soft. Use an original image of at least {width} × {height} px.",
-      "encoderError": "Could not load the lossless encoder. Refresh and try again.",
+      "encoderError": "Could not load the WebP encoder. Refresh and try again.",
       "empty": "Upload an image to create banners",
       "downloadAll": "Download all · ZIP",
       "download": "Download",
       "noFile": "No file selected",
       "loading": "Creating banners…",
       "importing": "Reading image…",
-      "processing": "Creating and losslessly compressing…",
+      "processing": "Creating and compressing…",
       "packaging": "Creating ZIP…",
       "ready": "{count} file(s) ready",
       "typeError": "Choose a PNG, JPG or WebP image.",
@@ -103,7 +103,8 @@
   const t=key=>(copy[language]||copy.en)[key];
   const readyText=()=>language==='zh'?t('ready').replace('{count}',state.outputs.length):`${state.outputs.length} ${state.outputs.length===1?'file':'files'} ready`;
   const outputTitle=kind=>t(kind==='room'&&state.project.id!=='hapi-ludo'?'banner':kind);
-  const state={project:projects[0],image:null,file:null,outputs:[],busy:false,notice:null,phase:'empty',busyMessage:null,previewBackground:'black'};
+  const webpMode=()=>window.FunWebP?.getMode?.()||'high';
+  const state={outputMode:null,modeRefresh:false,project:projects[0],image:null,file:null,outputs:[],busy:false,notice:null,phase:'empty',busyMessage:null,previewBackground:'black'};
   let template=null;
   function cropRect(iw,ih,tw,th){
     const scale=Math.max(tw/iw,th/ih),sw=tw/scale,sh=th/scale;
@@ -155,7 +156,7 @@
     for(const file of state.outputs){
       const row=document.createElement('div');row.className='banner-output';
       const info=document.createElement('div'),title=document.createElement('strong'),meta=document.createElement('span');
-      title.textContent=outputTitle(file.kind);meta.textContent=`${file.width} × ${file.height} px · ${(file.blob.size/1024).toFixed(1)} KB`;
+      title.textContent=outputTitle(file.kind);meta.textContent=`${file.width} × ${file.height} px · ${(file.blob.size/1024).toFixed(1)} KB · ${file.mode==='lossless'?(language==='zh'?'严格无损':'Exact lossless'):(language==='zh'?'高清压缩':'High quality')}`;
       info.append(title,meta);
       const link=document.createElement('a');link.className='download';link.href=file.url;link.download=file.name;link.textContent=t('download');link.setAttribute('aria-label',t('download')+' '+outputTitle(file.kind));
       link.addEventListener('click',()=>window.Hub?.record('banner','download'));
@@ -172,6 +173,7 @@
   function syncLanguage(){
     document.querySelectorAll('[data-banner-i18n]').forEach(el=>el.textContent=t(el.dataset.bannerI18n));
     $('#bannerProjectCatalog').querySelectorAll('[data-project]').forEach(button=>{const project=projects.find(item=>item.id===button.dataset.project);button.setAttribute('aria-label',`${t('select')} ${project.name}`)});
+    const compression=document.querySelector('[data-banner-i18n="compression"]');if(compression)compression.textContent=webpMode()==='lossless'?(language==='zh'?'严格无损 WebP · 像素完全保留':'Exact lossless WebP · Pixels preserved'):(language==='zh'?'高清压缩 WebP · 小体积优先':'High-quality WebP · Smaller files');
     const spec=state.project.outputs[0],ratio=state.project.id==='hapi-ludo'?'3.3':String(spec.width/spec.height);
     for(const key of ['helpDescription','helpPrompt'])document.querySelector(`[data-banner-i18n="${key}"]`).textContent=t(key).replace('{ratio}',ratio);
     $('#bannerRoomTitle').textContent=outputTitle('room');$('#bannerRoomSize').textContent=`${spec.width} × ${spec.height} px`;
@@ -188,19 +190,20 @@
   function prepareProject(project){
     return Promise.all([prepareBannerWebP(),project.outputs.length===2&&!template?readImage('assets/game-banner-frame.webp','frameError').then(frame=>{template=frame}):Promise.resolve()]);
   }
-  async function createOutputs(image,file,project){
+  async function createOutputs(image,file,project,mode=webpMode()){
     const fresh=[],base=file.name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'banner';
     try{
       for(const render of drawBanners(image,template,project)){
-        const blob=await canvasToLosslessWebP(render.canvas);
-        fresh.push({...render,blob,url:URL.createObjectURL(blob),name:`${base}-${project.id}-${render.kind}-banner-${render.width}x${render.height}.webp`});
+        const blob=await canvasToWebP(render.canvas,{mode});
+        if(mode!==webpMode())throw new Error('modeChanged');
+        fresh.push({...render,mode,blob,url:URL.createObjectURL(blob),name:`${base}-${project.id}-${render.kind}-banner-${render.width}x${render.height}.webp`});
       }
       return fresh;
     }catch(error){for(const output of fresh)URL.revokeObjectURL(output.url);throw error}
   }
   function commitOutputs(image,file,project,fresh){
     for(const output of state.outputs)URL.revokeObjectURL(output.url);
-    state.project=project;state.image=image;state.file=file;state.outputs=fresh;state.phase='success';
+    state.project=project;state.image=image;state.file=file;state.outputs=fresh;state.outputMode=fresh[0]?.mode||webpMode();state.phase='success';
     for(const output of fresh){const canvas=$(output.kind==='room'?'#roomBannerCanvas':'#gameBannerCanvas');canvas.width=output.width;canvas.height=output.height;canvas.getContext('2d').drawImage(output.canvas,0,0)}
     $('#bannerEmpty').classList.add('hidden');$('#bannerPreviews').classList.remove('hidden');$('#bannerSourcebar').classList.remove('hidden');
     $('#bannerDropzone').classList.remove('upload-ready');$('#bannerDropzone').classList.add('has-banners');$('#bannerDropzone').removeAttribute('role');$('#bannerDropzone').removeAttribute('tabindex');
@@ -209,13 +212,13 @@
     window.Hub?.record('banner','generated',fresh.length);
   }
   async function selectProject(project){
-    if(state.busy||project===state.project)return;
+    if(state.busy||project===state.project&&state.outputs.length&&state.outputMode===webpMode())return;
     if(!state.image){state.project=project;state.phase='empty';setNotice(null);syncLanguage();return}
     // Commit the project and its outputs together; a failed switch retains the previous files.
     state.busy=true;state.phase='processing';state.busyMessage='processing';setNotice(null);syncControls();
     try{await prepareProject(project);const fresh=await createOutputs(state.image,state.file,project);commitOutputs(state.image,state.file,project,fresh)}
-    catch(error){setNotice(copy.en[error.message]?error.message:'exportError')}
-    finally{state.busy=false;state.busyMessage=null;syncControls()}
+    catch(error){if(error.message!=='modeChanged')setNotice(copy.en[error.message]?error.message:'exportError')}
+    finally{state.busy=false;state.busyMessage=null;syncControls();if(state.modeRefresh)refreshCompression()}
   }
   async function loadFiles(files){
     if(state.busy)return;
@@ -234,21 +237,34 @@
       state.phase='processing';state.busyMessage='processing';syncControls();
       const fresh=await createOutputs(image,file,state.project);commitOutputs(image,file,state.project,fresh);
     }catch(error){
-      setNotice(copy.en[error.message]?error.message:'exportError');
-    }finally{if(sourceUrl)URL.revokeObjectURL(sourceUrl);state.busy=false;state.busyMessage=null;syncControls()}
+      if(error.message!=='modeChanged')setNotice(copy.en[error.message]?error.message:'exportError');
+    }finally{if(sourceUrl)URL.revokeObjectURL(sourceUrl);state.busy=false;state.busyMessage=null;syncControls();if(state.modeRefresh)refreshCompression()}
   }
+  async function refreshCompression(){
+    if(!state.image||state.busy||location.hash!=='#banners')return;
+    state.modeRefresh=false;
+    if(state.outputs.length&&state.outputMode===webpMode())return;
+    state.busy=true;state.phase='processing';state.busyMessage='processing';setNotice(null);syncControls();
+    try{await prepareProject(state.project);const fresh=await createOutputs(state.image,state.file,state.project);commitOutputs(state.image,state.file,state.project,fresh)}
+    catch(error){if(error.message!=='modeChanged')setNotice(copy.en[error.message]?error.message:'exportError')}
+    finally{state.busy=false;state.busyMessage=null;syncControls();if(state.modeRefresh)refreshCompression()}
+  }
+  document.addEventListener('webp:mode-change',()=>{
+    state.modeRefresh=true;for(const file of state.outputs)URL.revokeObjectURL(file.url);state.outputs=[];state.outputMode=null;
+    renderOutputs();syncLanguage();if(!state.busy)refreshCompression();
+  });
   async function downloadAll(){
-    if(state.busy||!state.outputs.length)return;
+    if(state.busy||!state.outputs.length)return;const mode=webpMode();
     state.busy=true;state.phase='processing';state.busyMessage='packaging';setNotice(null);syncControls();let url;
     try{
       const zip=new JSZip();for(const file of state.outputs)zip.file(file.name,file.blob);
-      const blob=await zip.generateAsync({type:'blob'});url=URL.createObjectURL(blob);
+      const blob=await zip.generateAsync({type:'blob'});if(mode!==webpMode())return;url=URL.createObjectURL(blob);
       const link=document.createElement('a');link.href=url;link.download='Fun-Toolkit-Banners.zip';link.hidden=true;document.body.append(link);link.click();window.Hub?.record('banner','download');link.remove();
       state.phase='success';
       // Leave the browser time to start reading the downloadable Blob.
       const downloadUrl=url;setTimeout(()=>URL.revokeObjectURL(downloadUrl),60000);url=null;
     }catch(error){setNotice('zipError')}
-    finally{if(url)URL.revokeObjectURL(url);state.busy=false;state.busyMessage=null;syncControls()}
+    finally{if(url)URL.revokeObjectURL(url);state.busy=false;state.busyMessage=null;syncControls();if(state.modeRefresh)refreshCompression()}
   }
   $('#bannerPreviewBlack').addEventListener('click',()=>setPreviewBackground('black'));
   $('#bannerPreviewTransparent').addEventListener('click',()=>setPreviewBackground('transparent'));
@@ -265,7 +281,7 @@
   document.addEventListener('dragover',event=>{if(active()&&Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();dropzone.classList.add('drag')}});
   document.addEventListener('dragleave',event=>{if(!event.relatedTarget)dropzone.classList.remove('drag')});
   document.addEventListener('drop',event=>{dropzone.classList.remove('drag');if(active()&&event.dataTransfer?.files.length){event.preventDefault();return loadFiles(event.dataTransfer.files)}});
-  window.addEventListener('hashchange',()=>dropzone.classList.remove('drag'));
+  window.addEventListener('hashchange',()=>{dropzone.classList.remove('drag');if(active()&&(state.modeRefresh||state.image&&state.outputMode!==webpMode()))refreshCompression()});
   $('#bannerDownloadAll').addEventListener('click',downloadAll);
   window.addEventListener('pagehide',event=>{if(!event.persisted)state.outputs.forEach(file=>URL.revokeObjectURL(file.url))});
   window.BannerTool={syncLanguage};
