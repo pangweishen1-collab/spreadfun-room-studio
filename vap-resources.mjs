@@ -72,18 +72,21 @@ function getSourceObject(resource,sourceVapConfig,timestamp){
   if(!index){index=new Map((sourceVapConfig.frame||[]).map(item=>[item.i,item.obj]));sourceFrameIndexes.set(sourceVapConfig,index);}
   return index.get(frame)?.find(item=>String(item.srcId)===resource.sourceId)||null;
 }
-/** One timeline drives editor geometry, baked gold and the native VAP slot. */
-export function resourceMotion(resource,{timestamp=0,duration=120,fps=24}={}){
+/** Avatar/ID lead the gold entrance, then share one float and exit timeline. */
+export function resourceMotion(resource,{timestamp=0,duration=120,fps=24,part='avatar'}={}){
   if(resource.animation!=='float-pop'||resource.type!=='image'||resource.sourceId!==undefined)return {scale:1,offsetY:0,opacity:1};
   const start=resource.start||0,end=resource.end??duration,rate=finite(fps)&&fps>0?fps:24;
+  if(timestamp<start)return {scale:0,offsetY:0,opacity:0};
   // Preserve one/two-frame resources instead of making every available frame invisible.
   if(!finite(end)||(end-start)*rate<=2.000001)return {scale:1,offsetY:0,opacity:1};
   const stop=Math.max(start,end-1/rate),span=stop-start,local=Math.max(0,timestamp-start);
-  const enter=Math.min(.65,span*.45),exit=Math.min(1,span*.45),p=clamp(local/enter);
-  const scale=p<=0?0:p>=1?1:1-Math.exp(-8*p)*Math.cos(12*p);
-  return {scale,offsetY:10*Math.sin(local*2*Math.PI/2.4),opacity:scale<=0?0:clamp((stop-timestamp)/exit)};
+  const enter=Math.min(.48,span*.45),exit=Math.min(1,span*.45),p=clamp(local/enter);
+  // One shared, gently overshooting entrance keeps the portrait, ID and badge attached.
+  const q=p-1,scale=p<=0?0:p>=1?1:1+2.2*q*q*q+1.2*q*q;
+  const appearance=smooth(0,Math.min(.14,enter*.6),local);
+  return {scale,offsetY:10*Math.sin(local*2*Math.PI/2.4),opacity:scale<=0?0:Math.min(appearance,clamp((stop-timestamp)/exit))};
 }
-export function resourceFrame(resource,{width,height,sourceVapConfig,timestamp=0,duration=120,fps=24}={}){
+export function resourceFrame(resource,{width,height,sourceVapConfig,timestamp=0,duration=120,fps=24,part='avatar'}={}){
   if(timestamp<resource.start||(resource.end!==null&&timestamp>=resource.end))return null;
   if(resource.sourceId!==undefined){
     const obj=getSourceObject(resource,sourceVapConfig,timestamp);if(!obj)return null;
@@ -91,7 +94,7 @@ export function resourceFrame(resource,{width,height,sourceVapConfig,timestamp=0
     return {rect:[Math.round(x+obj.frame[0]*scale+(resource.offsetX||0)*width),Math.round(y+obj.frame[1]*scale+(resource.offsetY||0)*height),Math.max(1,Math.round(obj.frame[2]*scale*(resource.scaleX??1))),Math.max(1,Math.round(obj.frame[3]*scale*(resource.scaleY??1)))],sourceObject:obj,motionOpacity:1};
   }
   let rect=[Math.round(resource.x*width),Math.round(resource.y*height),Math.max(1,Math.round(resource.width*width)),Math.max(1,Math.round(resource.height*height))];
-  const motion=resourceMotion(resource,{timestamp,duration,fps});
+  const motion=resourceMotion(resource,{timestamp,duration,fps,part});
   if(resource.animation==='float-pop'){
     const [x,y,w,h]=rect,frameScale=resource.avatarFrame?148/120:1,pad=resource.avatarFrame?14/120:0;
     const scale=Math.min(motion.scale,width/(w*frameScale),height/(h*frameScale));
@@ -208,10 +211,10 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       if(!finite(resourceOpacity)||resourceOpacity<0||resourceOpacity>1)throw new TypeError('Invalid resource opacity');
     }
     function backgroundFrame(entry,timestamp,resourceOpacity=1){
-      const geometry=resourceFrame(entry.r,{width,height,sourceVapConfig,timestamp,duration,fps});if(!geometry)return null;
+      const geometry=resourceFrame(entry.r,{width,height,sourceVapConfig,timestamp,duration,fps,part:'frame'});if(!geometry)return null;
       const rect=avatarFrameRect(geometry.rect),b=entry.background,key=entry.r.opacity*Math.min(resourceOpacity,geometry.motionOpacity??1);
       if(key!==b.cacheKey){
-        const rgba=new Uint8ClampedArray(b.pixels.data),alpha=new Uint8ClampedArray(rgba.length);
+        const rgba=b.rgba ||= new Uint8ClampedArray(b.pixels.data.length),alpha=b.alphaPixels ||= new Uint8ClampedArray(rgba.length);rgba.set(b.pixels.data);
         for(let py=0;py<b.h;py++){
           const weight=key;
           for(let px=0;px<b.w;px++){const p=(py*b.w+px)*4;rgba[p+3]=Math.round(rgba[p+3]*weight);alpha[p]=alpha[p+1]=alpha[p+2]=255;alpha[p+3]=rgba[p+3];}
@@ -226,8 +229,13 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
     }
     function active(entry,timestamp,sourceCanvas,resourceOpacity=1){
       const {r,w,h,mask}=entry,geometry=resourceFrame(r,{width,height,sourceVapConfig,timestamp,duration,fps});
+      if(!geometry){
+        if(entry.maskKey!==0){mask.ctx.fillStyle='#000';mask.ctx.fillRect(0,0,w,h);entry.maskKey=0;}
+        return null;
+      }
+      const weight=r.opacity*Math.min(resourceOpacity,geometry.motionOpacity??1);
+      if(!geometry.sourceObject&&entry.maskKey===weight)return geometry;
       mask.ctx.fillStyle='#000';mask.ctx.fillRect(0,0,w,h);
-      if(!geometry)return null;
       if(geometry.sourceObject){
         if(!sourceCanvas)return null;
         const obj=geometry.sourceObject;
@@ -236,13 +244,15 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
         else mask.ctx.drawImage(sourceCanvas,...obj.mFrame,0,0,w,h);
         mask.ctx.restore();
       }else{mask.ctx.fillStyle='#fff';mask.ctx.fillRect(0,0,w,h);}
-      const pixels=mask.ctx.getImageData(0,0,w,h);
-      for(let py=0;py<h;py++)for(let px=0;px<w;px++){
-        const p=(py*w+px)*4;
-        const shape=r.shape==='circle'?clamp((.5-Math.hypot((px+.5)/w-.5,(py+.5)/h-.5))*Math.min(w,h)+.5):1;
-        const weight=shape*r.opacity*Math.min(resourceOpacity,geometry.motionOpacity??1);
-        const value=Math.round(pixels.data[p]*weight);pixels.data[p]=pixels.data[p+1]=pixels.data[p+2]=value;pixels.data[p+3]=255;
+      // Local slot shapes never change within a renderer. Reuse their exact
+      // coverage and pixel buffer; native masks must still be read every frame.
+      const shape=entry.shapeCoverage ||= Float64Array.from({length:w*h},(_,i)=>r.shape==='circle'?clamp((.5-Math.hypot((i%w+.5)/w-.5,(Math.floor(i/w)+.5)/h-.5))*Math.min(w,h)+.5):1);
+      const pixels=geometry.sourceObject?mask.ctx.getImageData(0,0,w,h):(entry.maskPixels ||= new ImageData(new Uint8ClampedArray(w*h*4),w,h));
+      for(let i=0;i<shape.length;i++){
+        const p=i*4,value=Math.round((geometry.sourceObject?pixels.data[p]:255)*(shape[i]*r.opacity*Math.min(resourceOpacity,geometry.motionOpacity??1)));
+        pixels.data[p]=pixels.data[p+1]=pixels.data[p+2]=value;pixels.data[p+3]=255;
       }
+      entry.maskKey=geometry.sourceObject?null:weight;
       mask.ctx.putImageData(pixels,0,0);return geometry;
     }
     // Spatial video masks stay independent; the temporal gift envelope fades

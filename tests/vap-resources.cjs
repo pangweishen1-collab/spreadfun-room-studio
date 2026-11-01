@@ -27,15 +27,26 @@ const {pathToFileURL}=require('node:url');
   assert.throws(()=>R.normalizeResources([{...text,animation:'float-pop'}],{duration:6}),/新增头像/);
   assert.equal(R.resourceMotion(movingAvatar,{duration:6,timestamp:0}).scale,0);
   assert.equal(R.resourceMotion(movingAvatar,{duration:6,timestamp:0}).opacity,0,'the entrance has no stray one-pixel gold/ID flash');
-  assert(R.resourceMotion(movingAvatar,{duration:6,timestamp:.12}).scale>1,'the entrance gently overshoots before settling');
-  assert.equal(R.resourceMotion(movingAvatar,{duration:6,timestamp:.65}).scale,1);
+  assert(R.resourceMotion(movingAvatar,{duration:6,timestamp:.32}).scale>1,'the shared entrance gently overshoots before settling');
+  assert.equal(R.resourceMotion(movingAvatar,{duration:6,timestamp:.48}).scale,1);
   assert(Math.abs(R.resourceMotion(movingAvatar,{duration:6,timestamp:3}).offsetY-10)<1e-9);
   assert(Math.abs(R.resourceMotion(movingAvatar,{duration:6,timestamp:4.2}).offsetY+10)<1e-9,'floating amplitude is ten output pixels in both directions');
   assert.equal(R.resourceMotion(movingAvatar,{duration:6,timestamp:6-1/24}).opacity,0,'the final encoded frame is fully faded');
   assert.equal(R.resourceMotion({...movingAvatar,start:2,end:5},{duration:8,timestamp:2}).scale,0,'a timed Key starts its own entrance when it first appears');
   assert(Math.abs(R.resourceMotion({...movingAvatar,start:2,end:5},{duration:8,timestamp:3.8}).offsetY+10)<1e-9,'floating uses the Key lifetime rather than wall-clock playback time');
   assert.equal(R.resourceMotion({...movingAvatar,start:2,end:5},{duration:8,timestamp:5-1/24}).opacity,0,'an explicit Key end owns its exit fade');
+  const staggeredAvatar={...movingAvatar,start:1};
+  for(const part of ['avatar','frame']){
+    assert.deepEqual(R.resourceMotion(staggeredAvatar,{duration:6,timestamp:.9,part}),{scale:0,offsetY:0,opacity:0},'one-second start hides both avatar and gold before their lifetime');
+    assert.equal(R.resourceFrame(staggeredAvatar,{width:720,height:1560,duration:6,timestamp:.9,part}),null);
+    assert.equal(R.resourceMotion(staggeredAvatar,{duration:6,timestamp:6-1/24,part}).opacity,0,'avatar and gold finish their exit on the same encoded frame');
+  }
+  for(const time of [1,1.05,1.2,1.32,1.48,2,5.8])assert.deepEqual(R.resourceMotion(staggeredAvatar,{duration:6,timestamp:time}),R.resourceMotion(staggeredAvatar,{duration:6,timestamp:time,part:'frame'}),'portrait, ID and gold use one identical entrance and exit');
+  for(let time=1;time<=1.6;time+=.01){const m=R.resourceMotion(staggeredAvatar,{duration:6,timestamp:time});assert(m.scale>=0&&m.scale<1.06,'natural spring overshoot stays below six percent');}
+  assert.equal(R.resourceMotion(staggeredAvatar,{duration:6,timestamp:1.48}).scale,1);
+  assert.deepEqual(R.resourceFrame(staggeredAvatar,{width:720,height:1560,duration:6,timestamp:1.2}).rect,R.resourceFrame(staggeredAvatar,{width:720,height:1560,duration:6,timestamp:1.2,part:'frame'}).rect);
   for(const duration of [1/24,2/24])assert.deepEqual(R.resourceMotion(movingAvatar,{duration,timestamp:0,fps:24}),{scale:1,offsetY:0,opacity:1},'one/two-frame clips retain their avatar');
+  for(const duration of [3/24,4/24]){const middle=duration/2;assert(R.resourceMotion(movingAvatar,{duration,timestamp:middle,part:'frame'}).opacity>0,'a shortened gold delay cannot hide an entire short resource interval');}
   assert.deepEqual(R.resourceFrame(movingAvatar,{width:720,height:1560,duration:6,timestamp:3}).rect,[288,556,144,144]);
   assert.deepEqual(R.resourceFrame(movingAvatar,{width:720,height:1560,duration:6,timestamp:4.2}).rect,[288,536,144,144]);
   assert.deepEqual(R.resourceFrame({...movingAvatar,animation:undefined},{width:720,height:1560,duration:6,timestamp:3}).rect,[288,546,144,144],'existing static keys do not acquire animation');
@@ -139,7 +150,16 @@ const {pathToFileURL}=require('node:url');
     motionRenderer.drawMasks(motionPlanes.getContext('2d'),motionLayout,tailTime,null,{resourceOpacity:.5});const [mmx,mmy]=motionLayout.resourceMasks.avatar1;assert.equal(motionPlanes.data[((mmy+30)*motionPlanes.width+mmx+30)*4],128,'replacement mask uses the same single exit fade as its gold frame');
     const motionConfig=P.makeVapc({width:240,height:240,fps:24,frames:144,packedLayout:motionLayout});R.addResourceConfig(motionConfig,{resources:motionRenderer.resources,layout:motionLayout,fps:24,frames:144,duration:6});assert(P.validateVapc(motionConfig));assert.equal(motionConfig.funToolkit.resourceManifest[0].animation,'float-pop');
     for(const index of [0,3,8,16,43,72,143])assert.deepEqual(motionConfig.frame[index].obj[0].frame,R.resourceFrame(motionRenderer.resources[0],{width:240,height:240,duration:6,fps:24,timestamp:index/24}).rect,'runtime replacement reads the exact animated editor/gold geometry');
-    assert.notDeepEqual(motionConfig.frame[3].obj[0].frame,motionConfig.frame[16].obj[0].frame,'elastic motion is encoded into the VAP frame metadata');motionRenderer.dispose();globalThis.createImageBitmap=bitmapDecoder;
+    assert.notDeepEqual(motionConfig.frame[3].obj[0].frame,motionConfig.frame[16].obj[0].frame,'elastic motion is encoded into the VAP frame metadata');motionRenderer.dispose();
+    const staggeredReference={...motionAvatar,start:1,defaultAvatar:true},staggeredRenderer=await R.createResourceRenderer([staggeredReference],{width:240,height:240,duration:6,fps:24}),exportRenderer=await R.createResourceRenderer([staggeredReference],{width:240,height:240,duration:6,fps:24,includeDefaultAvatars:false});
+    assert(staggeredRenderer.apply(transparent,.9).data.every(v=>v===0),'the left preview respects the delayed default start');
+    assert(staggeredRenderer.apply(transparent,1.05).data.some((v,p)=>p%4===3&&v>0),'the left reference portrait appears before the gold icon');
+    assert(staggeredRenderer.applyStatic(transparent,1.05).data.some((v,p)=>p%4===3&&v>0),'gold begins together with the avatar');
+    assert(staggeredRenderer.applyStatic(transparent,1.2).data.some((v,p)=>p%4===3&&v>0),'gold follows the quick avatar entrance');
+    assert.deepEqual(exportRenderer.apply(transparent,1.05).data,exportRenderer.applyStatic(transparent,1.05).data,'output draws only the gold icon and never the preview portrait');
+    for(const entry of await exportRenderer.getPackageFiles())assert([...new Uint8Array(await entry.blob.arrayBuffer())].every(v=>v===0),'staggering never puts the default human into the external resource package');
+    const exportedTags=await exportRenderer.getPlayerTags();assert([...new Uint8Array(await (await oldGlobals.get('fetch').value(exportedTags.tag1)).arrayBuffer())].every(v=>v===0),'staggered default player bindings remain transparent');
+    staggeredRenderer.dispose();exportRenderer.dispose();globalThis.createImageBitmap=bitmapDecoder;
   }finally{for(const [k,d]of oldGlobals)d?Object.defineProperty(globalThis,k,d):delete globalThis[k];}
   console.log('vap-resources: spatially independent resources with shared temporal gift fades and transparent default bindings, preserved native occlusion, fixed gold RGB/alpha composition and scaling, native src/frame/mask validation, tag uniqueness, timing/animated source binding, packed-plane unpack math, own resource opacity, circular avatar alpha, safe package defaults, metadata-aware size budget and premultiplied dynamic output passed. Browser codec and SDK playback are separate acceptance checks.');
 })().catch(error=>{console.error(error);process.exitCode=1});

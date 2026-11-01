@@ -2,7 +2,7 @@ import {computeVapLayout, makeVapc, appendVapcBox, extractVapcBox, validateVapc}
 import {detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261029-auto-method2';
 import {inspectImageSequence, sequenceMetadata, decodeSequenceFrame} from './vap-sequence.mjs?v=20261029-sequence-speed1';
 export {inspectImageSequence, sequenceMetadata, decodeSequenceFrame};
-import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261030-avatar-motion1';
+import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261101-avatar-unified1';
 import {normalizeGiftFade, giftFadeOpacity, applyGiftFade} from './vap-gift-fade.mjs?v=20261029-gift-fade1';
 
 export const LIMITS = Object.freeze({fileBytes:200*1024*1024,outputBytes:3000000,durationSeconds:120,sourceMaxSide:4096,outputMinSide:16,outputMaxSide:2048,fps:60,packedMaxSide:4096});

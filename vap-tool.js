@@ -74,7 +74,7 @@
   let resourceModulePromise=null,resourcePreview=null,resourcePreviewRevision=-1;
   let giftFadeModulePromise=null;
   const getGiftFadeModule=()=>giftFadeModulePromise||(giftFadeModulePromise=import('./vap-gift-fade.mjs?v=20261029-gift-fade1').catch(error=>{giftFadeModulePromise=null;throw error}));
-  const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261030-avatar-motion1').catch(error=>{resourceModulePromise=null;throw error}));
+  const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261101-avatar-unified1').catch(error=>{resourceModulePromise=null;throw error}));
   const resourceEditor=window.VapResourceEditor?.create({root,stage,canvas,onChange(event={}){
     if(state.loading||state.converting||state.packing)return;
     if(event.reason==='interaction-start'){pause();return}
@@ -90,7 +90,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[];
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261030-avatar-motion1').catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261101-avatar-unified1').catch(error=>{enginePromise=null;throw error}));
   function errorKey(error,fallback='errorConvert'){
     const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',budget:'errorBudget',cancelled:'cancelled'};
     return codes[error?.code]||fallback;
@@ -288,7 +288,7 @@
     try{await video.play();if(!current()){video.pause();return}state.playing=true;sync();loop()}catch(error){if(current())showNotice('errorDecode')}
   }
   function getPreviewProcessor(opts){
-    if(!previewProcessor)previewProcessor=import('./vap-matte.mjs?v=20261030-avatar-motion1').then(module=>module.createMatteProcessor(opts)).catch(error=>{previewProcessor=null;throw error});
+    if(!previewProcessor)previewProcessor=import('./vap-matte.mjs?v=20261101-avatar-unified1').then(module=>module.createMatteProcessor(opts)).catch(error=>{previewProcessor=null;throw error});
     return previewProcessor;
   }
   function cancelSourceFrameWait(){

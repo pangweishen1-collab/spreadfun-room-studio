@@ -1,5 +1,14 @@
 # 更新记录
 
+## 1.7.1 - 2026-11-01
+
+### VAP refinements
+
+- Keep a default human portrait in the editing preview only; output players, MP4 files and resource packages retain transparent replaceable avatar slots.
+- Start new circular avatar keys at one second and share a gentle spring entrance between the portrait, ID and optional gold icon, followed by the existing float and fade.
+- Allow the gold icon to be disabled independently while keeping its avatar key. Collapse Alpha resolution by default and use circular black playback controls with white icons.
+- Reuse avatar mask coverage and pixel buffers, preserving native animated masks, output dimensions, FPS and encoder quality. A local 240-frame mask comparison kept identical pixels and reduced median mask work from 74 ms to 16 ms; total conversion still depends on video encoding.
+
 ## 1.7.0 - 2026-10-30
 
 ### Image production
