@@ -1,5 +1,18 @@
 # 更新记录
 
+## 1.7.3 - 2026-11-02
+
+### VAP inspection
+
+- Right-align the finished-VAP inspection entry and distinguish it from the help button with a light-blue treatment and playback icon.
+- Place playback resource bindings in a dedicated right-hand panel beside the preview on desktop; use a single column on narrow screens. Show an explicit empty state when the file has no replaceable keys.
+- Move the transparent play/pause control into the canvas lower-right corner, retaining circular 70%-opaque black styling, white icons, accessible state labels and keyboard operation.
+
+### Shared interface
+
+- Remove the divider above the VAP text/avatar key editor and soften horizontal content dividers across the tools without reducing input, selection or focus contrast.
+- Synchronize divider tokens, reusable disclosure styles and the project UI guidance.
+
 ## 1.7.2 - 2026-11-02
 
 ### VAP quality and size
