@@ -1,7 +1,7 @@
 /* Hallmark · macrostructure: Split Studio · theme: custom brand blue / yellow · enrichment: original flat editorial illustration
  * pre-emit critique: P4 H5 E4 S5 R5 V4 · scope: home page only
  */
-@import url('tokens.css');
+@import url('tokens.css?v=20261102-soft-dividers1');
 
 html:has(#homeTool:not(.hidden)),
 body:has(#homeTool:not(.hidden)){overflow-x:clip}

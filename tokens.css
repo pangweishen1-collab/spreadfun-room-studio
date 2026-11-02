@@ -6,7 +6,7 @@
   --color-home-blue: var(--blue);
   --color-home-blue-soft: var(--tool-blue-soft);
   --color-home-yellow-soft: oklch(97% 0.055 94);
-  --color-home-rule: var(--line);
+  --color-home-rule: var(--tool-divider,#f0f1f4);
   --color-home-focus: var(--blue);
   --font-home-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
   --font-home-body: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC", sans-serif;

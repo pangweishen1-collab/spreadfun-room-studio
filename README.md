@@ -1,6 +1,6 @@
 # Fun Toolkit
 
-当前版本 **1.7.0**（2026-10-30）。全站 WebP 默认「高清压缩」，保留「严格无损」切换；头像框支持多 SVGA 批量生产，VAP 支持画布内上下移动视频、头像与文字 Key 编辑及运行时替换。`vap-inspect.html` 可打开成品并重新绑定资源，普通视频播放器只显示 RGB 与灰度 Alpha 的拼接画面。完整更新和验收范围见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **1.7.3**（2026-11-02）。全站 WebP 默认「高清压缩」，保留「严格无损」切换；头像框支持多 SVGA 批量生产，VAP 支持画布内上下移动视频、头像与文字 Key 编辑及运行时替换。`vap-inspect.html` 可打开成品并重新绑定资源，普通视频播放器只显示 RGB 与灰度 Alpha 的拼接画面。完整更新和验收范围见 [CHANGELOG.md](CHANGELOG.md)。
 
 专为乐趣运营打造的素材处理工作台，包含聚合首页、五个生产工具、资源库与共享统计页。图片在浏览器中处理，正式站由 Cloudflare Pages 提供静态资源，API Worker + D1 保存现有工具统计与需求；本地可用 Python + SQLite 预览服务。
 
@@ -39,7 +39,7 @@ VAP 工作区自动识别 MP4 与序列帧，不展示输入类型和识别提�
 
 网站统一使用“按标签替换”，不再展示资源合成方式选项，并固定导出原生 Vapx；默认人像仅供占位预览，MP4 保留可替换的标签／ID和资源遮罩，不把默认头像写入 RGB；透明头像占位文件位于完整 ZIP 的 `resources/`，自选头像使用实际素材，同时提供 `resources.json`、`vapc.json` 与接入说明。播放时可替换头像与文字，无需重新编码。动态资源强制使用预乘 RGB，原生源按官方黑底预乘关系恢复后合成。ZIP 预算包括默认图片、外置配置与封装。
 
-成品验收页支持重新绑定本地头像与文字。格式依据 [Tencent VAP 文档](https://github.com/Tencent/vap/blob/master/Introduction.md) 与 [Web SDK](https://github.com/Tencent/vap/blob/master/web/README.md)。浏览器通过不代表 iOS／Android SDK 真机已认证。素材仍在本机处理，统计仅记录成功生成与下载次数。随 1.5.0 一同发布。
+成品验收页支持重新绑定本地头像与文字。桌面布局为左侧透明预览、右侧标签资源替换，资源面板不再接在画布下方；手机窄屏自然上下排列。播放／暂停统一使用画布右下角的圆形黑底白色图标，工具页成品入口右对齐并与使用说明区分样式。格式依据 [Tencent VAP 文档](https://github.com/Tencent/vap/blob/master/Introduction.md) 与 [Web SDK](https://github.com/Tencent/vap/blob/master/web/README.md)。浏览器通过不代表 iOS／Android SDK 真机已认证。素材仍在本机处理，统计仅记录成功生成与下载次数。随 1.5.0 一同发布。
 
 ### VAP 转换工具
 
