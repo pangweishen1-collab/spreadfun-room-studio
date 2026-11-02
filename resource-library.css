@@ -15,8 +15,8 @@
 #resourceTool .resource-source strong{font-size:14px;line-height:22px;font-weight:600}
 #resourceTool .resource-source span{color:var(--tool-muted);font-size:12px;line-height:20px;font-variant-numeric:tabular-nums;text-align:right}
 #resourceTool .resource-export .size-heading{margin-top:24px}
-#resourceTool .size-heading h3,#resourceTool legend{padding:0;color:var(--tool-heading);font-size:14px;line-height:22px;font-weight:500}
-#resourceTool .dimension-fields label{font-size:12px}
+#resourceTool .size-heading h3,#resourceTool fieldset:not(.webp-settings)>legend{padding:0;color:var(--tool-heading);font-size:14px;line-height:22px;font-weight:500}
+#resourceTool .dimension-fields label{font-size:var(--tool-field-label-size,12px);line-height:var(--tool-field-label-line-height,18px)}
 #resourceTool .dimension-input{border-color:#8b95a5}
 #resourceTool .dimension-input input{min-height:44px;font-size:16px;font-weight:500}
 #resourceTool .dimension-input:hover{border-color:#6296d0}
@@ -61,7 +61,7 @@ html[data-input-modality="keyboard"] #resourceTool .dimension-input:focus-within
 @media(prefers-reduced-motion:reduce){#resourceTool .resource-presets button{transition:none}}
 
 /* Store presets use native form controls and the existing blue interaction palette. */
-#resourceTool .resource-target-label{display:block;margin-top:20px;color:var(--tool-heading);font-size:14px;line-height:22px;font-weight:500}
+#resourceTool .resource-target-label{display:block;margin-top:20px;color:var(--tool-heading);font-size:var(--tool-field-label-size,12px);line-height:var(--tool-field-label-line-height,18px);font-weight:500}
 #resourceTool .resource-target{display:block;width:100%;min-height:44px;margin-top:0;padding:10px 44px 10px 12px;border:1px solid #8b95a5;border-radius:10px;background:#fff;color:var(--tool-heading);font:inherit;font-size:14px;line-height:22px;cursor:pointer}
 #resourceTool .resource-target:hover{border-color:#6296d0}
 #resourceTool .resource-target:focus-visible,#resourceTool .resource-market-guide summary:focus-visible{outline:2px solid var(--tool-focus);outline-offset:2px}
@@ -84,7 +84,7 @@ html[data-input-modality="keyboard"] #resourceTool .dimension-input:focus-within
 #resourceTool .resource-preview-surface .resource-preview-image{width:100%;max-width:100%}
 #resourceTool .resource-preview-skeleton{border-radius:0}
 #resourceTool .resource-corners{display:grid;grid-template-columns:auto minmax(40px,1fr) 72px;align-items:center;gap:4px 8px;margin-top:16px}
-#resourceTool .resource-corners>label{display:block;color:var(--tool-heading);font-size:14px;line-height:22px;font-weight:500}
+#resourceTool .resource-corners>label{display:block;color:var(--tool-heading);font-size:var(--tool-field-label-size,12px);line-height:var(--tool-field-label-line-height,18px);font-weight:500}
 #resourceTool .resource-corner-inputs{display:contents}
 #resourceTool #resourceCornerRange{width:100%;min-width:0;height:44px;margin:0;accent-color:var(--blue);cursor:pointer}
 #resourceTool .resource-corner-number{width:72px;margin-top:0}

@@ -79,7 +79,7 @@
 
 参数分组使用原生 `details / summary`。复用模板 `disclosure.css` 与 README 的 title / actions 结构：标题 `flex:1; min-width:0`，允许长英文换行；右侧 `inline-flex; align-items:center; flex:none; gap:8px`，包含不拆行、不压缩的状态与固定16×16px的SVG箭头。状态标签与箭头共用同一垂直中轴，不能靠字符 `⌄`、字体基线或负margin补位置。箭头绕SVG中心旋转180°，展开/收起不能让状态跳位。没有状态时保留actions箭头槽。
 
-summary最小44px，整行点击、Enter/Space和焦点沿用原生行为，不嵌套额外操作按钮；装饰SVG加 `aria-hidden=true` 与 `focusable=false`。双语更新只替换标题span/状态span文本，不给整个summary写textContent，以免删除SVG。检查中文与长英文、320/375px、展开/收起、已应用/待应用/未启用；核对状态与箭头中心差、8px间距和16px图标尺寸。减少动态时保留状态并取消旋转过渡。
+折叠区顶部外间距4px、分隔线后内间距4px；summary无额外上下padding，最小44px。桌面与手机共用该紧凑节奏，长标题自然增高，不使用固定高度截字。整行点击、Enter/Space和焦点沿用原生行为，不嵌套额外操作按钮；装饰SVG加 `aria-hidden=true` 与 `focusable=false`。双语更新只替换标题span/状态span文本，不给整个summary写textContent，以免删除SVG。检查中文与长英文、320/375px、展开/收起、已应用/待应用/未启用；核对状态与箭头中心差、8px间距和16px图标尺寸。减少动态时保留状态并取消旋转过渡。
 
 批量列表有稳定任务标识、文件名、规格、体积和单项结果；部分失败不冒充全部成功，重试只处理实际失败项。选择/全选的可用范围明确；ZIP只打包可用结果，空列表不可下载。裁切确认前保留草稿、取消恢复；透明棋盘、黑色预览和操作控件不能进入导出像素。
 

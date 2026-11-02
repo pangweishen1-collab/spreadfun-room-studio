@@ -16,7 +16,7 @@
 #vapTool .vap-input-modes{margin-bottom:16px}
 #vapTool .vap-segments button,#vapTool .vap-view-toolbar button,#vapTool .vap-view-modes button{min-height:44px;min-width:0;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;color:var(--tool-muted);font:inherit;font-size:14px;line-height:20px;cursor:pointer}
 #vapTool .vap-segments button[aria-pressed=true],#vapTool .vap-view-toolbar button[aria-pressed=true],#vapTool .vap-view-modes button[aria-pressed=true]{border-color:#a8d0ff;background:#eaf3ff;color:var(--blue)}
-#vapTool label,#vapTool .vap-field-label{font-size:14px;line-height:20px;color:var(--tool-heading)}
+#vapTool label,#vapTool .vap-field-label{font-size:var(--tool-field-label-size,12px);line-height:var(--tool-field-label-line-height,18px);color:var(--tool-heading)}
 #vapTool .vap-field-label{display:block;margin:16px 0 8px}
 #vapTool select,#vapTool input[type=number]{box-sizing:border-box;width:100%;min-width:0;min-height:44px;padding:10px 12px;border:1px solid var(--tool-field-border,#8b95a5);border-radius:10px;background:#fff;color:var(--tool-heading);font:inherit;font-size:16px;line-height:22px}
 #vapTool .ft-select>select{padding-right:44px;font-size:14px}
@@ -83,9 +83,11 @@
 #vapTool .vap-sourcebar>div{display:grid;gap:4px;min-width:0}
 #vapTool .vap-sourcebar strong{font-size:12px;font-weight:600;line-height:20px;overflow-wrap:anywhere}
 #vapTool .vap-sourcebar span{font-size:11px;line-height:18px;color:var(--tool-muted);font-variant-numeric:tabular-nums}
-#vapTool .vap-disclosure{margin-top:20px;padding-top:16px;border-top:1px solid var(--line)}
-#vapTool .vap-disclosure summary{display:flex;align-items:center;gap:12px;list-style:none;min-height:44px;color:var(--tool-heading);font-size:14px;line-height:20px;font-weight:500;cursor:pointer}
+#vapTool .vap-disclosure{margin-top:var(--tool-disclosure-gap,4px);padding-top:var(--tool-disclosure-inset,4px);border-top:1px solid var(--line)}
+#vapTool .vap-disclosure summary{display:flex;align-items:center;gap:12px;list-style:none;min-height:var(--tool-disclosure-height,44px);color:var(--tool-heading);font-size:14px;line-height:20px;font-weight:500;cursor:pointer}
 #vapTool .vap-disclosure summary::-webkit-details-marker{display:none}
+#vapTool #vapAlphaPanel{margin-top:var(--tool-disclosure-gap,4px);padding-top:0;border-top:0}
+#vapTool #vapAlphaPanel .vap-alpha-options{padding-top:8px}
 #vapTool .vap-disclosure-title{flex:1;min-width:0;overflow-wrap:anywhere}
 #vapTool .vap-disclosure-meta{display:inline-flex;align-items:center;gap:8px;flex-shrink:0}
 #vapTool .vap-disclosure-chevron{display:block;width:16px;height:16px;flex:none;pointer-events:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;color:var(--tool-muted);transform-origin:center;transition:transform 160ms ease}
@@ -169,7 +171,7 @@
 #vapTool .vap-mask-status[data-invalid=true]{background:#fff2d9;color:#956118}
 #vapTool .vap-mask-status[data-enabled=true]:not([data-invalid=true]){background:#eaf7ee;color:#287647}
 #vapTool .vap-mask-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:end;margin-top:8px}
-#vapTool .vap-mask-fields>label{display:grid;gap:7px;min-width:0;color:var(--tool-muted);font-size:12px;line-height:20px}
+#vapTool .vap-mask-fields>label{display:grid;gap:7px;min-width:0;color:var(--tool-muted);font-size:var(--tool-field-label-size,12px);line-height:var(--tool-field-label-line-height,18px)}
 #vapTool .vap-gift-fade-fields{grid-template-columns:repeat(2,minmax(0,1fr))}
 #vapTool .vap-percent-input{position:relative;display:block;min-width:0}
 #vapTool .vap-percent-input>input{min-height:44px;padding-right:34px}
@@ -181,18 +183,15 @@
 /* Reveal the output comparison only after a valid conversion is committed. */
 #vapTool .vap-preview-comparison{container-type:inline-size;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;min-width:0;gap:8px 16px;--vap-preview-ratio:.4615384615}
 #vapTool .vap-preview-comparison:not(.has-result){grid-template-columns:minmax(0,1fr)}
-#vapTool .vap-preview-comparison:not(.has-source) #vapStage{grid-row:1}
-#vapTool .vap-compare-source-label{display:flex;align-items:center;min-height:44px;grid-column:1;grid-row:1;font-size:13px;font-weight:500;color:var(--tool-muted)}
-#vapTool #vapStage{grid-column:1;grid-row:2}
-#vapTool .vap-result-preview>.vap-card-heading{grid-column:2;grid-row:1;min-width:0;min-height:44px;margin:0;gap:8px}
-#vapTool .vap-result-preview>.vap-card-heading h3{color:var(--tool-muted);font-size:13px;font-weight:500}
-#vapTool .vap-result-preview>.vap-card-heading .vap-button{min-height:36px;padding:6px 10px;font-size:12px}
-#vapTool #vapResultFrame{grid-column:2;grid-row:2}
+#vapTool .vap-preview-heading{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px}
+#vapTool #vapCompareResultLabel{font-size:13px;font-weight:500;color:var(--tool-muted)}
+#vapTool #vapStage{grid-column:1;grid-row:1}
+#vapTool #vapResultFrame{grid-column:2;grid-row:1}
 #vapTool #vapStage,#vapTool #vapResultFrame{box-sizing:border-box;width:100%;height:min(520px,calc((100cqw - 16px)/2/var(--vap-preview-ratio)));min-height:0;max-height:520px;aspect-ratio:var(--vap-preview-ratio)}
 #vapTool .vap-preview-comparison:not(.has-result) #vapStage{height:min(520px,calc(100cqw/var(--vap-preview-ratio)))}
 #vapTool #vapStage,#vapTool #vapResultPlayer{display:flex;align-items:center;justify-content:center}
 #vapTool #vapStage>video,#vapTool #vapStage>canvas,#vapTool #vapResultPlayer>canvas{min-width:0;min-height:0;width:auto;height:auto;max-width:100%;max-height:100%;object-fit:contain}
-@media(max-width:640px){#vapTool .vap-preview-comparison{grid-template-columns:minmax(0,1fr);row-gap:8px}#vapTool .vap-result-preview>.vap-card-heading{grid-column:1;grid-row:4;margin-top:12px}#vapTool #vapResultFrame{grid-column:1;grid-row:5}#vapTool .vap-result-preview>.vap-card-heading .vap-button{min-height:44px}#vapTool #vapStage,#vapTool #vapResultFrame{height:min(440px,calc(100cqw/var(--vap-preview-ratio)));max-height:440px}#vapTool .vap-empty img{width:96px;height:72px}}
+@media(max-width:640px){#vapTool .vap-preview-comparison{grid-template-columns:minmax(0,1fr);row-gap:8px}#vapTool #vapCompareResultLabel{display:none}#vapTool #vapResultFrame{grid-column:1;grid-row:2}#vapTool #vapStage,#vapTool #vapResultFrame{height:min(440px,calc(100cqw/var(--vap-preview-ratio)));max-height:440px}#vapTool .vap-empty img{width:96px;height:72px}}
 
 @media(max-width:540px){#vapTool .vap-view-toolbar>:is(.vap-view-modes,.vap-view-background){flex:0 0 100%;max-width:none}}
 

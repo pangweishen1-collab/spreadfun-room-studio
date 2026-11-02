@@ -1,6 +1,6 @@
 /* Fun Toolkit disclosure header · resource 1.4.3 */
-.ft-disclosure{margin-top:20px;padding-top:16px;border-top:1px solid var(--ft-color-surface-divider,#e8e8ed)}
-.ft-disclosure>summary{display:flex;align-items:center;gap:12px;min-height:44px;padding:8px 0;list-style:none;color:var(--ft-color-text-heading,#202a3b);font-size:14px;line-height:20px;font-weight:500;cursor:pointer}
+.ft-disclosure{margin-top:var(--tool-disclosure-gap,4px);padding-top:var(--tool-disclosure-inset,4px);border-top:1px solid var(--ft-color-surface-divider,#e8e8ed)}
+.ft-disclosure>summary{display:flex;align-items:center;gap:12px;min-height:var(--tool-disclosure-height,44px);padding:0;list-style:none;color:var(--ft-color-text-heading,#202a3b);font-size:14px;line-height:20px;font-weight:500;cursor:pointer}
 .ft-disclosure>summary::-webkit-details-marker{display:none}
 .ft-disclosure-title{flex:1;min-width:0;overflow-wrap:anywhere}
 .ft-disclosure-actions{display:inline-flex;align-items:center;gap:8px;flex:none}

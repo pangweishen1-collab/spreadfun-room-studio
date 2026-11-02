@@ -90,7 +90,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[];
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261101-avatar-unified1').catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261101-smart-ultra3').catch(error=>{enginePromise=null;throw error}));
   function errorKey(error,fallback='errorConvert'){
     const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',budget:'errorBudget',cancelled:'cancelled'};
     return codes[error?.code]||fallback;
@@ -108,7 +108,7 @@
     if(!preview&&resourceEditor?.hasErrors())throw Object.assign(new Error('invalid resources'),{uiKey:'resourceInvalid'});
     // Incomplete slots may be edited while the source and valid slots remain visible.
     if(preview)resourceOptions.resources=resourceOptions.resources.filter(r=>r.type==='image'?r.file instanceof Blob&&r.file.size:r.text?.trim());
-    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,rgbAlphaMode:resourceOptions.resourceMode==='dynamic'&&resourceOptions.resources.length?'premultiplied':$('RgbAlphaMode').value||'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(matteMethod==='chroma_key'&&$('Screen').value==='auto'&&state.sourceKind==='chroma_mp4'&&state.detectedBackground?{background:state.detectedBackground.slice()}:{}),alphaScale:state.alphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:Math.round(target*1e6),quality:$('Quality').value,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
+    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,rgbAlphaMode:resourceOptions.resourceMode==='dynamic'&&resourceOptions.resources.length?'premultiplied':$('RgbAlphaMode').value||'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(matteMethod==='chroma_key'&&$('Screen').value==='auto'&&state.sourceKind==='chroma_mp4'&&state.detectedBackground?{background:state.detectedBackground.slice()}:{}),alphaScale:state.alphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:Math.round(target*1e6),quality:'ultra',optimizeSize:true,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
   }
   function syncPreviewVolume(){
     const gain=$('KeepAudio').checked?Math.max(0,Math.min(2,Number($('Volume').value)/100||0)):0;
@@ -257,7 +257,7 @@
     $('ProgressRow').hidden=!state.loading&&!state.converting;$('Phase').textContent=t(state.loading?'reading':state.phase);$('Percent').textContent=Math.round(state.progress*100)+'%';$('Progress').value=state.progress;
     $('Notice').hidden=!state.notice;$('Notice').textContent=state.notice?t(state.notice):'';$('Notice').dataset.tone=state.errorTone;
     $('PreviewError').hidden=!state.previewError;$('PreviewError').textContent=t('previewFailed');
-    $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareSourceLabel').hidden=!ready;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(Number($('Width').value)/Number($('Height').value)||720/1560));syncOutputPlaceholder();
+    $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareResultLabel').hidden=!state.result;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(Number($('Width').value)/Number($('Height').value)||720/1560));syncOutputPlaceholder();
     for(const id of ['DownloadMp4','DownloadJson','DownloadZip'])$(id).disabled=locked||!state.result;
     $('ResultPlay').hidden=!state.result;$('ResultPlay').disabled=locked||!state.result||state.playerState!=='ready';$('DownloadMp4').title=t('vapPlaybackNotice');
     $('ResourceBundleHint').hidden=state.result?.config?.info?.isVapx!==1;$('ResourceBundleHint').textContent=t('resourceBundleHint');
@@ -525,7 +525,7 @@
   $('MaskInput').addEventListener('change',event=>{loadMask(event.target.files);event.target.value=''});
   window.UploadPaste?.register({zone:stage,isActive:()=>state.active,isBusy:busy,onFiles:loadFiles});
   window.UploadPaste?.register({zone:$('MaskRow'),isActive:event=>state.active&&!$('MaskRow').hidden&&($('MaskRow').contains(event.target)||$('MaskRow').contains(document.activeElement)),isBusy:busy,onFiles:loadMask});
-  for(const id of ['Method','Screen','Target','Quality','KeepAudio','RgbAlphaMode','LightRecovery'])$(id).addEventListener('change',invalidate);
+  for(const id of ['Method','Screen','Target','KeepAudio','RgbAlphaMode','LightRecovery'])$(id).addEventListener('change',invalidate);
   $('Fps').addEventListener('change',()=>{if(busy())return;if(isSequence()){const frame=Math.min(state.file.frameCount-1,Math.floor(sourceTime()*state.meta.fps));pause();const fps=Number($('Fps').value);if(Number.isInteger(fps)&&fps>=1&&fps<=60){state.meta={...state.meta,fps,duration:state.file.frameCount/fps};state.sequenceTime=frame/fps}}invalidate()});
   for(const id of ['Tolerance','Softness','Spill'])$(id).addEventListener('input',invalidate);
   for(const [id,other] of [['Width','Height'],['Height','Width']])$(id).addEventListener('input',()=>{
