@@ -1,5 +1,24 @@
 # 更新记录
 
+## 1.7.4 - 2026-11-02
+
+### VAP resource correctness
+
+- Keep the full gold question-mark badge below optional avatar keys. Unbound and transparent avatar bindings reveal the badge; replacement portraits overlay it. The default human remains editor-only.
+- Preserve explicit no-cutout metadata through native VAP re-import and export. Keep resource tags, masks, animation geometry and text defaults replaceable.
+- Preserve embedded text font size and color when importing native resource slots instead of deriving font size from texture height.
+- Keep native VAP transparency and timing by default instead of applying its spatial and temporal fades again; additional effects remain opt-in, with ordinary-source preferences restored when switching back.
+- Align optional-resource playback, automatic source previews and source-video duration handling across the editor and output inspector.
+- Re-import the current session's exact exported VAP without duplicating its local keys, while preserving unrelated local work; use valid animated frames for inherited resource dimensions.
+- Keep duplicate-key validation focused on resource tags instead of reporting an unrelated video-preview failure.
+- Use readable mobile navigation spacing for all six tools, including English labels.
+
+### Matting, size and performance
+
+- Detect smooth uneven chroma screens with conservative multi-frame evidence; calibrate local screen colors and clean connected screen shadows and limb gaps while retaining non-key foreground detail.
+- Cap clips up to five seconds at 1.5 MB, respecting smaller user limits and a bounded one-frame endpoint tolerance; longer clips keep the 3 MB ceiling. Use effective native video duration for classification while reserving bytes for complete audio and resource packaging.
+- Reuse native VAP GPU byte-plane processing and lazily allocate resource composition buffers, with CPU fallback and existing resolution, FPS and alpha behavior preserved.
+
 ## 1.7.3 - 2026-11-02
 
 ### VAP inspection
