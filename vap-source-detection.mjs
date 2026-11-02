@@ -97,10 +97,69 @@ function analyzeFrame(frame,minSide){
   return {color:classifyScreenColor(background),background,confidence:Math.min(ratio,consistent,sideRatio+.40)};
 }
 
+// Uneven but smooth coloured plates need a separate gate: a wider RGB
+// radius alone would turn grass, skies and coloured subjects into key screens.
+function analyzeGradientFrame(frame){
+  const {width,height,data}=frame||{};
+  if(!Number.isInteger(width)||!Number.isInteger(height)||width<16||height<16||width>4096||height>4096||width*height>8388608||!data||data.length!==width*height*4)return null;
+  // Align the band to the sampling grid: an odd-width band sampled every two
+  // pixels otherwise weighs the left/top edges twice as much as right/bottom.
+  const step=Math.max(1,Math.floor(Math.max(width,height)/96)),band=Math.max(step,Math.ceil(Math.min(width,height)*.035/step)*step),samples=[],sides=[[],[],[],[]];
+  for(let y=0;y<height;y+=step)for(let x=0;x<width;x+=step){
+    const i=(y*width+x)*4;if(data[i+3]<250)return null;
+    const point={x:width===1?0:x/(width-1)*2-1,y:height===1?0:y/(height-1)*2-1,rgb:[data[i],data[i+1],data[i+2]],px:x,py:y};samples.push(point);
+    if(y<band)sides[0].push(point);if(x>=width-band)sides[1].push(point);if(y>=height-band)sides[2].push(point);if(x<band)sides[3].push(point);
+  }
+  if(sides.some(side=>side.length<2))return null;
+  const border=sides.flat(),colours=border.filter(p=>colored(p.rgb));
+  if(colours.length/border.length<.80)return null;
+  const color=classifyScreenColor(center(colours.map(p=>p.rgb)));if(color==='custom')return null;
+  // A gold subject touching a green perimeter must not shift the measured
+  // green direction. Other families still count against the border gate below.
+  const background=center(colours.filter(p=>classifyScreenColor(p.rgb)===color).map(p=>p.rgb));
+  const vector=rgb=>{const mean=(rgb[0]+rgb[1]+rgb[2])/3;return rgb.map(v=>v-mean);},unit=vector(background),length=Math.hypot(...unit);for(let c=0;c<3;c++)unit[c]/=length;
+  const near=p=>{if(!colored(p.rgb)||classifyScreenColor(p.rgb)!==color)return false;const v=vector(p.rgb),norm=Math.hypot(...v);return v.reduce((sum,n,c)=>sum+n*unit[c],0)/norm>=.98;};
+  const matching=border.filter(near),borderRatio=matching.length/border.length,colourConsistency=matching.length/colours.filter(p=>classifyScreenColor(p.rgb)===color).length;
+  const sideRatio=Math.min(...sides.map(side=>side.filter(near).length/side.length)),plate=samples.filter(near),area=plate.length/samples.length;
+  if(borderRatio<.80||colourConsistency<.94||sideRatio<.35||area<.45)return null;
+  // Strong local texture is contrary evidence, even when every pixel is green.
+  const keyed=new Map(plate.map(p=>[p.py*width+p.px,p])),differences=[];
+  for(const p of plate){const neighbors=[];if(p.px+step<width)neighbors.push(p.py*width+p.px+step);if(p.py+step<height)neighbors.push((p.py+step)*width+p.px);for(const key of neighbors){const q=keyed.get(key);if(q)differences.push(Math.max(...p.rgb.map((v,c)=>Math.abs(v-q.rgb[c]))));}}
+  if(differences.length<20)return null;
+  const percentile=(values,f)=>{const sorted=values.slice().sort((a,b)=>a-b);return sorted[Math.min(sorted.length-1,Math.floor(sorted.length*f))];};
+  if(percentile(differences,.95)>8||differences.reduce((sum,v)=>sum+v,0)/differences.length>4)return null;
+  const features=p=>[1,p.x,p.y,p.x*p.y,p.x*p.x,p.y*p.y];
+  function solve(matrix,rhs){
+    const rows=matrix.map((row,i)=>[...row,rhs[i]]);
+    for(let col=0;col<6;col++){
+      let pivot=col;for(let row=col+1;row<6;row++)if(Math.abs(rows[row][col])>Math.abs(rows[pivot][col]))pivot=row;
+      if(Math.abs(rows[pivot][col])<1e-8)return null;[rows[col],rows[pivot]]=[rows[pivot],rows[col]];
+      const divisor=rows[col][col];for(let c=col;c<=6;c++)rows[col][c]/=divisor;
+      for(let row=0;row<6;row++)if(row!==col){const factor=rows[row][col];for(let c=col;c<=6;c++)rows[row][c]-=factor*rows[col][c];}
+    }
+    return rows.map(row=>row[6]);
+  }
+  const rows=matching.map(p=>({...p,f:features(p),weight:1}));let coefficients,residuals;
+  for(let pass=0;pass<4;pass++){
+    const matrix=Array.from({length:6},()=>Array(6).fill(0)),rhs=Array.from({length:3},()=>Array(6).fill(0));
+    for(const p of rows){const w=p.weight*p.weight;for(let i=0;i<6;i++){for(let j=0;j<6;j++)matrix[i][j]+=p.f[i]*p.f[j]*w;for(let c=0;c<3;c++)rhs[c][i]+=p.f[i]*p.rgb[c]*w;}}
+    coefficients=rhs.map(v=>solve(matrix,v));if(coefficients.some(v=>!v))return null;
+    residuals=rows.map(p=>distance(p.rgb,coefficients.map(co=>co.reduce((sum,v,i)=>sum+v*p.f[i],0))));
+    for(let i=0;i<rows.length;i++)rows[i].weight=Math.min(1,12/Math.max(1,residuals[i]));
+  }
+  if(percentile(residuals,.5)>8||percentile(residuals,.75)>12||percentile(residuals,.9)>36)return null;
+  const profile=[[-1,-1],[1,-1],[-1,1],[1,1],[0,0]].map(([x,y])=>coefficients.map(co=>co.reduce((sum,v,i)=>sum+v*[1,x,y,x*y,x*x,y*y][i],0)));
+  if(profile.some(rgb=>rgb.some(v=>!Number.isFinite(v)||v<0||v>255)||classifyScreenColor(rgb)!==color))return null;
+  if(Math.max(...profile.map(rgb=>distance(rgb,background)))<32)return null;
+  // A smooth coloured room without a contrasting foreground is not enough.
+  if(1-area<.015)return null;
+  return {color,background,confidence:Math.min(borderRatio,colourConsistency,sideRatio+.5),backgroundVariation:true,gradientProfile:profile};
+}
+
 /** Shared one-frame fallback for the matte processor, including contain padding. */
 export function detectFrameScreen(frame){
-  const result=analyzeFrame(frame,3);
-  return result?.color?result:null;
+  const result=analyzeFrame(frame,3);if(result?.color)return result;
+  const gradient=analyzeGradientFrame(frame);if(!gradient)return null;const {gradientProfile,...screen}=gradient;return screen;
 }
 
 /**
@@ -112,7 +171,8 @@ export function detectVideoSource(frames){
   if(!Array.isArray(frames)||!frames.length)return plain();
   const samples=frames.map(frame=>{
     const neutral=analyzeNeutralFrame(frame);
-    return neutral?.blank?null:neutral||analyzeFrame(frame,8);
+    if(neutral?.blank)return null;if(neutral)return neutral;
+    const uniform=analyzeFrame(frame,8);return uniform?.color?uniform:analyzeGradientFrame(frame)||uniform;
   }).filter(Boolean);
   if(!samples.length)return plain();
   const neutral=samples.filter(sample=>sample.matteMethod);
@@ -130,5 +190,11 @@ export function detectVideoSource(frames){
   // Family names alone cannot distinguish a red screen changing to orange/red,
   // or two different greens. One stable plate RGB is shared by preview/export.
   if(matches.some(sample=>distance(sample.background,background)>18))return plain();
-  return {sourceKind:'chroma_mp4',screenColor:classifyScreenColor(background),background,confidence:Math.round(Math.min(...matches.map(sample=>sample.confidence))*matches.length/samples.length*1000)/1000};
+  const variation=matches.some(sample=>sample.backgroundVariation);
+  if(variation){
+    if(matches.some(sample=>!sample.backgroundVariation||sample.color!==matches[0].color))return plain();
+    const profiles=matches.map(sample=>sample.gradientProfile);
+    for(let i=0;i<profiles[0].length;i++){const middle=center(profiles.map(profile=>profile[i]));if(profiles.some(profile=>distance(profile[i],middle)>36))return plain();}
+  }
+  return {sourceKind:'chroma_mp4',screenColor:classifyScreenColor(background),background,confidence:Math.round(Math.min(...matches.map(sample=>sample.confidence))*matches.length/samples.length*1000)/1000,...(variation?{backgroundVariation:true}:{})};
 }

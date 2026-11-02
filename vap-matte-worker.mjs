@@ -1,4 +1,4 @@
-import {keyPixels,applyVerticalMask,normalizeVerticalMask} from './vap-matte.mjs?v=20261029-detail1';
+import {keyPixels,applyVerticalMask,normalizeVerticalMask} from './vap-matte.mjs?v=20261102-gradientkey3';
 
 const scope=globalThis.self;
 const workspace={};
@@ -15,6 +15,7 @@ scope.addEventListener('message',event=>{
       const input=value.options||{};dimensions(input.width,input.height);
       options={width:input.width,height:input.height,matteMethod:'chroma_key',screenColor:input.screenColor||'auto',verticalMask:{...normalizeVerticalMask(input.verticalMask)}};
       if(input.lightRecovery!==undefined){if(typeof input.lightRecovery!=='boolean')throw new TypeError('Invalid light recovery mode');options.lightRecovery=input.lightRecovery;}
+      if(input.adaptiveChroma!==undefined){if(typeof input.adaptiveChroma!=='boolean')throw new TypeError('Invalid adaptive chroma mode');options.adaptiveChroma=input.adaptiveChroma;}
       for(const key of ['keyTolerance','edgeSoftness','spill'])if(Number.isFinite(input[key]))options[key]=input[key];
       if(input.background!==undefined){
         if(!Array.isArray(input.background)||input.background.length!==3||!input.background.every(v=>Number.isInteger(v)&&v>=0&&v<=255))throw new TypeError('Invalid screen RGB');

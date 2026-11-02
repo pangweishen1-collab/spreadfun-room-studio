@@ -19,6 +19,7 @@ const path=require('node:path');
   const mask={enabled:true,topStart:0,topEnd:.25,bottomStart:.75,bottomEnd:1};
   const baseOptions={width:5,height:5,screenColor:'green',background:[0,220,0],keyTolerance:.25,edgeSoftness:.08,spill:.7,verticalMask:mask};
   const pixels=(width=5,height=5)=>{const values=new Uint8ClampedArray(width*height*4);for(let i=0;i<values.length;i+=4)values.set([0,220,0,255],i);values.set([240,25,30,255],Math.floor(width*height/2)*4);return new TestImageData(values,width,height)};
+  const gradientPixels=(frame=0)=>{const width=48,height=32,values=new Uint8ClampedArray(width*height*4);for(let y=0;y<height;y++)for(let x=0;x<width;x++){const green=Math.round(80+y/(height-1)*140);values.set(x>15&&x<32&&y>8&&y<25?(frame?[38,58,210,128]:[210,35,50,255]):[Math.round(green*.25),green,Math.round(green*.18),255],(y*width+x)*4);}return new TestImageData(values,width,height)};
   function control(){const c=new AbortController(),listeners=new Set();return {abort:()=>c.abort(),listeners,signal:{get aborted(){return c.signal.aborted},addEventListener(type,fn,options){listeners.add(fn);c.signal.addEventListener(type,fn,options)},removeEventListener(type,fn){listeners.delete(fn);c.signal.removeEventListener(type,fn)}}};}
 
   class FakeWorker{
@@ -83,6 +84,12 @@ const path=require('node:path');
       const source=pixels(),expected=applyVerticalMask(keyPixels(source.data,5,5,{...baseOptions,lightRecovery,matteMethod:'chroma_key'}),5,5,mask),job=recoveryPool.process(source);FakeWorker.instances[0].complete();assert.deepEqual((await job).image.data,expected);recoveryPool.dispose();clean();
     }
     reset();for(const lightRecovery of [null,0,1,'true','false',{},[]])await assert.rejects(createChromaWorkerPool({...baseOptions,lightRecovery}),{name:'TypeError',message:'Invalid light recovery mode'});assert.equal(FakeWorker.instances.length,0,'invalid recovery values fail before starting workers');clean();
+    for(const adaptiveChroma of [false,true]){
+      reset();const adaptivePool=await createChromaWorkerPool({...baseOptions,adaptiveChroma,unwanted:'ignored'});
+      assert.equal(FakeWorker.instances[0].config.adaptiveChroma,adaptiveChroma,'the pool forwards either explicit adaptive chroma boolean');assert.deepEqual(Object.keys(FakeWorker.instances[0].config).sort(),['width','height','matteMethod','verticalMask','screenColor','background','keyTolerance','edgeSoftness','spill','adaptiveChroma'].sort());
+      const source=pixels(),expected=applyVerticalMask(keyPixels(source.data,5,5,{...baseOptions,adaptiveChroma,matteMethod:'chroma_key'}),5,5,mask),job=adaptivePool.process(source);FakeWorker.instances[0].complete();assert.deepEqual((await job).image.data,expected);adaptivePool.dispose();clean();
+    }
+    reset();for(const adaptiveChroma of [null,0,1,'true','false',{},[]])await assert.rejects(createChromaWorkerPool({...baseOptions,adaptiveChroma}),{name:'TypeError',message:'Invalid adaptive chroma mode'});assert.equal(FakeWorker.instances.length,0,'invalid adaptive chroma values fail before worker startup');clean();
 
     reset();const queuedPool=await createChromaWorkerPool(baseOptions),activeImage=pixels(),waitingImage=pixels(),overflowImage=pixels();
     const active=queuedPool.process(activeImage),waiting=queuedPool.process(waitingImage);
@@ -151,8 +158,17 @@ const path=require('node:path');
       }
     }
     for(const lightRecovery of [null,0,1,'true','false',{},[]]){const worker=await actualWorker({...baseOptions,lightRecovery});assert.equal(worker.replies.length,1);assert.equal(worker.replies[0].type,'error','the actual worker rejects non-boolean recovery settings');assert.equal(worker.replies[0].message,'Invalid light recovery mode');}
+    for(const adaptiveChroma of [false,true]){
+      const options={...baseOptions,width:48,height:32,background:[45,170,32],adaptiveChroma},worker=await actualWorker(options);assert.equal(worker.replies.pop().type,'ready','the real worker accepts the adaptive chroma boolean');
+      for(let frame=0;frame<2;frame++){
+        const source=gradientPixels(frame),expected=applyVerticalMask(keyPixels(source.data,48,32,{...options,matteMethod:'chroma_key'}),48,32,mask),legacy=applyVerticalMask(keyPixels(source.data,48,32,{...options,adaptiveChroma:false,matteMethod:'chroma_key'}),48,32,mask);
+        if(adaptiveChroma)assert.notDeepEqual(expected,legacy,'the varying-screen fixture exercises the adaptive algorithm');else assert.deepEqual(expected,legacy,'disabled adaptive chroma preserves legacy bytes');
+        const input=structuredClone({type:'frame',id:frame,width:48,height:32,byteOffset:0,buffer:source.data.buffer},{transfer:[source.data.buffer]});worker.scope.receive({data:input});const output=worker.replies.pop();assert.equal(output.type,'result');assert.deepEqual(new Uint8ClampedArray(output.buffer),expected,'actual worker and CPU adaptive chroma agree byte for byte, including scratch reuse');
+      }
+    }
+    for(const adaptiveChroma of [null,0,1,'true','false',{},[]]){const worker=await actualWorker({...baseOptions,adaptiveChroma});assert.equal(worker.replies.length,1);assert.equal(worker.replies[0].type,'error','the actual worker rejects non-boolean adaptive chroma settings');assert.equal(worker.replies[0].message,'Invalid adaptive chroma mode');}
     await flush();assert.deepEqual(unhandled,[],'dispose/abort/startup rejection must not create internal unhandled rejections');assert.equal(timers.size,0);
-    console.log('PASS: chroma workers handshake/fallback, synchronous transfer, bounded FIFO/overflow, copied settings, explicit true/false light recovery forwarding and non-boolean rejection, fresh exact shared-algorithm output with enabled recovery and scratch reuse, size/resource bounds, worker/protocol failures, cancellation, timeout and idempotent cleanup.');
+    console.log('PASS: chroma workers handshake/fallback, synchronous transfer, bounded FIFO/overflow, copied settings, explicit true/false light recovery and adaptive chroma forwarding and validation, fresh exact shared-algorithm output with enabled recovery/adaptive mode and scratch reuse, legacy bytes with adaptive mode disabled, size/resource bounds, worker/protocol failures, cancellation, timeout and idempotent cleanup.');
   }finally{
     for(const handle of timers.keys())originalClearTimeout(handle);global.setTimeout=originalTimeout;global.clearTimeout=originalClearTimeout;process.removeListener('unhandledRejection',onUnhandled);
     for(const [key,descriptor]of Object.entries(saved))descriptor?Object.defineProperty(globalThis,key,descriptor):delete globalThis[key];

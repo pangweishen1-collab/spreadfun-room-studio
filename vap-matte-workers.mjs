@@ -1,4 +1,4 @@
-import {normalizeVerticalMask} from './vap-matte.mjs?v=20261029-detail1';
+import {normalizeVerticalMask} from './vap-matte.mjs?v=20261102-gradientkey3';
 
 const START_TIMEOUT_MS=2000;
 const WORK_PIXEL_BUDGET=96*1024*1024;
@@ -19,6 +19,7 @@ function settings(options){
     result.background=options.background.slice();
   }
   if(options.lightRecovery!==undefined){if(typeof options.lightRecovery!=='boolean')throw new TypeError('Invalid light recovery mode');result.lightRecovery=options.lightRecovery;}
+  if(options.adaptiveChroma!==undefined){if(typeof options.adaptiveChroma!=='boolean')throw new TypeError('Invalid adaptive chroma mode');result.adaptiveChroma=options.adaptiveChroma;}
   for(const key of ['keyTolerance','edgeSoftness','spill'])if(Number.isFinite(options[key]))result[key]=options[key];
   return result;
 }
@@ -113,7 +114,7 @@ export async function createChromaWorkerPool(options,{signal}={}){
     try{
       for(let index=0;index<size;index++){
         if(disposed)return;
-        const worker=new WorkerType(new URL('./vap-matte-worker.mjs?v=20261029-detail1',import.meta.url),{type:'module',name:'vap-chroma-'+(index+1)});
+        const worker=new WorkerType(new URL('./vap-matte-worker.mjs?v=20261102-gradientkey3',import.meta.url),{type:'module',name:'vap-chroma-'+(index+1)});
         const entry={worker,ready:false,job:null};entries.push(entry);
         entry.message=event=>message(entry,event);
         entry.error=event=>{event?.preventDefault?.();stop(failure(event?.message),!started);};

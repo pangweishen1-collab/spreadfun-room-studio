@@ -115,6 +115,54 @@ const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*
   const clear=sample(()=>[0,255,0,0]);assert.deepEqual(detectVideoSource([clear,clear]),plain);
   const noisy=sample((x,y,w,h)=>{const rgb=green(x,y,w,h),noise=(x*7+y*11)%9-4;return rgb.map((v,i)=>i===3?v:v+noise);});
   assert.equal(detectVideoSource([noisy,noisy]).screenColor,'green','minor codec noise should keep uniform-screen detection');
+  // A smooth, measured green ramp is a plate only with coherent spatial
+  // evidence and a contrasting subject. Preserve the original uniform path.
+  const rampPaint=(reverse=false,textured=false,foreground=true)=>(x,y,w,h)=>{
+    if(foreground&&x>w*.29&&x<w*.70&&y>h*.22&&y<h*.88)return [220,152,73,255];
+    const px=reverse?1-x/(w-1):x/(w-1),py=y/(h-1),noise=textured?((x+y)%2?20:-20):((x*7+y*3)%3-1);
+    return [50+35*px+40*py+noise,125+35*px+60*py+noise,38+23*px+30*py+noise,255];
+  };
+  const ramp=sample(rampPaint()),rampBefore=ramp.data.slice(),rampResult=detectVideoSource([ramp,ramp,ramp]);
+  assert.equal(rampResult.sourceKind,'chroma_mp4');assert.equal(rampResult.screenColor,'green');assert.equal(rampResult.backgroundVariation,true);assert.ok(rampResult.confidence>=.8);
+  assert.equal(detectFrameScreen(ramp).backgroundVariation,true,'the shared frame fallback preserves gradient evidence');
+  assert.deepEqual(ramp.data,rampBefore,'gradient analysis leaves all pixels intact');
+  for(const [width,height] of [[72,128],[108,192],[144,256]]){
+    const frame=sample(rampPaint(),width,height),before=frame.data.slice(),detected=detectVideoSource([frame,frame,frame]);
+    assert.equal(detected.sourceKind,'chroma_mp4','smooth plate survives the actual browser probe grid '+width+'x'+height);assert.equal(detected.backgroundVariation,true);assert.deepEqual(frame.data,before);
+  }
+  const goldAtEdge=sample((x,y,w,h)=>{
+    if(x>w*.82&&y>h*.1&&y<h*.4||x>w*.32&&x<w*.65&&y>h*.35&&y<h*.82)return [220,160,40,255];
+    const px=x/(w-1),py=y/(h-1);return [45+15*px+45*py,125+15*px+20*py,25+20*px+35*py,255];
+  },72,128),goldBefore=goldAtEdge.data.slice();
+  assert.equal(detectVideoSource([goldAtEdge,goldAtEdge,goldAtEdge]).backgroundVariation,true,'a contrasting gold subject at the perimeter cannot bias the green reference direction');
+  assert.deepEqual(goldAtEdge.data,goldBefore);
+  assert.equal(Object.hasOwn(detectVideoSource([g,g,g]),'backgroundVariation'),false,'uniform screens retain the previous exact result schema');
+  const grassNoise=sample(rampPaint(false,true));
+  assert.deepEqual(detectVideoSource([grassNoise,grassNoise,grassNoise]),plain,'textured green surroundings cannot become a gradient screen');
+  const softTexture=sample((x,y,w,h)=>{const rgb=rampPaint()(x,y,w,h);if(rgb[0]===220)return rgb;const noise=18*Math.sin(x*.24)+18*Math.sin(y*.33);return rgb.map((v,c)=>c===3?v:v+noise);});
+  assert.deepEqual(detectVideoSource([softTexture,softTexture,softTexture]),plain,'smooth but spatially irregular green texture fails the low-order plate fit');
+  const emptyRamp=sample(rampPaint(false,false,false));
+  assert.deepEqual(detectVideoSource([emptyRamp,emptyRamp,emptyRamp]),plain,'a smooth coloured environment without foreground evidence is insufficient');
+  const reversedRamp=sample(rampPaint(true));
+  assert.equal(detectFrameScreen(reversedRamp)?.backgroundVariation,true);
+  assert.deepEqual(detectVideoSource([ramp,ramp,reversedRamp]),plain,'opposite spatial plate profiles cannot share an automatic background model');
+  assert.deepEqual(detectVideoSource([ramp,ramp,g]),plain,'uniform and gradient evidence is not silently combined into one fixed key');
+  const node5Dir=process.env.VAP_GREEN_NODE5_PROBES||path.join(__dirname,'../../vap-avatar-preview-qa/green-node5');
+  if([0,1,2].every(i=>fs.existsSync(path.join(node5Dir,`probe-${i}.rgba`)))){
+    const captured=[0,1,2].map(i=>({width:96,height:170,data:new Uint8ClampedArray(fs.readFileSync(path.join(node5Dir,`probe-${i}.rgba`)))})),before=captured.map(f=>f.data.slice());
+    for(const frame of captured){assert.equal(frame.data.length,96*170*4);const screen=detectFrameScreen(frame);assert.equal(screen?.color,'green');assert.equal(screen.backgroundVariation,true);}
+    const detected=detectVideoSource(captured);assert.equal(detected.sourceKind,'chroma_mp4');assert.equal(detected.screenColor,'green');assert.equal(detected.backgroundVariation,true);assert.ok(detected.confidence>=.8);
+    captured.forEach((frame,i)=>assert.deepEqual(frame.data,before[i]));
+    console.log('vap-source-detection: optional uneven-green node5 samples passed (96x170, three video times).');
+  }
+  for(const height of [128,192,256]){
+    if(![0,1,2].every(i=>fs.existsSync(path.join(node5Dir,`probe${height}-${i}.rgba`))))continue;
+    const width=height*9/16,captured=[0,1,2].map(i=>({width,height,data:new Uint8ClampedArray(fs.readFileSync(path.join(node5Dir,`probe${height}-${i}.rgba`)))})),before=captured.map(frame=>frame.data.slice());
+    for(const frame of captured){assert.equal(frame.data.length,width*height*4);assert.equal(detectFrameScreen(frame)?.backgroundVariation,true,'all actual browser-size frames support a smooth green plate');}
+    const detected=detectVideoSource(captured);assert.equal(detected.sourceKind,'chroma_mp4');assert.equal(detected.screenColor,'green');assert.equal(detected.backgroundVariation,true);assert.ok(detected.confidence>=.8);
+    captured.forEach((frame,i)=>assert.deepEqual(frame.data,before[i]));
+    console.log('vap-source-detection: optional uneven-green node5 samples passed ('+width+'x'+height+', three video times).');
+  }
   // Real 720x1280 green gift video: the first sampled frame contains a yellow
   // light burst whose downsampled edge pixels narrowly miss the old consistency
   // gate. Two later frames retain the same RGB plate. Use frame-at-or-before

@@ -80,7 +80,7 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
   assert.ok(!giftAside.includes('id="giftPreviewContext"'),'the outer right card only holds adjustments and export');
   assert.ok(/<div\b[^>]*id="giftPreviewContext"[^>]*\bhidden/.test(giftStage),'the entire live preview stays hidden until an image has loaded');
   for(const side of [200,240,400,500])assert.match(giftAside,new RegExp('data-gift-size="'+side+'"'));
-  assert.ok(edgeTag,'edge controls use a native disclosure');assert.ok(!/\sopen(?:\s|=|>)/.test(edgeTag),'edge controls start collapsed');assert.ok(colorTag&&/\sopen(?:\s|=|>)/.test(colorTag),'color controls start expanded');
+  assert.ok(edgeTag,'edge controls use a native disclosure');assert.ok(!/\sopen(?:\s|=|>)/.test(edgeTag),'edge controls start collapsed');assert.ok(colorTag&&!/\sopen(?:\s|=|>)/.test(colorTag),'color controls start collapsed');
   assert.ok(advancedTag&&!/\sopen(?:\s|=|>)/.test(advancedTag),'retouch and transform controls start collapsed');
   assert.equal(api.state.side,200);assert.equal(get('#giftPreviewWidth').value,'200');assert.equal(get('#giftPreviewHeight').value,'200');assert.equal(api.state.settings.offsetX,0);assert.equal(get('#giftPreviewDownload').disabled,true);assert.equal(feedback.at(-1).phase,'empty');
   assert.equal(canvas.listenerOptions.get('wheel').passive,false,'the canvas wheel handler can prevent page scroll while it zooms');

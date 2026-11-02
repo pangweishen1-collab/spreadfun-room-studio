@@ -275,18 +275,18 @@ button.ft-motion-sheen[aria-busy=true]{cursor:progress}
 @media(hover:none){.tool-navigation a:active{color:#0055b3}.tool-navigation a:active::before{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.tool-navigation a,.tool-navigation a::before{transition:none;transform:none}.tool-navigation a:hover,.tool-navigation a:hover::before{transform:none}}
 
-/* Five tool destinations keep a complete row on phones and compact tablets. */
+/* Six destinations keep readable spacing on phones and compact tablets. */
 @media(min-width:541px) and (max-width:1100px){
  .topbar .brand{margin-right:auto}
  .topbar .top-actions{margin-left:0}
  .topbar .tool-navigation{order:3;width:100%;margin:0;justify-content:flex-start;gap:24px}
 }
 @media(min-width:541px) and (max-width:700px){
- .topbar .tool-navigation{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+ .topbar .tool-navigation{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
  .tool-navigation a{min-height:44px;padding:10px 0;min-width:0}
  .nav-label-full{display:none}.nav-label-short{display:inline}
 }
-@media(max-width:540px){.tool-navigation a{font-size:15px}}
+@media(max-width:540px){.topbar .tool-navigation{grid-template-columns:repeat(3,minmax(0,1fr));gap:4px 12px}.tool-navigation a{font-size:15px}}
 @media(max-width:360px){.topbar .tool-navigation{gap:0}.tool-navigation a{font-size:14px}}
 
 /* Upload empty states keep two text lines; clipboard support remains active. */

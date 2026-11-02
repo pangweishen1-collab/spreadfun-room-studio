@@ -9,6 +9,19 @@ const abort = signal => { if(signal?.aborted) throw Object.assign(new Error('Res
 
 export const RESOURCE_LIMITS = Object.freeze({count:6, fileBytes:12*1024*1024, textLength:80, textureSide:4096, texturePixels:16*1024*1024});
 const avatarFrameUrl=new URL('./assets/vap-avatar-base.webp',import.meta.url);
+const circleCoverage=(x,y,w,h)=>clamp((.5-Math.hypot(x-.5,y-.5))*Math.min(w,h)+.5);
+function transparentAvatarSlot(resource,sourceVapConfig){
+  if(resource.type!=='image')return false;
+  // The replaceable texture can be empty while the complete question badge
+  // stays underneath it. A transparent runtime slot must not erase that base.
+  if(resource.avatarFrame===true)return false;
+  if(resource.transparentAvatar!==undefined)return resource.transparentAvatar;
+  if(resource.sourceId===undefined)return false;
+  const source=sourceVapConfig?.src?.find(item=>String(item.srcId)===resource.sourceId),tag=source?.srcTag?.replace(/^\[(.*)\]$/,'$1');
+  const manifest=sourceVapConfig?.funToolkit?.resourceManifest;
+  return Array.isArray(manifest)&&manifest.some(item=>item?.type==='image'&&item.tag===tag&&(item.transparentAvatar===true||item.transparentAvatar===undefined&&item.placeholder===true));
+}
+
 /** The gold badge follows the replaceable avatar slot; only the badge is baked. */
 export function avatarFrameRect([x,y,w,h]){return [x-w*14/120,y-h*14/120,w*148/120,h*148/120];}
 export function normalizeResources(resources = [], {width=720, height=1560, duration=120, sourceVapConfig} = {}) {
@@ -23,6 +36,7 @@ export function normalizeResources(resources = [], {width=720, height=1560, dura
     if(!['image','text'].includes(r.type)||!['circle','square'].includes(r.shape)||!['cover','contain'].includes(r.fit)) throw new TypeError('资源类型或适配方式无效。');
     if(r.defaultAvatar!==undefined&&typeof r.defaultAvatar!=='boolean')throw new TypeError('默认头像标记无效。');
     if(r.avatarFrame!==undefined&&(typeof r.avatarFrame!=='boolean'||r.type!=='image'))throw new TypeError('头像底图仅适用于头像资源。');
+    if(r.transparentAvatar!==undefined&&(typeof r.transparentAvatar!=='boolean'||r.type!=='image'))throw new TypeError('透明头像区域仅适用于头像资源。');
     if(r.animation!==undefined&&r.animation!=='none'&&r.animation!=='float-pop')throw new TypeError('资源动画无效。');
     if(r.animation==='float-pop'&&(r.type!=='image'||r.sourceId!==undefined&&r.sourceId!==null))throw new TypeError('默认动画仅适用于新增头像 Key。');
     if(![r.x,r.y,r.width,r.height,r.opacity].every(finite)||r.width<=0||r.height<=0||r.width>1||r.height>1||r.opacity<0||r.opacity>1) throw new TypeError('请检查资源位置、尺寸和透明度。');
@@ -49,7 +63,7 @@ function surface(width,height){
   if(!Number.isSafeInteger(width)||!Number.isSafeInteger(height)||width<1||height<1||width>RESOURCE_LIMITS.textureSide||height>RESOURCE_LIMITS.textureSide||width*height>RESOURCE_LIMITS.texturePixels)throw new RangeError('资源尺寸过大，请缩小后重试。');
   const canvas=typeof OffscreenCanvas==='function'?new OffscreenCanvas(width,height):Object.assign(document.createElement('canvas'),{width,height});
   const ctx=canvas.getContext('2d',{willReadFrequently:true});
-  if(!ctx) throw new Error('Cannot create resource canvas');
+  if(!ctx){canvas.width=canvas.height=1;throw new Error('Cannot create resource canvas');}
   ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';
   return {canvas,ctx};
 }
@@ -142,7 +156,7 @@ export function addResourceConfig(config,{resources,layout,fps,frames,duration,s
     const frame=resourceFrame(r,{width:config.info.w,height:config.info.h,sourceVapConfig,timestamp:i/fps,duration,fps});
     return {srcId:r.id,z,frame:frame?.rect||[0,0,1,1],mFrame:layout.resourceMasks[r.id],mt:0};
   })}));
-  config.funToolkit={...config.funToolkit,resourceMode:'dynamic',resourceDefaults:Object.fromEntries(resources.filter(r=>r.type==='text').map(r=>[r.tag,r.text])),resourceManifest:resources.map(r=>({tag:r.tag,type:r.type,...(r.type==='image'?{file:`resources/${r.tag}.png`,...(r.defaultAvatar===true?{placeholder:true}:{})}:{text:r.text}),...(r.animation==='float-pop'?{animation:r.animation}:{}),...(r.sourceId!==undefined?{sourceId:r.sourceId}:{})}))};
+  config.funToolkit={...config.funToolkit,resourceMode:'dynamic',resourceDefaults:Object.fromEntries(resources.filter(r=>r.type==='text').map(r=>[r.tag,r.text])),resourceManifest:resources.map(r=>({tag:r.tag,type:r.type,...(r.type==='image'?{file:`resources/${r.tag}.png`,...(r.defaultAvatar===true?{placeholder:true}:{})}:{text:r.text}),...(r.animation==='float-pop'?{animation:r.animation}:{}),...(r.avatarFrame===true?{avatarFrame:true}:{}),...(r.type==='image'?{transparentAvatar:transparentAvatarSlot(r,sourceVapConfig)}:{}),...(r.sourceId!==undefined?{sourceId:r.sourceId}:{})}))};
   return config;
 }
 
@@ -182,8 +196,7 @@ export function unpackVapFrame(source,options){const unpacker=createVapUnpacker(
 
 export async function createResourceRenderer(input,{width=720,height=1560,duration=120,fps=24,verticalMask={enabled:false},sourceVapConfig,signal,includeDefaultAvatars=true}={}){
   const resources=normalizeResources(input,{width,height,duration,sourceVapConfig}),entries=[],urls=[];
-  const composition=surface(width,height);
-  let avatarFrameBitmap;
+  let composition,avatarFrameBitmap;
   try{
     if(resources.some(r=>r.avatarFrame)){
       const response=await fetch(avatarFrameUrl,{signal});if(!response.ok)throw new Error('头像底图未能加载，请重试。');
@@ -192,10 +205,14 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
     for(const r of resources){
       abort(signal);const [w,h]=dimensions(r,width,height,sourceVapConfig),texture=surface(w,h),mask=surface(w,h),layer=surface(w,h);
       const entry={r,w,h,texture,mask,layer};entries.push(entry);
+      if(transparentAvatarSlot(r,sourceVapConfig))entry.cutout=surface(w,h);
       if(r.avatarFrame){
         const bw=Math.ceil(w*148/120),bh=Math.ceil(h*148/120),background=surface(bw,bh),alpha=surface(bw,bh);
         background.ctx.drawImage(avatarFrameBitmap,0,0,bw,bh);
-        entry.background={...background,alpha,w:bw,h:bh,pixels:background.ctx.getImageData(0,0,bw,bh),cacheKey:null};
+        const pixels=background.ctx.getImageData(0,0,bw,bh);
+        // Keep the entire question-mark badge as a fixed base. The optional
+        // avatar texture is a separate layer placed over its centre at playback.
+        entry.background={...background,alpha,w:bw,h:bh,pixels,cacheKey:null};
       }
       let bitmap;
       try{
@@ -223,9 +240,19 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       }
       return rect;
     }
-    function drawStatic(ctx,timestamp,{resourceOpacity=1}={}){
+    function cutoutFrame(entry,timestamp,sourceCanvas,resourceOpacity){
+      const geometry=active(entry,timestamp,sourceCanvas,resourceOpacity);if(!geometry)return null;
+      const mask=entry.mask.ctx.getImageData(0,0,entry.w,entry.h).data,pixels=entry.cutoutPixels ||= new Uint8ClampedArray(mask.length);
+      for(let p=0;p<pixels.length;p+=4)pixels[p+3]=mask[p];
+      entry.cutout.ctx.putImageData(new ImageData(pixels,entry.w,entry.h),0,0);return geometry.rect;
+    }
+    function drawStatic(ctx,timestamp,{sourceCanvas,resourceOpacity=1}={}){
       valid(resourceOpacity);
-      for(const e of entries){if(!e.background)continue;const rect=backgroundFrame(e,timestamp,resourceOpacity);if(rect)ctx.drawImage(e.background.canvas,...rect);}
+      for(const e of entries){
+        const slot=e.cutout?cutoutFrame(e,timestamp,sourceCanvas,resourceOpacity):null;
+        if(slot){const previous=ctx.globalCompositeOperation;ctx.globalCompositeOperation='destination-out';ctx.drawImage(e.cutout.canvas,...slot);ctx.globalCompositeOperation=previous||'source-over';}
+        if(e.background){const rect=backgroundFrame(e,timestamp,resourceOpacity);if(rect)ctx.drawImage(e.background.canvas,...rect);}
+      }
     }
     function active(entry,timestamp,sourceCanvas,resourceOpacity=1){
       const {r,w,h,mask}=entry,geometry=resourceFrame(r,{width,height,sourceVapConfig,timestamp,duration,fps});
@@ -246,7 +273,7 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       }else{mask.ctx.fillStyle='#fff';mask.ctx.fillRect(0,0,w,h);}
       // Local slot shapes never change within a renderer. Reuse their exact
       // coverage and pixel buffer; native masks must still be read every frame.
-      const shape=entry.shapeCoverage ||= Float64Array.from({length:w*h},(_,i)=>r.shape==='circle'?clamp((.5-Math.hypot((i%w+.5)/w-.5,(Math.floor(i/w)+.5)/h-.5))*Math.min(w,h)+.5):1);
+      const shape=entry.shapeCoverage ||= Float64Array.from({length:w*h},(_,i)=>r.shape==='circle'?circleCoverage((i%w+.5)/w,(Math.floor(i/w)+.5)/h,w,h):1);
       const pixels=geometry.sourceObject?mask.ctx.getImageData(0,0,w,h):(entry.maskPixels ||= new ImageData(new Uint8ClampedArray(w*h*4),w,h));
       for(let i=0;i<shape.length;i++){
         const p=i*4,value=Math.round((geometry.sourceObject?pixels.data[p]:255)*(shape[i]*r.opacity*Math.min(resourceOpacity,geometry.motionOpacity??1)));
@@ -258,7 +285,7 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
     // Spatial video masks stay independent; the temporal gift envelope fades
     // every slot once while preserving its own opacity and native occlusion.
     function draw(ctx,timestamp,{sourceCanvas,includeStatic=true,includeDefaults=true,resourceOpacity=1}={}){
-      valid(resourceOpacity);if(includeStatic)drawStatic(ctx,timestamp,{resourceOpacity});
+      valid(resourceOpacity);if(includeStatic)drawStatic(ctx,timestamp,{sourceCanvas,resourceOpacity});
       for(const e of entries){
         if(!includeDefaults&&e.r.defaultAvatar===true)continue;
         const geometry=active(e,timestamp,sourceCanvas,resourceOpacity);if(!geometry)continue;
@@ -269,14 +296,22 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       }
     }
     return {
-      resources,draw,drawStatic,hasStaticLayers:entries.some(e=>e.background),
-      apply(imageData,timestamp,options){composition.ctx.putImageData(imageData,0,0);draw(composition.ctx,timestamp,options);return composition.ctx.getImageData(0,0,width,height);},
-      applyStatic(imageData,timestamp,options){composition.ctx.putImageData(imageData,0,0);drawStatic(composition.ctx,timestamp,options);return composition.ctx.getImageData(0,0,width,height);},
+      resources,draw,drawStatic,hasStaticLayers:entries.some(e=>e.background||e.cutout),
+      apply(imageData,timestamp,options){valid();const target=composition ||= surface(width,height);target.ctx.putImageData(imageData,0,0);draw(target.ctx,timestamp,options);return target.ctx.getImageData(0,0,width,height);},
+      applyStatic(imageData,timestamp,options){valid();const target=composition ||= surface(width,height);target.ctx.putImageData(imageData,0,0);drawStatic(target.ctx,timestamp,options);return target.ctx.getImageData(0,0,width,height);},
       // White pixels carrying the badge alpha compose with the existing grayscale
       // base alpha using source-over: Aout = Abadge + Abase * (1 - Abadge).
-      drawStaticPlanes(ctx,layout,timestamp,{resourceOpacity=1}={}){
+      drawStaticPlanes(ctx,layout,timestamp,{sourceCanvas,resourceOpacity=1}={}){
         valid(resourceOpacity);const [ax,ay,aw,ah]=layout.aFrame;
         for(const e of entries){
+          const slot=e.cutout?cutoutFrame(e,timestamp,sourceCanvas,resourceOpacity):null;
+          if(slot){
+            const [x,y,w,h]=slot;
+            // Packed RGB is premultiplied over black; black source-over clears
+            // the same coverage as destination-out in the visible RGBA preview.
+            ctx.save();ctx.beginPath();ctx.rect(0,0,width,height);ctx.clip();ctx.drawImage(e.cutout.canvas,...slot);ctx.restore();
+            ctx.save();ctx.beginPath();ctx.rect(ax,ay,aw,ah);ctx.clip();ctx.drawImage(e.cutout.canvas,ax+x*aw/width,ay+y*ah/height,w*aw/width,h*ah/height);ctx.restore();
+          }
           if(!e.background)continue;const rect=backgroundFrame(e,timestamp,resourceOpacity);if(!rect)continue;
           const [x,y,w,h]=rect;
           ctx.save();ctx.beginPath();ctx.rect(0,0,width,height);ctx.clip();ctx.drawImage(e.background.canvas,...rect);ctx.restore();
@@ -286,7 +321,7 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       drawMasks(ctx,layout,timestamp,sourceCanvas,{resourceOpacity=1}={}){valid(resourceOpacity);for(const e of entries){active(e,timestamp,sourceCanvas,resourceOpacity);ctx.drawImage(e.mask.canvas,...layout.resourceMasks[e.r.id]);}},
       getPlayerTags(){return tagsPromise ||= Promise.all(entries.map(async e=>{if(e.r.type==='text')return [e.r.tag,e.r.text];const url=URL.createObjectURL(await toBlob(e.r.defaultAvatar===true?emptyTexture():e.texture.canvas));urls.push(url);return [e.r.tag,url];})).then(Object.fromEntries);},
       getPackageFiles(){return filesPromise ||= Promise.all(entries.filter(e=>e.r.type==='image').map(async e=>({name:`resources/${e.r.tag}.png`,blob:await toBlob(e.r.defaultAvatar===true?emptyTexture():e.texture.canvas)})));},
-      dispose(){if(disposed)return;disposed=true;for(const url of urls)URL.revokeObjectURL(url);for(const e of entries)for(const s of [e.texture,e.mask,e.layer,e.background,e.background?.alpha].filter(Boolean))s.canvas.width=s.canvas.height=1;composition.canvas.width=composition.canvas.height=1;if(placeholder)placeholder.canvas.width=placeholder.canvas.height=1;}
+      dispose(){if(disposed)return;disposed=true;for(const url of urls)URL.revokeObjectURL(url);for(const e of entries)for(const s of [e.texture,e.mask,e.layer,e.background,e.background?.alpha,e.cutout].filter(Boolean))s.canvas.width=s.canvas.height=1;if(composition)composition.canvas.width=composition.canvas.height=1;if(placeholder)placeholder.canvas.width=placeholder.canvas.height=1;}
     };
-  }catch(error){avatarFrameBitmap?.close?.();for(const e of entries)for(const s of [e.texture,e.mask,e.layer,e.background,e.background?.alpha].filter(Boolean))s.canvas.width=s.canvas.height=1;composition.canvas.width=composition.canvas.height=1;throw error;}
+  }catch(error){avatarFrameBitmap?.close?.();for(const e of entries)for(const s of [e.texture,e.mask,e.layer,e.background,e.background?.alpha,e.cutout].filter(Boolean))s.canvas.width=s.canvas.height=1;if(composition)composition.canvas.width=composition.canvas.height=1;throw error;}
 }

@@ -1,4 +1,5 @@
-import {SCREEN_COLORS, classifyScreenColor, detectFrameScreen} from './vap-source-detection.mjs?v=20261029-auto-method2';
+import {calibrateChromaPlate} from './vap-chroma-plate.mjs?v=20261102-gradient7';
+import {SCREEN_COLORS, classifyScreenColor, detectFrameScreen} from './vap-source-detection.mjs?v=20261102-gradientkey3';
 // Local frame-to-alpha providers. No image, frame, or mask leaves this device.
 const clamp = value => Math.max(0, Math.min(1, value));
 const byte = value => Math.max(0, Math.min(255, Math.round(value)));
@@ -55,12 +56,21 @@ function screenOption(color,background){
   if(color==='custom')throw new Error('自定义幕布需要提供 RGB 颜色。');
   return null;
 }
-function chromaPixels(data,width,height,screen,tolerance,softness,despill,workspace,lightRecovery){
+function chromaPixels(data,width,height,screen,tolerance,softness,despill,workspace,lightRecovery,adaptiveChroma){
   const count=width*height,bg=screen.background,mean=(bg[0]+bg[1]+bg[2])/3,hue=bg.map(v=>v-mean),hueLength=Math.hypot(...hue),unit=hue.map(v=>hueLength?v/hueLength:0);
+  const plate=adaptiveChroma?calibrateChromaPlate(data,width,height,bg):null;
   const reused=workspace?.alpha instanceof Float32Array&&workspace.alpha.length===count&&workspace.reference instanceof Int32Array&&workspace.reference.length===count&&workspace.distance instanceof Uint16Array&&workspace.distance.length===count;
   const alpha=reused?workspace.alpha:new Float32Array(count),reference=reused?workspace.reference:new Int32Array(count),distance=reused?workspace.distance:new Uint16Array(count),out=new Uint8ClampedArray(data.length);
   if(reused)alpha.fill(0);
   else if(workspace)Object.assign(workspace,{alpha,reference,distance});
+  let exterior=null;
+  if(plate){
+    exterior=workspace?.exterior instanceof Uint8Array&&workspace.exterior.length===count?workspace.exterior:new Uint8Array(count);exterior.fill(0);if(workspace)workspace.exterior=exterior;
+    let head=0,tail=0;
+    const visit=p=>{if(!exterior[p]&&plate.isExterior(p)){exterior[p]=1;reference[tail++]=p;}};
+    for(let x=0;x<width;x++){visit(x);visit((height-1)*width+x)}for(let y=1;y<height-1;y++){visit(y*width);visit(y*width+width-1)}
+    while(head<tail){const p=reference[head++],x=p%width;if(x)visit(p-1);if(x+1<width)visit(p+1);if(p>=width){visit(p-width);if(x)visit(p-width-1);if(x+1<width)visit(p-width+1)}if(p+width<count){visit(p+width);if(x)visit(p+width-1);if(x+1<width)visit(p+width+1)}}
+  }
   reference.fill(-1);distance.fill(65535);
   const noise=.001+tolerance*.008,noiseBytes=1+tolerance*8;
   const screenKey=bg[1]>=bg[0]&&bg[1]>=bg[2]?1:bg[0]>=bg[2]?0:2,plateLuminance=.2126*bg[0]+.7152*bg[1]+.0722*bg[2];
@@ -71,14 +81,18 @@ function chromaPixels(data,width,height,screen,tolerance,softness,despill,worksp
   const rLow=bg[0]-noiseBytes,rHigh=bg[0]+noiseBytes,gLow=bg[1]-noiseBytes,gHigh=bg[1]+noiseBytes,bLow=bg[2]-noiseBytes,bHigh=bg[2]+noiseBytes;
   for(let p=0;p<count;p++){
     const o=p*4,r=data[o],g=data[o+1],b=data[o+2];let minimum=0;
+    if(exterior?.[p]||data[o+3]===0)continue;
+    const pixelBg=plate?plate.at(p):bg;if(plate&&plate.isPlate(p,pixelBg))continue;
     // This box is wholly inside the existing zero-alpha noise floor; it only
     // skips arithmetic for proven plate pixels, without changing light edges.
     if(data[o+3]===0||(r>=rLow&&r<=rHigh&&g>=gLow&&g<=gHigh&&b>=bLow&&b<=bHigh))continue;
     // Every well-conditioned channel constrains the same compositing equation.
     // Ignore only tiny denominators: codec noise in a near-zero plate channel
     // must not invent an opaque patch. This also supports two-high-channel hues.
-    for(let c=0;c<3;c++){const value=data[o+c];if(bg[c]>=32)minimum=Math.max(minimum,1-(value+noiseBytes)/bg[c]);if(255-bg[c]>=32)minimum=Math.max(minimum,(value-noiseBytes-bg[c])/(255-bg[c]));}minimum=clamp(minimum);
-    if(minimum<=noise||data[o+3]===0)continue;
+    for(let c=0;c<3;c++){const value=data[o+c];if(pixelBg[c]>=32)minimum=Math.max(minimum,1-(value+noiseBytes)/pixelBg[c]);if(255-pixelBg[c]>=32)minimum=Math.max(minimum,(value-noiseBytes-pixelBg[c])/(255-pixelBg[c]));}minimum=clamp(minimum);
+    // Screen-coloured holes between limbs must not borrow nearby opaque
+    // foreground colour. Strong foreground anchors remain protected.
+    if(minimum<=noise||data[o+3]===0||(plate&&minimum<.75&&plate.isExterior(p)))continue;
     alpha[p]=minimum;
     // Distinct hues and solid neutrals anchor nearby mixed pixels. A red plate
     // must preserve a green subject just as a blue plate preserves a red one.
@@ -95,9 +109,16 @@ function chromaPixels(data,width,height,screen,tolerance,softness,despill,worksp
   for(let p=0;p<count;p++){
     const o=p*4;let a=alpha[p];
     if(a<=0)continue;
+    if(plate&&reference[p]<0){
+      // Detached codec-coloured screen islands have no path to a foreground
+      // anchor. Keep other-colour particles and continuous foreground edges.
+      const average=(data[o]+data[o+1]+data[o+2])/3,r=data[o]-average,g=data[o+1]-average,b=data[o+2]-average;
+      if(data[o+screenKey]-Math.max(data[o+(screenKey+1)%3],data[o+(screenKey+2)%3])>8&&r*unit[0]+g*unit[1]+b*unit[2]>Math.hypot(r,g,b)*.85)continue;
+    }
+    const pixelBg=plate?plate.at(p):bg;
     if(a>0){
       if(reference[p]===p)a=1;
-      else if(reference[p]>=0){const r=reference[p]*4;let numerator=0,denominator=0;for(let c=0;c<3;c++){const foreground=data[r+c]-bg[c];numerator+=(data[o+c]-bg[c])*foreground;denominator+=foreground*foreground;}if(denominator>16)a=Math.max(a,clamp(numerator/denominator));}
+      else if(reference[p]>=0){const r=reference[p]*4;let numerator=0,denominator=0;for(let c=0;c<3;c++){const foreground=data[r+c]-pixelBg[c];numerator+=(data[o+c]-pixelBg[c])*foreground;denominator+=foreground*foreground;}if(denominator>16)a=Math.max(a,clamp(numerator/denominator));}
       // Suppress only codec-level screen noise. Soft ribbons and independent
       // particles retain continuous alpha instead of a binary colour cut.
       a*=smooth(noise,noise*2,a);a=Math.pow(a,1+softness*.5);
@@ -124,7 +145,7 @@ function chromaPixels(data,width,height,screen,tolerance,softness,despill,worksp
         }
       }
     }
-    recover(out,o,data[o],data[o+1],data[o+2],a,bg,data[o+3]);
+    recover(out,o,data[o],data[o+1],data[o+2],a,pixelBg,data[o+3]);
     if(lightRecovery&&despill>0&&cornerScreen){
       let base=0,excess=255;
       for(let c=0;c<3;c++)if(!spillChannels[c])base=Math.max(base,out[o+c]);
@@ -152,15 +173,16 @@ export function detectScreenColor(data,width,height,requested='auto'){
 }
 
 /** Straight RGB + alpha, shared by live preview and the exported packed frame. */
-export function keyPixels(data,width,height,{matteMethod='black_luma',keyTolerance=.25,edgeSoftness=.08,spill=.7,background,screenColor='auto',lightRecovery=false}={},workspace){
+export function keyPixels(data,width,height,{matteMethod='black_luma',keyTolerance=.25,edgeSoftness=.08,spill=.7,background,screenColor='auto',lightRecovery=false,adaptiveChroma=false}={},workspace){
   pixels(data,width,height);if(!['black_luma','white_luma','chroma_key','opaque'].includes(matteMethod))throw new Error('此抠像方式需要独立的本地模型或遮罩。');
+  if(typeof adaptiveChroma!=='boolean')throw new Error('渐变幕布参数无效。');
   if(typeof lightRecovery!=='boolean')throw new Error('光效透明修复参数无效。');
   const tolerance=setting(keyTolerance,.25),softness=setting(edgeSoftness,.08),despill=setting(spill,.7);
   if(matteMethod==='opaque')return data.slice();
   const screen=matteMethod==='chroma_key'?(screenOption(screenColor,background)||detectScreenColor(data,width,height,screenColor)):null;
   if(matteMethod==='chroma_key'&&!screen)return data.slice();
   const bg=screen?.background||(matteMethod==='white_luma'?[255,255,255]:[0,0,0]);
-  if(screen)return chromaPixels(data,width,height,screen,tolerance,softness,despill,workspace,lightRecovery);
+  if(screen)return chromaPixels(data,width,height,screen,tolerance,softness,despill,workspace,lightRecovery,adaptiveChroma);
   const out=new Uint8ClampedArray(data.length);
   for(let o=0;o<data.length;o+=4){
     const r=data[o],g=data[o+1],b=data[o+2];let alpha;
@@ -258,7 +280,7 @@ export async function createMatteProcessor(options={}){
       }
       abort(options.signal);return new ImageData(applyVerticalMask(data,width,height,activeVerticalMask),width,height);
     },
-    dispose(){if(disposed)return;disposed=true;mask?.dispose();ai?.task?.close();previous=null;chromaWorkspace.alpha=chromaWorkspace.reference=chromaWorkspace.distance=null;input.target.width=input.target.height=maskSurface.target.width=maskSurface.target.height=1;}
+    dispose(){if(disposed)return;disposed=true;mask?.dispose();ai?.task?.close();previous=null;chromaWorkspace.alpha=chromaWorkspace.reference=chromaWorkspace.distance=chromaWorkspace.exterior=null;input.target.width=input.target.height=maskSurface.target.width=maskSurface.target.height=1;}
   };
   return processor;
 }

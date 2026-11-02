@@ -15,16 +15,22 @@
       let value=own(tags,tag)?tags[tag]:own(tags,short)?tags[short]:source.srcType==='txt'&&(own(defaults,tag)||own(defaults,short))?(own(defaults,tag)?defaults[tag]:defaults[short]):undefined;
       if(source.srcType==='txt'&&typeof value==='string'&&value.length<=2000)bindings[tag]=value||'\u200b';
       else if(source.srcType==='img'&&typeof value==='string'&&/^(blob:|data:image\/(?:png|jpe?g|webp);base64,)/i.test(value))bindings[tag]=value;
-      else missing.push(tag);
+      else if(value===undefined||value===null||value==='')missing.push(tag);
+      else throw new Error('Invalid VAP resource binding: '+tag);
     }
     return {bindings,missing};
   }
   function sdkResourceOptions(config,tags){
     const {bindings,missing}=resourceBindings(config,tags);
-    if(missing.length)throw new Error('Missing VAP resource bindings: '+missing.join(', '));
     // SDK resources share the options object. Bracketed aliases keep even a tag
     // named src/container from replacing player control fields.
     const copy=JSON.parse(JSON.stringify(config)),options=Object.create(null);
+    // The SDK only compiles textures for bound sources. Omit empty slots from
+    // its mutable playback copy; the original downloadable Key metadata stays intact.
+    const skipped=new Set(missing);copy.src=(copy.src||[]).filter(source=>!skipped.has(source.srcTag));
+    const visibleIds=new Set(copy.src.map(source=>String(source.srcId)));
+    for(const frame of copy.frame||[])frame.obj=(frame.obj||[]).filter(object=>visibleIds.has(String(object.srcId)));
+    if(!copy.src.length)copy.info.isVapx=0;
     for(const source of copy.src||[]){const original=source.srcTag,alias='['+original.replace(/^\[(.*)\]$/,'$1')+']';source.srcTag=alias;options[alias]=bindings[original];}
     return {config:copy,options};
   }
@@ -56,9 +62,10 @@
     if(!sdkPromise)sdkPromise=new Promise((resolve,reject)=>{const script=document.createElement('script');script.src='vendor/tencent-vap/vap.min.js';const failed=()=>{script.remove();sdkPromise=null;reject(new Error('VAP player unavailable'));};script.onload=()=>window.Vap?.default?resolve(window.Vap.default):failed();script.onerror=failed;document.head.append(script);});
     return sdkPromise;
   }
-  async function mount({url,config,tags={}}={}){
+  async function mount({url,config,tags={},autoplay=true}={}){
     currentResult={url,config,tags:{...tags}};
     const token=++version;if(!reset(token))return;const el=host();if(!el)return;
+    requested=autoplay&&active&&!document.hidden;
     if(!setState('loading',token))return;sync();let candidate=null,failed=false;
     function fail(error){
       if(token!==version||failed)return;failed=true;
@@ -119,13 +126,13 @@
       for(const alias of aliases)delete merged[alias];
       Object.defineProperty(merged,tag,{value:tags[key],enumerable:true,configurable:true,writable:true});
     }
-    return mount({...result,tags:merged});
+    return mount({...result,tags:merged,autoplay:requested});
   }
   document.addEventListener('vap:result',event=>mount(event.detail));
   document.addEventListener('vap:result-invalidated',destroy);
-  document.addEventListener('vap:active',event=>{active=event.detail.active;if(!active&&player){requested=false;player.pause();}sync();});
+  document.addEventListener('vap:active',event=>{active=event.detail.active;if(!active){requested=false;player?.pause();}sync();});
   document.addEventListener('click',event=>{if(event.target.closest?.('#vapResultPlay'))toggle();});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden&&player){requested=false;player.pause();sync();}});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){requested=false;player?.pause();sync();}});
   window.addEventListener('pagehide',destroy);
   window.VapResultPlayer={mount,destroy,setLanguage:sync,getMissingTags:(config,tags)=>resourceBindings(config,tags).missing,updateTags};
 })();
