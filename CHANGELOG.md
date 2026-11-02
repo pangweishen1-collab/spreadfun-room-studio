@@ -1,5 +1,18 @@
 # 更新记录
 
+## 1.7.2 - 2026-11-02
+
+### VAP quality and size
+
+- Use ultra quality with automatic size optimization by default and hide the retired compression preset selector. Check up to five decoded samples of RGB, local edges, alpha and dynamic key masks before skipping redundant bitrate refinement; retain the previous ultra refinement when checks fail or cannot run.
+- Keep selected dimensions, FPS, resource metadata and the hard file-size limit. Sampled quality checks are not a lossless guarantee; complex footage may retain the previous ultra bitrate.
+
+### Interface refinements
+
+- Use compact disclosure spacing throughout the Gift and VAP controls: 4px margin, 4px padding after the divider and a 44px clickable header. Synchronize reusable disclosure styles and guidance.
+- Move Alpha resolution above advanced settings, keep legacy audio/RGB options hidden, remove the current-effect heading and align the two preview canvases.
+- Standardize small field captions at 12px across the tools while retaining existing input and button sizes.
+
 ## 1.7.1 - 2026-11-01
 
 ### VAP refinements
