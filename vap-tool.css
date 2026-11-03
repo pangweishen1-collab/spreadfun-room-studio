@@ -50,6 +50,17 @@
 #vapTool .vap-stage.is-dragging{border-color:var(--blue);box-shadow:inset 0 0 0 1px var(--blue);background-color:#deedff}
 #vapTool .vap-stage.has-file{cursor:ns-resize;touch-action:pan-x}
 #vapTool .vap-stage.is-positioning{cursor:grabbing}
+#vapTool .vap-color-picker{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:12px}
+#vapTool .vap-color-picker[hidden]{display:none}
+#vapTool .vap-color-picker .vap-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;min-height:40px;padding:8px 14px;font-size:14px}
+#vapTool .vap-color-picker svg{fill:none;stroke:var(--blue);stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#vapTool .vap-color-picker [aria-pressed=true]{border-color:#8abfff;background:#eaf3ff;color:var(--blue)}
+#vapTool .vap-picked-color{display:inline-flex;align-items:center;gap:8px;min-height:40px;color:var(--tool-muted);font-size:12px;line-height:18px;font-variant-numeric:tabular-nums}
+#vapTool .vap-color-swatch{width:22px;height:22px;border:1px solid #cbd5e1;border-radius:6px;background:var(--vap-key-color,#f1f5f9);box-shadow:inset 0 0 0 2px #fff}
+#vapTool .vap-color-pick-hint{position:absolute;top:12px;left:12px;right:12px;z-index:12;width:fit-content;max-width:calc(100% - 24px);box-sizing:border-box;padding:8px 12px;border:1px solid #a8d0ff;border-radius:10px;background:#f5f9fff2;color:#005bb8;font-size:12px;line-height:18px;pointer-events:none;box-shadow:0 2px 8px #0000000d}
+#vapTool .vap-color-pick-hint[hidden]{display:none}
+#vapTool .vap-stage.is-color-picking,#vapTool .vap-stage.is-color-picking>video{cursor:crosshair;touch-action:none}
+#vapTool .vap-stage.is-color-picking .vap-resource-overlay,#vapTool .vap-stage.is-color-picking .vap-mask-overlay{display:none}
 #vapTool .vap-stage.has-file:focus-visible{outline:2px solid var(--blue);outline-offset:3px}
 #vapTool .vap-stage>video,#vapTool .vap-stage>canvas{display:block;width:auto;height:auto;max-width:100%;max-height:520px;object-fit:contain}
 #vapTool .vap-stage>canvas{max-height:520px}

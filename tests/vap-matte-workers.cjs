@@ -147,6 +147,18 @@ const path=require('node:path');
       const replies=[],scope={addEventListener(type,fn){assert.equal(type,'message');this.receive=fn},postMessage(value,transfer=[]){replies.push(structuredClone(value,{transfer}))}};
       put('self',scope);await import(pathToFileURL(path.join(__dirname,'../vap-matte-worker.mjs')).href+'?recovery-unit='+(++recoveryImport)+'-'+Date.now());scope.receive({data:{type:'init',options}});return {scope,replies};
     }
+    for(const picked of [[45,142,69],[74,173,116],[70,148,134],[176,44,60],[55,76,166]]){
+      const options={...baseOptions,screenColor:'custom',background:picked.slice()},worker=await actualWorker(options);
+      assert.equal(worker.replies.pop().type,'ready');options.background.fill(0);
+      for(let frame=0;frame<2;frame++){
+        const source=pixels();for(let offset=0;offset<source.data.length;offset+=4)source.data.set([...picked,255],offset);
+        if(frame===0)source.data.set([230,210,40,128],(2*5+2)*4);
+        const expected=applyVerticalMask(keyPixels(source.data,5,5,{...options,background:picked,matteMethod:'chroma_key'}),5,5,mask);
+        const input=structuredClone({type:'frame',id:frame,width:5,height:5,byteOffset:0,buffer:source.data.buffer},{transfer:[source.data.buffer]});worker.scope.receive({data:input});
+        const output=worker.replies.pop();assert.equal(output.type,'result');assert.deepEqual(new Uint8ClampedArray(output.buffer),expected,'actual worker preserves cloned eyedropper RGB and matches preview/export pixels');
+        if(frame===1)assert.ok(new Uint8ClampedArray(output.buffer).every(value=>value===0),'clearing a picked screen does not retain previous foreground pixels');
+      }
+    }
     for(const lightRecovery of [false,true]){
       const options={...baseOptions,lightRecovery,background:[60,194,61]},worker=await actualWorker(options);assert.equal(worker.replies.pop().type,'ready','the real worker accepts the boolean recovery mode');
       for(let frame=0;frame<2;frame++){
@@ -159,7 +171,7 @@ const path=require('node:path');
     }
     for(const lightRecovery of [null,0,1,'true','false',{},[]]){const worker=await actualWorker({...baseOptions,lightRecovery});assert.equal(worker.replies.length,1);assert.equal(worker.replies[0].type,'error','the actual worker rejects non-boolean recovery settings');assert.equal(worker.replies[0].message,'Invalid light recovery mode');}
     for(const adaptiveChroma of [false,true]){
-      const options={...baseOptions,width:48,height:32,background:[45,170,32],adaptiveChroma},worker=await actualWorker(options);assert.equal(worker.replies.pop().type,'ready','the real worker accepts the adaptive chroma boolean');
+      const options={...baseOptions,width:48,height:32,screenColor:'custom',background:[45,170,32],adaptiveChroma},worker=await actualWorker(options);assert.equal(worker.replies.pop().type,'ready','the real worker accepts the adaptive chroma boolean with picked RGB');
       for(let frame=0;frame<2;frame++){
         const source=gradientPixels(frame),expected=applyVerticalMask(keyPixels(source.data,48,32,{...options,matteMethod:'chroma_key'}),48,32,mask),legacy=applyVerticalMask(keyPixels(source.data,48,32,{...options,adaptiveChroma:false,matteMethod:'chroma_key'}),48,32,mask);
         if(adaptiveChroma)assert.notDeepEqual(expected,legacy,'the varying-screen fixture exercises the adaptive algorithm');else assert.deepEqual(expected,legacy,'disabled adaptive chroma preserves legacy bytes');
