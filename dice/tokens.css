@@ -1,0 +1,51 @@
+/* Dice Studio adapters to Fun Toolkit UI 1.0.6 / resource 1.4.6. */
+:root {
+  --color-transparent: transparent;
+  --color-purple: #8053AF;
+  --color-purple-soft: #F1EAF8;
+  --color-dialog-backdrop: rgba(20, 30, 48, .32);
+  --color-checker-a: #FFFFFF;
+  --color-checker-b: #EDF1F6;
+}
+.ft-ui {
+  --color-paper: var(--ft-color-surface-page);
+  --color-surface: var(--ft-color-surface-card);
+  --color-surface-soft: #F8FAFD;
+  --color-stage: var(--ft-color-surface-blue-soft);
+  --color-ink: var(--ft-color-text-body);
+  --color-heading: var(--ft-color-text-heading);
+  --color-muted: var(--ft-color-text-muted);
+  --color-secondary: var(--ft-color-text-secondary);
+  --color-rule: var(--ft-color-surface-divider);
+  --color-rule-strong: #D8DCE2;
+  --color-accent: var(--ft-color-action-primary);
+  --color-accent-hover: var(--ft-color-action-hover);
+  --color-accent-pressed: var(--ft-color-action-pressed);
+  --color-accent-soft: var(--ft-color-surface-blue-soft);
+  --color-accent-rule: #BDD8FA;
+  --color-replace: var(--ft-color-action-replace);
+  --color-success: var(--ft-color-semantic-success);
+  --color-success-soft: var(--ft-color-semantic-success-surface);
+  --color-warning: var(--ft-color-semantic-warning);
+  --color-warning-soft: var(--ft-color-semantic-warning-surface);
+  --color-danger: var(--ft-color-semantic-error);
+  --color-danger-soft: var(--ft-color-semantic-error-surface);
+  --color-on-dark: var(--ft-color-text-on-action);
+  --color-shadow: rgba(0, 0, 0, .035);
+  --color-shadow-strong: rgba(20, 40, 70, .12);
+  --font-body: var(--ft-font-family);
+  --font-display: var(--ft-font-family);
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --text-xs: 12px;
+  --text-sm: 12px;
+  --text-base: 14px;
+  --text-md: 14px;
+  --text-lg: 16px;
+  --text-xl: 26px;
+  --radius-sm: var(--ft-radius-input);
+  --radius-md: var(--ft-radius-inner);
+  --radius-lg: var(--ft-radius-card);
+  --dur-fast: 120ms;
+  --dur-normal: 180ms;
+  --ease-standard: var(--ft-ease);
+}

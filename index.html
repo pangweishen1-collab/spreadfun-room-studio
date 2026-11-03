@@ -51,7 +51,9 @@ body{min-width:320px}
 @media(max-width:540px){.topbar{padding:14px 16px;gap:14px}.brand{font-size:16px}.top-actions{width:100%;gap:8px}.language-switch{width:auto;min-width:112px;flex:1;height:40px}.top-actions #examplesButton,.top-actions #contactButton{width:auto;min-width:0;flex:1;font-size:12px;padding:5px 8px}main{padding:22px 16px 32px}.intro{margin-bottom:24px}.intro h1,.intro h1:lang(zh-CN){font-size:28px;letter-spacing:-.5px}.intro .eyebrow{font-size:9px;letter-spacing:1.4px;gap:8px}.intro .eyebrow:before,.intro .eyebrow:after{width:16px}.preview{padding:16px}.preview-head{gap:8px}.stage{height:450px}.upload-empty{padding:16px}.upload-empty strong{font-size:15px}.upload-empty span{display:block;line-height:1.6}.preview-grid{padding:12px;gap:10px}.preview-grid.count-2,.preview-grid.count-3{grid-template-columns:repeat(2,minmax(0,1fr))}.preview-grid.count-1 .batch-preview canvas{height:375px}.preview-grid.count-2 .batch-preview canvas,.preview-grid.count-3 .batch-preview canvas{height:210px}.delete-preview{width:30px;height:30px;line-height:30px}.preview-caption{font-size:11px}.exports{padding:16px}.file-actions button{min-height:36px}.examples-grid{grid-template-columns:1fr}.crop-dialog{padding:18px}.crop-dialog p{line-height:1.6}.crop-actions button{min-height:44px}.crop-control input{min-height:24px}.lifetime-stat{padding:16px}.site-footer{line-height:1.6}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{transition:none!important;scroll-behavior:auto!important}}
 </style>
-  <link rel="stylesheet" href="toolkit.css?v=20261103-footer1">
+  <link rel="stylesheet" href="toolkit.css?v=20261103-dice1-20261103-metaltext1">
+  <link rel="stylesheet" href="avatar-fonts.css?v=20261103-metaltext1">
+  <link rel="stylesheet" href="avatar-custom.css?v=20261103-metaltext1">
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
@@ -66,7 +68,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="vap-player.css?v=20261026-play-icon1">
 </head>
 <body>
-  <header class="topbar"><a class="brand" id="brandHome" href="#room-backgrounds" data-i18n-label="homeLink" aria-label="Fun Toolkit · Room backgrounds"><div class="mark" aria-hidden="true"><img src="assets/spreadfun-mark.webp" alt="" width="30" height="30"></div><div class="brand-copy"><span class="brand-name">Fun Toolkit</span></div></a><nav class="tool-navigation" id="toolsNavigation" aria-label="Tools"><a href="#room-backgrounds" data-tool-link="room" data-i18n-label="roomNav" aria-current="page"><span class="nav-label-full" data-i18n="roomNav">Room backgrounds</span><span class="nav-label-short" data-i18n="roomNavShort">Room BG</span></a><a href="#avatar-frames" data-tool-link="avatar" data-i18n-label="avatarNav"><span class="nav-label-full" data-i18n="avatarNav">Avatar frames</span><span class="nav-label-short" data-i18n="avatarNavShort">Avatar</span></a><a href="#banners" data-tool-link="banner" data-i18n-label="bannerNav"><span data-i18n="bannerNav">Banner</span></a><a id="giftPreviewLink" href="#gift-previews" data-tool-link="gift-preview" data-i18n-label="giftPreviewNav"><span data-i18n="giftPreviewNav">礼物图</span></a><a id="vapToolLink" href="#vap-tools" data-tool-link="vap" data-i18n-label="vapNav"><span data-i18n="vapNav">VAP工具</span></a><a id="resourcesLink" href="#resources" data-tool-link="resources" data-i18n-label="resourcesNav"><span data-i18n="resourcesNav">资源库</span></a></nav><div class="top-actions"><button class="tiny lang-button" id="langToggle" onclick="toggleLanguage()" aria-label="切换语言"><span class="lang-icon">文</span><span class="lang-label" id="langLabel">中文</span></button><button class="tiny" id="contactButton" onclick="openContact()"><span class="nav-author-avatar" aria-hidden="true"><img src="assets/author-profile.webp" alt="" width="452" height="544"></span><span id="contactButtonText">Contact author</span></button></div></header>
+  <header class="topbar"><a class="brand" id="brandHome" href="#room-backgrounds" data-i18n-label="homeLink" aria-label="Fun Toolkit · Room backgrounds"><div class="mark" aria-hidden="true"><img src="assets/spreadfun-mark.webp" alt="" width="30" height="30"></div><div class="brand-copy"><span class="brand-name">Fun Toolkit</span></div></a><nav class="tool-navigation" id="toolsNavigation" aria-label="Tools"><a href="#room-backgrounds" data-tool-link="room" data-i18n-label="roomNav" aria-current="page"><span class="nav-label-full" data-i18n="roomNav">Room backgrounds</span><span class="nav-label-short" data-i18n="roomNavShort">Room BG</span></a><a href="#avatar-frames" data-tool-link="avatar" data-i18n-label="avatarNav"><span class="nav-label-full" data-i18n="avatarNav">Avatar frames</span><span class="nav-label-short" data-i18n="avatarNavShort">Avatar</span></a><a href="#banners" data-tool-link="banner" data-i18n-label="bannerNav"><span data-i18n="bannerNav">Banner</span></a><a id="giftPreviewLink" href="#gift-previews" data-tool-link="gift-preview" data-i18n-label="giftPreviewNav"><span data-i18n="giftPreviewNav">礼物图</span></a><a id="vapToolLink" href="#vap-tools" data-tool-link="vap" data-i18n-label="vapNav"><span data-i18n="vapNav">VAP工具</span></a><a id="diceToolLink" href="#dice-preview" data-tool-link="dice" data-i18n-label="diceNav"><span data-i18n="diceNav">骰子</span></a><a id="resourcesLink" href="#resources" data-tool-link="resources" data-i18n-label="resourcesNav"><span data-i18n="resourcesNav">资源库</span></a></nav><div class="top-actions"><button class="tiny lang-button" id="langToggle" onclick="toggleLanguage()" aria-label="切换语言"><span class="lang-icon">文</span><span class="lang-label" id="langLabel">中文</span></button><button class="tiny" id="contactButton" onclick="openContact()"><span class="nav-author-avatar" aria-hidden="true"><img src="assets/author-profile.webp" alt="" width="452" height="544"></span><span id="contactButtonText">Contact author</span></button></div></header>
 <dialog class="hub-request-dialog ft-motion-dialog" id="hubRequestDialog" aria-labelledby="hubRequestDialogTitle">
   <div class="hub-dialog-heading"><h2 id="hubRequestDialogTitle" data-hub-i18n="requestDialogTitle">提出工具需求</h2><button type="button" class="hub-button hub-secondary" id="hubRequestClose" data-hub-i18n="close">关闭</button></div>
   <p class="hub-dialog-description" data-hub-i18n="requestDialogDescription">描述具体任务和期望的输出，有助于作者判断需求与实现方式。</p>
@@ -88,7 +90,11 @@ body{min-width:320px}
       </aside>
     </section>
   </main>  <main id="avatarTool" class="hidden" data-tool="avatar">
-    <div class="intro"><div><h1 data-i18n="avatarTitle">Avatar frame preview maker</h1></div></div>
+    <div class="avatar-subtabs" role="tablist" aria-label="头像框功能">
+      <button type="button" id="avatarImagesTab" role="tab" aria-selected="true" aria-controls="avatarImagesPanel" tabindex="0" data-custom-i18n="imagesTab">头像框图片</button>
+      <button type="button" id="avatarCustomTab" role="tab" aria-selected="false" aria-controls="avatarCustomPanel" tabindex="-1" data-custom-i18n="customTab">定制头像框</button>
+    </div>
+    <section id="avatarImagesPanel" role="tabpanel" aria-labelledby="avatarImagesTab">
     <section class="workspace avatar-workspace">
       <section class="preview card frame-preview">
         <div class="preview-head"><h2 data-i18n="animationPreview">Animation preview</h2><span class="frame-status" id="svgaPlaybackStatus">No file selected</span></div>
@@ -128,6 +134,44 @@ body{min-width:320px}
       </aside>
     </section>
     <input type="file" id="svgaInput" accept=".svga" multiple hidden>
+    </section>
+    <section id="avatarCustomPanel" role="tabpanel" aria-labelledby="avatarCustomTab" hidden>
+      <section class="workspace avatar-custom-workspace">
+        <section class="preview card avatar-custom-preview">
+          <div class="preview-head"><h2 data-custom-i18n="preview">效果预览</h2><span class="frame-status" id="avatarCustomStatus">尚未选择文件</span></div>
+          <div class="stage avatar-custom-stage upload-ready ft-upload-zone" id="avatarCustomStage" role="group" aria-label="上传定制头像框 SVGA">
+            <div class="upload-empty" id="avatarCustomEmpty"><img class="tool-empty-art" src="design-system/assets/feedback/empty-upload.svg" alt="" width="120" height="90"><strong data-custom-i18n="uploadTitle">点击、拖入或粘贴 SVGA 文件</strong><span data-custom-i18n="uploadHint">保留原动效，添加定制文字</span><button type="button" id="avatarCustomUpload" class="preview-upload ft-motion-sheen" data-custom-i18n="upload">上传 SVGA</button></div>
+            <div class="avatar-custom-scene checkerboard" id="avatarCustomScene" hidden><div id="avatarCustomPlayer" aria-label="SVGA 预览"></div><canvas id="avatarCustomTextLayer" tabindex="0" role="img" aria-label="拖动文字调整位置，方向键微调"></canvas></div>
+          </div>
+          <div class="frame-sourcebar" id="avatarCustomSourcebar" hidden><div><strong id="avatarCustomFileName"></strong><span id="avatarCustomFileMeta"></span></div><button type="button" class="tiny" id="avatarCustomReplace" data-custom-i18n="replace">替换文件</button></div>
+          <div class="avatar-custom-toolbar" id="avatarCustomToolbar" hidden><button class="play-button" type="button" id="avatarCustomPlay"><span id="avatarCustomPlayIcon" aria-hidden="true">▶</span><span id="avatarCustomPlayText" data-custom-i18n="play">播放</span></button><button class="avatar-custom-secondary" type="button" id="avatarCustomCenter" data-custom-i18n="center">水平居中</button><span id="avatarCustomTime" class="frame-time"></span></div>
+          <p class="avatar-custom-notice" id="avatarCustomNotice" role="status" aria-live="polite" hidden></p>
+        </section>
+        <aside class="exports card avatar-custom-settings">
+          <div class="output-title-row"><h2 data-custom-i18n="textSettings">定制文字</h2><span class="badge">SVGA</span></div>
+          <fieldset id="avatarCustomFields" disabled>
+            <div class="avatar-custom-fields-row avatar-custom-main-row"><div><label for="avatarCustomText" data-custom-i18n="textLabel">文字内容</label><textarea id="avatarCustomText" maxlength="80" rows="1" spellcheck="false">YOUR NAME</textarea></div><div><div class="avatar-custom-font-label"><label for="avatarCustomFont" data-custom-i18n="fontLabel">英文字体</label><a href="https://fonts.google.com/" target="_blank" rel="noopener noreferrer" data-custom-i18n="fontLibrary">字体库 ↗</a></div><select id="avatarCustomFont">
+              <option value="inter">Inter</option><option value="montserrat">Montserrat</option><option value="bebas">Bebas Neue</option><option value="oswald">Oswald</option><option value="playfair">Playfair Display</option><option value="cinzel">Cinzel</option><option value="pacifico">Pacifico</option><option value="orbitron">Orbitron</option>
+            </select></div></div>
+            <div class="avatar-custom-presets-label" id="avatarCustomStylesLabel" data-custom-i18n="stylePresets">字体样式预设</div>
+            <div class="avatar-custom-presets" role="group" aria-labelledby="avatarCustomStylesLabel">
+              <button type="button" class="avatar-text-preset" data-text-style="plain" aria-pressed="true"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="stylePlain">纯色</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="brightGold" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleBrightGold">亮金立体</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="champagne" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleChampagne">香槟金</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="silver" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleSilver">银色金属</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="roseGold" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleRoseGold">玫瑰金</span></button>
+            </div>
+            <div class="avatar-custom-fields-row"><div><label for="avatarCustomFontSize" data-custom-i18n="sizeLabel">文字大小</label><div class="dimension-input"><input id="avatarCustomFontSize" type="number" min="8" max="512" value="30" step="1" inputmode="numeric"><span>px</span></div></div><div><label for="avatarCustomWeight" data-custom-i18n="weightLabel">字重</label><select id="avatarCustomWeight"><option value="400">400</option><option value="500">500</option><option value="600" selected>600</option><option value="700">700</option><option value="800">800</option></select></div></div>
+            <div class="avatar-custom-fields-row"><div><label for="avatarCustomColor" data-custom-i18n="colorLabel">文字颜色</label><div class="avatar-custom-color"><input id="avatarCustomColor" type="color" value="#ffffff"><input id="avatarCustomColorValue" type="text" value="#FFFFFF" maxlength="7" aria-label="文字颜色 HEX" spellcheck="false" autocomplete="off"></div></div><div><label for="avatarCustomStrokeWidth" data-custom-i18n="strokeLabel">描边宽度</label><div class="dimension-input"><input id="avatarCustomStrokeWidth" type="number" min="0" max="16" value="0" step="0.1" inputmode="decimal"><span>px</span></div></div></div>
+            <label for="avatarCustomStrokeColor" data-custom-i18n="strokeColorLabel">描边颜色</label><div class="avatar-custom-color"><input id="avatarCustomStrokeColor" type="color" value="#000000"><input id="avatarCustomStrokeColorValue" type="text" value="#000000" maxlength="7" aria-label="描边颜色 HEX" spellcheck="false" autocomplete="off"></div>
+          </fieldset>
+          <div class="avatar-custom-output-spec"><span data-custom-i18n="svgaLimit">SVGA · 3MB 内</span><span data-custom-i18n="frameSpec">首帧 WebP · 240 × 240</span></div>
+          <button type="button" id="avatarCustomExport" class="batch-download frame-download ft-motion-sheen" disabled aria-busy="false" data-custom-i18n="export">导出 SVGA + WebP</button>
+          <div id="avatarCustomResult" class="avatar-custom-result" hidden><canvas id="avatarCustomFirstFrame" class="checkerboard" width="240" height="240" aria-label="实际导出第一帧"></canvas><div id="avatarCustomDownloads"></div></div>
+        </aside>
+      </section>
+      <input type="file" id="avatarCustomInput" accept=".svga" hidden>
+    </section>
   </main>
   <main id="giftPreviewTool" class="hidden" data-tool="gift-preview" aria-labelledby="giftPreviewTitle">
   <div class="intro tool-intro"><div><h1 id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具</h1></div></div>
@@ -426,6 +470,7 @@ body{min-width:320px}
   <p class="help-prompt" data-banner-i18n="helpPrompt">Generate a banner image with a 3.3:1 aspect ratio.</p>
   <p class="help-followup" data-banner-i18n="helpFollowup">Save the image and upload it here. The tool automatically crops and exports a room banner and a game banner as WebP files.</p>
 </dialog>
+<main id="diceTool" class="hidden" data-tool="dice"><iframe id="dicePreviewFrame" title="骰子预览" src="about:blank" allow="autoplay" referrerpolicy="same-origin"></iframe></main>
 <footer class="site-footer" id="siteFooter"><div class="footer-inner">
   <span class="footer-copyright">© 2026 Fun Toolkit</span>
   <span class="footer-production" id="footerProduction" aria-live="polite" aria-atomic="true"><span data-hub-i18n="productionLabel">全站已生产</span><strong data-stat="generated">—</strong><span data-hub-i18n="productionUnit">份</span></span>
@@ -705,7 +750,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
 
   </script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
-  <script src="vendor/svga-2.3.2.min.js"></script>
+  <script src="vendor/svga-2.3.2.min.js?v=20261103-metaltext1"></script>
   <script src="banner-webp.js?v=20261030-webp2"></script>
   <script src="webp-settings.js?v=20261030-webp2"></script>
   <script src="project-selector.js?v=20261026-projects1"></script>
@@ -720,5 +765,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="vap-player.js?v=20261102-release174"></script>
   <script src="vap-resource-editor.js?v=20261102-release174"></script>
   <script src="vap-tool.js?v=20261103-eyedropper1"></script>
-  <script src="toolkit.js?v=20261103-footer1"></script>
+  <script src="dice-embed.js?v=20261103-dice1"></script>
+  <script src="toolkit.js?v=20261103-dice1"></script>
+  <script type="module" src="avatar-custom.js?v=20261103-metaltext1"></script>
 </body></html>

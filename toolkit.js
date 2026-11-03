@@ -11,7 +11,7 @@
   const $ = selector => document.querySelector(selector);
   const strings = {
     en: {
-      vapNav:'VAP tools',vapTitle:'VAP converter',resourcesNav:'Assets',navResourcesTitle:'Asset library',giftPreviewNav:'Gift images',giftPreviewTitle:'Gift & vehicle preview maker',
+      diceNav:'Dice',diceTitle:'Dice preview',vapNav:'VAP tools',vapTitle:'VAP converter',resourcesNav:'Assets',navResourcesTitle:'Asset library',giftPreviewNav:'Gift images',giftPreviewTitle:'Gift & vehicle preview maker',
       roomNav:'Room backgrounds',roomNavShort:'Room BG',avatarNav:'Avatar frames',avatarNavShort:'Avatar',examplesNav:'Examples',bannerNav:'Banner',navBannerTitle:'Banner maker',homeLink:'Fun Toolkit · Room backgrounds',designGuidelinesShort:'Guide',designGuidelines:'Design guidelines',designGuidelinesLabel:'Design guidelines (opens in a new tab)',footerResources:'Footer resources',navLabel:'Tools',roomSubtitle:'Create room backgrounds in two sizes, ready to use.',
       avatarTitle:'Avatar frame preview maker',avatarSubtitle:'Drop an SVGA, find your frame, export a transparent WebP.',animationPreview:'Animation preview',
       noFile:'No file selected',loading:'Loading animation…',playing:'Playing',paused:'Paused',dropSvga:'Click, drop or paste SVGA files',svgaHint:'Select multiple files and choose a frame for each.',pasteHint:'Paste with ⌘V / Ctrl+V to upload',uploadSvga:'Upload SVGA',replaceSvga:'Replace file',
@@ -21,7 +21,7 @@
       batchTitle:'SVGA queue',addSvga:'Add SVGA',downloadAllFrames:'Export all · ZIP',removeSvga:'Remove file',batchPartial:'Some files could not be exported. The successful files are in the ZIP.',batchFailed:'No frames could be exported. Please retry.',batchProgress:'Exported',batchOf:'of',typeError:'Choose .svga files.',sizeError:'This file is too large. Choose an SVGA under 50 MB.',loadError:'Could not read this SVGA. The file may be damaged or unsupported. Try another file.',loadTimeout:'This SVGA took too long to load. Try another file.',unavailable:'The animation player could not load. Refresh the page and try again.',invalidAnimation:'This SVGA has invalid dimensions or no frames.',exportError:'Could not export this frame. Please try again.',saved:'Download requested. Check your browser downloads.',retry:'Download again',frame:'Frame',original:'Original',seconds:'s',footerAuthor:'Winsome',footerContact:'Contact author: Winsome',navRoomTitle:'Room backgrounds',navAvatarTitle:'Avatar frame preview maker'
     },
     zh: {
-      vapNav:'VAP工具',vapTitle:'VAP 转换工具',resourcesNav:'资源库',navResourcesTitle:'资源库',giftPreviewNav:'礼物图',giftPreviewTitle:'礼物&座驾预览图生产工具',
+      diceNav:'骰子',diceTitle:'骰子预览',vapNav:'VAP工具',vapTitle:'VAP 转换工具',resourcesNav:'资源库',navResourcesTitle:'资源库',giftPreviewNav:'礼物图',giftPreviewTitle:'礼物&座驾预览图生产工具',
       roomNav:'房间背景',roomNavShort:'房间背景',avatarNav:'头像框',avatarNavShort:'头像框',examplesNav:'案例图片',bannerNav:'Banner',navBannerTitle:'Banner 生产工具',homeLink:'Fun Toolkit · 房间背景',designGuidelinesShort:'规范',designGuidelines:'设计规范',designGuidelinesLabel:'设计规范（在新标签页打开）',footerResources:'页脚资源',navLabel:'工具导航',roomSubtitle:'一次上传，生成两种尺寸的房间背景。',
       avatarTitle:'头像框预览图生产工具',avatarSubtitle:'拖入 SVGA，停在喜欢的一帧，导出透明 WebP。',animationPreview:'动态预览',
       noFile:'尚未选择文件',loading:'正在读取动画…',playing:'播放中',paused:'已暂停',dropSvga:'点击、拖入或粘贴多个 SVGA 文件',svgaHint:'可一次添加多个文件，分别选择需要的帧。',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',uploadSvga:'上传 SVGA',replaceSvga:'替换文件',
@@ -35,7 +35,7 @@
   const state={video:null,file:null,frame:0,playing:false,loading:false,exporting:false,dimension:240,dimensionValid:true,active:'room',notice:null,download:null,downloadUrl:null,lastPreview:0,jobs:[],activeId:null,batching:false,batchProgress:null,downloadKind:null};
   let nextJobId=0,inputAction='append';
   const playerHost=$('#svgaPlayer'),output=$('#frameOutputCanvas'),input=$('#svgaInput');
-  let player=null,exportPlayer=null;
+  let player=null,exportPlayer=null,avatarPreviewVisible=true;
   // Pausing and exporting reuse the selected frame; replacement/size changes
   // invalidate the hidden render independently of the fixed 240px preview.
   let renderedVideo=null,renderedFrame=-1,renderedSize=0,previewVideo=null,previewFrame=-1;
@@ -44,7 +44,8 @@
   window.JSZipUtils=window.JSZipUtils||{};
   const exportHost=document.createElement('div');exportHost.setAttribute('aria-hidden','true');exportHost.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;visibility:hidden';document.body.append(exportHost);
   const t=key=>(strings[language]||strings.en)[key]||key;
-  const currentTool=()=>({'#banners':'banner','#avatar-frames':'avatar','#room-backgrounds':'room','#gift-previews':'gift-preview','#vap-tools':'vap','#resources':'resources'}[location.hash]||'room');
+  const avatarImagesActive=()=>state.active==='avatar'&&!window.AvatarCustom?.isSelected?.();
+  const currentTool=()=>({'#banners':'banner','#avatar-frames':'avatar','#room-backgrounds':'room','#gift-previews':'gift-preview','#vap-tools':'vap','#resources':'resources','#dice-preview':'dice'}[location.hash]||'room');
   function syncFeedback(){
     const phase=state.loading?'loading':state.exporting?'processing':state.notice||!state.dimensionValid?'error':state.download?'success':state.video?'ready':'empty';
     const message=state.loading?t('loading'):state.exporting?t('exporting'):state.notice?t(state.notice):!state.dimensionValid?t('dimensionError'):state.download?t('saved'):'';
@@ -95,15 +96,16 @@
     $('#frameSizeError').classList.toggle('hidden',state.dimensionValid);
     if(state.notice)setNotice(state.notice);
     if(state.video)$('#svgaFileMeta').textContent=`${t('original')} ${state.video.videoSize.width} × ${state.video.videoSize.height} · ${state.video.frames} ${language==='zh'?'帧':'frames'} · ${state.video.FPS} FPS`;
-    renderBatchList();syncControls();syncFrame();syncDownloadResult();window.WebPSettings?.sync();if(window.BannerTool)window.BannerTool.syncLanguage();if(window.Hub)window.Hub.syncLanguage();window.GiftPreviewTool?.syncLanguage();window.ResourceLibrary?.syncLanguage();window.VapTool?.setLanguage(language);window.VapResultPlayer?.setLanguage();updateDocumentTitle();
+    renderBatchList();syncControls();syncFrame();syncDownloadResult();window.WebPSettings?.sync();if(window.BannerTool)window.BannerTool.syncLanguage();if(window.Hub)window.Hub.syncLanguage();window.GiftPreviewTool?.syncLanguage();window.ResourceLibrary?.syncLanguage();window.VapTool?.setLanguage(language);window.DicePreview?.setLanguage(language);window.VapResultPlayer?.setLanguage();updateDocumentTitle();
   }
-  function updateDocumentTitle(){document.title=t(({banner:'navBannerTitle',avatar:'navAvatarTitle',room:'navRoomTitle','gift-preview':'giftPreviewTitle',resources:'navResourcesTitle',vap:'vapTitle'})[state.active])+' · Fun Toolkit'}
+  function updateDocumentTitle(){document.title=t(({banner:'navBannerTitle',avatar:'navAvatarTitle',room:'navRoomTitle','gift-preview':'giftPreviewTitle',resources:'navResourcesTitle',vap:'vapTitle',dice:'diceTitle'})[state.active])+' · Fun Toolkit'}
   function activateTool(){
     const next=currentTool(),changed=next!==state.active;if(next!=='avatar')pause();state.active=next;
     $('#roomTool').classList.toggle('hidden',next!=='room');$('#avatarTool').classList.toggle('hidden',next!=='avatar');$('#bannerTool').classList.toggle('hidden',next!=='banner');
     $('#resourceTool').classList.toggle('hidden',next!=='resources');
     $('#giftPreviewTool').classList.toggle('hidden',next!=='gift-preview');
     $('#vapTool')?.classList.toggle('hidden',next!=='vap');window.VapTool?.setActive(next==='vap');
+    $('#diceTool')?.classList.toggle('hidden',next!=='dice');window.DicePreview?.setActive(next==='dice');
     window.FunToolkitUI?.activate(next);
     document.querySelectorAll('[data-tool-link]').forEach(link=>{if(link.dataset.toolLink===next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')});
     $('#examplesButton').classList.toggle('hidden',next!=='room');updateDocumentTitle();
@@ -144,7 +146,7 @@
   function togglePlayback(){
     if(!state.video||state.loading||state.exporting)return;
     if(state.playing){pause();return}
-    if(state.active!=='avatar'||document.hidden)return;
+    if(!avatarImagesActive()||document.hidden)return;
     state.playing=true;player.stepToFrame(state.frame,true);syncControls();
   }
   async function validateFile(file){
@@ -233,7 +235,7 @@
     if(state.loading||state.exporting)return;
     const selected=Array.from(files);if(!selected.length)return;
     const previous=currentJob(),previousIndex=state.jobs.indexOf(previous);pause();state.loading=true;state.batchProgress=null;setNotice(null);syncControls();
-    const additions=[];let firstError=null;
+    const additions=[];let firstError=null,mounted=null;
     try{
       ensurePlayers();
       for(const file of selected){
@@ -245,7 +247,6 @@
         finally{job.loading=false;}
         renderBatchList();syncControls();
       }
-      let mounted=null;
       for(const candidate of additions.filter(job=>job.video&&!job.error)){
         try{await mountJob(candidate);mounted=candidate;break;}
         catch(error){candidate.error='loadError';candidate.video=null;firstError||='loadError';}
@@ -259,7 +260,7 @@
       else showEmptyAvatar();
       if(firstError)setNotice(firstError);
     }catch(error){setNotice(strings.en[error.message]?error.message:'loadError');}
-    finally{state.loading=false;renderBatchList();syncLanguage();}
+    finally{state.loading=false;renderBatchList();syncLanguage();if(mounted&&avatarPreviewVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches)togglePlayback();}
   }
   function changeDimension(changed){
     const value=Number(changed.value),valid=changed.value.trim()!==''&&Number.isInteger(value)&&value>=16&&value<=2048;
@@ -326,7 +327,7 @@
   for(const id of ['#svgaUpload','#svgaReplace','#svgaAdd'])$(id).addEventListener('click',event=>{event.stopPropagation();pickSvga(id==='#svgaReplace');});
   input.addEventListener('change',event=>{const replace=inputAction==='replace';inputAction='append';input.multiple=true;loadSvga(event.target.files,{replace});event.target.value=''});
   $('#frameDownloadAll').addEventListener('click',exportAllFrames);
-  window.UploadPaste?.register({zone:$('#svgaDropzone'),isActive:()=>state.active==='avatar',isBusy:()=>state.loading||state.exporting,onFiles:loadSvga});
+  window.UploadPaste?.register({zone:$('#svgaDropzone'),isActive:avatarImagesActive,isBusy:()=>state.loading||state.exporting,onFiles:loadSvga});
   $('#svgaDropzone').addEventListener('click',()=>{if(!state.video&&!state.loading)pickSvga()});
   $('#svgaDropzone').addEventListener('keydown',event=>{if(event.target===$('#svgaDropzone')&&!state.video&&(event.key==='Enter'||event.key===' ')){event.preventDefault();if(!state.loading)pickSvga()}});
   let dragDepth=0;
@@ -335,9 +336,9 @@
   $('#svgaDropzone').addEventListener('dragleave',event=>{event.preventDefault();if(--dragDepth<=0){dragDepth=0;$('#svgaDropzone').classList.remove('drag')}});
   $('#svgaDropzone').addEventListener('drop',event=>{event.preventDefault();dragDepth=0;$('#svgaDropzone').classList.remove('drag');return loadSvga(event.dataTransfer.files)});
   // Accept a file dropped anywhere on the active avatar tool, including its sidebar.
-  document.addEventListener('dragover',event=>{if(Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();if(state.active==='avatar')$('#svgaDropzone').classList.add('drag')}});
+  document.addEventListener('dragover',event=>{if(Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();if(avatarImagesActive())$('#svgaDropzone').classList.add('drag')}});
   document.addEventListener('dragleave',event=>{if(!event.relatedTarget){dragDepth=0;$('#svgaDropzone').classList.remove('drag')}});
-  document.addEventListener('drop',event=>{if(!event.dataTransfer?.files.length)return;event.preventDefault();dragDepth=0;$('#svgaDropzone').classList.remove('drag');if(state.active==='avatar'&&!$('#svgaDropzone').contains(event.target))return loadSvga(event.dataTransfer.files)});
+  document.addEventListener('drop',event=>{if(!event.dataTransfer?.files.length)return;event.preventDefault();dragDepth=0;$('#svgaDropzone').classList.remove('drag');if(avatarImagesActive()&&!$('#svgaDropzone').contains(event.target))return loadSvga(event.dataTransfer.files)});
   $('#svgaPlay').addEventListener('click',togglePlayback);$('#svgaPrevious').addEventListener('click',()=>seek(state.frame-1));$('#svgaNext').addEventListener('click',()=>seek(state.frame+1));
   $('#svgaTimeline').addEventListener('pointerdown',pause);$('#svgaFrameNumber').addEventListener('focus',pause);
   $('#svgaTimeline').addEventListener('input',event=>seek(Number(event.target.value)-1));$('#svgaFrameNumber').addEventListener('change',event=>seek(Number(event.target.value)-1));$('#svgaFrameNumber').addEventListener('keydown',event=>{if(event.key==='Enter'){event.preventDefault();seek(Number(event.target.value)-1)}});
@@ -346,7 +347,7 @@
   document.addEventListener('webp:mode-change',()=>{releaseDownload();syncControls()});
   document.addEventListener('visibilitychange',()=>{if(document.hidden)pause()});
   matchMedia('(prefers-reduced-motion: reduce)').addEventListener('change',event=>{if(event.matches)pause()});
-  new IntersectionObserver(entries=>{if(!entries[0].isIntersecting&&state.playing)pause()}).observe($('#svgaDropzone'));
+  new IntersectionObserver(entries=>{avatarPreviewVisible=entries[0].isIntersecting;if(!avatarPreviewVisible&&state.playing)pause()}).observe($('#svgaDropzone'));
   document.querySelectorAll('[data-tool-link]').forEach(link=>link.addEventListener('click',event=>{
     if(event.button!==0||event.metaKey||event.ctrlKey||event.shiftKey||event.altKey)return;
     event.preventDefault();const hash=link.getAttribute('href');if(location.hash!==hash)location.hash=hash;activateTool();
@@ -355,6 +356,7 @@
   window.addEventListener('pagehide',()=>{pause();releaseDownload()});
   new ResizeObserver(()=>{if(state.video&&!state.loading&&!state.playing)player.stepToFrame(state.frame,false)}).observe(playerHost);
   window.Toolkit={syncLanguage};
+  window.Toolkit.pauseAvatar=pause;window.Toolkit.isAvatarBusy=()=>state.loading||state.exporting;
   let savedLanguage;try{savedLanguage=localStorage.getItem('spreadfun-toolkit-language')}catch(error){}
   if(savedLanguage==='zh'||savedLanguage==='en')setLanguage(savedLanguage);
   activateTool();syncLanguage();

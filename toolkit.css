@@ -286,14 +286,14 @@ button.ft-motion-sheen[aria-busy=true]{cursor:progress}
 @media(hover:none){.tool-navigation a:active{color:#0055b3}.tool-navigation a:active::before{opacity:1;transform:none}}
 @media(prefers-reduced-motion:reduce){.tool-navigation a,.tool-navigation a::before{transition:none;transform:none}.tool-navigation a:hover,.tool-navigation a:hover::before{transform:none}}
 
-/* Six destinations keep readable spacing on phones and compact tablets. */
+/* Tool destinations keep readable spacing on phones and compact tablets. */
 @media(min-width:541px) and (max-width:1100px){
  .topbar .brand{margin-right:auto}
  .topbar .top-actions{margin-left:0}
  .topbar .tool-navigation{order:3;width:100%;margin:0;justify-content:flex-start;gap:24px}
 }
 @media(min-width:541px) and (max-width:700px){
- .topbar .tool-navigation{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px}
+ .topbar .tool-navigation{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px}
  .tool-navigation a{min-height:44px;padding:10px 0;min-width:0}
  .nav-label-full{display:none}.nav-label-short{display:inline}
 }
@@ -334,3 +334,7 @@ canvas.svga-batch-thumb{display:block;object-fit:contain;background:var(--tool-b
 @media(min-width:701px) and (max-width:900px){.svga-batch-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
 .frame-position>label{font-size:var(--tool-field-label-size,12px);line-height:var(--tool-field-label-line-height,18px)}
+
+/* The dice workspace keeps its renderer and browser-local files isolated. */
+#diceTool { padding: 0 0 48px; }
+#dicePreviewFrame { display:block; width:100%; min-height:800px; border:0; background:#F5F5F7; }

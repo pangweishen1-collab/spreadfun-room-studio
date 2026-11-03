@@ -23,7 +23,7 @@ EVENT_TYPES = ("generated", "download")
 MAX_BODY = 16 * 1024
 STATIC_EXTENSIONS = {
     ".html", ".css", ".js", ".mjs", ".wasm", ".webp", ".png", ".jpg",
-    ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".svga",
+    ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".svga", ".skel", ".atlas",
 }
 
 

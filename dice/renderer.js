@@ -1,0 +1,405 @@
+const loadImage = src => new Promise((resolve, reject) => {
+  const image = new Image();
+  image.onload = () => resolve(image);
+  image.onerror = () => reject(new Error('图片加载失败，请重新生成候选包'));
+  image.src = src;
+});
+
+const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
+
+// A round is exactly 60 frames (two seconds) at 30fps.
+export const loopFrameState = (frame, mode, target) => {
+  const index = Math.max(0, Math.floor(frame));
+  const sequence = Math.floor(index / 60);
+  return {
+    elapsed: (index % 60) / 30,
+    sequence,
+    points: mode === 'all' ? [1, 2, 3, 4, 5, 6] : [mode === 'continuous' ? sequence % 6 + 1 : Number(target)],
+    timestamp: Math.round(index * 1_000_000 / 30),
+    duration: Math.round((index + 1) * 1_000_000 / 30) - Math.round(index * 1_000_000 / 30),
+  };
+};
+
+export class GameRenderer {
+  constructor(canvas, onStatus = () => {}) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d');
+    this.layer = document.createElement('canvas');
+    this.layer.width = 720;
+    this.layer.height = 1600;
+    this.context = new spine.ManagedWebGLRenderingContext(this.layer, { alpha: true, preserveDrawingBuffer: true, antialias: true });
+    this.gl = this.context.gl;
+    this.scene = new spine.SceneRenderer(this.layer, this.context);
+    this.scene.camera.viewportWidth = 720;
+    this.scene.camera.viewportHeight = 1600;
+    this.scene.camera.position.set(360, 800, 0);
+    this.scene.camera.update();
+    this.onStatus = onStatus;
+    this.mode = 'all';
+    this.target = 1;
+    this.elapsed = 1.3;
+    this.playing = false;
+    this.autoLoop = false;
+    this.loopSeconds = 2;
+    this.visible = true;
+    this.sequence = 0;
+    this.last = performance.now();
+    this.loadId = 0;
+    this.tick = this.tick.bind(this);
+    requestAnimationFrame(this.tick);
+    document.addEventListener('visibilitychange', () => { this.last = performance.now(); });
+  }
+
+  async load(candidate) {
+    const id = ++this.loadId;
+    const assets = new spine.AssetManager(this.context);
+    assets.loadBinary(candidate.skel);
+    assets.loadTextureAtlas(candidate.atlas, undefined, undefined, candidate.atlasPage ? {[candidate.atlasPage]:candidate.texture} : undefined);
+    await assets.loadAll();
+    if (assets.hasErrors()) throw new Error('动画资源加载失败：' + JSON.stringify(assets.getErrors()));
+    const atlas = assets.require(candidate.atlas);
+    const binary = new spine.SkeletonBinary(new spine.AtlasAttachmentLoader(atlas));
+    const data = binary.readSkeletonData(assets.require(candidate.skel));
+    const [background, icon] = await Promise.all([
+      loadImage(previewGrade(candidate) === 'purple' ? '/dice/assets/ui/bg_紫.webp' : '/dice/assets/ui/bg_绿.webp'),
+      loadImage(candidate.png['大骰子']),
+    ]);
+    if (id !== this.loadId) { assets.dispose(); return; }
+    this.assets?.dispose();
+    this.assets = assets;
+    this.candidate = candidate;
+    this.background = background;
+    this.icon = icon;
+    this.data = data;
+    this.skeletons = Array.from({ length: 6 }, () => new spine.Skeleton(data));
+    this.elapsed = 1.3;
+    this.playing = false;
+    this.draw();
+    this.status();
+  }
+
+  configure(mode, target) {
+    if (this.recordingLoop) return false;
+    this.mode = mode;
+    this.target = Number(target);
+    this.sequence = 0;
+    this.elapsed = 1.3;
+    this.playing = false;
+    this.draw();
+    this.status();
+  }
+
+  setLooping(enabled = true, seconds = 2) {
+    if (this.recordingLoop) return false;
+    if (!Number.isFinite(seconds) || seconds <= 0) throw new RangeError('循环时长须大于0秒');
+    this.autoLoop = Boolean(enabled);
+    this.loopSeconds = seconds;
+    this.stopAfterRound = false;
+    return true;
+  }
+
+  clear() {
+    this.loadId += 1;
+    this.playing = false;
+    this.data = null;
+    this.candidate = null;
+    this.assets?.dispose();
+    this.assets = null;
+    this.ctx.clearRect(0, 0, 720, 1600);
+  }
+
+  play() {
+    if (!this.data || this.recordingLoop) return false;
+    this.stopAfterRound = false;
+    this.elapsed = 0;
+    this.playing = true;
+    this.last = performance.now();
+    this.status();
+    return true;
+  }
+  pause() {
+    if (this.recordingLoop) return false;
+    if (this.autoLoop) { this.playing = false; this.stopAfterRound = false; }
+    else if (this.mode === 'continuous' && this.playing && this.elapsed < 0.64) this.stopAfterRound = true;
+    else this.playing = false;
+    this.status();
+  }
+  reset() { if (this.recordingLoop) return false; this.sequence = 0; this.stopAfterRound = false; this.play(); }
+
+  status() {
+    this.onStatus({ playing: this.playing, mode: this.mode, target: this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target, elapsed: this.elapsed });
+  }
+
+  tick(now) {
+    const delta = Math.min((now - this.last) / 1000, 0.1);
+    this.last = now;
+    if (this.recordingLoop) {
+      // Offline encoding owns every draw. The realtime fallback alone uses RAF.
+      if (!this.offlineEncoding && this.data && this.visible && !document.hidden) {
+        try {
+          this.recordingCheck?.();
+          this.drawLoopFrame(Math.floor((now - this.recordingStarted) * 30 / 1000));
+        } catch (error) { this.recordingAbort?.(error); }
+      }
+      requestAnimationFrame(this.tick);
+      return;
+    }
+    if (this.data && this.visible && !document.hidden) {
+      if (this.playing) {
+        this.elapsed += delta;
+        const roundSeconds = this.autoLoop ? this.loopSeconds : 1.4;
+        if (this.elapsed >= roundSeconds) {
+          if ((this.autoLoop || this.mode === 'continuous') && !this.stopAfterRound) {
+            this.sequence += 1;
+            this.elapsed = this.autoLoop ? this.elapsed % roundSeconds : 0;
+          } else {
+            this.elapsed = roundSeconds;
+            this.playing = false;
+            this.stopAfterRound = false;
+          }
+          this.status();
+        }
+      }
+      if (this.recording || this.playing || this.elapsed >= 1.4 && this.wasPlaying) this.draw();
+      this.wasPlaying = this.playing;
+    }
+    requestAnimationFrame(this.tick);
+  }
+
+  draw(time = this.elapsed) {
+    if (!this.data) return;
+    const purple = previewGrade(this.candidate) === 'purple';
+    const gl = this.gl;
+    gl.viewport(0, 0, 720, 1600);
+    gl.clearColor(0, 0, 0, 0);
+    gl.clear(gl.COLOR_BUFFER_BIT);
+    const ctx = this.ctx;
+    ctx.clearRect(0, 0, 720, 1600);
+    ctx.drawImage(this.background, 0, 0, 720, 1600);
+    // The supplied background has a rasterized old title. Replace its title area.
+    const titleFill = ctx.createLinearGradient(0, 418, 0, 515);
+    titleFill.addColorStop(0, purple ? '#b75bf6' : '#76c64e');
+    titleFill.addColorStop(1, purple ? '#bd74ed' : '#91d071');
+    ctx.fillStyle = titleFill;
+    ctx.beginPath();
+    ctx.roundRect(290, 420, 244, 96, 12);
+    ctx.fill();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.font = '900 32px Arial, "PingFang SC", sans-serif';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = purple ? '#6c2ba3' : '#337731';
+    const title = this.candidate.name.length > 10 ? this.candidate.name.slice(0, 10) + '…' : this.candidate.name;
+    ctx.strokeText(title, 409, 452, 232);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(title, 409, 452, 232);
+    ctx.font = '700 21px Arial, "PingFang SC", sans-serif';
+    ctx.fillText(purple ? '紫色等级' : '绿色等级', 409, 490);
+    ctx.drawImage(this.icon, 65, 335, 240, 240);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(259, 520, 23, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#343b45'; ctx.beginPath(); ctx.moveTo(253, 509); ctx.lineTo(253, 531); ctx.lineTo(270, 520); ctx.closePath(); ctx.fill();
+
+    const all = this.mode === 'all';
+    const selected = this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target;
+    this.scene.begin();
+    for (let index = 0; index < (all ? 6 : 1); index++) {
+      const skeleton = this.skeletons[index];
+      const point = all ? index + 1 : selected;
+      skeleton.setToSetupPose();
+      const animation = this.data.findAnimation('spin_' + point);
+      animation.apply(skeleton, -1, Math.min(time, animation.duration), false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
+      skeleton.x = all ? [198, 363, 529][index % 3] : 363;
+      skeleton.y = 1600 - (all ? (index < 3 ? 720 : 903) : 810);
+      skeleton.scaleX = skeleton.scaleY = all ? 0.9 : 1.6;
+      skeleton.updateWorldTransform(spine.Physics.update);
+      this.scene.drawSkeleton(skeleton, false);
+    }
+    this.scene.end();
+    ctx.drawImage(this.layer, 0, 0);
+  }
+
+  async record(seconds = 4.2) {
+    this.validateRecording(seconds);
+    this.recording = true;
+    try { return await this.recordRealtime(seconds); }
+    finally { this.recording = false; }
+  }
+
+  validateRecording(seconds) {
+    if (!this.data) throw new Error('请等待资源加载完成');
+    if (document.hidden) throw new Error('当前页面在后台，请保持此页可见后再录制');
+    if (this.recording) throw new Error('正在录制视频，请等待完成');
+    if (!Number.isFinite(seconds) || seconds <= 0 || seconds >= 30) throw new Error('录制时长须大于0且小于30秒');
+  }
+
+  drawLoopFrame(frame) {
+    const state = loopFrameState(frame, this.mode, this.target);
+    this.sequence = state.sequence;
+    this.elapsed = state.elapsed;
+    this.draw(state.elapsed);
+    return state;
+  }
+
+  async loopEncoderConfig() {
+    if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return null;
+    for (const hardwareAcceleration of ['prefer-hardware', 'no-preference']) {
+      const config = {
+        codec: 'avc1.420028', width: 720, height: 1600,
+        framerate: 30, bitrate: 6_000_000, hardwareAcceleration,
+        // Quality mode must not drop submitted frames. Baseline AVC has no B frames.
+        latencyMode: 'quality', avc: { format: 'annexb' },
+      };
+      try {
+        const result = await VideoEncoder.isConfigSupported(config);
+        if (result.supported && result.config.avc?.format === 'annexb') return config;
+      } catch {}
+    }
+    return null;
+  }
+
+  async recordLoop(seconds = 6) {
+    this.validateRecording(seconds);
+    const saved = Object.fromEntries(['mode', 'target', 'elapsed', 'sequence', 'playing', 'stopAfterRound', 'wasPlaying'].map(key => [key, this[key]]));
+    const sourceData = this.data, sourceLoad = this.loadId;
+    let encoder, watchdog, abortError, rejectFailure;
+    const failure = new Promise((_, reject) => { rejectFailure = reject; });
+    // Error signals can arrive during a synchronous draw batch, before its await.
+    failure.catch(() => {});
+    const abort = error => {
+      if (!abortError) {
+        abortError = error;
+        this.cancelLoopRecording?.(error);
+        rejectFailure(error);
+      }
+    };
+    const check = () => {
+      if (abortError) throw abortError;
+      if (document.hidden || !this.visible) throw new Error('录制期间页面被切到后台，请保持此页可见后重试');
+      if (this.data !== sourceData || this.loadId !== sourceLoad) throw new Error('录制素材已变化，请重新导出视频');
+    };
+    const checkVisibility = () => { if (document.hidden) abort(new Error('录制期间页面被切到后台，请保持此页可见后重试')); };
+    const wait = operation => Promise.race([operation, failure]);
+    this.recording = true;
+    this.recordingLoop = true;
+    this.offlineEncoding = true;
+    this.playing = false;
+    this.stopAfterRound = false;
+    this.recordingCheck = check;
+    this.recordingAbort = abort;
+    document.addEventListener('visibilitychange', checkVisibility);
+    watchdog = setTimeout(() => abort(new Error('视频录制超时，请重试')), 30_000);
+    try {
+      const config = await wait(this.loopEncoderConfig());
+      check();
+      if (!config) {
+        this.offlineEncoding = false;
+        const blob = await wait(this.recordRealtime(seconds, true));
+        check();
+        return blob;
+      }
+      const chunks = [];
+      let lastTimestamp = -1;
+      encoder = new VideoEncoder({
+        output: chunk => {
+          if (abortError) return;
+          if (chunk.timestamp <= lastTimestamp || (!chunks.length && chunk.type !== 'key')) {
+            abort(new Error('视频编码帧顺序异常，请重试'));
+            return;
+          }
+          lastTimestamp = chunk.timestamp;
+          const bytes = new Uint8Array(chunk.byteLength);
+          chunk.copyTo(bytes);
+          chunks.push(bytes);
+        },
+        error: () => abort(new Error('视频编码失败，请重试')),
+      });
+      encoder.configure(config);
+      const frames = Math.round(seconds * 30);
+      for (let index = 0; index < frames; index++) {
+        check();
+        const state = this.drawLoopFrame(index);
+        const frame = new VideoFrame(this.canvas, { timestamp: state.timestamp, duration: state.duration });
+        try { encoder.encode(frame, { keyFrame: index % 60 === 0 }); }
+        finally { frame.close(); }
+        // Bound in-flight frames and yield without waiting for video wall time.
+        if (encoder.encodeQueueSize >= 4) await wait(encoder.flush());
+        if (index % 8 === 7) await wait(new Promise(resolve => setTimeout(resolve, 0)));
+      }
+      await wait(encoder.flush());
+      check();
+      if (chunks.length !== frames) throw new Error('视频编码帧数不完整，请重试');
+      return new Blob(chunks, { type: 'video/h264' });
+    } finally {
+      clearTimeout(watchdog);
+      document.removeEventListener('visibilitychange', checkVisibility);
+      if (encoder && encoder.state !== 'closed') encoder.close();
+      this.recording = false;
+      this.recordingLoop = false;
+      this.offlineEncoding = false;
+      this.recordingCheck = this.recordingAbort = null;
+      if (this.data === sourceData && this.loadId === sourceLoad) {
+        Object.assign(this, saved);
+        this.last = performance.now();
+        this.draw();
+        this.status();
+      }
+    }
+  }
+
+  async recordRealtime(seconds, loop = false) {
+    if (typeof MediaRecorder === 'undefined' || typeof this.canvas.captureStream !== 'function') throw new Error('当前浏览器不支持视频录制，请使用 Chrome');
+    const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/mp4', 'video/webm'].find(type => MediaRecorder.isTypeSupported(type));
+    if (!mime) throw new Error('当前浏览器没有可用的视频编码器');
+    let stream, recorder, stopTimer, watchdog, checkVisibility;
+    try {
+      if (loop) this.drawLoopFrame(0);
+      stream = this.canvas.captureStream(30);
+      recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+      return await new Promise((resolve, reject) => {
+        const chunks = [];
+        let settled = false, stopRequested = false;
+        const fail = error => {
+          if (settled) return;
+          settled = true;
+          reject(error);
+          try { if (recorder.state !== 'inactive') recorder.stop(); } catch {}
+        };
+        if (loop) this.cancelLoopRecording = fail;
+        recorder.ondataavailable = event => { if (!settled && event.data.size) chunks.push(event.data); };
+        recorder.onerror = () => fail(new Error('视频录制失败'));
+        recorder.onstop = () => {
+          if (settled) return;
+          if (!stopRequested) return fail(new Error('视频录制意外中断，请重试'));
+          settled = true;
+          resolve(new Blob(chunks, { type: mime }));
+        };
+        checkVisibility = () => {
+          if (document.hidden) fail(new Error('录制期间页面被切到后台，请保持此页可见后重试'));
+        };
+        document.addEventListener('visibilitychange', checkVisibility);
+        if (loop) this.recordingStarted = performance.now();
+        else this.reset();
+        recorder.start(250);
+        stopTimer = setTimeout(() => {
+          if (settled) return;
+          if (recorder.state === 'inactive') return fail(new Error('视频录制意外中断，请重试'));
+          stopRequested = true;
+          try { recorder.stop(); } catch { fail(new Error('视频录制失败')); }
+        }, seconds * 1000);
+        watchdog = setTimeout(() => fail(new Error('视频录制超时，请重试')), 30_000);
+      });
+    } finally {
+      clearTimeout(stopTimer);
+      clearTimeout(watchdog);
+      if (checkVisibility) document.removeEventListener('visibilitychange', checkVisibility);
+      if (recorder) {
+        recorder.ondataavailable = recorder.onerror = recorder.onstop = null;
+        try { if (recorder.state !== 'inactive') recorder.stop(); } catch {}
+      }
+      stream?.getTracks().forEach(track => track.stop());
+      if (loop) this.cancelLoopRecording = null;
+    }
+  }
+}

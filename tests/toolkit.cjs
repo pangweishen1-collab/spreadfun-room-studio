@@ -5,7 +5,7 @@ const path=require('node:path');
 const vm=require('node:vm');
 const elements=new Map(),storage=new Map(),links=[];
 const events=[],feedback=[],reveals=[],activations=[],players=[],encodes=[],zips=[];
-let giftActivations=0,giftLanguageSyncs=0;
+let giftActivations=0,giftLanguageSyncs=0,reducedMotion=false,intersectionCallback=null;
 const latestFeedback=()=>feedback.at(-1);
 const recorded=type=>events.filter(event=>event.tool==='avatar'&&event.type===type).reduce((total,event)=>total+event.count,0);
 let nextVideo=null,parseFails=false,encodeFails=false,downloadClicks=0,holdParser=false,pendingParser=null,holdRenderers=false;
@@ -39,7 +39,7 @@ class MockPlayer {
 }
 class MockZip{constructor(){this.files=[];zips.push(this)}file(name,blob){this.files.push({name,blob});return this}async generateAsync(options){this.options=options;if(holdZip)await holdZip;if(zipFails)throw Error('zip failed');return new Blob(['zip'],{type:'application/zip'})}static async loadAsync(){return {file(name){return name==='movie.spec'?{async:async()=>JSON.stringify({movie:{},images:{}})}:{}}}}}
 const video=()=>({videoSize:{width:320,height:320},frames:60,FPS:30});
-const sandbox={document:doc,window:{FunWebP:{getMode:()=>compressionMode},addEventListener(){},FunToolkitUI:{setState(tool,value){assert.equal(tool,'avatar');feedback.push({...value})},reveal(target){reveals.push(target)},activate(tool){activations.push(tool)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},location:{hash:'#avatar-frames'},language:'en',localStorage:{getItem:k=>storage.get(k)},SVGA:{Player:MockPlayer,Parser:class{load(file,success,failure){const complete=()=>parseFails?failure(Error('bad')):success(file.video||nextVideo||video());if(holdParser)pendingParser=complete;else queueMicrotask(complete)}}},JSZip:MockZip,ResizeObserver:class{observe(){}},IntersectionObserver:class{observe(){}},performance,URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},Blob,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,setTimeout,clearTimeout,matchMedia:()=>({matches:false,addEventListener(){}}),canvasToWebP:async(...args)=>{assert.equal(args.length,2,'WebP export snapshots the shared compression profile');assert.ok(['high','lossless'].includes(args[1].mode));webpModes.push(args[1].mode);encodes.push({width:args[0].width,height:args[0].height,mode:args[1].mode,video:players[1]?.video,frame:players[1]?.lastFrame});if(holdEncode)await holdEncode;if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['test-'+encodes.length],{type:'image/webp'})},setLanguage(value){sandbox.language=value}};
+const sandbox={document:doc,window:{FunWebP:{getMode:()=>compressionMode},addEventListener(){},FunToolkitUI:{setState(tool,value){assert.equal(tool,'avatar');feedback.push({...value})},reveal(target){reveals.push(target)},activate(tool){activations.push(tool)}},Hub:{record(tool,type,count=1){events.push({tool,type,count})}}},location:{hash:'#avatar-frames'},language:'en',localStorage:{getItem:k=>storage.get(k)},SVGA:{Player:MockPlayer,Parser:class{load(file,success,failure){const complete=()=>parseFails?failure(Error('bad')):success(file.video||nextVideo||video());if(holdParser)pendingParser=complete;else queueMicrotask(complete)}}},JSZip:MockZip,ResizeObserver:class{observe(){}},IntersectionObserver:class{constructor(callback){intersectionCallback=callback}observe(){}},performance,URL:{createObjectURL:()=> 'blob:test',revokeObjectURL(){}},Blob,Uint8Array,Number,Math,Array,Object,Promise,Error,String,Date,setTimeout,clearTimeout,matchMedia:()=>({matches:reducedMotion,addEventListener(){}}),canvasToWebP:async(...args)=>{assert.equal(args.length,2,'WebP export snapshots the shared compression profile');assert.ok(['high','lossless'].includes(args[1].mode));webpModes.push(args[1].mode);encodes.push({width:args[0].width,height:args[0].height,mode:args[1].mode,video:players[1]?.video,frame:players[1]?.lastFrame});if(holdEncode)await holdEncode;if(encodeFails||encodes.length===failEncodeAt)throw Error('encode failed');return new Blob(['test-'+encodes.length],{type:'image/webp'})},setLanguage(value){sandbox.language=value}};
 sandbox.window.SVGA=sandbox.SVGA;sandbox.window.JSZip=sandbox.JSZip;
 sandbox.window.Hub.activate=()=>{};sandbox.window.Hub.syncLanguage=()=>{};
 sandbox.window.GiftPreviewTool={activate(){assert.equal(get('#giftPreviewTool').classList.contains('hidden'),false,'gift activates after its page is visible');giftActivations++},syncLanguage(){giftLanguageSyncs++}};
@@ -64,8 +64,8 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   assert.equal(latestFeedback().phase,'ready');assert.equal(reveals.length,2,'newly imported player and first-frame preview reveal once');
   sandbox.language='en';api.syncLanguage();assert.equal(reveals.length,2,'language updates do not replay the preview reveal');
   assert.equal(api.state.video.frames,60);assert.equal(api.state.loading,false);assert.equal(get('#frameDownload').disabled,false);
-  // With ordinary motion preferences, initial and replacement uploads still wait for Play.
-  assert.equal(api.state.frame,0);assert.equal(get('#svgaFrameNumber').value,1);assert.equal(api.state.playing,false);
+  // Successful visible uploads loop automatically; frame editing and export still pause.
+  assert.equal(api.state.frame,0);assert.equal(get('#svgaFrameNumber').value,1);assert.equal(api.state.playing,true);
   assert.equal(events.length,0,'upload and first-frame preview must not count');
   const hiddenStepsBeforeExport=players[1].steps.length;
   const firstExport=api.exportFrame();assert.equal(latestFeedback().phase,'processing');assert.equal(get('#frameDownload')['aria-busy'],'true');assert.equal(get('#svgaUpload')['aria-busy'],'false');
@@ -74,9 +74,9 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   assert.equal(players[1].steps.length,hiddenStepsBeforeExport,'240px export reuses the exact paused preview rather than re-rendering its hidden canvas');
   get('#svgaPlay').fire('click');assert.equal(api.state.playing,true);
   await api.loadSvga([{...file,name:'replacement.svga'}],{replace:true});
-  assert.equal(api.state.frame,0);assert.equal(get('#svgaFrameNumber').value,1);assert.equal(api.state.playing,false);assert.equal(get('#frameDownload').disabled,false);
+  assert.equal(api.state.frame,0);assert.equal(get('#svgaFrameNumber').value,1);assert.equal(api.state.playing,true);assert.equal(get('#frameDownload').disabled,false);
   const revealsAfterReplacement=reveals.length;
-  get('#svgaPlay').fire('click');assert.equal(api.state.playing,true);
+  get('#svgaPlay').fire('click');assert.equal(api.state.playing,false);get('#svgaPlay').fire('click');assert.equal(api.state.playing,true);
   const hiddenStepsBeforeSeek=players[1].steps.length;
   api.seek(27);assert.equal(players[1].steps.length,hiddenStepsBeforeSeek+1,'seeking renders only the new frame');assert.equal(reveals.length,revealsAfterReplacement,'playing and scrubbing frames never restart reveal motion');assert.equal(api.state.frame,27);assert.equal(get('#svgaFrameNumber').value,28);assert.equal(api.state.playing,false);
   api.togglePlayback();assert.equal(api.state.playing,true);get('#svgaFrameNumber').fire('focus');assert.equal(api.state.playing,false);
@@ -110,7 +110,7 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   }
   assert.equal(elements.has('#homeTool'),false);assert.equal(elements.has('#statisticsTool'),false);assert.equal(elements.has('#footerStatistics'),false,'routing no longer depends on removed page elements');
   sandbox.location.hash='#avatar-frames';api.activateTool();assert.equal(api.state.frame,27);assert.equal(get('#avatarTool').classList.contains('hidden'),false);assert.equal(links[1]['aria-current'],'page');
-  await docListeners.get('drop')({target:get('#frameDownload'),dataTransfer:{files:[file]},preventDefault(){}});assert.equal(api.state.file,file);assert.equal(api.state.frame,0);assert.equal(api.state.playing,false);
+  await docListeners.get('drop')({target:get('#frameDownload'),dataTransfer:{files:[file]},preventDefault(){}});assert.equal(api.state.file,file);assert.equal(api.state.frame,0);assert.equal(api.state.playing,true);
   assert.throws(()=>api.validateVideo({videoSize:{width:NaN,height:320},frames:0,FPS:30}));
   assert.equal(recorded('generated'),2);assert.equal(recorded('download'),3,'file failures, route and language changes, and page-wide drops must not count');
   get('#frameWidth').value='2048';api.changeDimension(get('#frameWidth'));const resizedStart=players[1].steps.length;await api.exportFrame();assert.equal(players[1].steps.length,resizedStart+2,'larger exports render at full size, then release the enlarged canvas');assert.equal(api.state.download.endsWith('-2048x2048.webp'),true);
@@ -140,7 +140,7 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   const [firstJob,badJob,secondJob]=api.state.jobs;
   assert.equal(firstJob.video,firstVideo);assert.equal(secondJob.video,secondVideo);assert.equal(badJob.video,null);assert.equal(badJob.error,'loadError');
   assert.equal(api.state.activeId,firstJob.id,'the first valid newly imported animation becomes current');
-  assert.equal(api.state.file,firstFile);assert.equal(api.state.frame,0);assert.equal(api.state.playing,false);
+  assert.equal(api.state.file,firstFile);assert.equal(api.state.frame,0);assert.equal(api.state.playing,true);
   assert.equal(badJob.select.disabled,true,'broken queue rows cannot be selected');assert.equal(badJob.remove.disabled,false,'broken rows remain removable');
   assert.equal(get('#svgaBatchCount').textContent,'3');assert.equal(get('#frameDownloadAll').disabled,false);
   assert.equal(get('#frameDownloadAll').classList.contains('hidden'),false);
@@ -212,5 +212,17 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   assert.equal(api.state.activeId,removeGood.id);assert.equal(api.state.file,secondFile,'deleting the current item continues past a failed adjacent renderer to the next good file');
   assert.equal(api.state.frame,0);assert.equal(get('#frameDownload').disabled,false);
   for(const job of [...api.state.jobs])await api.removeJob(job.id);
-  console.log('PASS: shared empty/loading/processing/ready/success/error feedback, translated async labels, busy controls, one-time preview/result reveals, no scrub reveal, failed-export preservation; navigation/state retention, live FileList, paused first-frame uploads and export, explicit playback, exact frame/Enter, pause-on-edit, bounded seeking, locked dimensions, invalid input, export naming, corrupt-file preservation, language, page-wide drop, successful-only generation/download and retry counts; multi-file queue, per-file frame retention, failed-row isolation, explicit replacement, active deletion, batch ZIP size/mode snapshots, collision-safe names, export locks, partial/all failures, stale-mode rejection, renderer restoration, busy-navigation render guards, renderer-failure replacement/deletion recovery and ZIP retry accounting.');
+  // Upload autoplay has the same route, mode, visibility and motion boundaries as manual playback.
+  await api.loadSvga([firstFile]);assert.equal(api.state.playing,true);assert.equal(players[0].loops,0,'uploads loop using the pinned SDK');
+  const autoSteps=players[0].steps.length;api.syncLanguage();assert.equal(players[0].steps.length,autoSteps,'language changes never restart upload playback');
+  players[0].callback(17);assert.equal(api.state.frame,17);const countsBeforeAutoExport=recorded('generated');await api.exportFrame();assert.equal(api.state.playing,false);assert.match(api.state.download,/-frame-018-/,'export freezes the actual current playback frame');assert.equal(recorded('generated'),countsBeforeAutoExport+1);
+  await api.loadSvga([]);assert.equal(api.state.playing,false,'cancelled uploads do not restart playback');
+  doc.hidden=true;await api.loadSvga([firstFile]);assert.equal(api.state.playing,false,'background uploads stay paused');doc.hidden=false;
+  reducedMotion=true;await api.loadSvga([firstFile]);assert.equal(api.state.playing,false,'reduced motion disables automatic playback');reducedMotion=false;
+  intersectionCallback([{isIntersecting:false}]);await api.loadSvga([firstFile]);assert.equal(api.state.playing,false,'offscreen uploads stay paused');intersectionCallback([{isIntersecting:true}]);assert.equal(api.state.playing,false,'returning onscreen does not override a paused preview');
+  sandbox.window.AvatarCustom={isSelected:()=>true};await api.loadSvga([firstFile]);assert.equal(api.state.playing,false,'custom tab uploads cannot start the old image player');sandbox.window.AvatarCustom=null;
+  holdParser=true;const hiddenRouteUpload=api.loadSvga([firstFile]);await new Promise(resolve=>setTimeout(resolve,0));sandbox.location.hash='#room-backgrounds';api.activateTool();holdParser=false;pendingParser();pendingParser=null;await hiddenRouteUpload;assert.equal(api.state.playing,false,'leaving the route before parsing completes prevents autoplay');sandbox.location.hash='#avatar-frames';api.activateTool();assert.equal(api.state.playing,false,'route re-entry preserves explicit paused state');
+  await api.loadSvga([firstFile]);assert.equal(api.state.playing,true);intersectionCallback([{isIntersecting:false}]);assert.equal(api.state.playing,false,'leaving the viewport pauses the loop');intersectionCallback([{isIntersecting:true}]);
+  for(const job of [...api.state.jobs])await api.removeJob(job.id);
+  console.log('PASS: shared empty/loading/processing/ready/success/error feedback, translated async labels, busy controls, one-time preview/result reveals, no scrub reveal, failed-export preservation; navigation/state retention, live FileList, guarded upload autoplay and paused exact-frame export, explicit playback, exact frame/Enter, pause-on-edit, bounded seeking, locked dimensions, invalid input, export naming, corrupt-file preservation, language, page-wide drop, successful-only generation/download and retry counts; multi-file queue, per-file frame retention, failed-row isolation, explicit replacement, active deletion, batch ZIP size/mode snapshots, collision-safe names, export locks, partial/all failures, stale-mode rejection, renderer restoration, busy-navigation render guards, renderer-failure replacement/deletion recovery and ZIP retry accounting.');
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -1,0 +1,227 @@
+{
+  "schemaVersion": 2,
+  "updated": "2026-11-03",
+  "source": "Google Fonts official CSS API and google/fonts repository",
+  "subset": "latin",
+  "fonts": [
+    {
+      "label": "Inter",
+      "family": "FT Inter",
+      "weight": 600,
+      "style": "normal",
+      "fallback": "sans-serif",
+      "description": "Clean sans",
+      "file": "inter-variable-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/inter/v20/UcC73FwrK3iLTeHuS_nVMrMxCp50SjIa1ZL7W0Q5nw.woff2",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "inter-OFL.txt",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/OFL.txt",
+      "bytes": 48432,
+      "sha256": "c940764593d0fe5d596be327ca7558855e018039fb78509aa21921fd3644c3e4",
+      "variable": true,
+      "weightRange": [
+        100,
+        900
+      ],
+      "axes": {
+        "wght": {
+          "min": 100,
+          "max": 900
+        }
+      },
+      "metadataSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/inter/METADATA.pb",
+      "syntheticBoldAllowed": false
+    },
+    {
+      "label": "Montserrat",
+      "family": "FT Montserrat",
+      "weight": 600,
+      "style": "normal",
+      "fallback": "sans-serif",
+      "description": "Geometric",
+      "file": "montserrat-variable-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/montserrat/v31/JTUSjIg1_i6t8kCHKm459WlhyyTh89Y.woff2",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Montserrat:wght@100..900&display=swap",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "montserrat-OFL.txt",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/OFL.txt",
+      "bytes": 35508,
+      "sha256": "6438d7b8ea9c7c3992d5e2fd2afdb1ff948570a3ef0bedae76247b51632960ba",
+      "variable": true,
+      "weightRange": [
+        100,
+        900
+      ],
+      "axes": {
+        "wght": {
+          "min": 100,
+          "max": 900
+        }
+      },
+      "metadataSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/montserrat/METADATA.pb",
+      "syntheticBoldAllowed": false
+    },
+    {
+      "label": "Bebas Neue",
+      "family": "FT Bebas Neue",
+      "weight": 400,
+      "style": "normal",
+      "fallback": "sans-serif",
+      "description": "Tall display",
+      "file": "bebasneue-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/bebasneue/v16/JTUSjIg69CK48gW7PXoo9WlhyyTh89Y.woff2",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Bebas%20Neue:wght@400&display=swap",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "bebasneue-OFL.txt",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/bebasneue/OFL.txt",
+      "bytes": 8596,
+      "sha256": "441b026df205d28954f61b6989c7bbd228c0adff42f746a266c6a5d89134bc34",
+      "variable": false,
+      "weightRange": [
+        400,
+        400
+      ],
+      "syntheticBoldAllowed": true
+    },
+    {
+      "label": "Oswald",
+      "family": "FT Oswald",
+      "weight": 600,
+      "style": "normal",
+      "fallback": "sans-serif",
+      "description": "Condensed",
+      "file": "oswald-variable-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/oswald/v57/TK3iWkUHHAIjg752GT8Gl-1PKw.woff2",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Oswald:wght@200..700&display=swap",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "oswald-OFL.txt",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/OFL.txt",
+      "bytes": 28456,
+      "sha256": "c36937da4c39049704f1def587f7837a24ad52d3bfd2d27d3b6eb9f4220b2e3a",
+      "variable": true,
+      "weightRange": [
+        200,
+        700
+      ],
+      "axes": {
+        "wght": {
+          "min": 200,
+          "max": 700
+        }
+      },
+      "metadataSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/oswald/METADATA.pb",
+      "syntheticBoldAllowed": false
+    },
+    {
+      "label": "Playfair Display",
+      "family": "FT Playfair Display",
+      "weight": 600,
+      "style": "normal",
+      "fallback": "serif",
+      "description": "Elegant serif",
+      "file": "playfairdisplay-variable-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/playfairdisplay/v40/nuFiD-vYSZviVYUb_rj3ij__anPXDTzYgEM86xQ.woff2",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Playfair%20Display:wght@400..900&display=swap",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "playfairdisplay-OFL.txt",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/OFL.txt",
+      "bytes": 38460,
+      "sha256": "5d91eb5d522a03081946c44c8ca17c902230dfed5f0f9b5014262135d47b15b2",
+      "variable": true,
+      "weightRange": [
+        400,
+        900
+      ],
+      "axes": {
+        "wght": {
+          "min": 400,
+          "max": 900
+        }
+      },
+      "metadataSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/playfairdisplay/METADATA.pb",
+      "syntheticBoldAllowed": false
+    },
+    {
+      "label": "Cinzel",
+      "family": "FT Cinzel",
+      "weight": 600,
+      "style": "normal",
+      "fallback": "serif",
+      "description": "Classic capitals",
+      "file": "cinzel-variable-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/cinzel/v26/8vIJ7ww63mVu7gt79mT7PkRXMw.woff2",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Cinzel:wght@400..900&display=swap",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "cinzel-OFL.txt",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/OFL.txt",
+      "bytes": 25888,
+      "sha256": "ef95296c778719c3d658a8284d65078100450948851b9114485ada01d9d3d3f8",
+      "variable": true,
+      "weightRange": [
+        400,
+        900
+      ],
+      "axes": {
+        "wght": {
+          "min": 400,
+          "max": 900
+        }
+      },
+      "metadataSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/cinzel/METADATA.pb",
+      "syntheticBoldAllowed": false
+    },
+    {
+      "label": "Pacifico",
+      "family": "FT Pacifico",
+      "weight": 400,
+      "style": "normal",
+      "fallback": "cursive",
+      "description": "Handwritten",
+      "file": "pacifico-400-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/pacifico/v23/FwZY7-Qmy14u9lezJ-6H6MmBp0u-.woff2",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Pacifico:wght@400&display=swap",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "pacifico-OFL.txt",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/pacifico/OFL.txt",
+      "bytes": 22296,
+      "sha256": "1a47a54e53bbfd3cfb4673636eac5edc98a7ecbf36c41340f48086a4f4796b18",
+      "variable": false,
+      "weightRange": [
+        400,
+        400
+      ],
+      "syntheticBoldAllowed": true
+    },
+    {
+      "label": "Orbitron",
+      "family": "FT Orbitron",
+      "weight": 600,
+      "style": "normal",
+      "fallback": "sans-serif",
+      "description": "Futuristic",
+      "file": "orbitron-variable-latin.woff2",
+      "url": "https://fonts.gstatic.com/s/orbitron/v35/yMJRMIlzdpvBhQQL_Qq7dy1biN15.woff2",
+      "cssSource": "https://fonts.googleapis.com/css2?family=Orbitron:wght@400..900&display=swap",
+      "license": "SIL Open Font License 1.1",
+      "licenseFile": "orbitron-OFL.txt",
+      "licenseSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/orbitron/OFL.txt",
+      "bytes": 11768,
+      "sha256": "967b3909a7d6a5cc6365e9947775060fca15efdb62bc70099aef2e7d86e10205",
+      "variable": true,
+      "weightRange": [
+        400,
+        900
+      ],
+      "axes": {
+        "wght": {
+          "min": 400,
+          "max": 900
+        }
+      },
+      "metadataSource": "https://raw.githubusercontent.com/google/fonts/main/ofl/orbitron/METADATA.pb",
+      "syntheticBoldAllowed": false
+    }
+  ],
+  "totalFontBytes": 219404
+}
