@@ -1,8 +1,8 @@
 # Fun Toolkit
 
-当前版本 **1.8.1**（2026-11-03）。全站 WebP 默认「高清压缩」，保留「严格无损」切换；头像框支持多 SVGA 批量生产，VAP 支持画布内上下移动视频、头像与文字 Key 编辑及运行时替换。`vap-inspect.html` 可打开成品并重新绑定资源，普通视频播放器只显示 RGB 与灰度 Alpha 的拼接画面。完整更新和验收范围见 [CHANGELOG.md](CHANGELOG.md)。
+当前版本 **1.9.0**（2026-11-03）。全站 WebP 默认「高清压缩」，保留「严格无损」切换；头像框支持多 SVGA 批量生产、定制文字和金属字体预设；骰子提供本地素材预览及循环视频导出；VAP 支持画布内上下移动视频、头像与文字 Key 编辑及运行时替换。`vap-inspect.html` 可打开成品并重新绑定资源，普通视频播放器只显示 RGB 与灰度 Alpha 的拼接画面。完整更新和验收范围见 [CHANGELOG.md](CHANGELOG.md)。
 
-专为乐趣运营打造的素材处理工作台，包含五个生产工具、资源库与全站共享生产统计。图片在浏览器中处理，正式站由 Cloudflare Pages 提供静态资源，API Worker + D1 保存现有工具统计与需求；本地可用 Python + SQLite 预览服务。
+专为乐趣运营打造的素材处理工作台，包含六个生产工具、资源库与全站共享生产统计。图片在浏览器中处理，正式站由 Cloudflare Pages 提供静态资源，API Worker + D1 保存现有工具统计与需求；本地可用 Python + SQLite 预览服务。
 
 - 房间背景工具：批量图片上传、合成预览、每图每尺寸独立裁切、720 × 1560 / 300 × 480 WebP 与 ZIP 下载。
 - 头像框预览图生产工具：批量读取本地 SVGA，每个文件保留独立选帧；支持播放/暂停、时间轴、上一帧/下一帧、帧号输入、透明 WebP 单帧导出及统一尺寸的批量 ZIP。损坏文件单独提示，可继续添加、替换当前项或移除文件。
@@ -113,6 +113,22 @@ python3 server.py --host 127.0.0.1 --port 8765
 macOS 默认数据文件为 `~/Library/Application Support/Fun Toolkit/toolkit.sqlite3`，位于网站目录之外，不进入 ZIP。可用 `FUN_TOOLKIT_DATA_DIR` 设置私有数据目录，或使用 `python3 server.py --db /absolute/private/path/toolkit.sqlite3` 指定文件；服务器拒绝将数据库放在网站目录内。
 
 接口为 `GET /api/stats`、`POST /api/events` 与 `POST /api/requests`。正式站已由 Cloudflare Worker + D1 提供跨用户累计；单独复制静态页面不包含这项服务。旧使用次数无法追溯。
+
+## 定制头像框
+
+头像框下的「头像框图片／定制头像框」两个子 Tab 居中展示，分别保留会话内的上传内容。原大标题已移除，原多 SVGA 静态帧批量导出仍可使用。
+
+头像框两个页签上传／替换 SVGA 后会自动循环播放；手动暂停和选帧保持有效，导出时暂停，隐藏页面或离开视区也暂停。开启系统「减少动态效果」时保留静止预览。
+
+在「定制头像框」上传一个 SVGA，文字与字体同一行，可编辑颜色、字号、字重和描边宽度／颜色；可直接拖动画面上的文字，方向键逐像素微调，Shift 加速，或一键水平居中。8 款英文字体均本地托管并保留 OFL 许可证：Inter、Montserrat、Bebas Neue、Oswald、Playfair Display、Cinzel、Pacifico、Orbitron。其中 6 款支持原生可变字重，Oswald 上限 700；Bebas Neue、Pacifico 提供常规和浏览器加粗。描边宽度默认 0，范围 0–16px。字体转为 PNG 图层写进 SVGA，播放器无需安装字体。
+
+字体样式预设包含纯色、亮金立体、香槟金、银色金属和玫瑰金。金属效果使用多段反射渐变、细边高光和短距离立体厚度；可继续调整字体、字重、文字颜色和描边，切换预设不改变字号或位置。预览、SVGA 内嵌文字与首帧 WebP 共用同一文字图层，金属效果随文件一起导出。选择纯色只移除金属效果，保留当前颜色与描边。
+
+导出按钮下方不显示额外成品预览或下载列表。点击「导出 SVGA + WebP」直接下载一个 ZIP，包含 `*-custom.svga` 和 `*-preview.webp`。SVGA 保留原尺寸、帧率、时长和动效，文字为上层固定图层；首帧 WebP 从生成的 SVGA 第 0 帧重新渲染，默认 240×240、透明背景，并沿用全站 WebP 编码设置。
+
+SVGA 输出不超过 3,000,000 字节；仅在超限时尝试优化可安全缩放的 PNG 贴图，补偿原图层变换以保留画面位置与尺寸。不删帧或音轨；仍不能压到上限时明确提示，不输出超标文件。支持 SVGA 2.0 protobuf 和标准 ZIP `movie.spec`，旧式 `movie.binary` 双时间线封装目前明确拒绝。SVGA 与 WebP、ZIP 都成功后累计生产 2 个文件，ZIP 下载计 1 次，重试下载不重复计生产。
+
+固定版 SVGAPlayer 2.3.2 的遮罩组切换包含两处局部兼容修复，见 `vendor/SVGA-PATCHES.md`；原 MIT 许可证保留。引擎及状态回归通过 `node tests/avatar-custom-engine.cjs` 和 `node tests/avatar-custom.cjs` 运行。浏览器验收不等同于原生 iOS／Android SDK 真机认证。
 
 ## 头像框工具用法
 

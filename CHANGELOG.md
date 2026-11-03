@@ -1,5 +1,27 @@
 # 更新记录
 
+## 1.9.0 - 2026-11-03
+
+### Avatar frames
+
+- Add centered Frame images / Custom frames tabs while retaining multi-file static-frame exports.
+- Customize SVGA text with eight locally hosted English fonts, weight, fill color, outline and direct canvas positioning.
+- Add editable 3D Gold, Champagne, Silver and Rose gold metallic presets using reflective gradients, bevel highlights and crisp extrusion; preserve a Solid option.
+- Export the actual customized SVGA and its transparent 240×240 first-frame WebP together. Keep the SVGA within 3,000,000 bytes through bounded image optimization; reject files that cannot fit without dropping frames.
+- Start visible SVGA uploads and replacements automatically. Keep manual pause, frame selection, export pausing, background/offscreen safeguards and reduced-motion preferences.
+- Fix the pinned web renderer's matte-group exit so appended text stays above original masked sprites. Preserve third-party licences.
+
+### Dice workbench
+
+- Add the Dice navigation item and a local browser workbench for green and purple dice assets.
+- Preview a two-second loop and export six seconds containing three complete cycles. Package ten original PNG files without altering their pixels.
+- Keep imported assets on the visitor's computer. Preserve the current shared statistics schema without a D1 migration.
+
+### Validation
+
+- Verify customized raw and legacy ZIP SVGA output, original animation records, masked layers, metallic PNG transparency, actual first-frame WebP pixels, desktop and narrow-screen controls.
+- Browser and decoded-artifact checks do not certify native iOS or Android SVGA runtimes; export speed and size depend on the source assets and device.
+
 ## 1.8.1 - 2026-11-03
 
 ### Shared interface
