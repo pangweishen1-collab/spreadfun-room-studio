@@ -103,9 +103,13 @@ const file={name:'ring.svga',size:100,slice:()=>({arrayBuffer:async()=>new Uint8
   sandbox.language='zh';api.syncLanguage();assert.match(latestFeedback().message,/svga/i,'a retained error follows language changes');assert.equal(doc.title,'头像框预览图生产工具 · Fun Toolkit');assert.match(get('#svgaFileMeta').textContent,/60 帧/);
   sandbox.location.hash='#banners';api.activateTool();assert.equal(api.state.active,'banner');assert.equal(activations.at(-1),'banner');assert.equal(doc.title,'Banner 生产工具 · Fun Toolkit');assert.equal(links[2]['aria-current'],'page');assert.equal(get('#bannerTool').classList.contains('hidden'),false);assert.equal(get('#avatarTool').classList.contains('hidden'),true);assert.equal(get('#examplesButton').classList.contains('hidden'),true);
   sandbox.location.hash='#avatar-frames';api.activateTool();assert.equal(api.state.frame,27);
-  sandbox.location.hash='';api.activateTool();assert.equal(api.state.active,'home');assert.equal(get('#homeTool').classList.contains('hidden'),false);assert.equal(get('#avatarTool').classList.contains('hidden'),true);assert.equal(get('#brandHome')['aria-current'],'page');assert.equal(api.state.video,original);assert.equal(api.state.frame,27);
-  sandbox.location.hash='#statistics';api.activateTool();assert.equal(api.state.active,'statistics');assert.equal(get('#statisticsTool').classList.contains('hidden'),false);assert.equal(get('#homeTool').classList.contains('hidden'),true);assert.equal(get('#footerStatistics')['aria-current'],'page');assert.equal(get('#brandHome')['aria-current'],undefined);assert.equal(api.state.video,original);
-  sandbox.location.hash='#avatar-frames';api.activateTool();assert.equal(api.state.frame,27);assert.equal(get('#statisticsTool').classList.contains('hidden'),true);
+  for(const hash of ['','#home','#statistics','#missing-tool']){
+    sandbox.location.hash=hash;api.activateTool();assert.equal(api.state.active,'room','removed hub routes and unknown links fall back to the room tool');
+    assert.equal(get('#roomTool').classList.contains('hidden'),false);assert.equal(get('#avatarTool').classList.contains('hidden'),true);assert.equal(links[0]['aria-current'],'page');assert.equal(links[1]['aria-current'],undefined);assert.equal(doc.title,'房间背景工具 · Fun Toolkit');
+    assert.equal(api.state.video,original);assert.equal(api.state.frame,27,'route fallback keeps the avatar upload and selected frame');
+  }
+  assert.equal(elements.has('#homeTool'),false);assert.equal(elements.has('#statisticsTool'),false);assert.equal(elements.has('#footerStatistics'),false,'routing no longer depends on removed page elements');
+  sandbox.location.hash='#avatar-frames';api.activateTool();assert.equal(api.state.frame,27);assert.equal(get('#avatarTool').classList.contains('hidden'),false);assert.equal(links[1]['aria-current'],'page');
   await docListeners.get('drop')({target:get('#frameDownload'),dataTransfer:{files:[file]},preventDefault(){}});assert.equal(api.state.file,file);assert.equal(api.state.frame,0);assert.equal(api.state.playing,false);
   assert.throws(()=>api.validateVideo({videoSize:{width:NaN,height:320},frames:0,FPS:30}));
   assert.equal(recorded('generated'),2);assert.equal(recorded('download'),3,'file failures, route and language changes, and page-wide drops must not count');

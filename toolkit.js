@@ -12,7 +12,7 @@
   const strings = {
     en: {
       vapNav:'VAP tools',vapTitle:'VAP converter',resourcesNav:'Assets',navResourcesTitle:'Asset library',giftPreviewNav:'Gift images',giftPreviewTitle:'Gift & vehicle preview maker',
-      roomNav:'Room backgrounds',roomNavShort:'Room BG',avatarNav:'Avatar frames',avatarNavShort:'Avatar',examplesNav:'Examples',bannerNav:'Banner',navBannerTitle:'Banner maker',homeTitle:'Operations workspace',statisticsTitle:'Usage statistics',homeLink:'Fun Toolkit home',statisticsLink:'Statistics',designGuidelines:'Design guidelines',designGuidelinesLabel:'Design guidelines (opens in a new tab)',footerResources:'Footer resources',navLabel:'Tools',roomSubtitle:'Create room backgrounds in two sizes, ready to use.',
+      roomNav:'Room backgrounds',roomNavShort:'Room BG',avatarNav:'Avatar frames',avatarNavShort:'Avatar',examplesNav:'Examples',bannerNav:'Banner',navBannerTitle:'Banner maker',homeLink:'Fun Toolkit · Room backgrounds',designGuidelinesShort:'Guide',designGuidelines:'Design guidelines',designGuidelinesLabel:'Design guidelines (opens in a new tab)',footerResources:'Footer resources',navLabel:'Tools',roomSubtitle:'Create room backgrounds in two sizes, ready to use.',
       avatarTitle:'Avatar frame preview maker',avatarSubtitle:'Drop an SVGA, find your frame, export a transparent WebP.',animationPreview:'Animation preview',
       noFile:'No file selected',loading:'Loading animation…',playing:'Playing',paused:'Paused',dropSvga:'Click, drop or paste SVGA files',svgaHint:'Select multiple files and choose a frame for each.',pasteHint:'Paste with ⌘V / Ctrl+V to upload',uploadSvga:'Upload SVGA',replaceSvga:'Replace file',
       play:'Play',pause:'Pause',previousFrame:'Previous frame',nextFrame:'Next frame',frameTimeline:'Frame timeline',scrubHint:'Drag to pause at a frame',currentFrame:'Current frame',localPrivacy:'Processed locally. Your files never leave this device.',
@@ -22,7 +22,7 @@
     },
     zh: {
       vapNav:'VAP工具',vapTitle:'VAP 转换工具',resourcesNav:'资源库',navResourcesTitle:'资源库',giftPreviewNav:'礼物图',giftPreviewTitle:'礼物&座驾预览图生产工具',
-      roomNav:'房间背景',roomNavShort:'房间背景',avatarNav:'头像框',avatarNavShort:'头像框',examplesNav:'案例图片',bannerNav:'Banner',navBannerTitle:'Banner 生产工具',homeTitle:'乐趣运营工作台',statisticsTitle:'使用统计',homeLink:'Fun Toolkit 首页',statisticsLink:'使用统计',designGuidelines:'设计规范',designGuidelinesLabel:'设计规范（在新标签页打开）',footerResources:'页脚资源',navLabel:'工具导航',roomSubtitle:'一次上传，生成两种尺寸的房间背景。',
+      roomNav:'房间背景',roomNavShort:'房间背景',avatarNav:'头像框',avatarNavShort:'头像框',examplesNav:'案例图片',bannerNav:'Banner',navBannerTitle:'Banner 生产工具',homeLink:'Fun Toolkit · 房间背景',designGuidelinesShort:'规范',designGuidelines:'设计规范',designGuidelinesLabel:'设计规范（在新标签页打开）',footerResources:'页脚资源',navLabel:'工具导航',roomSubtitle:'一次上传，生成两种尺寸的房间背景。',
       avatarTitle:'头像框预览图生产工具',avatarSubtitle:'拖入 SVGA，停在喜欢的一帧，导出透明 WebP。',animationPreview:'动态预览',
       noFile:'尚未选择文件',loading:'正在读取动画…',playing:'播放中',paused:'已暂停',dropSvga:'点击、拖入或粘贴多个 SVGA 文件',svgaHint:'可一次添加多个文件，分别选择需要的帧。',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',uploadSvga:'上传 SVGA',replaceSvga:'替换文件',
       play:'播放',pause:'暂停',previousFrame:'上一帧',nextFrame:'下一帧',frameTimeline:'帧时间轴',scrubHint:'拖动即可停在指定帧',currentFrame:'当前帧',localPrivacy:'文件仅在本地处理，不会上传至服务器。',
@@ -44,7 +44,7 @@
   window.JSZipUtils=window.JSZipUtils||{};
   const exportHost=document.createElement('div');exportHost.setAttribute('aria-hidden','true');exportHost.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;visibility:hidden';document.body.append(exportHost);
   const t=key=>(strings[language]||strings.en)[key]||key;
-  const currentTool=()=>({'#banners':'banner','#avatar-frames':'avatar','#room-backgrounds':'room','#statistics':'statistics','#gift-previews':'gift-preview','#vap-tools':'vap','#resources':'resources'}[location.hash]||'home');
+  const currentTool=()=>({'#banners':'banner','#avatar-frames':'avatar','#room-backgrounds':'room','#gift-previews':'gift-preview','#vap-tools':'vap','#resources':'resources'}[location.hash]||'room');
   function syncFeedback(){
     const phase=state.loading?'loading':state.exporting?'processing':state.notice||!state.dimensionValid?'error':state.download?'success':state.video?'ready':'empty';
     const message=state.loading?t('loading'):state.exporting?t('exporting'):state.notice?t(state.notice):!state.dimensionValid?t('dimensionError'):state.download?t('saved'):'';
@@ -97,17 +97,15 @@
     if(state.video)$('#svgaFileMeta').textContent=`${t('original')} ${state.video.videoSize.width} × ${state.video.videoSize.height} · ${state.video.frames} ${language==='zh'?'帧':'frames'} · ${state.video.FPS} FPS`;
     renderBatchList();syncControls();syncFrame();syncDownloadResult();window.WebPSettings?.sync();if(window.BannerTool)window.BannerTool.syncLanguage();if(window.Hub)window.Hub.syncLanguage();window.GiftPreviewTool?.syncLanguage();window.ResourceLibrary?.syncLanguage();window.VapTool?.setLanguage(language);window.VapResultPlayer?.setLanguage();updateDocumentTitle();
   }
-  function updateDocumentTitle(){document.title=t(({banner:'navBannerTitle',avatar:'navAvatarTitle',room:'navRoomTitle',home:'homeTitle',statistics:'statisticsTitle','gift-preview':'giftPreviewTitle',resources:'navResourcesTitle',vap:'vapTitle'})[state.active])+' · Fun Toolkit'}
+  function updateDocumentTitle(){document.title=t(({banner:'navBannerTitle',avatar:'navAvatarTitle',room:'navRoomTitle','gift-preview':'giftPreviewTitle',resources:'navResourcesTitle',vap:'vapTitle'})[state.active])+' · Fun Toolkit'}
   function activateTool(){
     const next=currentTool(),changed=next!==state.active;if(next!=='avatar')pause();state.active=next;
     $('#roomTool').classList.toggle('hidden',next!=='room');$('#avatarTool').classList.toggle('hidden',next!=='avatar');$('#bannerTool').classList.toggle('hidden',next!=='banner');
     $('#resourceTool').classList.toggle('hidden',next!=='resources');
     $('#giftPreviewTool').classList.toggle('hidden',next!=='gift-preview');
     $('#vapTool')?.classList.toggle('hidden',next!=='vap');window.VapTool?.setActive(next==='vap');
-    $('#homeTool').classList.toggle('hidden',next!=='home');$('#statisticsTool').classList.toggle('hidden',next!=='statistics');
     window.FunToolkitUI?.activate(next);
     document.querySelectorAll('[data-tool-link]').forEach(link=>{if(link.dataset.toolLink===next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')});
-    for(const [selector,page] of [['#brandHome','home'],['#footerStatistics','statistics']]){const link=$(selector);if(next===page)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')}
     $('#examplesButton').classList.toggle('hidden',next!=='room');updateDocumentTitle();
     if(window.Hub)window.Hub.activate(next);
     if(next==='room')window.RoomWebP?.activate();
