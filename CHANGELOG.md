@@ -1,5 +1,18 @@
 # 更新记录
 
+## 1.8.1 - 2026-11-03
+
+### Shared interface
+
+- Replace the overview and statistics pages with a persistent 40px footer showing the shared production-file total, current version, design guidelines and author entry across all six tools.
+- Open room backgrounds by default and from the logo; old overview and statistics bookmarks fall back to the room tool while preserving uploaded work.
+- Reserve footer space so controls remain reachable at the bottom of the page, keep the footer compact in Chinese and English on narrow screens, and hide the separate browser-local production card.
+
+### Reliability
+
+- Refresh the shared count on tool activation, successful event submission and reconnection; retain the post-write refresh ordering, six-tool validation, event deduplication and unknown-versus-zero states.
+- Inject the shipped footer version from package.json during the build. Verify the full regression suite, all tool routes, desktop and 320px bilingual layouts.
+
 ## 1.8.0 - 2026-11-03
 
 ### Features
