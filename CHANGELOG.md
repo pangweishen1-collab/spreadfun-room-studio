@@ -1,5 +1,18 @@
 # 更新记录
 
+## 1.8.0 - 2026-11-03
+
+### Features
+
+- Add a screen-color eyedropper below the MP4 preview. Pick the exact RGB from the original video and apply it to both transparent preview and VAP export; retain automatic detection as a one-click reset.
+- Pause and reveal the original frame while picking, use a small median sample to reduce codec noise, and ignore preview backgrounds, masks and avatar/text layers. Escape or the picker button cancels without changing the committed color.
+- Support custom gray-green, red, blue and other screen colors through the existing local CPU/Worker pipeline, preserving existing output dimensions and file-size limits.
+
+### Reliability and validation
+
+- Guard pending seeks, loading and conversion; successful source replacement clears the old picked color, while failed or cancelled imports preserve current work. Native VAP and image sequences retain their existing controls.
+- Verify actual gray-green, red, blue and real gradient-screen MP4 exports, original-frame sampling, preview/export consistency, cancellation, mobile layout and offline decoded alpha. Similar foreground and screen colors can still become translucent; this release does not guarantee lossless or perfect matting.
+
 ## 1.7.4 - 2026-11-02
 
 ### VAP resource correctness
