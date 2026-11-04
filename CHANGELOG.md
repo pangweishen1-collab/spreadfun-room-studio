@@ -1,5 +1,14 @@
 # 更新记录
 
+## 1.11.0 - 2026-11-04
+
+### Dice preview
+
+- Generate the green dice roll from six original sz_1–sz_6 faces, with a 1.3× zoom peak and native Spine 4.2 mesh/deform animation; retain the purple ten-image template flow.
+- Include the hidden anchor and supplied base sounds automatically. Keep each grade's preview session, original PNG/MP3 bytes, optional file/folder replacements, and failed-import recovery in the browser.
+- Export a six-second, 180-frame H.264 MP4 with a mono AAC sound track when enabled, capped at 1,000,000 bytes. Green ZIPs include JSON, atlas, attachment images, originals, sound timeline and any current video.
+- Keep sound failures independent of visual preview, provide a silent export switch, use Canvas projection when green WebGL is unavailable, and revalidate dice assets after releases.
+
 ## 1.10.0 - 2026-11-04
 
 ### Custom avatar frames
