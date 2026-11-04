@@ -1,7 +1,7 @@
 // Both upload surfaces share the existing file validation and clipboard parser.
 export function bindDiceUploads({primaryZone, replacementZone, input, primaryButton,
   replacementButton, isBusy, hasPreview, onFiles, isActive = () => true,
-  folderInput, primaryFolderButton, replacementFolderButton, onEmptyFolder = () => {},
+  onDirectory, onError, folderInput, primaryFolderButton, replacementFolderButton, onEmptyFolder = () => {},
   paste = window.UploadPaste, document = window.document}) {
   const cleanups = [];
   const listen = (node, type, handler) => {
@@ -39,7 +39,13 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
     listen(zone, 'drop', event => {
       if (hasFiles(event)) event.preventDefault();
       clearHover(zone);
-      if (active()) return importFiles(event.dataTransfer?.files);
+      if (!active() || isBusy()) return;
+      const transfer=event.dataTransfer;
+      if (Array.from(transfer?.items || []).some(item=>item.webkitGetAsEntry?.()?.isDirectory)) {
+        if (onDirectory) return onDirectory(()=>readDropFiles(transfer));
+        return readDropFiles(transfer).then(importFiles).catch(error=>onError ? onError(error) : Promise.reject(error));
+      }
+      return importFiles(transfer?.files);
     });
     const unregister = paste?.register({zone, isActive:active, isBusy,
       onFiles:files => active() ? importFiles(files) : undefined});
@@ -63,7 +69,7 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
       const files = Array.from(folderInput.files || []);
       folderInput.value = '';
       if (!isActive() || isBusy() || !files.length) return;
-      const pngs = files.filter(file => /\.png$/i.test(file.name)
+      const pngs = files.filter(file => /\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(file.name.normalize('NFKC').trim())
         && !(file.webkitRelativePath || file.name).split(/[/\\]/).some(part => part.startsWith('.')));
       return pngs.length ? importFiles(pngs) : onEmptyFolder();
     });
@@ -76,4 +82,26 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
     cleanups.splice(0).forEach(dispose => dispose());
     [primaryZone, replacementZone].forEach(clearHover);
   };
+}
+
+// Read all directory pages, with one bound shared by file and directory entries.
+export async function readDropFiles(transfer) {
+  const files=[], roots=Array.from(transfer.items||[]).map(item=>item.webkitGetAsEntry?.()).filter(Boolean);
+  if (!roots.length) return Array.from(transfer.files||[]);
+  let count=0;
+  const bounded = operation => new Promise((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error('文件夹读取超时，请重新选择素材目录')),8000);
+    operation.then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
+  });
+  const visit = async entry => {
+    if (++count>512) throw new Error('文件夹内容过多，请直接选择这一套骰子素材目录');
+    if (entry.name.startsWith('.') || entry.name==='__MACOSX') return;
+    if (entry.isFile) files.push(await bounded(new Promise((resolve,reject)=>entry.file(resolve,reject))));
+    else if (entry.isDirectory) {
+      const reader=entry.createReader();
+      for (;;) { const page=await bounded(new Promise((resolve,reject)=>reader.readEntries(resolve,reject))); if(!page.length) break; for(const child of page) await visit(child); }
+    }
+  };
+  for (const root of roots) await visit(root);
+  return files.filter(file=>/\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(file.name.normalize('NFKC').trim()));
 }

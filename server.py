@@ -23,7 +23,7 @@ EVENT_TYPES = ("generated", "download")
 MAX_BODY = 16 * 1024
 STATIC_EXTENSIONS = {
     ".html", ".css", ".js", ".mjs", ".wasm", ".webp", ".png", ".jpg",
-    ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".svga", ".skel", ".atlas",
+    ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2", ".ttf", ".otf", ".svga", ".skel", ".atlas", ".mp3",
 }
 
 
@@ -169,6 +169,11 @@ class ToolkitHandler(SimpleHTTPRequestHandler):
     def setup(self):
         super().setup()
         self.connection.settimeout(30)
+
+    def end_headers(self):
+        if not self.path.startswith("/api"):
+            self.send_header("Cache-Control", "no-store")
+        super().end_headers()
 
     def log_message(self, format, *args):
         # Never log client IPs, user file names, query strings, or submitted request content.

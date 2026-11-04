@@ -1,4 +1,5 @@
 import { VIDEO_SPEC } from './video-export.mjs';
+import { CanvasSpineRenderer } from './six-face/canvas-spine.mjs';
 
 const loadImage = src => new Promise((resolve, reject) => {
   const image = new Image();
@@ -21,6 +22,7 @@ const loadBackground = candidate => {
   return backgroundImages.get(src);
 };
 const sameAssets = (current, next) => current && next &&
+  current.kind === next.kind &&
   ['skel', 'atlas', 'texture', 'atlasPage'].every(key => current[key] === next[key]) &&
   current.png?.['大骰子'] === next.png?.['大骰子'];
 
@@ -44,13 +46,19 @@ export class GameRenderer {
     this.layer = document.createElement('canvas');
     this.layer.width = 720;
     this.layer.height = 1600;
-    this.context = new spine.ManagedWebGLRenderingContext(this.layer, { alpha: true, preserveDrawingBuffer: true, antialias: true });
+    try { this.context = new spine.ManagedWebGLRenderingContext(this.layer, { alpha: true, preserveDrawingBuffer: true, antialias: true });
     this.gl = this.context.gl;
     this.scene = new spine.SceneRenderer(this.layer, this.context);
     this.scene.camera.viewportWidth = 720;
     this.scene.camera.viewportHeight = 1600;
     this.scene.camera.position.set(360, 800, 0);
     this.scene.camera.update();
+    } catch { this.context = this.gl = this.scene = null; }
+    if (!this.ctx) throw new Error('浏览器无法创建预览画布');
+    this.layer.addEventListener?.('webglcontextlost', event => {
+      event.preventDefault(); this.gpuLost = true;
+      if (this.candidate?.kind !== 'six-face') this.pause();
+    });
     this.onStatus = onStatus;
     this.mode = 'all';
     this.target = 1;
@@ -69,29 +77,55 @@ export class GameRenderer {
     document.addEventListener('visibilitychange', () => { this.last = performance.now(); });
   }
 
+  get visible() { return this._visible; }
+  set visible(value) { this._visible=Boolean(value); if (!value) this.onStatus?.({playing:false}); }
+
   async load(candidate) {
     const id = ++this.loadId;
     const presentationId = ++this.presentationId;
-    const assets = new spine.AssetManager(this.context);
-    assets.loadBinary(candidate.skel);
-    assets.loadTextureAtlas(candidate.atlas, undefined, undefined, candidate.atlasPage ? {[candidate.atlasPage]:candidate.texture} : undefined);
-    await assets.loadAll();
-    if (assets.hasErrors()) throw new Error('动画资源加载失败：' + JSON.stringify(assets.getErrors()));
-    const atlas = assets.require(candidate.atlas);
-    const binary = new spine.SkeletonBinary(new spine.AtlasAttachmentLoader(atlas));
-    const data = binary.readSkeletonData(assets.require(candidate.skel));
-    const [background, icon] = await Promise.all([
-      loadBackground(candidate),
-      loadImage(candidate.png['大骰子']),
-    ]);
-    if (id !== this.loadId || presentationId !== this.presentationId) { assets.dispose(); return false; }
-    this.assets?.dispose();
-    this.assets = assets;
-    this.candidate = candidate;
-    this.background = background;
-    this.icon = icon;
-    this.data = data;
-    this.skeletons = Array.from({ length: 6 }, () => new spine.Skeleton(data));
+    let assets, software, data;
+    try {
+      let atlas, texture;
+      if (candidate.kind === 'six-face') {
+        const [text, image] = await Promise.all([
+          fetch(candidate.atlas).then(r => { if (!r.ok) throw new Error('图集读取失败'); return r.text(); }),
+          loadImage(candidate.texture),
+        ]);
+        atlas = new spine.TextureAtlas(text); texture = image;
+        if (this.context && !this.gpuLost) {
+          const gpu = new spine.GLTexture(this.context, image, false);
+          for (const page of atlas.pages) page.setTexture(gpu);
+          assets = {dispose:() => gpu.dispose()};
+        } else {
+          // Canvas projection uses the same JSON/atlas and the same six result faces.
+          for (const page of atlas.pages) { page.width = image.naturalWidth; page.height = image.naturalHeight; }
+          for (const region of atlas.regions) region.updateUVs?.();
+          assets = {dispose() {}};
+        }
+        data = new spine.SkeletonJson(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(candidate.json);
+        software = new CanvasSpineRenderer(atlas, texture, {width:720,height:1600});
+      } else {
+        if (!this.context || this.gpuLost) throw new Error('紫色动画需要 WebGL，请刷新或使用最新版 Chrome');
+        assets = new spine.AssetManager(this.context);
+        assets.loadBinary(candidate.skel);
+        assets.loadTextureAtlas(candidate.atlas, undefined, undefined, candidate.atlasPage ? {[candidate.atlasPage]:candidate.texture} : undefined);
+        await assets.loadAll();
+        if (assets.hasErrors()) throw new Error('动画资源加载失败：' + JSON.stringify(assets.getErrors()));
+        atlas = assets.require(candidate.atlas);
+        data = new spine.SkeletonBinary(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(assets.require(candidate.skel));
+      }
+      const [background, icon] = await Promise.all([
+        loadBackground(candidate), loadImage(candidate.icon || candidate.png['大骰子'] || candidate.png.sz_1),
+      ]);
+      if (id !== this.loadId || presentationId !== this.presentationId) { assets?.dispose(); software?.dispose(); return false; }
+      const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons};
+      Object.assign(this, {assets, software, candidate, background, icon, data,
+        skeletons:Array.from({length:6}, () => new spine.Skeleton(data))});
+      try { this.draw(); }
+      catch (error) { Object.assign(this, previous); throw error; }
+      previous.assets?.dispose(); previous.software?.dispose();
+    } catch (error) { assets?.dispose(); software?.dispose(); throw error; }
+
     this.elapsed = 1.3;
     this.playing = false;
     this.draw();
@@ -142,6 +176,7 @@ export class GameRenderer {
     this.candidate = null;
     this.assets?.dispose();
     this.assets = null;
+    this.software?.dispose(); this.software = null;
     this.ctx.clearRect(0, 0, 720, 1600);
   }
 
@@ -206,10 +241,11 @@ export class GameRenderer {
   draw(time = this.elapsed) {
     if (!this.data) return;
     const purple = previewGrade(this.candidate) === 'purple';
+    const gpu = this.context && !this.gpuLost && !this.gl.isContextLost?.();
     const gl = this.gl;
-    gl.viewport(0, 0, 720, 1600);
+    if (gpu) { gl.viewport(0, 0, 720, 1600);
     gl.clearColor(0, 0, 0, 0);
-    gl.clear(gl.COLOR_BUFFER_BIT);
+    gl.clear(gl.COLOR_BUFFER_BIT); }
     const ctx = this.ctx;
     ctx.clearRect(0, 0, 720, 1600);
     ctx.drawImage(this.background, 0, 0, 720, 1600);
@@ -238,7 +274,7 @@ export class GameRenderer {
 
     const all = this.mode === 'all';
     const selected = this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target;
-    this.scene.begin();
+    if (gpu) this.scene.begin();
     for (let index = 0; index < (all ? 6 : 1); index++) {
       const skeleton = this.skeletons[index];
       const point = all ? index + 1 : selected;
@@ -247,12 +283,19 @@ export class GameRenderer {
       animation.apply(skeleton, -1, Math.min(time, animation.duration), false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
       skeleton.x = all ? [198, 363, 529][index % 3] : 363;
       skeleton.y = 1600 - (all ? (index < 3 ? 720 : 903) : 810);
-      skeleton.scaleX = skeleton.scaleY = all ? 0.9 : 1.6;
+      if (this.candidate.kind === 'six-face') {
+        const {crop,sourceSize,cropOffset} = this.candidate.geometry;
+        const ratio = Math.max(crop[2],crop[3])/sourceSize;
+        const size = (all ? 172 : 300) * Math.min(1,.655/ratio);
+        skeleton.scaleX = skeleton.scaleY = size/200;
+        skeleton.x -= cropOffset[0]*size/sourceSize;
+        skeleton.y += cropOffset[1]*size/sourceSize;
+      } else skeleton.scaleX = skeleton.scaleY = all ? 0.9 : 1.6;
       skeleton.updateWorldTransform(spine.Physics.update);
-      this.scene.drawSkeleton(skeleton, false);
+      if (gpu) this.scene.drawSkeleton(skeleton, false);
+      else this.software?.draw(ctx, skeleton, 1600);
     }
-    this.scene.end();
-    ctx.drawImage(this.layer, 0, 0);
+    if (gpu) { this.scene.end(); ctx.drawImage(this.layer, 0, 0); }
   }
 
   async record(seconds = 4.2) {

@@ -21,7 +21,7 @@ function png(size,alpha=255) {
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',deflateSync(pixels)),chunk('IEND')]);
 }
 const files=SLOTS.map(slot=>({name:slot==='大骰子'?'icon.png':slot+'.png',data:'data:image/png;base64,'+png(slot==='大骰子'?240:200).toString('base64')}));
-const payload={name:'仙人掌',grade:'green',mode:'all',point:1,composition:'auto',files};
+const payload={name:'仙人掌旧十图',grade:'purple',mode:'all',point:1,composition:'auto',files};
 function memoryStore() {
   const records=new Map();return {records,fail:false,writes:0,
     async get(id){return structuredClone(records.get(id));},
@@ -41,6 +41,7 @@ async function zipFactory() {
 }
 const storage=memoryStore(),urlBlobs=new Map();let serial=0,renders=0,smallDigits=false,blockVideo=null,preparedSize=null;
 const dependencies={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvailable:true,
+  fetchAsset:async path=>new Blob([path.endsWith('.png')?png(30):Buffer.from('ID3-default-audio')],{type:path.endsWith('.png')?'image/png':'audio/mpeg'}),
   createObjectURL:blob=>{const url='blob:fixture-'+(++serial);urlBlobs.set(url,blob);return url;},revokeObjectURL:url=>urlBlobs.delete(url),zipFactory,
   decodePNG:async(blob,name)=>({alphaArea:smallDigits&&/^sz_[1-6]/.test(name)?1200:16000,close(){}}),
   renderRuntime:async(files,composition)=>{renders++;assert.equal(files.length,10);assert.ok(['faces','digits'].includes(composition));return{texture:new Blob([png(612)],{type:'image/png'}),atlasText:atlasText()};},
@@ -56,8 +57,8 @@ for(const [entries,key] of [[files.slice(1),'missing'],[[...files,{name:'extra.p
 assert.throws(()=>validateSettings({...payload,point:true}));assert.throws(()=>validateSettings(null));
 for(const invalid of [{mode:'unknown'},{point:0},{point:7},{point:null}])assert.throws(()=>validateSettings({...payload,...invalid}));
 for(const mode of ['all','single','continuous'])assert.deepEqual(
-  validateSettings({...payload,mode,point:6}),{name:'仙人掌',grade:'green',mode:'all',point:1,composition:'auto'});
-assert.equal(VIDEO_PROFILE,'loop6-v3-1mb');
+  validateSettings({...payload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',mode:'all',point:1,composition:'auto',soundEnabled:true});
+assert.equal(VIDEO_PROFILE,'loop6-v4-audio-1mb');
 assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_000_000);
 assert.equal(inspectPNG(new Uint8Array(png(200)),'sz_0').width,200);
 const corrupted=new Uint8Array(png(200));corrupted[40]^=1;assert.throws(()=>inspectPNG(corrupted,'sz_0'));
@@ -68,26 +69,28 @@ checks.push('canonical_alias_missing_extra_duplicates_png_crc_dimensions_setting
 
 const first=await post('/api/preview/import',payload);
 assert.equal(first.revision,1);assert.equal(first.resolvedComposition,'faces');assert.equal(first.candidate.template,'green');assert.equal(first.candidate.atlasPage,'preview.png');
-assert.equal(first.candidate.previewGrade,'green');assert.equal(first.files.find(f=>f.slot==='大骰子').name,'icon.png');
+assert.equal(first.candidate.previewGrade,'purple');assert.equal(first.files.find(f=>f.slot==='大骰子').name,'icon.png');
 for(const file of first.files)assert.deepEqual(Buffer.from(await urlBlobs.get(file.url).arrayBuffer()),Buffer.from(files.find(f=>f.name===file.name).data.split(',')[1],'base64'));
 const before=structuredClone(await storage.get(first.id));
 const invalid=structuredClone(payload);invalid.files[0].data='data:image/png;base64,broken';await rejects(()=>post('/api/preview/import',invalid));
 assert.deepEqual(await storage.get(first.id),before);assert.equal(storage.records.size,1);
-storage.fail=true;await assert.rejects(()=>post(`/api/preview/${first.id}/settings`,{expectedRevision:1,grade:'purple'}));storage.fail=false;
+storage.fail=true;await assert.rejects(()=>post(`/api/preview/${first.id}/settings`,{expectedRevision:1,name:'存储配额失败'}));storage.fail=false;
 assert.deepEqual(await storage.get(first.id),before);
 checks.push('imports_preserve_all_ten_original_bytes_names_and_failed_import_or_storage_write_keep_existing_session');
 
-const noop=await post(`/api/preview/${first.id}/settings`,{expectedRevision:1,grade:'green',mode:'continuous',point:6});
+const noop=await post(`/api/preview/${first.id}/settings`,{expectedRevision:1,grade:'purple',mode:'continuous',point:6});
 assert.equal(noop.revision,1);assert.equal(noop.candidate.id,first.candidate.id);
 const renderCount=renders;
-const second=await post(`/api/preview/${first.id}/settings`,{expectedRevision:1,grade:'purple',mode:'single',point:6});
+const second=await post(`/api/preview/${first.id}/settings`,{expectedRevision:1,name:'紫色十图更名',mode:'single',point:6});
 assert.equal(second.revision,2);assert.equal(second.candidate.template,'green');assert.equal(second.candidate.previewGrade,'purple');assert.equal(renders,renderCount);
 assert.notEqual(second.candidate.id,first.candidate.id);assert.deepEqual(second.files,first.files);
 assert.equal(second.mode,'all');assert.equal(second.point,1);
 for(const key of ['atlas','texture','skel'])assert.equal(second.candidate[key],first.candidate[key]);
 assert.equal(second.candidate.png['大骰子'],first.candidate.png['大骰子']);
 await rejects(()=>post(`/api/preview/${first.id}/settings`,{expectedRevision:1,point:2}),409);
-checks.push('fixed_all_point1_no_op_settings_keep_revision_grade_changes_keep_runtime_urls_and_stale_settings_reject');
+await assert.rejects(()=>post(`/api/preview/${first.id}/settings`,{expectedRevision:2,grade:'green'}),error=>error.status===409&&error.payload.needsUpload===true);
+assert.equal((await storage.get(first.id)).revision,2);
+checks.push('fixed_all_point1_no_op_and_name_settings_keep_runtime_urls_cross_grade_needs_upload_and_stale_settings_reject');
 
 smallDigits=true;const digitSession=await post('/api/preview/import',{...payload,name:'数字分离',mode:'continuous',point:6});smallDigits=false;
 assert.equal(digitSession.resolvedComposition,'digits');
@@ -110,14 +113,14 @@ checks.push('auto_detection_override_independent_sessions_and_refresh_restore_ke
 const headers={'Content-Type':'video/h264','X-Preview-Revision':'2','X-Candidate-Id':second.candidate.id};
 const input=new Blob(['procedural-video-fixture'],{type:'video/h264'});
 const video=await adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input});
-assert.equal(video.profile,'loop6-v3-1mb');assert.equal(video.frameCount,180);assert.equal(video.revision,2);assert.equal(video.candidate,second.candidate.id);
+assert.equal(video.profile,VIDEO_PROFILE);assert.equal(video.frameCount,180);assert.equal(video.revision,2);assert.equal(video.candidate,second.candidate.id);
 const savedVideo=structuredClone((await storage.get(first.id)).video);
 const bundled=await adapter.api(`/api/preview/${first.id}/bundle`);
 const zip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(bundled.url).arrayBuffer()));
 const zipNames=Object.keys(zip.files).filter(name=>!zip.files[name].dir);
-assert.deepEqual(zipNames.sort(),['preview.json','preview.mp4',...files.map(f=>'res/'+f.name)].sort());
+assert.deepEqual(zipNames.sort(),['preview.json','preview.mp4','res/anchor.png','audio/dice_roll.mp3','audio/sound_ui_dice6.mp3','sound-timeline.json',...files.map(f=>'res/'+f.name)].sort());
 for(const file of files)assert.deepEqual(Buffer.from(await zip.file('res/'+file.name).async('uint8array')),Buffer.from(file.data.split(',')[1],'base64'));
-const config=JSON.parse(await zip.file('preview.json').async('string'));assert.equal(config.video.duration,6);assert.equal(config.video.frameCount,180);assert.equal(config.video.profile,'loop6-v3-1mb');assert.equal(config.mode,'all');assert.equal(config.point,1);
+const config=JSON.parse(await zip.file('preview.json').async('string'));assert.equal(config.video.duration,6);assert.equal(config.video.frameCount,180);assert.equal(config.video.profile,VIDEO_PROFILE);assert.equal(config.mode,'all');assert.equal(config.point,1);assert.equal(config.soundEnabled,true);
 const beforeOversize=await storage.get(first.id),writesBeforeOversize=storage.writes;
 preparedSize=VIDEO_SPEC.maxBytes+1;
 try {await rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}));}
@@ -171,7 +174,7 @@ checks.push('real_jszip_contains_only_original_res_configuration_and_current_bou
 let release;blockVideo={promise:new Promise(resolve=>{release=resolve;})};
 const pending=adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers:{...headers,'X-Preview-Revision':'3','X-Candidate-Id':third.candidate.id},body:input});
 await new Promise(resolve=>setTimeout(resolve,0));
-const fourth=await post(`/api/preview/${first.id}/settings`,{expectedRevision:3,grade:'green'});release();
+const fourth=await post(`/api/preview/${first.id}/settings`,{expectedRevision:3,soundEnabled:false});release();
 await rejects(()=>pending,409);blockVideo=null;assert.equal((await adapter.api(`/api/preview/${first.id}`)).video,null);
 assert.deepEqual((await storage.get(first.id)).video,savedVideo);
 const oldRecord=await storage.get(first.id);oldRecord.video={...savedVideo,profile:'loop6-v1',revision:fourth.revision,candidate:fourth.candidate.id};storage.records.set(first.id,oldRecord);

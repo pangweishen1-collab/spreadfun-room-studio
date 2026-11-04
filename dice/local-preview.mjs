@@ -1,10 +1,16 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
 import { VIDEO_SPEC } from './video-export.mjs';
+import {generateSixFaceRuntime} from './six-face/runtime.mjs';
+import {selectFaceFiles} from './six-face/import-faces.mjs';
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
+export const GREEN_SLOTS = Array.from({length:6},(_,i)=>`sz_${i+1}`);
 export const VIDEO_PROFILE = VIDEO_SPEC.profile;
 const REGIONS = ['1', '2', 'anchor', ...Array.from({length:6}, (_, i) => `sz_${i+1}`)];
-const SETTING_KEYS = ['name', 'grade', 'mode', 'point', 'composition'];
+const SETTING_KEYS = ['name', 'grade', 'mode', 'point', 'composition', 'soundEnabled'];
 const MAX_PNG = 12 * 1024 * 1024;
+const SOUND_NAMES=['dice_roll','sound_ui_dice6'];
+const DEFAULT_AUDIO=Object.fromEntries(SOUND_NAMES.map(name=>[name,`/dice/assets/audio/${name}.mp3`]));
+const DEFAULT_ANCHOR='/dice/assets/anchor.png';
 
 export class PreviewError extends Error {
   constructor(message, status=400, details={}) {
@@ -39,21 +45,22 @@ export function validateFiles(entries) {
   return SLOTS.map(s=>mapped.get(s));
 }
 
-export function validateSettings(payload, previous={name:'骰子预览',grade:'green',mode:'all',point:1,composition:'auto'}) {
+export function validateSettings(payload, previous={name:'骰子预览',grade:'green',mode:'all',point:1,composition:'auto',soundEnabled:true}) {
   if (!payload || typeof payload!=='object' || Array.isArray(payload)) throw new PreviewError('请求内容需要是对象');
-  const result=Object.fromEntries(SETTING_KEYS.map(k=>[k,Object.hasOwn(payload,k)?payload[k]:previous[k]]));
+  const result=Object.fromEntries(SETTING_KEYS.map(k=>[k,Object.hasOwn(payload,k)?payload[k]:k==='soundEnabled'?(previous[k]??true):previous[k]]));
   if(typeof result.name!=='string' || !result.name.trim() || result.name.trim().length>80) throw new PreviewError('请填写 1～80 字的预览名称');
   result.name=result.name.trim();
   if(!['green','purple'].includes(result.grade)) throw new PreviewError('请选择绿色或紫色等级背景');
   if(!['all','single','continuous'].includes(result.mode)) throw new PreviewError('预览模式需为 all、single 或 continuous');
   if(!Number.isInteger(result.point) || result.point<1 || result.point>6) throw new PreviewError('点数需为 1～6 的整数');
   if(!['auto','faces','digits'].includes(result.composition)) throw new PreviewError('素材类型需为 auto、faces 或 digits');
+  if(typeof result.soundEnabled!=='boolean')throw new PreviewError('声音设置需要是布尔值');
   result.mode='all'; result.point=1;
   return result;
 }
 
 const CRC_TABLE=Array.from({length:256},(_,n)=>{for(let i=0;i<8;i++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0;});
-export function inspectPNG(bytes,slot,name=slot+'.png') {
+export function inspectPNG(bytes,slot,name=slot+'.png',{flexible=false}={}) {
   if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length>MAX_PNG) throw new PreviewError(`${name}：PNG 大小不合法`);
   if(![137,80,78,71,13,10,26,10].every((v,i)=>bytes[i]===v)) throw new PreviewError(`${name}：需要有效 PNG`);
   const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
@@ -76,6 +83,11 @@ export function inspectPNG(bytes,slot,name=slot+'.png') {
     offset=stop;
   }
   if(!dimensions||!data||!end) throw new PreviewError(`${name}：PNG 数据损坏`);
+  if(flexible){
+    if(!dimensions.width||!dimensions.height||dimensions.width>4096||dimensions.height>4096||dimensions.width*dimensions.height>4*1024*1024)
+      throw new PreviewError(`${name}：单边最多4096、单张最多4MP`);
+    return dimensions;
+  }
   const size=slot==='大骰子'?240:200;
   if(dimensions.width!==size||dimensions.height!==size) throw new PreviewError(`${name}：尺寸需为 ${size}×${size}`);
   return dimensions;
@@ -88,6 +100,49 @@ function decodeDataURL(data,name) {
   if(encoded.length>Math.ceil(MAX_PNG/3)*4||encoded.length%4||!/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) throw new PreviewError(`${name}：PNG 数据损坏或超过 12 MB`);
   try {return Uint8Array.from(atob(encoded),c=>c.charCodeAt(0));}
   catch {throw new PreviewError(`${name}：PNG 数据损坏`);}
+}
+
+function importEntries(value) {
+  const list=Array.isArray(value)?value:value instanceof Map?[...value].map(([name,file])=>({name,file})):
+    value&&typeof value==='object'?Object.entries(value).map(([name,file])=>({name,file})):null;
+  if(!list||list.length>30)throw new PreviewError('请选择这一套骰子的 PNG 与可选 MP3');
+  return list.map(entry=>{
+    if(entry instanceof Blob)return {name:entry.name,blob:entry};
+    if(!entry||typeof entry!=='object')throw new PreviewError('上传文件信息不完整');
+    const blob=entry.blob instanceof Blob?entry.blob:entry.file instanceof Blob?entry.file:null;
+    const nested=entry.file&&typeof entry.file==='object'&&!(entry.file instanceof Blob)?entry.file:null;
+    const name=blob?.name||nested?.name||entry.name;
+    return {...(nested||entry),name,blob:blob||nested?.blob};
+  });
+}
+export function validateSixFaceFiles(entries) {
+  const anchors=entries.filter(entry=>String(entry?.name||'').normalize('NFKC').trim().toLowerCase()==='anchor.png');
+  if(anchors.length>1)throw new PreviewError('重复：anchor.png');
+  const candidates=entries.filter(entry=>!anchors.includes(entry)).map(entry=>{
+    const blob=entry instanceof Blob?entry:entry?.blob||entry?.file;
+    const encoded=typeof entry?.data==='string'?entry.data.split(',')[1]:null;
+    const size=blob?.size??entry?.size??(encoded?Math.max(1,Math.floor(encoded.length*3/4)):0);
+    return {name:entry?.name,size,webkitRelativePath:blob?.webkitRelativePath||entry?.webkitRelativePath||'',upload:entry};
+  });
+  let selected;
+  try{selected=selectFaceFiles(candidates);}catch(error){throw new PreviewError(error.message,400,
+    {code:error.code,missing:error.missing?.map(point=>'sz_'+point+'.png'),duplicates:error.duplicates,required:GREEN_SLOTS.map(slot=>slot+'.png')});}
+  const upload=(file,slot)=>{const entry=file.upload||file;return {...entry,name:entry.name,...(entry instanceof Blob?{blob:entry}:{}),slot};};
+  const result=Object.entries(selected.faces).map(([point,file])=>upload(file,'sz_'+point));
+  if(selected.hero)result.push(upload(selected.hero,'大骰子'));
+  if(selected.extras[0])result.push(upload(selected.extras[0],'sz_0'));
+  if(anchors[0])result.push(upload(anchors[0],'anchor'));
+  Object.defineProperty(result,'warnings',{value:selected.warnings});
+  return result;
+}
+async function originalBlob(entry,audio=false) {
+  if(entry.blob instanceof Blob)return entry.blob;
+  if(audio){
+    const match=/^data:audio\/(?:mpeg|mp3);base64,([A-Za-z0-9+/]*={0,2})$/.exec(entry.data||'');
+    if(!match||match[1].length>12*1024*1024)throw new PreviewError(`${entry.name}：请选择有效 MP3`);
+    try{return new Blob([Uint8Array.from(atob(match[1]),c=>c.charCodeAt(0))],{type:'audio/mpeg'});}catch{throw new PreviewError(`${entry.name}：MP3 无法读取`);}
+  }
+  return new Blob([decodeDataURL(entry.data,entry.name)],{type:'image/png'});
 }
 
 export function detectComposition(files,requested='auto') {
@@ -113,7 +168,7 @@ async function canvasBlob(value) {
   if(value.convertToBlob) return value.convertToBlob({type:'image/png'});
   return new Promise((resolve,reject)=>value.toBlob(b=>b?resolve(b):reject(new PreviewError('预览图集生成失败')),'image/png'));
 }
-async function decodePNG(blob,name) {
+async function decodePNG(blob,name,{allowEmpty=false}={}) {
   let drawable, cleanup=()=>{};
   try {
     if(typeof createImageBitmap==='function') {drawable=await createImageBitmap(blob);cleanup=()=>drawable.close();}
@@ -127,7 +182,7 @@ async function decodePNG(blob,name) {
     const pixels=ctx.getImageData(0,0,value.width,value.height).data;
     let alphaArea=0,visible=false;
     for(let i=3;i<pixels.length;i+=4) {if(pixels[i])visible=true;if(pixels[i]>=16)alphaArea++;}
-    if(!visible) throw new PreviewError(`${name}：图片没有可见内容`);
+    if(!visible&&!allowEmpty) throw new PreviewError(`${name}：图片没有可见内容`);
     return {drawable,alphaArea,close:cleanup};
   } catch(error) {cleanup();if(error instanceof PreviewError)throw error;throw new PreviewError(`${name}：PNG 读取失败`);}
 }
@@ -201,11 +256,22 @@ export function createLocalPreview(dependencies={}) {
   const storage=dependencies.storage||createIndexedDBStorage();
   const decode=dependencies.decodePNG||decodePNG;
   const render=dependencies.renderRuntime||((files,composition)=>renderRuntime(files,composition,decode));
+  const renderSix=dependencies.renderSixFace||generateSixFaceRuntime;
   const hash=dependencies.hash||sha256, uuid=dependencies.uuid||(()=>crypto.randomUUID().replaceAll('-',''));
   const objectURL=dependencies.createObjectURL||(blob=>URL.createObjectURL(blob));
   const revoke=dependencies.revokeObjectURL||(url=>URL.revokeObjectURL(url));
   const urls=new Map();
+  const defaultAssets=new Map();
   function url(key,blob) {if(!urls.has(key))urls.set(key,objectURL(blob));return urls.get(key);}
+  function audioURLs(record){return Object.fromEntries(SOUND_NAMES.map(name=>[name,record.audio?.[name]?.blob?
+    url(`${record.id}/audio/${name}/${record.audio[name].sha256}`,record.audio[name].blob):DEFAULT_AUDIO[name]]));}
+  async function defaultAsset(path){
+    if(!defaultAssets.has(path))defaultAssets.set(path,(async()=>{
+      if(dependencies.fetchAsset)return dependencies.fetchAsset(path);
+      const response=await fetch(path);if(!response.ok)throw new PreviewError('默认交付素材读取失败，请重试');return response.blob();
+    })().catch(error=>{defaultAssets.delete(path);throw error;}));
+    const blob=await defaultAssets.get(path);if(!(blob instanceof Blob)||!blob.size)throw new PreviewError('默认交付素材为空');return blob;
+  }
   async function read(id) {
     const record=await storage.get(id);
     if(!record)throw new PreviewError('预览会话不存在',404);
@@ -217,28 +283,75 @@ export function createLocalPreview(dependencies={}) {
   }
   function publicSession(record) {
     const files=record.files.map(({blob,alphaArea,...file})=>({...file,url:url(`${record.id}/file/${file.slot}`,blob)}));
+    const audio=audioURLs(record),audioFiles=Object.fromEntries(SOUND_NAMES.map(name=>{const item=record.audio?.[name];return [name,{name:item?.name||name+'.mp3',size:item?.blob?.size??null,sha256:item?.sha256||null,url:audio[name],default:!item?.blob}];}));
+    const anchor=record.anchor?{...Object.fromEntries(Object.entries(record.anchor).filter(([k])=>k!=='blob'&&k!=='alphaArea')),url:url(`${record.id}/file/anchor`,record.anchor.blob)}:
+      {name:'anchor.png',url:DEFAULT_ANCHOR,default:true,hidden:true};
+    anchor.hidden=true;
+    const sixFace=record.runtime.kind==='six-face',png=Object.fromEntries(files.map(f=>[f.slot,f.url]));
+    const icon=png['大骰子']||png.sz_0||png.sz_1;png['大骰子']??=icon;png.anchor??=anchor.url;
     const candidate={id:record.candidateId,version:record.revision,name:record.name,template:'green',previewGrade:record.grade,
-      skel:dependencies.templateURL||'/dice/assets/template.skel',atlasPage:'preview.png',
-      atlas:url(`${record.id}/runtime/${record.resolvedComposition}/atlas`,new Blob([record.runtime.atlasText],{type:'text/plain'})),
-      texture:url(`${record.id}/runtime/${record.resolvedComposition}/texture`,record.runtime.texture),png:Object.fromEntries(files.map(f=>[f.slot,f.url]))};
+      kind:sixFace?'six-face':'template',...(sixFace?{json:record.runtime.json,geometry:record.runtime.geometry,warnings:record.runtime.warnings||[]}:{skel:dependencies.templateURL||'/dice/assets/template.skel'}),
+      atlasPage:record.runtime.atlasPage||'preview.png',
+      atlas:url(`${record.id}/runtime/${sixFace?'six-face':record.resolvedComposition}/atlas`,new Blob([record.runtime.atlasText],{type:'text/plain'})),
+      texture:url(`${record.id}/runtime/${sixFace?'six-face':record.resolvedComposition}/texture`,record.runtime.texture),png,icon,anchor,audio,soundEnabled:record.soundEnabled!==false};
     let video=null;
     if(validVideo(record.video,record)) {const {blob,...metadata}=record.video;video={...metadata,url:url(`${record.id}/video/${metadata.sha256}`,blob)};}
     const videoAvailable=dependencies.videoAvailable??Boolean(globalThis.VideoEncoder||globalThis.MediaRecorder);
-    return {id:record.id,revision:record.revision,...Object.fromEntries(SETTING_KEYS.map(k=>[k,record[k]])),
+    return {id:record.id,revision:record.revision,...Object.fromEntries(SETTING_KEYS.map(k=>[k,k==='soundEnabled'?record[k]!==false:record[k]])),
       created:record.created,files,candidate,video,videoAvailable,videoUnavailableReason:videoAvailable?null:'当前浏览器不支持视频导出，请使用 Chrome',
-      resolvedComposition:record.resolvedComposition,compositionDetection:record.compositionDetection};
+      resolvedComposition:record.resolvedComposition,compositionDetection:record.compositionDetection,
+      kind:candidate.kind,warnings:record.runtime.warnings||[],anchor,audio:audioFiles,audioURLs:audio,
+      needsUpload:record.grade==='green'&&!sixFace};
   }
-  async function importSession(payload) {
-    const settings=validateSettings(payload),entries=validateFiles(payload.files),files=[];
-    for(const entry of entries) {
-      const bytes=decodeDataURL(entry.data,entry.name),dimensions=inspectPNG(bytes,entry.slot,entry.name),blob=new Blob([bytes],{type:'image/png'});
-      const image=await decode(blob,entry.name);
-      try {files.push({name:entry.name,slot:entry.slot,blob,...dimensions,alphaArea:image.alphaArea,sha256:await hash(blob)});}
-      finally {image.close?.();}
+  async function importSession(payload,{signal}={}) {
+    const aborted=()=>{if(signal?.aborted)throw new DOMException('操作已取消','AbortError');};aborted();
+    const settings=validateSettings(payload),input=importEntries(payload.files),files=[],audio={};
+    if(payload.audio)for(const [name,value]of Object.entries(payload.audio))input.push({name:name+'.mp3',blob:value instanceof Blob?value:value?.blob||value?.file,data:value?.data});
+    const audioEntries=[],pngEntries=[];
+    for(const entry of input){
+      const name=String(entry.name||''),match=/^(dice_roll|sound_ui_dice6)\.mp3$/i.exec(name);
+      if(match)audioEntries.push({...entry,sound:match[1].toLowerCase()});else pngEntries.push(entry);
     }
-    const detection=detectComposition(files,settings.composition);
-    const record={id:uuid(),candidateId:uuid(),revision:1,...settings,...detection,files,video:null,created:Math.floor(Date.now()/1000)};
-    record.runtime=await render(files,record.resolvedComposition);
+    const anchors=pngEntries.filter(entry=>/^anchor\.png$/i.test(entry.name||''));
+    if(anchors.length>1)throw new PreviewError('重复：anchor.png');
+    const entries=settings.grade==='green'?validateSixFaceFiles(pngEntries):[
+      ...validateFiles(pngEntries.filter(entry=>!/^anchor\.png$/i.test(entry.name||''))),...anchors.map(entry=>({...entry,slot:'anchor'}))];
+    const importWarnings=[...(entries.warnings||[])];
+    if(settings.grade==='green'&&settings.composition==='digits')throw new PreviewError('绿色六面需要完整骰面，请选择 faces 或 auto');
+    let totalBytes=0;
+    for(const entry of entries) {
+      aborted();
+      const optional=settings.grade==='green'&&['大骰子','sz_0'].includes(entry.slot);
+      try{
+      const blob=await originalBlob(entry),bytes=new Uint8Array(await blob.arrayBuffer());
+      const flexible=settings.grade==='green'||entry.slot==='anchor',dimensions=inspectPNG(bytes,entry.slot,entry.name,{flexible});
+      if(totalBytes+blob.size>48*1024*1024)throw new PreviewError('所选 PNG 合计不能超过48 MiB');
+      let alphaArea=0;
+      if(settings.grade!=='green'||!GREEN_SLOTS.includes(entry.slot)){
+        const image=await decode(blob,entry.name,{allowEmpty:entry.slot==='anchor'});try{alphaArea=image.alphaArea;}finally{image.close?.();}
+      }
+      files.push({name:entry.name,slot:entry.slot,blob,...dimensions,alphaArea,sha256:await hash(blob)});
+      totalBytes+=blob.size;
+      }catch(error){
+        if(!optional||error.name==='AbortError')throw error;
+        importWarnings.push(`${entry.name}：${error.message||'可选素材无法读取'}；已忽略${entry.slot==='大骰子'?'并使用主题面或第1面作为封面':''}`);
+      }
+    }
+    for(const entry of audioEntries){
+      aborted();
+      if(audio[entry.sound])throw new PreviewError('重复：'+entry.sound+'.mp3');
+      const blob=await originalBlob(entry,true);if(!blob.size||blob.size>8*1024*1024)throw new PreviewError(entry.name+'：MP3 需在8 MiB以内');
+      const head=new Uint8Array(await blob.slice(0,10).arrayBuffer());
+      if(!(head[0]===73&&head[1]===68&&head[2]===51)&&!(head[0]===255&&(head[1]&224)===224))throw new PreviewError(entry.name+'：需要有效 MP3');
+      audio[entry.sound]={name:entry.name,blob,size:blob.size,sha256:await hash(blob)};
+    }
+    const detection=settings.grade==='green'?{resolvedComposition:'faces',compositionDetection:{method:'six_original_flat_faces',detected:'faces'}}:detectComposition(files,settings.composition);
+    const record={id:uuid(),candidateId:uuid(),revision:1,...settings,...detection,files,audio,anchor:files.find(file=>file.slot==='anchor')||null,video:null,created:Math.floor(Date.now()/1000)};
+    try{record.runtime=settings.grade==='green'?await renderSix(files,{name:settings.name,signal}):await render(files,record.resolvedComposition);}
+    catch(error){throw error instanceof PreviewError||error.name==='AbortError'?error:new PreviewError(error.message||'六面资源生成失败');}
+    if(settings.grade==='green'&&(!record.runtime?.json||!record.runtime?.texture||!record.runtime?.atlasText))throw new PreviewError('六面资源生成不完整');
+    if(settings.grade==='green')record.runtime.warnings=[...importWarnings,...(record.runtime.warnings||[])];
+    aborted();
     await storage.put(record);
     return publicSession(record);
   }
@@ -246,8 +359,12 @@ export function createLocalPreview(dependencies={}) {
     const record=await read(id);
     if(!payload||!Number.isInteger(payload.expectedRevision)||payload.expectedRevision!==record.revision)throw new PreviewError('预览已更新，请刷新后重试',409);
     const settings=validateSettings(payload,record);
-    if(SETTING_KEYS.every(k=>settings[k]===record[k]))return publicSession(record);
-    const next={...record,...settings,revision:record.revision+1,candidateId:uuid(),...detectComposition(record.files,settings.composition)};
+    if(settings.grade!==record.grade)throw new PreviewError(settings.grade==='green'?'绿色等级需要上传六张完整骰面':'紫色等级需要上传完整的十张 PNG',409,
+      {needsUpload:true,grade:settings.grade,required:(settings.grade==='green'?GREEN_SLOTS:SLOTS).map(slot=>slot+'.png')});
+    if(record.runtime.kind==='six-face'&&settings.composition==='digits')throw new PreviewError('绿色六面需要完整骰面，请选择 faces 或 auto');
+    if(SETTING_KEYS.every(k=>settings[k]===(k==='soundEnabled'?record[k]!==false:record[k])))return publicSession(record);
+    const detection=record.runtime.kind==='six-face'?{resolvedComposition:'faces',compositionDetection:record.compositionDetection}:detectComposition(record.files,settings.composition);
+    const next={...record,...settings,revision:record.revision+1,candidateId:uuid(),...detection};
     if(next.resolvedComposition!==record.resolvedComposition)next.runtime=await render(next.files,next.resolvedComposition);
     await storage.put(next,{revision:record.revision,candidateId:record.candidateId});
     return publicSession(next);
@@ -257,7 +374,7 @@ export function createLocalPreview(dependencies={}) {
     if(!Number.isInteger(revision)||revision!==record.revision||headers.get('X-Candidate-Id')!==record.candidateId)throw new PreviewError('预览已更新，请重新录制当前版本',409);
     if(!(options.body instanceof Blob)||!options.body.size||options.body.size>90*1024*1024)throw new PreviewError('视频大小不合法');
     const started=performance.now(),module=dependencies.prepareVideo?null:await import('./video-export.mjs');
-    const blob=await (dependencies.prepareVideo||module.prepareVideo)(options.body);
+    const blob=await (dependencies.prepareVideo||module.prepareVideo)(options.body,{audio:audioURLs(record),soundEnabled:record.soundEnabled!==false});
     if(!(blob instanceof Blob)||!blob.size)throw new PreviewError('视频校验失败，请重新导出');
     if(blob.size>VIDEO_SPEC.maxBytes)throw new PreviewError('视频超过 1 MB，请重新生成');
     const info=blob.videoInfo||(module?.inspectVideo?await module.inspectVideo(blob):null);
@@ -272,8 +389,23 @@ export function createLocalPreview(dependencies={}) {
     const record=await read(id),zip=await (dependencies.zipFactory||zipFactory)();
     const config={id,revision:record.revision,...Object.fromEntries(SETTING_KEYS.map(k=>[k,record[k]])),
       resolvedComposition:record.resolvedComposition,compositionDetection:record.compositionDetection,
-      files:record.files.map(({blob,alphaArea,...file})=>file),video:null};
+      kind:record.runtime.kind||'template',files:record.files.map(({blob,alphaArea,...file})=>file),video:null,audio:{}};
+    config.soundEnabled=record.soundEnabled!==false;
     for(const file of record.files) zip.file('res/'+file.name,file.blob);
+    if(record.runtime.kind==='six-face'){
+      for(const [path,blob]of Object.entries(record.runtime.files||{}))zip.file(path,blob);
+      config.geometry=record.runtime.geometry;config.warnings=record.runtime.warnings||[];
+      config.runtime={json:'dice.json',atlas:'dice.atlas',texture:record.runtime.atlasPage||'dice.png',format:'Spine 4.2 JSON'};
+    }
+    const anchor=record.anchor||{name:'anchor.png',blob:await defaultAsset(DEFAULT_ANCHOR)};
+    if(!record.anchor)zip.file('res/'+anchor.name,anchor.blob);
+    config.anchor={file:'res/'+anchor.name,hidden:true,sha256:anchor.sha256||await hash(anchor.blob)};
+    for(const name of SOUND_NAMES){
+      const item=record.audio?.[name],blob=item?.blob||await defaultAsset(DEFAULT_AUDIO[name]),path='audio/'+name+'.mp3';
+      zip.file(path,blob);config.audio[name]={file:path,name:item?.name||name+'.mp3',sha256:item?.sha256||await hash(blob),default:!item?.blob};
+    }
+    zip.file('sound-timeline.json',JSON.stringify({roundSeconds:2,enabled:record.soundEnabled!==false,audio:config.audio,
+      animations:Object.fromEntries(Array.from({length:6},(_,i)=>['spin_'+(i+1),[{name:'dice_roll',time:0},...(i===5?[{name:'sound_ui_dice6',time:.6}]:[])]]))},null,2));
     if(validVideo(record.video,record)) {
       zip.file('preview.mp4',record.video.blob);
       config.video={file:'preview.mp4',...Object.fromEntries(['sha256','profile','duration','fps','frameCount','width','height','method','processingMs'].map(k=>[k,record.video[k]]))};
@@ -290,7 +422,7 @@ export function createLocalPreview(dependencies={}) {
     if(method==='GET'&&(match=/^\/api\/preview\/([a-f0-9]{32})(\/bundle)?$/.exec(path)))return match[2]?bundle(match[1]):publicSession(await read(match[1]));
     if(method==='POST') {
       let payload;try{payload=typeof options.body==='string'?JSON.parse(options.body):options.body;}catch{throw new PreviewError('请求内容需要是对象');}
-      if(path==='/api/preview/import')return importSession(payload);
+      if(path==='/api/preview/import')return importSession(payload,options);
       if((match=/^\/api\/preview\/([a-f0-9]{32})\/settings$/.exec(path)))return settings(match[1],payload);
     }
     throw new PreviewError('预览接口不存在',404);

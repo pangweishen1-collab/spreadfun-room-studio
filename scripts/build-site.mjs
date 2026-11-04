@@ -18,6 +18,8 @@ await writeFile(path.join(target,'_headers'),`/*
   Permissions-Policy: camera=(), microphone=(), geolocation=()
   Cross-Origin-Opener-Policy: same-origin
   Cross-Origin-Embedder-Policy: require-corp
+/dice/*
+  Cache-Control: no-cache
 /design-system/
   Cache-Control: no-cache
 /design-system/index.html

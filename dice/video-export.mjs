@@ -1,8 +1,9 @@
 // Reuse the same locally bundled MP4 muxer/codec pipeline as vap-engine.mjs.
 // Annex B takes a packet-copy path: no decoder, encoder, server, or FFmpeg.
+import {mixReviewAudio} from './audio.mjs';
 const media = () => import('../vendor/mediabunny/mediabunny.mjs');
 export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6,
-  profile: 'loop6-v3-1mb', bitrate: 1_400_000, maxBytes: 1_000_000});
+  profile: 'loop6-v4-audio-1mb', bitrate: 1_400_000, maxBytes: 1_000_000});
 const MAX_BYTES = 64 * 1024 * 1024;
 const fail = message => { throw new Error(message); };
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -182,7 +183,9 @@ export async function inspectVideo(blob) {
     timings.sort((a, b) => a.timestamp - b.timestamp);
     const constantFrameRate = timings.length > 0 && timings.every((timing, index) =>
       Math.abs(timing.timestamp - first - index / 30) < .0001 && Math.abs(timing.duration - 1 / 30) < .0001);
-    return {width: source.width, height: source.height, duration, fps: frameCount / duration, frameCount, codec: source.codec, constantFrameRate};
+    const audioTrack=await source.input.getPrimaryAudioTrack();
+    const audio=audioTrack?{codec:await audioTrack.getCodec(),numberOfChannels:await audioTrack.getNumberOfChannels(),sampleRate:await audioTrack.getSampleRate()}:null;
+    return {width: source.width, height: source.height, duration, fps: frameCount / duration, frameCount, codec: source.codec, constantFrameRate,audio};
   } finally { source.input.dispose(); }
 }
 
@@ -227,8 +230,44 @@ async function transcodeFallback(blob, M, bitrate = VIDEO_SPEC.bitrate) {
   finally { await iterator?.return?.(); source.input.dispose(); if (canvas) canvas.width = canvas.height = 1; }
 }
 
-/** Canonical six-second MP4. The returned Blob carries read-only videoInfo. */
-export async function prepareVideo(blob) {
+// AAC encoders may append whole silent packets beyond the six-second buffer.
+// Shrink at packet boundaries: retain the exact H.264 and AAC payloads, while
+// dropping only packets crossing the review end (the last cue ends before it).
+async function trimReviewAudioPadding(blob,M){
+  const input=new M.Input({source:new M.BlobSource(blob),formats:[M.MP4]});
+  const {target,output}=makeOutput(M);
+  try{
+    const conversion=await M.Conversion.init({input,output,trim:{start:0,end:VIDEO_SPEC.duration},
+      copy:{mode:'forced',boundaryPolicy:'shrink'}});
+    if(conversion.discardedTracks.length||conversion.utilizedTracks.length!==2)fail('音轨时长校准失败，请关闭音效后导出');
+    await conversion.execute();
+    return new Blob([target.buffer],{type:'video/mp4'});
+  }catch(error){await output.cancel().catch(()=>{});throw error;}
+  finally{input.dispose();}
+}
+
+// Packet-copy the existing H.264 video and encode only the mixed mono audio.
+async function muxReviewAudio(blob,buffer,M){
+  const source=await openVideo(blob,M);let output,video,audio;
+  try{
+    const targetOutput=makeOutput(M);output=targetOutput.output;
+    video=new M.EncodedVideoPacketSource('avc');output.addVideoTrack(video,{frameRate:30});
+    if(buffer){audio=new M.AudioBufferSource({codec:'aac',quality:new M.Quality({bitrate:48_000})});output.addAudioTrack(audio);}
+    const config=await source.track.getDecoderConfig();if(!config)fail('无法读取视频编码参数，请重新导出');
+    await output.start();
+    const copyVideo=async()=>{let first=true;try{for await(const packet of new M.EncodedPacketSink(source.track).packets()){await video.add(packet,first?{decoderConfig:config}:undefined);first=false;}}finally{video.close();}};
+    const encodeAudio=async()=>{if(!audio)return;try{await audio.add(buffer);}finally{audio.close();}};
+    const guard=task=>task.catch(error=>{void output.cancel().catch(()=>{});throw error;});
+    await Promise.all([guard(copyVideo()),guard(encodeAudio())]);
+    await output.finalize();
+    const result=new Blob([targetOutput.target.buffer],{type:'video/mp4'});
+    return buffer?await trimReviewAudioPadding(result,M):result;
+  }catch(error){await output?.cancel().catch(()=>{});if(buffer)throw new Error('AAC音轨生成失败，请关闭音效后导出');throw error;}
+  finally{source.input.dispose();}
+}
+
+/** Canonical six-second MP4. Sound is explicit, preserving old video-only callers. */
+export async function prepareVideo(blob,options={}) {
   checkBlob(blob);
   const mime = blob.type.split(';')[0].toLowerCase(), M = await media();
   let result, method;
@@ -241,13 +280,27 @@ export async function prepareVideo(blob) {
   // Keep the fast packet-copy path for the usual native output. A bounded
   // retry handles encoders that overshoot their target without scaling frames.
   const source = mime === 'video/h264' || mime === 'video/avc' ? result : blob;
+  const soundEnabled=options.soundEnabled===true;
+  let mixed=null,video=result;
+  if(soundEnabled){
+    let supported=false;
+    try{supported=await M.canEncodeAudio('aac',{numberOfChannels:1,sampleRate:48000,quality:new M.Quality({bitrate:48_000})});}catch{}
+    if(!supported)fail('当前浏览器无法生成AAC音轨，请关闭音效后导出');
+    mixed=await mixReviewAudio(options.audio,{soundEnabled:true,six:options.six!==false,sampleRate:48000,...options.audioCapabilities});
+    result=await muxReviewAudio(video,mixed,M);
+  }else if(options.soundEnabled===false&&(await inspectVideo(video)).audio){
+    result=await muxReviewAudio(video,null,M);
+  }
   for (const bitrate of [1_250_000, 1_050_000]) {
     if (result.size <= VIDEO_SPEC.maxBytes) break;
-    result = await transcodeFallback(source, M, bitrate); method = 'size_limited_transcode';
+    video = await transcodeFallback(source, M, bitrate); method = 'size_limited_transcode';
+    result=mixed?await muxReviewAudio(video,mixed,M):video;
   }
   if (result.size > VIDEO_SPEC.maxBytes) fail('视频压缩后仍超过 1 MB，请重新生成');
   const info = await inspectVideo(result);
   if (!matches(info)) fail('视频规格校验未通过，请重新导出');
-  Object.defineProperty(result, 'videoInfo', {value: Object.freeze({...VIDEO_SPEC, ...info, method}), enumerable: false});
+  if(soundEnabled&&(!info.audio||info.audio.codec!=='aac'||info.audio.numberOfChannels!==1||info.audio.sampleRate!==48000))fail('AAC音轨校验失败，请关闭音效后导出');
+  if(options.soundEnabled===false&&info.audio)fail('静音视频仍包含音轨，请重新导出');
+  Object.defineProperty(result, 'videoInfo', {value: Object.freeze({...VIDEO_SPEC, ...info, method,soundEnabled,audioBitrate:soundEnabled?48_000:null}), enumerable: false});
   return result;
 }

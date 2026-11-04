@@ -58,7 +58,7 @@ function harness(onBatch,options={}) {
   const paste={register(config){const entry={config:{isActive:()=>true,isBusy:()=>false,...config},active:true};registrations.push(entry);return()=>{entry.active=false;};}};
   const binding=bindDiceUploads({primaryZone,replacementZone,input,primaryButton,replacementButton,
     isBusy:()=>state.busy,hasPreview:()=>state.preview,isActive:()=>state.active,onFiles:files=>{batches.push(files);return onBatch?.(files);},paste,document,
-    folderInput,primaryFolderButton,replacementFolderButton,onEmptyFolder:()=>{emptyFolderCount++;return options.onEmptyFolder?.();}});
+    onDirectory:options.onDirectory,folderInput,primaryFolderButton,replacementFolderButton,onEmptyFolder:()=>{emptyFolderCount++;return options.onEmptyFolder?.();}});
   const dispose=typeof binding==='function'?binding:()=>binding.dispose();
   function routePaste(files,target=document){
     const event={target},active=registrations.filter(entry=>entry.active&&entry.config.isActive(event));
@@ -260,5 +260,21 @@ const checks=[];
   h.primaryFolderLabel.emit('click');h.replacementFolderLabel.emit('click');h.folderInput.files=liveFiles([fileB]);h.folderInput.emit('change');
   assert.equal(h.folderPickerCount,before);assert.equal(h.batches.length,1);
   checks.push('folder_validation_errors_propagate_after_input_clear_and_dispose_removes_folder_buttons_and_change_handler');
+}
+
+{
+  let start=0, releaseRead, committed;
+  const h=harness(undefined,{onDirectory:async provider=>{
+    start++; h.state.busy=true;
+    try { committed=await provider(); } finally {h.state.busy=false;}
+  }});
+  const directory={name:'res',isDirectory:true,createReader(){let page=0;return {readEntries(resolve){if(page++===0)releaseRead=()=>resolve([{name:fileA.name,isFile:true,file(resolve){resolve(fileA);}}]);else resolve([]);}};}};
+  const transfer={types:['Files'],items:[{webkitGetAsEntry:()=>directory}],files:[]};
+  const first=h.primaryZone.emit('drop',{dataTransfer:transfer});
+  assert.equal(start,1); assert.equal(h.state.busy,true,'Directory transaction starts before enumeration resolves');
+  h.primaryZone.emit('drop',{dataTransfer:transfer});h.replacementButton.emit('click');
+  assert.equal(start,1);assert.equal(h.pickerCount,0,'Busy directory import blocks overlapping drops and pickers');
+  releaseRead(); await Promise.all(first.results);assert.deepEqual(committed,[fileA]);assert.equal(h.state.busy,false);
+  h.dispose();checks.push('directory_enumeration_starts_inside_import_transaction_and_blocks_overlapping_uploads');
 }
 console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Mock DOM/Event/FileList and UploadPaste registration contract only; native clipboard, file/directory pickers, failed-session preservation and browser layout require real browser QA.'},null,2));
