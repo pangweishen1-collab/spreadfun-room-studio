@@ -1,5 +1,14 @@
 # 更新记录
 
+## 1.9.1 - 2026-11-04
+
+### Dice preview
+
+- Reuse loaded skeletons and textures for grade/name changes. Preload backgrounds and preserve the current animation progress.
+- Center the dice name without a grade subtitle. Always roll all six faces and hide the mode/result controls.
+- Keep one unnumbered Upload assets heading in the operations panel and remove the redundant section headings and size badge.
+- Restore older sessions in six-face mode and invalidate older videos while retaining original PNGs and stored video Blobs.
+
 ## 1.9.0 - 2026-11-03
 
 ### Avatar frames
