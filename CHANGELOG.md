@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.9.2 - 2026-11-04
+
+### Dice interface
+
+- Remove the page and preview headings. Keep Upload assets as the only heading and move help beside it.
+- Start with the upload empty state on entry or refresh; show the actual preview after upload and retain the current upload during same-page tool navigation.
+
 ## 1.9.1 - 2026-11-04
 
 ### Dice preview
