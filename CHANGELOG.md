@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.9.4 - 2026-11-04
+
+### Dice preview export
+
+- Remove the playback buttons and status row beneath the automatic preview.
+- Retain 720×1600, 30fps and three full loops over six seconds; prefer efficient AVC profiles and lower the native encoder bitrate with bounded compression retries and a final 1,000,000-byte MP4 limit.
+- Invalidate videos from older export profiles while preserving their stored Blobs and every original PNG; downloads and ZIPs use only the current verified video.
+
 ## 1.9.3 - 2026-11-04
 
 ### Dice upload
