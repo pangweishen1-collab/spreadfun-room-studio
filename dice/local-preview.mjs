@@ -1,6 +1,7 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
 import { VIDEO_SPEC } from './video-export.mjs';
 import {generateSixFaceRuntime} from './six-face/runtime.mjs';
+import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
 export const GREEN_SLOTS = Array.from({length:6},(_,i)=>`sz_${i+1}`);
@@ -298,9 +299,10 @@ export function createLocalPreview(dependencies={}) {
     if(!record)throw new PreviewError('预览会话不存在',404);
     const anchor=record.runtime.metadata?.anchor;
     const migrateAnchor=record.runtime.kind==='six-face'&&!(anchor?.bone==='root'&&anchor.scaleX===6&&anchor.scaleY===6&&anchor.opacity===0);
-    if(record.mode==='all' && record.point===1&&!migrateAnchor)return record;
+    const migrateMotion=record.runtime.kind==='six-face'&&record.runtime.metadata?.motionVersion!==SIX_FACE_MOTION_VERSION;
+    if(record.mode==='all' && record.point===1&&!migrateAnchor&&!migrateMotion)return record;
     const migrated={...record,mode:'all',point:1,revision:record.revision+1,candidateId:uuid()};
-    if(migrateAnchor){
+    if(migrateAnchor||migrateMotion){
       migrated.runtime=await renderGreen(record.files,{name:record.name});
       migrated.runtime.warnings=[...new Set([...(record.runtime.warnings||[]),...(migrated.runtime.warnings||[])])];
     }
@@ -315,7 +317,7 @@ export function createLocalPreview(dependencies={}) {
       {name:'anchor.png',url:DEFAULT_ANCHOR,default:true,hidden:true};
     anchor.hidden=true;
     const sixFace=record.runtime.kind==='six-face',png=Object.fromEntries(files.map(f=>[f.slot,f.url]));
-    const runtimeKey=sixFace?(record.runtime.metadata?.anchor?'six-face-anchor-root-6x':'six-face'):record.resolvedComposition;
+    const runtimeKey=sixFace?('six-face/'+(record.runtime.metadata?.motionVersion||'legacy')):record.resolvedComposition;
     const icon=png['大骰子']||null;png.anchor??=anchor.url;
     const candidate={id:record.candidateId,version:record.revision,name:record.name,template:'green',previewGrade:record.grade,
       kind:sixFace?'six-face':'template',...(sixFace?{json:record.runtime.json,geometry:record.runtime.geometry,warnings:record.runtime.warnings||[]}:{skel:dependencies.templateURL||'/dice/assets/template.skel'}),

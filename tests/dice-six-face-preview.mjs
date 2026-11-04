@@ -78,12 +78,69 @@ assert.deepEqual(first.candidate.warnings,['fixture warning']);assert.equal(firs
 assert.equal(first.audio.dice_roll.default,true);assert.equal(first.anchor.hidden,true);
 assert.equal(stored.runtime.metadata.zoomPeak,1.3);assert.doesNotThrow(()=>structuredClone(stored));
 assert.equal(stored.runtime.metadata.staticImages,14);
+assert.equal(stored.runtime.metadata.motionVersion,'flat-handoff-v2');
 for(const file of first.files)assert.deepEqual(new Uint8Array(await urls.get(file.url).arrayBuffer()),new Uint8Array(await required.find(input=>input.name===file.name).arrayBuffer()));
 checks.push('six_native_files_preserved_geometry_is_serializable_missing_hero_is_explicit_and_public_audio_anchor_contract');
 
 const atlas=new S.TextureAtlas(stored.runtime.atlasText),data=new S.SkeletonJson(new S.AtlasAttachmentLoader(atlas)).readSkeletonData(stored.runtime.json);
 assert.equal(data.animations.length,12);assert.equal(data.slots[0].name,'anchor');assert.equal(data.slots[0].boneData.name,'root');assert.equal(data.slots[0].color.a,0);
 assert.deepEqual(Object.keys(stored.runtime.json.events),['dice_roll','sound_ui_dice6']);assert.equal(stored.runtime.json.skeleton.audio,'./audio/');
+function pose(point,time){
+ const skeleton=new S.Skeleton(data);data.findAnimation('spin_'+point).apply(skeleton,-1,time,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);skeleton.updateWorldTransform(S.Physics.update);return skeleton;
+}
+function worldVertices(slot){
+ const attachment=slot.getAttachment(),vertices=new Float32Array(attachment instanceof S.MeshAttachment?attachment.worldVerticesLength:8);
+ if(attachment instanceof S.MeshAttachment)attachment.computeWorldVertices(slot,0,vertices.length,vertices,0,2);else attachment.computeWorldVertices(slot,vertices,0,2);
+ for(const value of vertices)assert.ok(Number.isFinite(value));return vertices;
+}
+function assertLandedPlane(skeleton,point){
+ const slot=skeleton.findSlot('face_'+point),attachment=slot.getAttachment(),result=skeleton.findSlot('result'),flat=result.getAttachment(),vertices=worldVertices(slot),bone=result.bone;
+ assert.equal(attachment.name,'landed_'+point);assert.equal(attachment.path,'flat_'+point);assert.equal(flat.path,'flat_'+point);
+ assert.equal(slot.color.a,1);assert.equal(result.color.a,0);assert.equal(skeleton.findSlot('shadow').color.a,0);
+ for(const channel of ['r','g','b'])assert.ok(Math.abs(slot.color[channel]-1)<1e-6,'Landed face retains the original untinted image');
+ for(let i=0;i<attachment.regionUVs.length;i+=2){
+  const x=flat.x+(attachment.regionUVs[i]-.5)*flat.width*flat.scaleX,y=flat.y+(.5-attachment.regionUVs[i+1])*flat.height*flat.scaleY;
+  // Generated mesh vertices retain the rig's existing .01-unit quantization.
+  assert.ok(Math.abs(vertices[i]-(bone.a*x+bone.b*y+bone.worldX))<.006,'Landed mesh matches flat UV world X');
+  assert.ok(Math.abs(vertices[i+1]-(bone.c*x+bone.d*y+bone.worldY))<.006,'Landed mesh matches flat UV world Y');
+ }
+ for(let other=1;other<=6;other++)if(other!==point)assert.equal(skeleton.findSlot('face_'+other).color.a,0);
+}
+for(let point=1;point<=6;point++){
+ const before=pose(point,.549999).findSlot('face_'+point),at=pose(point,.550001).findSlot('face_'+point);
+ assert.equal(before.getAttachment().name,'mesh_'+point);assert.equal(at.getAttachment().name,'landed_'+point);
+ const left=worldVertices(before),right=worldVertices(at);assert.equal(left.length,right.length);
+ for(let i=0;i<left.length;i++)assert.ok(Math.abs(left[i]-right[i])<.01,'Changing the face attachment preserves its projected position');
+ for(const time of [.550001,.575,.583333,.591667,.595,.599999]){
+  const skeleton=pose(point,time);assert.equal(skeleton.findSlot('result').color.a,0,'No result/mesh crossfade during landing');
+  assert.equal(skeleton.findSlot('face_'+point).getAttachment().name,'landed_'+point);
+  if(time>=.591667)assertLandedPlane(skeleton,point);
+ }
+ // Frame times are stored as Float32 by the official Runtime. At the exact
+ // JS .6 boundary either identical representation may own the frame.
+ const boundary=pose(point,.6),boundaryAlpha=boundary.findSlot('result').color.a;
+ assert.ok(boundaryAlpha===0||boundaryAlpha===1);
+ if(boundaryAlpha===0)assertLandedPlane(boundary,point);
+ else for(let other=1;other<=6;other++)assert.equal(boundary.findSlot('face_'+other).color.a,0);
+ for(const time of [.600001,.608333,.616667,.625,.633333,1.99]){
+  const skeleton=pose(point,time);assert.equal(skeleton.findSlot('result').color.a,1);assert.equal(skeleton.findSlot('result').getAttachment().path,'flat_'+point);
+  for(let other=1;other<=6;other++)assert.equal(skeleton.findSlot('face_'+other).color.a,0,'The final result is the only visible dice layer');
+ }
+}
+checks.push('landing_attachment_switch_is_continuous_and_becomes_an_untinted_exact_flat_plane_before_atomic_result_handoff_without_double_layers');
+for(let point=1;point<=6;point++){
+ const skeleton=new S.Skeleton(data),stateData=new S.AnimationStateData(data),next=point%6+1,last=(point+1)%6+1;stateData.defaultMix=0;
+ const state=new S.AnimationState(stateData);
+ for(const [name,time]of [['spin_'+point,.575],['standby_'+next,0],['spin_'+last,0],['spin_'+last,.3],['spin_'+last,.275]]){
+  if(state.getCurrent(0)?.animation.name!==name)state.setAnimation(0,name,false);
+  state.update(time);state.apply(skeleton);skeleton.updateWorldTransform(S.Physics.update);
+  if(name.startsWith('standby_')||state.getCurrent(0).trackTime<.55){
+   for(let face=1;face<=6;face++)assert.equal(skeleton.findSlot('face_'+face).getAttachment().name,'mesh_'+face,'Each action restores rolling attachments without a setup reset');
+  }else assert.equal(skeleton.findSlot('face_'+Number(name.split('_')[1])).getAttachment().name,'landed_'+Number(name.split('_')[1]));
+  if(name.startsWith('standby_'))assert.equal(skeleton.findSlot('result').getAttachment().path,'flat_'+next);
+ }
+}
+checks.push('official_animation_state_spin_standby_and_next_spin_restore_attachments_without_set_to_setup_pose');
 for(let point=1;point<=6;point++){
  assert.deepEqual(stored.runtime.json.animations['spin_'+point].events,[{time:0,name:'dice_roll'},...(point===6?[{time:.6,name:'sound_ui_dice6'}]:[])]);
  for(const [time,scale]of [[0,1],[.3,1.3],[.6,1],[.633333,1]]){
@@ -249,6 +306,24 @@ await assertAnchorPixels(migratedRecord.runtime,CUSTOM_ANCHOR_COLOR);
 const again=await adapter.api('/api/preview/'+legacyAnchor.id);assert.equal(again.revision,8);assert.equal(again.candidate.id,migratedAnchor.candidate.id);assert.equal(renderCount,beforeMigrationRenders+1);assert.equal(writes,beforeMigrationWrites+1);
 const migratedBundle=await adapter.api('/api/preview/'+legacyAnchor.id+'/bundle');await compactBundle(migratedBundle,migratedRecord);
 checks.push('legacy_white_anchor_migrates_once_to_actual_custom_root_six_scale_pixels_with_one_revision_and_old_video_hidden_not_deleted');
+const legacyMotion=structuredClone(await storage.get(custom.id));
+legacyMotion.id='c'.repeat(32);legacyMotion.candidateId='d'.repeat(32);legacyMotion.revision=11;
+legacyMotion.runtime.metadata.motionVersion='crossfade-v1';
+for(let point=1;point<=6;point++)delete legacyMotion.runtime.json.skins[0].attachments['face_'+point]['landed_'+point];
+legacyMotion.video={...structuredClone(previousVideo),revision:11,candidate:legacyMotion.candidateId};
+records.set(legacyMotion.id,structuredClone(legacyMotion));
+const motionRenders=renderCount,motionWrites=writes,migratedMotion=await adapter.api('/api/preview/'+legacyMotion.id),motionRecord=await storage.get(legacyMotion.id);
+assert.equal(migratedMotion.revision,12);assert.notEqual(migratedMotion.candidate.id,legacyMotion.candidateId);assert.equal(migratedMotion.video,null);
+assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'flat-handoff-v2');
+for(let point=1;point<=6;point++)assert.ok(motionRecord.runtime.json.skins[0].attachments['face_'+point]['landed_'+point]);
+assert.deepEqual(motionRecord.files,legacyMotion.files);assert.deepEqual(motionRecord.audio,legacyMotion.audio);assert.deepEqual(motionRecord.anchor,legacyMotion.anchor);assert.deepEqual(motionRecord.video,legacyMotion.video);
+assert.deepEqual(new Uint8Array(await motionRecord.video.blob.arrayBuffer()),new Uint8Array(await legacyMotion.video.blob.arrayBuffer()));
+await assertAnchorPixels(motionRecord.runtime,CUSTOM_ANCHOR_COLOR);
+const motionAgain=await adapter.api('/api/preview/'+legacyMotion.id);
+assert.equal(motionAgain.revision,12);assert.equal(motionAgain.candidate.id,migratedMotion.candidate.id);assert.equal(motionAgain.candidate.atlas,migratedMotion.candidate.atlas);assert.equal(motionAgain.candidate.texture,migratedMotion.candidate.texture);
+assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);
+await compactBundle(await adapter.api('/api/preview/'+legacyMotion.id+'/bundle'),motionRecord);
+checks.push('correct_root_anchor_with_old_motion_migrates_once_via_cas_preserves_sources_audio_anchor_and_old_video_blob_but_hides_old_video');
 adapter.dispose();refresh.dispose();assert.equal(urls.size,0);
 checks.push('missing_faces_bad_audio_cancel_build_or_storage_failure_leave_all_previous_sessions_unchanged');
 console.log(JSON.stringify({ok:true,count:checks.length,checks,boundary:'Real JSON/PNG/ZIP/session contracts and official Runtime; Canvas sampling uses injected pixels, actual browser/IndexedDB/audio rendering require browser QA.'},null,2));

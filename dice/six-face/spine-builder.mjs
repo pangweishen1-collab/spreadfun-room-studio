@@ -3,6 +3,8 @@
 import {CUBE_MOTION} from './cube-roll.mjs';
 const ZOOM_PEAK=CUBE_MOTION.zoomPeak;
 import {encodeRgbaPng} from './png-rgba.mjs';
+export const SIX_FACE_MOTION_VERSION='flat-handoff-v2';
+const LAND_START=.55,LAND_READY=.591667,HANDOFF=.6;
 const FACE = [
   {point:1,n:[0,0,1],u:[1,0,0],v:[0,1,0]},
   {point:6,n:[0,0,-1],u:[-1,0,0],v:[0,1,0]},
@@ -43,7 +45,12 @@ for (let y=0;y<4;y++) for (let x=0;x<4;x++) {
 }
 const points=FACE.map(f => vertexOrder.map(i => vertex(f,grid[i%5],1-grid[Math.floor(i/5)])));
 const times=[...new Set([...Array.from({length:73},(_,i) => time(i/120)),.608333,.616667,.625,.633333])].sort((a,b) => a-b);
-const rollAlpha = t => smooth(t/.08)*(1-smooth((t-.6)/(.633333-.6)));
+const landingBlend = t => smooth((t-LAND_START)/(LAND_READY-LAND_START));
+const rollAlpha = t => t<HANDOFF?smooth(t/.08):0;
+// Slot RGBA interpolates all channels together. Finish the visible pose first,
+// then step its alpha at handoff so two different silhouettes never crossfade.
+const rgbaTimeline = color => times.map((t,i)=>({time:t,color:color(t),
+  ...(t<HANDOFF&&times[i+1]>=HANDOFF?{curve:'stepped'}:{})}));
 const hex = (shade,alpha) => {
   const c=Math.round(clamp(shade)*255).toString(16).padStart(2,'0');
   const a=Math.round(clamp(alpha)*255).toString(16).padStart(2,'0');
@@ -79,15 +86,17 @@ export function buildSpineJson(prepared) {
     const vertices=uvs.map((v,i) => round((i%2?.5-v:v-.5)*(i%2?faceHeight:faceWidth)));
     attachments['face_'+f.point]={['mesh_'+f.point]:{type:'mesh',path:'roll_'+f.point,width:faceWidth,height:faceHeight,
       uvs:[...uvs],triangles:[...triangles],vertices,hull:16}};
+    attachments['face_'+f.point]['landed_'+f.point]={type:'mesh',path:'flat_'+f.point,width:faceWidth,height:faceHeight,
+      uvs:[...uvs],triangles:[...triangles],vertices:[...vertices],hull:16};
   }
   const animations={};
   for (let point=1;point<=6;point++) {
     const data={slots:{},bones:{},attachments:{default:{}},drawOrder:[]},bones=data.bones;
-    bones[bodyBone]={scale:[{x:1,y:1},{time:.3,x:ZOOM_PEAK,y:ZOOM_PEAK},{time:.6,x:1,y:1}]};
+    bones[bodyBone]={scale:[{x:1,y:1},{time:.3,x:ZOOM_PEAK,y:ZOOM_PEAK},{time:LAND_READY,x:1,y:1},{time:HANDOFF,x:1,y:1}]};
     bones.dice_1={translate:times.filter(t => t<=.6).map(t => ({time:t,y:round(Math.sin(Math.min(t/.55,1)*Math.PI)**2*13*(1+(ZOOM_PEAK-1)*(1-Math.abs(2*clamp(t/.6)-1))))}))};
-    data.slots.shadow={rgba:times.map(t => ({time:t,color:hex(1,.15*rollAlpha(t))}))};
+    data.slots.shadow={rgba:rgbaTimeline(t => hex(1,.15*rollAlpha(t)*(1-landingBlend(t))))};
     bones.shadow_size={scale:bones[bodyBone].scale};
-    data.slots.result={attachment:[{name:'sz_'+point}],rgba:times.map(t => ({time:t,color:hex(1,1-rollAlpha(t))}))};
+    data.slots.result={attachment:[{name:'sz_'+point}],rgba:rgbaTimeline(t => hex(1,1-rollAlpha(t)))};
     let lastOrder='';
     for (const t of times) {
       const m=rotation(t,point),order=[0,1,...FACE.map((f,i) => ({i:i+2,z:transform(m,f.n)[2]})).sort((a,b) => a.z-b.z).map(f => f.i),8];
@@ -103,15 +112,23 @@ export function buildSpineJson(prepared) {
       const slot='face_'+f.point,name='mesh_'+f.point,setup=attachments[slot][name].vertices;
       data.attachments.default[slot]={[name]:{deform:times.filter(t => t<=.6).map(t => ({time:t,
         vertices:points[i].flatMap(p => project(p,rotation(t,point))).map((v,k) => round(v-setup[k]))}))}};
-      data.slots[slot]={rgba:times.map(t => {
+      if(f.point===point){
+        // Reuse the original transparent landing texture, including ears/horns.
+        // This attachment has its own deform track; changing meshes resets deform.
+        data.attachments.default[slot]['landed_'+f.point]={deform:times.filter(t=>t>=LAND_START&&t<=HANDOFF).map(t=>({time:t,
+          vertices:points[i].flatMap(p=>project(p,rotation(t,point))).map((v,k)=>round((v-setup[k])*(1-landingBlend(t))))}))};
+      }
+      data.slots[slot]={attachment:[{name},...(f.point===point?[{time:LAND_START,name:'landed_'+f.point}]:[])],rgba:rgbaTimeline(t => {
         const n=transform(rotation(t,point),f.n),light=Math.max(0,(-.35*n[0]+.55*n[1]+n[2])/Math.hypot(.35,.55,1));
-        return {time:t,color:hex(.78+.22*light,rollAlpha(t)*smooth(n[2]/.12))};
+        const settle=landingBlend(t),shade=.78+.22*light;
+        return hex(f.point===point?shade+(1-shade)*settle:shade,
+          rollAlpha(t)*smooth(n[2]/.12)*(f.point===point?1:1-settle));
       })};
     }
     data.events=[{time:0,name:'dice_roll'},...(point===6?[{time:.6,name:'sound_ui_dice6'}]:[])];
     animations['spin_'+point]=data;
     animations['standby_'+point]={slots:{result:{attachment:[{name:'sz_'+point}],rgba:[{color:'ffffffff'}]},
-      shadow:{rgba:[{color:'ffffff00'}]},...Object.fromEntries(FACE.map(f => ['face_'+f.point,{rgba:[{color:'ffffff00'}]}]))},
+      shadow:{rgba:[{color:'ffffff00'}]},...Object.fromEntries(FACE.map(f => ['face_'+f.point,{attachment:[{name:'mesh_'+f.point}],rgba:[{color:'ffffff00'}]}]))},
       bones:{[bodyBone]:{scale:[{x:1,y:1}]},dice_1:{translate:[{x:0,y:0}]}}};
   }
   return {skeleton:{spine:'4.2.43',x:-150,y:-150,width:300,height:300,images:'./images/',audio:'./audio/'},
@@ -212,7 +229,8 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal,a
   const atlasText=lines.join('\n')+'\n',json=buildSpineJson(prepared);
   const encoded=await encodeRgbaPng(page.width,page.height,page.data,{signal}),textureBlob=encoded.blob;
   const metadata={name:String(name).trim().slice(0,120)||'自定义骰子',format:'Spine 4.2 JSON; MeshAttachment + DeformTimeline',
-    spine:'4.2.43',imageSequences:0,staticImages:14,faceMeshes:6,faceMeshVertices:25,hull:16,
+    spine:'4.2.43',imageSequences:0,staticImages:14,faceMeshes:6,landingMeshes:6,faceMeshVertices:25,hull:16,
+    motionVersion:SIX_FACE_MOTION_VERSION,landing:{start:LAND_START,ready:LAND_READY,switch:HANDOFF,overlap:false},
     anchor:{slot:'anchor',bone:'root',attachment:'anchor',image:'images/anchor.png',width:30,height:30,scaleX:6,scaleY:6,opacity:0},
     crop:geo.crop,sourceSize:geo.sourceSize,cropOffset:[...prepared.cropOffset],logicalSize:[geo.faceWidth,geo.faceHeight],
     logicalOffset:[geo.offsetX,geo.offsetY],rasterScale,atlas:packing,rollEnd:.6,settleEnd:.633333,zoomPeak:ZOOM_PEAK,

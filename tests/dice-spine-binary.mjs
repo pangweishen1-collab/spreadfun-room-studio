@@ -67,6 +67,54 @@ function sample(left,right,animation,time){
  assert.equal(b.findSlot('anchor').bone.data.name,'root');assert.equal(b.findSlot('anchor').getAttachment().scaleX,6);assert.equal(b.findSlot('anchor').color.a,0);
  samples++;
 }
+function verticesOf(slot){
+ const attachment=slot.getAttachment(),vertices=new Float32Array(attachment instanceof S.MeshAttachment?attachment.worldVerticesLength:8);
+ if(attachment instanceof S.MeshAttachment)attachment.computeWorldVertices(slot,0,vertices.length,vertices,0,2);else attachment.computeWorldVertices(slot,vertices,0,2);
+ for(const value of vertices)assert.ok(Number.isFinite(value));return vertices;
+}
+function assertAtomicLanding(data){
+ for(let point=1;point<=6;point++)for(const time of [.550001,.575,.591667,.599999,.6,.600001,.608333,.633333]){
+  const skeleton=new S.Skeleton(data);data.findAnimation('spin_'+point).apply(skeleton,-1,time,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);skeleton.updateWorldTransform(S.Physics.update);
+  const result=skeleton.findSlot('result'),face=skeleton.findSlot('face_'+point);
+  assert.equal(result.getAttachment().path,'flat_'+point);
+  if(time===.6)assert.ok(result.color.a===0||result.color.a===1,'Float32 boundary still displays exactly one representation');
+  else assert.equal(result.color.a,time<.6?0:1,'Result alpha switches atomically at landing');
+  if(result.color.a===1){for(let other=1;other<=6;other++)assert.equal(skeleton.findSlot('face_'+other).color.a,0);continue;}
+  const attachment=face.getAttachment();assert.equal(attachment.name,'landed_'+point);assert.equal(attachment.path,'flat_'+point);
+  if(time<.591667)continue;
+  assert.equal(face.color.a,1);for(const channel of ['r','g','b'])near(face.color[channel],1,'Unlit final face',1e-6);
+  assert.equal(skeleton.findSlot('shadow').color.a,0);
+  for(let other=1;other<=6;other++)if(other!==point)assert.equal(skeleton.findSlot('face_'+other).color.a,0);
+  const vertices=verticesOf(face),flat=result.getAttachment(),bone=result.bone;
+  for(let i=0;i<attachment.regionUVs.length;i+=2){
+   const x=flat.x+(attachment.regionUVs[i]-.5)*flat.width*flat.scaleX,y=flat.y+(.5-attachment.regionUVs[i+1])*flat.height*flat.scaleY;
+   near(vertices[i],bone.a*x+bone.b*y+bone.worldX,'Handoff UV world X',.006);
+   near(vertices[i+1],bone.c*x+bone.d*y+bone.worldY,'Handoff UV world Y',.006);
+  }
+ }
+}
+function assertContinuousParity(left,right){
+ for(let point=1;point<=6;point++){
+  const skeletons=[left,right].map(data=>new S.Skeleton(data)),states=[left,right].map(data=>{const config=new S.AnimationStateData(data);config.defaultMix=0;return new S.AnimationState(config);});
+  const next=point%6+1,last=(point+1)%6+1;
+  for(const [name,delta]of [['spin_'+point,.575],['standby_'+next,0],['spin_'+last,0],['spin_'+last,.3],['spin_'+last,.275],['spin_'+last,.025],['standby_'+point,0]]){
+   for(let i=0;i<2;i++){
+    if(states[i].getCurrent(0)?.animation.name!==name)states[i].setAnimation(0,name,false);
+    states[i].update(delta);states[i].apply(skeletons[i]);skeletons[i].updateWorldTransform(S.Physics.update);
+   }
+   const [a,b]=skeletons;assert.deepEqual(a.drawOrder.map(slot=>slot.data.name),b.drawOrder.map(slot=>slot.data.name));
+   for(let i=0;i<a.slots.length;i++){
+    const x=a.slots[i],y=b.slots[i];assert.equal(x.getAttachment()?.name,y.getAttachment()?.name);assert.equal(x.getAttachment()?.path,y.getAttachment()?.path);
+    for(const channel of ['r','g','b','a'])near(x.color[channel],y.color[channel],'Continuous slot color',1e-6);
+    arrayNear(x.deform,y.deform,'Continuous deform');arrayNear(verticesOf(x),verticesOf(y),'Continuous world vertices');
+   }
+   if(name.startsWith('standby_')||states[1].getCurrent(0).trackTime<.55){
+    for(let face=1;face<=6;face++)assert.equal(b.findSlot('face_'+face).getAttachment().name,'mesh_'+face,'Actions restore rolling attachments without setup reset');
+   }
+   if(name.startsWith('standby_'))assert.equal(b.findSlot('result').getAttachment().path,'flat_'+Number(name.split('_')[1]));
+  }
+ }
+}
 const cases=[{sourceSize:200,crop:[35,35,131,131],cropOffset:[.5,.5]},
  {sourceSize:512,crop:[0,0,512,512],cropOffset:[0,0]},
  {sourceSize:201,crop:[5,47,130,130],cropOffset:[-30.5,11.5]}],results=[];
@@ -82,11 +130,12 @@ for(const prepared of cases){
    if(a instanceof S.DrawOrderTimeline)assert.equal(JSON.stringify(a.drawOrders),JSON.stringify(b.drawOrders));
    if(a instanceof S.AttachmentTimeline)assert.deepEqual([...a.attachmentNames],[...b.attachmentNames]);
   }
-  const times=animation.name.startsWith('spin_')?[...new Set([0,.3,.6,.608333,.616667,.625,animation.duration,...Array.from({length:305},(_,i)=>Math.min(i/480,animation.duration))])]:[0,.3,1.9];
+  const times=animation.name.startsWith('spin_')?[...new Set([0,.3,.549999,.55,.575,.583333,.591667,.599999,.6,.608333,.616667,.625,animation.duration,...Array.from({length:305},(_,i)=>Math.min(i/480,animation.duration))])]:[0,.3,1.9];
   for(const time of times)sample(original,decoded,animation.name,time);
   const p=Number(animation.name.split('_')[1]),skeleton=new S.Skeleton(decoded);skeleton.setToSetupPose();other.apply(skeleton,-1,other.duration,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
   assert.equal(skeleton.findSlot('result').getAttachment().path,'flat_'+p);
  }
+ assertAtomicLanding(original);assertAtomicLanding(decoded);assertContinuousParity(original,decoded);
  results.push({sourceSize:prepared.sourceSize,bytes:bytes.length,animations:12,imagesPath:decoded.imagesPath,audioPath:decoded.audioPath});
 }
 const stepped=buildSpineJson(cases[0]);
@@ -104,5 +153,6 @@ bad(json=>json.animations.spin_1.slots.result.alpha=[{value:1}]);
 bad(json=>json.skins[0].attachments.anchor.anchor.type='clipping');
 bad(json=>json.animations.spin_1.events[0].name='missing');
 console.log(JSON.stringify({ok:true,format:'Spine 4.2 binary',officialRuntime:'4.2.120',cases:results,samples,maximumWorldDelta,
+ landing:'Atomic result handoff after an untinted UV-aligned flat mesh; continuous AnimationState transitions without setup resets match JSON and binary',
  supported:'Regions, unweighted meshes, deform, RGBA, attachment, translate/scale, linear/stepped, drawOrder, events/audio',
  unsupportedFailsClosed:true,boundary:'Official JSON/Binary Runtime numerical parity; native .spine Editor and target game import are not certified.'},null,2));
