@@ -5,7 +5,6 @@ import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/d
 
 const $ = id => document.getElementById(id);
 const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, index) => 'sz_' + index)];
-const SESSION_KEY = 'fun-toolkit-dice-session-id';
 let session = null, pending = new Map(), grade = 'green', busy = false;
 let renderer = null, previewReady = false, hasCanvas = false, loadingPreview = false;
 let activity = null, notice = null, currentError = null, playback = null, hasPlayed = false, toastTimer;
@@ -38,7 +37,6 @@ function fillSettings(value) {
   $('preview-point').value = '1';
   $('composition').value = value.composition;
 }
-function remember(id) { try { localStorage.setItem(SESSION_KEY, id); } catch {} }
 function releasePending() {
   pending.forEach(file => URL.revokeObjectURL(file.previewUrl));
   pending = new Map();
@@ -133,7 +131,7 @@ function render() {
   $('error-message').textContent = currentError ? errorText(currentError) : '';
   $('preview-loading').hidden = !loadingPreview;
   $('preview-empty').hidden = hasCanvas;
-  $('preview-empty').querySelector('.feedback-image').src = '/dice/assets/fun-toolkit/assets/feedback/' + (currentError ? 'empty-error.svg' : 'empty-output.svg');
+  $('preview-empty').querySelector('.feedback-image').src = '/dice/assets/fun-toolkit/assets/feedback/' + (currentError ? 'empty-error.svg' : 'empty-upload.svg');
   $('preview-empty').querySelector('h3').textContent = t(currentError ? 'previewErrorTitle' : 'previewEmptyTitle');
   $('preview-empty').querySelector('p').textContent = currentError ? errorText(currentError) : t('previewEmptyHint');
   $('game-canvas').hidden = !hasCanvas;
@@ -170,10 +168,10 @@ async function loadSession(next, reusePresentation = false) {
   if (!next?.id || !next.candidate) throw issue('requestFailed');
   if (reusePresentation && renderer && previewReady && hasCanvas
     && await renderer.patchPresentation(next.candidate)) {
-    session = next; remember(next.id); fillSettings(next); render();
+    session = next; fillSettings(next); render();
     return;
   }
-  session = next; remember(next.id); fillSettings(next); previewReady = false;
+  session = next; fillSettings(next); previewReady = false;
   loadingPreview = true; hasPlayed = false; render();
   try {
     if (!renderer) throw issue('rendererFailed');
@@ -315,13 +313,3 @@ $('download-bundle').addEventListener('click', () => run('bundling', async () =>
 window.addEventListener('beforeunload', () => { pending.forEach(file => URL.revokeObjectURL(file.previewUrl)); renderer?.pause(); });
 connectEmbedded(renderer);
 render();
-let remembered;
-try { remembered=localStorage.getItem(SESSION_KEY); } catch {}
-if (/^[a-f0-9]{32}$/.test(remembered || '')) {
-  await run('restoring', async () => {
-    let previous;
-    try { previous=await api('/api/preview/' + remembered); }
-    catch (error) { if (error.status === 404) { try { localStorage.removeItem(SESSION_KEY); } catch {} throw issue('restoreFailed'); } throw error; }
-    await loadSession(previous);
-  });
-}

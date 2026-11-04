@@ -226,3 +226,6 @@ html.embedded .page-shell { padding-top:24px; padding-bottom:24px; }
 
 html.embedded body { min-height:0; }
 html.embedded .page-shell { flex:none; }
+
+/* No heading row above the preview; retain its metadata only for controller state. */
+#session-meta[hidden] { display:none; }
