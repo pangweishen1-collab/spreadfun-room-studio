@@ -1,5 +1,14 @@
 # 更新记录
 
+## 1.12.1 - 2026-11-04
+
+### Dice landing fixes
+
+- Align the rolling front face to the original transparent silhouette and brightness before switching to the stationary result. Remove the overlapping end fade that caused ghost edges on horns, fur and other shaped faces.
+- Keep the 1.3x scale peak, two-second preview loop, six-second video and fourteen static atlas regions. Reuse existing images for landing meshes without image sequences.
+- Reset all six mesh attachments for each spin and standby, preserve continuous Runtime playback, and rebuild older green motion sessions once with versioned asset caches while retaining source files.
+- Change the green upload prompt to “拖入大骰子+六点数图” and update its English translation. Purple motion and the compact resource-package structure remain unchanged.
+
 ## 1.12.0 - 2026-11-04
 
 ### Dice resource delivery
