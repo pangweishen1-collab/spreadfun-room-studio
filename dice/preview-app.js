@@ -18,8 +18,8 @@ function slotFor(name) {
   return SLOTS.includes(slot) ? slot : null;
 }
 function settings() {
-  return {name:$('dice-name').value.trim(), grade, mode:$('preview-mode').value,
-    point:Number($('preview-point').value), composition:$('composition').value};
+  return {name:$('dice-name').value.trim(), grade, mode:'all',
+    point:1, composition:$('composition').value};
 }
 function settingsDirty() {
   if (!session) return false;
@@ -27,15 +27,15 @@ function settingsDirty() {
   return Object.keys(values).some(key => values[key] !== session[key]);
 }
 function currentVideo(video = session?.video) {
-  return video?.profile === 'loop6-v1' && video.duration === 6 && video.fps === 30 && video.frameCount === 180
+  return video?.profile === 'loop6-v2' && video.duration === 6 && video.fps === 30 && video.frameCount === 180
     && video.width === 720 && video.height === 1600 && video.revision === session.revision
     && video.candidate === session.candidate?.id ? video : null;
 }
 function fillSettings(value) {
   $('dice-name').value = value.name;
   grade = value.grade;
-  $('preview-mode').value = value.mode;
-  $('preview-point').value = String(value.point);
+  $('preview-mode').value = 'all';
+  $('preview-point').value = '1';
   $('composition').value = value.composition;
 }
 function remember(id) { try { localStorage.setItem(SESSION_KEY, id); } catch {} }
@@ -161,13 +161,18 @@ function render() {
 }
 async function run(key, operation) {
   if (busy) return;
-  busy = true; currentError = null; notice = null; activity = {key}; render();
+  busy = true; currentError = null; notice = null; activity = key ? {key} : null; render();
   try { await operation(); }
   catch (error) { currentError = error; }
   finally { busy = false; activity = null; render(); }
 }
-async function loadSession(next) {
+async function loadSession(next, reusePresentation = false) {
   if (!next?.id || !next.candidate) throw issue('requestFailed');
+  if (reusePresentation && renderer && previewReady && hasCanvas
+    && await renderer.patchPresentation(next.candidate)) {
+    session = next; remember(next.id); fillSettings(next); render();
+    return;
+  }
   session = next; remember(next.id); fillSettings(next); previewReady = false;
   loadingPreview = true; hasPlayed = false; render();
   try {
@@ -234,12 +239,14 @@ async function saveSettings() {
   if (!values.name || values.name.length > 80) throw issue('nameRequired');
   const hadVideo = Boolean(currentVideo());
   const next = await post(`/api/preview/${session.id}/settings`, {...values, expectedRevision:session.revision});
-  await loadSession(next);
+  const presentationOnly = session.id === next.id && session.mode === next.mode
+    && session.point === next.point && session.resolvedComposition === next.resolvedComposition;
+  await loadSession(next, presentationOnly);
   notice = hadVideo && !next.video ? {key:'videoInvalidated'} : null;
 }
 function settingsChanged() {
   currentError = null; render();
-  if (session && !pending.size && settingsDirty()) return run('updatingSettings', saveSettings);
+  if (session && !pending.size && settingsDirty()) return run(null, saveSettings);
 }
 async function exportVideo() {
   if (!session || settingsDirty() || pending.size) return;

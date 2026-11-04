@@ -6,6 +6,21 @@ const loadImage = src => new Promise((resolve, reject) => {
 });
 
 const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
+const backgroundImages = new Map();
+const loadBackground = candidate => {
+  const src = previewGrade(candidate) === 'purple' ? '/dice/assets/ui/bg_紫.webp' : '/dice/assets/ui/bg_绿.webp';
+  if (!backgroundImages.has(src)) {
+    const pending = loadImage(src).catch(error => {
+      backgroundImages.delete(src);
+      throw error;
+    });
+    backgroundImages.set(src, pending);
+  }
+  return backgroundImages.get(src);
+};
+const sameAssets = (current, next) => current && next &&
+  ['skel', 'atlas', 'texture', 'atlasPage'].every(key => current[key] === next[key]) &&
+  current.png?.['大骰子'] === next.png?.['大骰子'];
 
 // A round is exactly 60 frames (two seconds) at 30fps.
 export const loopFrameState = (frame, mode, target) => {
@@ -45,6 +60,8 @@ export class GameRenderer {
     this.sequence = 0;
     this.last = performance.now();
     this.loadId = 0;
+    this.presentationId = 0;
+    for (const previewGrade of ['green', 'purple']) void loadBackground({previewGrade}).catch(() => {});
     this.tick = this.tick.bind(this);
     requestAnimationFrame(this.tick);
     document.addEventListener('visibilitychange', () => { this.last = performance.now(); });
@@ -52,6 +69,7 @@ export class GameRenderer {
 
   async load(candidate) {
     const id = ++this.loadId;
+    const presentationId = ++this.presentationId;
     const assets = new spine.AssetManager(this.context);
     assets.loadBinary(candidate.skel);
     assets.loadTextureAtlas(candidate.atlas, undefined, undefined, candidate.atlasPage ? {[candidate.atlasPage]:candidate.texture} : undefined);
@@ -61,10 +79,10 @@ export class GameRenderer {
     const binary = new spine.SkeletonBinary(new spine.AtlasAttachmentLoader(atlas));
     const data = binary.readSkeletonData(assets.require(candidate.skel));
     const [background, icon] = await Promise.all([
-      loadImage(previewGrade(candidate) === 'purple' ? '/dice/assets/ui/bg_紫.webp' : '/dice/assets/ui/bg_绿.webp'),
+      loadBackground(candidate),
       loadImage(candidate.png['大骰子']),
     ]);
-    if (id !== this.loadId) { assets.dispose(); return; }
+    if (id !== this.loadId || presentationId !== this.presentationId) { assets.dispose(); return false; }
     this.assets?.dispose();
     this.assets = assets;
     this.candidate = candidate;
@@ -76,6 +94,22 @@ export class GameRenderer {
     this.playing = false;
     this.draw();
     this.status();
+    return true;
+  }
+
+  // Name/grade changes keep the runtime and its live playback position intact.
+  // The old complete frame stays visible until the new background is ready.
+  async patchPresentation(candidate) {
+    if (!this.data || this.recording || !sameAssets(this.candidate, candidate)) return false;
+    const id = ++this.presentationId, loadId = this.loadId;
+    const background = await loadBackground(candidate);
+    if (id !== this.presentationId || loadId !== this.loadId || !this.data ||
+        this.recording || !sameAssets(this.candidate, candidate)) return false;
+    this.candidate = candidate;
+    this.background = background;
+    this.draw();
+    this.status();
+    return true;
   }
 
   configure(mode, target) {
@@ -100,6 +134,7 @@ export class GameRenderer {
 
   clear() {
     this.loadId += 1;
+    this.presentationId += 1;
     this.playing = false;
     this.data = null;
     this.candidate = null;
@@ -191,11 +226,9 @@ export class GameRenderer {
     ctx.lineWidth = 5;
     ctx.strokeStyle = purple ? '#6c2ba3' : '#337731';
     const title = this.candidate.name.length > 10 ? this.candidate.name.slice(0, 10) + '…' : this.candidate.name;
-    ctx.strokeText(title, 409, 452, 232);
+    ctx.strokeText(title, 412, 468, 232);
     ctx.fillStyle = '#fff';
-    ctx.fillText(title, 409, 452, 232);
-    ctx.font = '700 21px Arial, "PingFang SC", sans-serif';
-    ctx.fillText(purple ? '紫色等级' : '绿色等级', 409, 490);
+    ctx.fillText(title, 412, 468, 232);
     ctx.drawImage(this.icon, 65, 335, 240, 240);
     ctx.fillStyle = '#fff';
     ctx.beginPath(); ctx.arc(259, 520, 23, 0, Math.PI * 2); ctx.fill();

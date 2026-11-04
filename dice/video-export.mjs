@@ -1,7 +1,7 @@
 // Reuse the same locally bundled MP4 muxer/codec pipeline as vap-engine.mjs.
 // Annex B takes a packet-copy path: no decoder, encoder, server, or FFmpeg.
 const media = () => import('../vendor/mediabunny/mediabunny.mjs');
-export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6, profile: 'loop6-v1'});
+export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6, profile: 'loop6-v2'});
 const MAX_BYTES = 64 * 1024 * 1024;
 const fail = message => { throw new Error(message); };
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));

@@ -1,6 +1,6 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
-export const VIDEO_PROFILE = 'loop6-v1';
+export const VIDEO_PROFILE = 'loop6-v2';
 const REGIONS = ['1', '2', 'anchor', ...Array.from({length:6}, (_, i) => `sz_${i+1}`)];
 const SETTING_KEYS = ['name', 'grade', 'mode', 'point', 'composition'];
 const MAX_PNG = 12 * 1024 * 1024;
@@ -47,6 +47,7 @@ export function validateSettings(payload, previous={name:'骰子预览',grade:'g
   if(!['all','single','continuous'].includes(result.mode)) throw new PreviewError('预览模式需为 all、single 或 continuous');
   if(!Number.isInteger(result.point) || result.point<1 || result.point>6) throw new PreviewError('点数需为 1～6 的整数');
   if(!['auto','faces','digits'].includes(result.composition)) throw new PreviewError('素材类型需为 auto、faces 或 digits');
+  result.mode='all'; result.point=1;
   return result;
 }
 
@@ -204,13 +205,21 @@ export function createLocalPreview(dependencies={}) {
   const revoke=dependencies.revokeObjectURL||(url=>URL.revokeObjectURL(url));
   const urls=new Map();
   function url(key,blob) {if(!urls.has(key))urls.set(key,objectURL(blob));return urls.get(key);}
-  async function read(id) {const record=await storage.get(id);if(!record)throw new PreviewError('预览会话不存在',404);return record;}
+  async function read(id) {
+    const record=await storage.get(id);
+    if(!record)throw new PreviewError('预览会话不存在',404);
+    if(record.mode==='all' && record.point===1)return record;
+    const migrated={...record,mode:'all',point:1,revision:record.revision+1,candidateId:uuid()};
+    // Uploaded PNGs and old video Blobs remain stored; binding/profile hides old output.
+    await storage.put(migrated,{revision:record.revision,candidateId:record.candidateId});
+    return migrated;
+  }
   function publicSession(record) {
     const files=record.files.map(({blob,alphaArea,...file})=>({...file,url:url(`${record.id}/file/${file.slot}`,blob)}));
     const candidate={id:record.candidateId,version:record.revision,name:record.name,template:'green',previewGrade:record.grade,
       skel:dependencies.templateURL||'/dice/assets/template.skel',atlasPage:'preview.png',
-      atlas:url(record.candidateId+'/atlas',new Blob([record.runtime.atlasText],{type:'text/plain'})),
-      texture:url(record.candidateId+'/texture',record.runtime.texture),png:Object.fromEntries(files.map(f=>[f.slot,f.url]))};
+      atlas:url(`${record.id}/runtime/${record.resolvedComposition}/atlas`,new Blob([record.runtime.atlasText],{type:'text/plain'})),
+      texture:url(`${record.id}/runtime/${record.resolvedComposition}/texture`,record.runtime.texture),png:Object.fromEntries(files.map(f=>[f.slot,f.url]))};
     let video=null;
     if(validVideo(record.video,record)) {const {blob,...metadata}=record.video;video={...metadata,url:url(`${record.id}/video/${metadata.sha256}`,blob)};}
     const videoAvailable=dependencies.videoAvailable??Boolean(globalThis.VideoEncoder||globalThis.MediaRecorder);
@@ -237,7 +246,7 @@ export function createLocalPreview(dependencies={}) {
     if(!payload||!Number.isInteger(payload.expectedRevision)||payload.expectedRevision!==record.revision)throw new PreviewError('预览已更新，请刷新后重试',409);
     const settings=validateSettings(payload,record);
     if(SETTING_KEYS.every(k=>settings[k]===record[k]))return publicSession(record);
-    const next={...record,...settings,revision:record.revision+1,candidateId:uuid(),video:null,...detectComposition(record.files,settings.composition)};
+    const next={...record,...settings,revision:record.revision+1,candidateId:uuid(),...detectComposition(record.files,settings.composition)};
     if(next.resolvedComposition!==record.resolvedComposition)next.runtime=await render(next.files,next.resolvedComposition);
     await storage.put(next,{revision:record.revision,candidateId:record.candidateId});
     return publicSession(next);

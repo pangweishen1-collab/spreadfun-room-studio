@@ -79,10 +79,11 @@
 .inline-status[data-state='error'] { color: var(--color-danger); background: var(--color-danger-soft); }
 .inline-status[data-state='success'] { color: var(--color-success); background: var(--color-success-soft); }
 .inline-status[data-state='warning'] { color: var(--color-warning); background: var(--color-warning-soft); }
-.output-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--color-rule); }
+.output-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-rule); }
 .output-section h3 { color: var(--color-heading); font-size: 16px; font-weight: 650; line-height: 24px; }
 .output-description { margin-top: 8px; color: var(--color-secondary); font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
 .output-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.output-section > .output-actions { margin-top: 0; }
 .output-actions > .button { flex: 1 1 160px; }
 .video-details { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 12px 0 0; color: var(--color-secondary); font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
 .video-details dt { color: var(--color-muted); }
@@ -117,7 +118,8 @@
 .footer-links { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
 .toast { position: fixed; left: 50%; bottom: 24px; z-index: 1000; width: max-content; max-width: min(540px, calc(100vw - 32px)); transform: translateX(-50%); padding: 12px 16px; border: 1px solid var(--color-rule); border-radius: var(--ft-radius-inner); background: var(--color-surface); color: var(--color-ink); box-shadow: var(--ft-shadow-card); font-size: 13px; line-height: 20px; text-align: center; overflow-wrap: anywhere; }
 .filenames-note { margin-top: 12px; }
-.settings-section { margin-top: 24px; padding-top: 24px; border-top: 1px solid var(--color-rule); }
+.settings-section { margin-top: 20px; }
+.settings-section > .field:first-child { margin-top: 0; }
 .pending-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .inline-status:empty { display: none; }
 .inline-status[data-state='pending'] { color: var(--color-warning); background: var(--color-warning-soft); }
