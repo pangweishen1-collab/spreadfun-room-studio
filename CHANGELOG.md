@@ -1,5 +1,14 @@
 # 更新记录
 
+## 1.9.3 - 2026-11-04
+
+### Dice upload
+
+- Make the left empty preview the wide primary uploader, with click, drop and file paste using the same PNG validation.
+- Support folder selection on both upload surfaces, filtering out non-PNG sidecar files and hidden thumbnail directories and preserving original filenames.
+- Reduce the right upload area to a compact replacement entry while preserving the loaded preview aspect ratio.
+- Forward file paste from the active parent tool to the same child upload flow; ignore hidden tools and busy sessions.
+
 ## 1.9.2 - 2026-11-04
 
 ### Dice interface
