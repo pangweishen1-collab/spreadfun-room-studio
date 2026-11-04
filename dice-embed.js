@@ -20,6 +20,16 @@
       sync();
     },
   };
+  window.UploadPaste?.register({
+    zone:frame,
+    isActive:() => active && loaded,
+    onFiles(files) {
+      if (!active || !loaded) return;
+      const snapshot = Array.from(files || []);
+      if (!snapshot.length || !snapshot.every(file => file instanceof File)) return;
+      frame.contentWindow.postMessage({type:'fun-dice-files', files:snapshot}, location.origin);
+    },
+  });
   frame.addEventListener('load', sync);
   window.addEventListener('message', event => {
     if (event.origin !== location.origin || event.source !== frame.contentWindow) return;

@@ -228,4 +228,36 @@ html.embedded body { min-height:0; }
 html.embedded .page-shell { flex:none; }
 
 /* No heading row above the preview; retain its metadata only for controller state. */
+
+/* The empty preview is the main upload surface. Loaded video keeps its ratio. */
+.ft-ui .preview-card[data-has-canvas='false'] .preview-stage {
+  width: 100%; height: 520px; aspect-ratio: auto;
+}
+.preview-card[data-has-canvas='false'] .preview-toolbar { display: none; }
+.preview-empty.ft-upload-zone { border-radius: inherit; }
+.preview-empty p { max-width: 380px; }
+.preview-empty .keyboard-hint { margin-top: 0; color: var(--color-muted); }
+.preview-upload-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; max-width: 100%; margin-top: 8px; }
+.preview-upload-actions .button { min-width: 0; padding-inline: 12px; }
+#upload-zone {
+  flex-direction: row; justify-content: flex-start; min-height: 72px;
+  padding: 12px; gap: 8px; background: var(--color-surface-soft);
+  border-radius: var(--ft-radius-inner); text-align: left;
+}
+#upload-zone .upload-actions { display: flex; width: auto; justify-content: flex-start; }
+#upload-zone .upload-actions .button { width: auto; padding-inline: 10px; font-size: 12px; }
+@media (max-width: 900px) {
+  .ft-ui .preview-card[data-has-canvas='false'] .preview-stage { height: 480px; }
+}
+@media (max-width: 540px) {
+  .ft-ui .preview-card[data-has-canvas='false'] .preview-stage { height: 380px; }
+  .preview-empty { gap: 10px; }
+  .preview-upload-actions { margin-top: 0; }
+}
+@media (max-width: 350px) {
+  .ft-ui .preview-card[data-has-canvas='false'] .preview-stage { height: 360px; }
+  .preview-empty { gap: 8px; padding: 16px; }
+  .preview-empty .feedback-image { width: 96px; height: 72px; }
+  .preview-upload-actions .button { padding-inline: 10px; font-size: 12px; }
+}
 #session-meta[hidden] { display:none; }

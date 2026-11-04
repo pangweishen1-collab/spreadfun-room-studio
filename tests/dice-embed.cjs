@@ -4,13 +4,15 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
+const {File} = require('node:buffer');
 
 const origin = 'https://toolkit.example';
 const messages = [], assignments = [], checks = [];
 const anchors = [], downloads = [], attached = new Set();
 let removals = 0;
 const windowHandlers = new Map(), frameHandlers = new Map();
-const contentWindow = {postMessage(data, targetOrigin) { messages.push({data:JSON.parse(JSON.stringify(data)), targetOrigin}); }};
+const pasteRegistrations = [];
+const contentWindow = {postMessage(data, targetOrigin) { messages.push({data:data.type==='fun-dice-files'?{type:data.type,files:data.files}:JSON.parse(JSON.stringify(data)), targetOrigin}); }};
 let source = 'about:blank';
 const frame = {contentWindow, style:{}, title:'骰子预览',
   get src() { return source; },
@@ -31,14 +33,19 @@ const sandbox = {
     },
     body:{append(link) { attached.add(link); }},
   },
-  window:{addEventListener(type, handler) { windowHandlers.set(type, handler); }},
+  window:{addEventListener(type, handler) { windowHandlers.set(type, handler); }, UploadPaste:{register(config) { pasteRegistrations.push(config); }}},
   location:{origin},
+  File,
 };
 vm.createContext(sandbox);
 vm.runInContext(fs.readFileSync(path.join(__dirname, '../dice-embed.js'), 'utf8'), sandbox);
 const bridge = sandbox.window.DicePreview;
 const last = () => messages.at(-1);
 const emit = (data, eventOrigin=origin, eventSource=contentWindow) => windowHandlers.get('message')({data, origin:eventOrigin, source:eventSource});
+assert.equal(pasteRegistrations.length, 1);
+const paste = pasteRegistrations[0];
+assert.equal(paste.zone, frame);
+assert.equal(paste.isActive(), false);
 
 assert.equal(assignments.length, 0, 'initial navigation must not eagerly load dice');
 frameHandlers.get('load')();
@@ -104,6 +111,31 @@ assert.equal(last().data.language, 'en');
 assert.ok(messages.every(message => message.targetOrigin===origin), 'outbound messages must never use a wildcard origin');
 assert.equal(assignments.length, 1);
 checks.push('language_normalization_and_explicit_target_origin');
+
+const fileA = new File([new Uint8Array([9,8,7])], 'sz_1.png', {type:'image/png',lastModified:123});
+const fileB = new File([new Uint8Array([1,2,3])], '2.png', {type:'image/png',lastModified:456});
+const beforeInactivePaste = messages.length;
+assert.equal(paste.isActive(), false);
+paste.onFiles([fileA]);
+assert.equal(messages.length, beforeInactivePaste, 'Inactive tools must not forward files');
+bridge.setActive(true);
+assert.equal(paste.isActive(), true);
+const liveFiles = {0:fileA,1:fileB,length:2};
+paste.onFiles(liveFiles);
+const forwarded = last();
+liveFiles[0] = fileB; liveFiles.length = 0;
+assert.equal(forwarded.data.type, 'fun-dice-files');
+assert.equal(forwarded.targetOrigin, origin);
+assert.equal(forwarded.data.files.length, 2, 'A live list is snapshotted synchronously');
+assert.equal(forwarded.data.files[0], fileA, 'Original File bytes/reference are retained');
+assert.equal(forwarded.data.files[1], fileB);
+assert.deepEqual(Array.from(forwarded.data.files, file => [file.name,file.type,file.lastModified]), [['sz_1.png','image/png',123],['2.png','image/png',456]]);
+const beforeInvalidPaste = messages.length;
+for (const files of [null,[],[{}],[fileA,{}],new Array(2)]) paste.onFiles(files);
+assert.equal(messages.length, beforeInvalidPaste, 'Only nonempty File snapshots may be forwarded');
+bridge.setActive(false);
+assert.equal(paste.isActive(), false);
+checks.push('parent_paste_routes_only_active_loaded_file_snapshots_with_unchanged_files_and_explicit_origin');
 
 emit({type:'fun-dice-download', url:'blob:'+origin+'/video-id', fileName:'仙人掌.mp4'});
 emit({type:'fun-dice-download', url:'blob:'+origin+'/zip-id', fileName:'仙人掌素材.zip'});
