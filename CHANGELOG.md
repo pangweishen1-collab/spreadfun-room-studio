@@ -1,5 +1,15 @@
 # 更新记录
 
+## 1.12.0 - 2026-11-04
+
+### Dice resource delivery
+
+- Package layout change: ZIPs now contain only one named folder with matching .skel, .atlas, .png, res/ originals and sound/ audio. Download review videos separately; JSON, manifests, README, derived image folders and videos are excluded from game packages.
+- Apply the dice_green_ or dice_purple_ prefix automatically, normalize existing prefixes and unsafe filenames, and keep atlas page references consistent with the resulting name.
+- Export green rolls as genuine Spine 4.2 binary mesh/deform data, preserving all twelve animations, six results, a 1.3x scale peak and native sound events. Purple retains its original motion and adds the same native sound cues.
+- Bind the real pink anchor image to an invisible root slot with a 6x region attachment, and rebuild older green sessions once while retaining their original files.
+- Use the uploaded 3D 大骰子.png (or icon.png) for the preview hero. Support a separate hero replacement, prefer the explicit large-dice image, and show a missing-image hint instead of a flat-face fallback.
+
 ## 1.11.0 - 2026-11-04
 
 ### Dice preview
