@@ -1,0 +1,11 @@
+{
+  "name": "fflate",
+  "version": "0.8.3",
+  "source": "https://github.com/101arrowz/fflate",
+  "tarball": "https://registry.npmjs.org/fflate/-/fflate-0.8.3.tgz",
+  "integrity": "sha512-tbZNuJrLwGUp3zshBtdy4W+ORxZuIh8a5ilyIEQDC5rY1f3U20JMry0Ll3WBzU58EZKsEuJFXhb5gwv8CsPvgA==",
+  "files": {
+    "LICENSE": "0a1df3a083d0c010560aa342e87959c8c1070e6fd54545741f083f22d0c8b551",
+    "browser.mjs": "b7ca4450b19559a1d50eb381adcee94b82449674be4cd17789d9beba7e6122a1"
+  }
+}

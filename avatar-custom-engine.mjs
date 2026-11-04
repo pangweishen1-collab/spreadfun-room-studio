@@ -1,7 +1,8 @@
-/* Local SVGA text packaging. Schema: https://github.com/svga/SVGA-Format/blob/master/proto/svga.proto
- * Original protobuf records are retained verbatim unless an oversized raster asset
- * is explicitly optimized. PNG text is one additional sprite, not flattened frames.
+/* Local SVGA overlay packaging. Schema: https://github.com/svga/SVGA-Format/blob/master/proto/svga.proto
+ * Original timelines, audio and unknown fields are retained verbatim. PNG image
+ * streams may be losslessly repacked; image layers are not flattened animation frames.
  */
+import {compressDeflate,optimizePngLossless} from './avatar-lossless.mjs';
 const MAX_INPUT_BYTES=50*1024*1024,MAX_DECODED_BYTES=150*1024*1024,MAX_FIELDS=1000000;
 const encoder=new TextEncoder(),decoder=new TextDecoder('utf-8',{fatal:true});
 const parsedMarker=Symbol('parsedSvga');
@@ -124,14 +125,27 @@ export async function readSvga(input,{JSZip=globalThis.JSZip}={}){
   return {[parsedMarker]:true,format:'protobuf',info,images,root,sourceBytes:bytes};
 }
 export const readSvgaInfo=async(input,options)=>(await readSvga(input,options)).info;
-function uniqueKey(model){const used=new Set(model.images.map(i=>i.key));if(model.format==='zip')for(const sprite of model.spec.sprites)used.add(sprite.imageKey);else for(const r of model.root)if(r.id===4&&r.wire===2)used.add(text(records(r.data),1));let key='fun_custom_text',number=2;while(used.has(key))key='fun_custom_text_'+number++;return key}
-function textPlacement(options){
-  const bytes=asBytes(options.textImage),png=pngInfo(bytes);if(!png)fail('invalidTextImage','Text must be a valid PNG bitmap.');
+function imageKeysOf(model){const used=new Set(model.images.map(i=>i.key));if(model.format==='zip')for(const sprite of model.spec.sprites)used.add(sprite.imageKey);else for(const r of model.root)if(r.id===4&&r.wire===2)used.add(text(records(r.data),1));return used}
+function uniqueKey(used,kind){const base='fun_custom_'+kind;let key=base,number=2;while(used.has(key))key=base+'_'+number++;used.add(key);return key}
+function imagePlacement(options,legacy=false){
+  const bytes=asBytes(options.image),png=pngInfo(bytes);if(!png)fail(legacy?'invalidTextImage':'invalidImage','Overlay must be a valid PNG bitmap.');
+  if(bytes.length>MAX_INPUT_BYTES)fail('tooLarge','Overlay image exceeds the processing limit.');
   const {x,y,width,height}=options;
-  if(![x,y,width,height].every(Number.isFinite)||width<=0||height<=0||width>16384||height>16384||Math.abs(x)>32768||Math.abs(y)>32768)fail('invalidPlacement','Invalid text position or size.');
+  if(![x,y,width,height].every(Number.isFinite)||width<=0||height<=0||width>16384||height>16384||Math.abs(x)>32768||Math.abs(y)>32768)fail('invalidPlacement','Invalid overlay position or size.');
   return {bytes,png,x,y,width,height};
 }
-function textSpriteData(key,placement,frames){
+function layersOf(model,options){
+  const legacy=options.layers===undefined,inputs=legacy?[{...options,image:options.textImage,key:'text'}]:options.layers;
+  if(!Array.isArray(inputs)||inputs.length<1||inputs.length>8)fail('invalidLayers','Choose between one and eight image or text layers.');
+  const used=imageKeysOf(model);let total=0;
+  return inputs.map(input=>{
+    if(!input||typeof input!=='object'||(input.key!==undefined&&!['image','text'].includes(input.key)))fail('invalidLayers','Invalid image or text layer.');
+    const kind=input.key||'image',placement=imagePlacement(input,legacy);total+=placement.bytes.length;
+    if(total>MAX_INPUT_BYTES)fail('tooLarge','Combined overlays exceed the processing limit.');
+    return {...placement,kind,key:uniqueKey(used,kind)};
+  });
+}
+function overlaySpriteData(key,placement,frames){
   const {png,x,y,width,height}=placement;
   const layout=join([float(1,0),float(2,0),float(3,png.width),float(4,png.height)]);
   const matrix=join([float(1,width/png.width),float(2,0),float(3,0),float(4,height/png.height),float(5,x),float(6,y)]);
@@ -154,22 +168,21 @@ function scaleFrame(frame,sx,sy){
   return patch(frame,new Map([[2,message(2,updatedLayout)],[3,message(3,updatedMatrix)]]));
 }
 function scaledSprite(raw,sx,sy){const rs=records(raw);return join(rs.map(r=>r.id===2?message(2,scaleFrame(records(r.data),sx,sy)):r.raw))}
-function protobufBytes(model,key,placement,replacements){
+function effectiveLayer(layer,replacements){const bytes=replacements.get(layer.key)?.bytes||layer.bytes;return bytes===layer.bytes?layer:{...layer,bytes,png:pngInfo(bytes)}}
+function protobufBytes(model,layers,replacements){
   const imagesByIndex=new Map(model.images.map(i=>[i.index,i]));
   const parts=model.root.map((r,index)=>{
     if(r.id===3){const image=imagesByIndex.get(index),replacement=replacements.get(image.key);if(replacement)return message(3,patch(image.entry,new Map([[2,message(2,replacement.bytes)]])))}
     if(r.id===4){const rs=records(r.data),replacement=replacements.get(text(rs,1).replace('.matte',''));if(replacement&&(replacement.sx!==1||replacement.sy!==1))return message(4,scaledSprite(r.data,replacement.sx,replacement.sy))}
     return r.raw;
   });
-  return join([...parts,message(3,join([str(1,key),message(2,placement.bytes)])),message(4,textSpriteData(key,placement,model.info.frames))]);
+  for(const layer of layers){const placement=effectiveLayer(layer,replacements);parts.push(message(3,join([str(1,layer.key),message(2,placement.bytes)])),message(4,overlaySpriteData(layer.key,placement,model.info.frames)))}
+  return join(parts);
 }
 function cloneSpec(spec){return JSON.parse(JSON.stringify(spec))}
-async function zipBytes(model,key,placement,replacements){
+async function zipBytes(model,layers,replacements){
   // JSZip instances own mutable file maps, so every build starts from the retained input bytes.
-  const zip=await model.JSZip.loadAsync(model.sourceBytes),spec=cloneSpec(model.spec),{png,x,y,width,height}=placement;
-  const reserved=new Set(Object.keys(zip.files));let path=key+'.png',index=2;while(reserved.has(path))path=key+'_'+(index++)+'.png';
-  spec.images[key]=path.slice(0,-4);
-  spec.sprites.push({imageKey:key,frames:Array.from({length:model.info.frames},()=>({alpha:1,layout:{x:0,y:0,width:png.width,height:png.height},transform:{a:width/png.width,b:0,c:0,d:height/png.height,tx:x,ty:y}}))});
+  const zip=await model.JSZip.loadAsync(model.sourceBytes),spec=cloneSpec(model.spec),reserved=new Set(Object.keys(zip.files));
   for(const image of model.images){const replacement=replacements.get(image.key);if(!replacement)continue;zip.file(image.path,replacement.bytes);if(replacement.sx===1&&replacement.sy===1)continue;
     for(const sprite of spec.sprites)if(String(sprite.imageKey).replace('.matte','')===image.key)for(const frame of sprite.frames){
       const matrix=frame.transform||{a:1,b:0,c:0,d:1,tx:0,ty:0},layout=frame.layout||{x:0,y:0,width:0,height:0};
@@ -177,48 +190,83 @@ async function zipBytes(model,key,placement,replacements){
       frame.layout={...layout,x:(layout.x??0)/replacement.sx,y:(layout.y??0)/replacement.sy,width:(layout.width??0)/replacement.sx,height:(layout.height??0)/replacement.sy};
     }
   }
-  zip.file(path,placement.bytes);zip.file('movie.spec',JSON.stringify(spec));
+  for(const layer of layers){
+    const {key}=layer,{png,x,y,width,height,bytes}=effectiveLayer(layer,replacements);let path=key+'.png',index=2;while(reserved.has(path))path=key+'_'+(index++)+'.png';reserved.add(path);
+    spec.images[key]=path.slice(0,-4);spec.sprites.push({imageKey:key,frames:Array.from({length:model.info.frames},()=>({alpha:1,layout:{x:0,y:0,width:png.width,height:png.height},transform:{a:width/png.width,b:0,c:0,d:height/png.height,tx:x,ty:y}}))});zip.file(path,bytes);
+  }
+  zip.file('movie.spec',JSON.stringify(spec));
   return zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:9}});
 }
 async function assetBytes(model,image){return image.bytes||zipEntryBytes(model.zip.file(image.path))}
+async function optimizationAssets(model,layers){
+  const assets=[],seenPaths=new Set();
+  for(const image of model.images){if(model.format==='zip'&&seenPaths.has(image.path))continue;seenPaths.add(image.path);const original=await assetBytes(model,image),dimensions=pngInfo(original);if(dimensions){const aliases=model.format==='zip'?model.images.filter(other=>other.path===image.path):[image];assets.push({key:image.key,aliases,bytes:original,...dimensions,canResize:aliases.every(alias=>canResizeImage(model,alias.key)),kind:'source',priority:1})}}
+  for(const layer of layers)assets.push({key:layer.key,aliases:[layer],bytes:layer.bytes,...layer.png,canResize:true,kind:layer.kind,priority:layer.kind==='image'?0:2});
+  return assets.sort((a,b)=>a.priority-b.priority||b.bytes.length-a.bytes.length);
+}
+async function packProtobuf(body){
+  const [nativeResult,denseResult]=await Promise.allSettled([transform(body,'deflate'),compressDeflate(body)]);
+  const native=nativeResult.status==='fulfilled'?nativeResult.value:null;let dense=null;
+  if(denseResult.status==='fulfilled')try{dense=asBytes(denseResult.value)}catch{}
+  if(!native&&!dense)throw nativeResult.reason;
+  const bytes=dense&&(!native||dense.length<native.length)?dense:native;
+  return {bytes,nativeBytes:native?.length??bytes.length,packagingBytesSaved:native?native.length-bytes.length:0};
+}
 /**
- * Add one topmost static text PNG. x/y and width/height are logical SVGA pixels,
- * independent of PNG resolution (a 2x bitmap is supported).
- * optimizeImage({bytes,key,width,height,maxWidth,maxHeight,pass,canResize}) may
+ * Append static PNG layers in paint order. layers: [{image,x,y,width,height,key?}]
+ * uses key 'image' (default) or 'text'. The old textImage/x/y/width/height API remains.
+ * Coordinates are logical SVGA pixels, independent of PNG resolution.
+ * Every PNG is first repacked without changing decoded RGBA, dimensions or placement.
+ * The legacy optimizeImage({bytes,key,width,height,maxWidth,maxHeight,pass,canResize}) may
  * return smaller PNG bytes or null. Only called when the complete file is too large.
+ * Set allowLossyOptimization:false to prohibit this size-dependent resizing fallback.
  * Images with vector/clip geometry cannot be resized, but same-size PNG optimization
  * is safe. Original timeline/audio are retained, never frame-dropped to meet budget.
  */
 export async function buildCustomizedSvga(input,options={},runtime={}){
-  const model=await readSvga(input,runtime),placement=textPlacement(options),key=uniqueKey(model),replacements=new Map();
+  const model=await readSvga(input,runtime),layers=layersOf(model,options),replacements=new Map();
   const maxBytes=options.maxBytes??SVGA_MAX_OUTPUT_BYTES;
   if(!Number.isInteger(maxBytes)||maxBytes<1024||maxBytes>SVGA_MAX_OUTPUT_BYTES)fail('invalidSizeLimit','The SVGA size limit must be between 1 KB and 3 MB.');
   const progress=value=>runtime.onProgress?.(value);
   progress({phase:'packaging',progress:10});
-  const encode=async()=>model.format==='protobuf'?transform(protobufBytes(model,key,placement,replacements),'deflate'):zipBytes(model,key,placement,replacements);
-  let bytes=await encode(),passes=0;
-  if(bytes.length>maxBytes&&typeof options.optimizeImage==='function'){
-    const assets=[],seenPaths=new Set();
-    for(const image of model.images){if(model.format==='zip'&&seenPaths.has(image.path))continue;seenPaths.add(image.path);const original=await assetBytes(model,image),dimensions=pngInfo(original);if(dimensions){const aliases=model.format==='zip'?model.images.filter(other=>other.path===image.path):[image];assets.push({image,aliases,bytes:original,...dimensions,canResize:aliases.every(alias=>canResizeImage(model,alias.key))})}}
-    assets.sort((a,b)=>b.bytes.length-a.bytes.length);
+  const encode=async()=>model.format==='protobuf'?packProtobuf(protobufBytes(model,layers,replacements)):{bytes:await zipBytes(model,layers,replacements),packagingBytesSaved:0};
+  const baseline=await encode(),assets=await optimizationAssets(model,layers);let bytes=baseline.bytes,passes=0;
+  const losslessCandidates=new Map();
+  for(let index=0;index<assets.length;index++){
+    const asset=assets[index];progress({phase:'lossless',progress:12+Math.round(index/Math.max(1,assets.length)*40)});
+    let optimized;try{optimized=asBytes(await optimizePngLossless(new Uint8Array(asset.bytes)))}catch{continue}
+    const dimensions=pngInfo(optimized);if(!dimensions||dimensions.width!==asset.width||dimensions.height!==asset.height||optimized.length>=asset.bytes.length)continue;
+    for(const alias of asset.aliases){const replacement={bytes:optimized,sx:1,sy:1,lossless:true};replacements.set(alias.key,replacement);losslessCandidates.set(alias.key,replacement)}
+  }
+  if(replacements.size){const candidate=await encode();if(candidate.bytes.length<bytes.length)bytes=candidate.bytes;else replacements.clear()}
+  const losslessBytes=bytes.length;
+  if(bytes.length>maxBytes&&options.allowLossyOptimization!==false&&typeof options.optimizeImage==='function'){
     const scales=[.9,.75,.6];
     for(let pass=0;pass<scales.length&&bytes.length>maxBytes;pass++){
-      let changed=false;
-      for(let index=0;index<assets.length;index++){
-        const asset=assets[index],scale=asset.canResize?scales[pass]:1;
-        progress({phase:'optimizing',progress:20+Math.round((pass+index/Math.max(1,assets.length))/scales.length*65),pass:pass+1});
-        const result=await options.optimizeImage({key:asset.image.key,bytes:new Uint8Array(asset.bytes),width:asset.width,height:asset.height,maxWidth:Math.max(1,Math.round(asset.width*scale)),maxHeight:Math.max(1,Math.round(asset.height*scale)),pass:pass+1,canResize:asset.canResize});
-        if(result==null)continue;
-        const optimized=asBytes(result),dimensions=pngInfo(optimized);if(!dimensions)fail('invalidOptimizedImage','Image optimization must return PNG data.');
-        if((!asset.canResize&&(dimensions.width!==asset.width||dimensions.height!==asset.height))||dimensions.width>asset.width||dimensions.height>asset.height)continue;
-        const current=replacements.get(asset.image.key)?.bytes||asset.bytes;if(optimized.length>=current.length)continue;
-        // Keep one canonical geometry change relative to the untouched original.
-        for(const alias of asset.aliases)replacements.set(alias.key,{bytes:optimized,sx:asset.width/dimensions.width,sy:asset.height/dimensions.height});changed=true;
+      let index=0;
+      for(const priority of [0,1,2]){
+        let changed=false;
+        for(const asset of assets.filter(value=>value.priority===priority)){
+          const scale=asset.canResize?scales[pass]:1;
+          progress({phase:'optimizing',progress:20+Math.round((pass+index++/Math.max(1,assets.length))/scales.length*65),pass:pass+1});
+          const result=await options.optimizeImage({key:asset.key,kind:asset.kind,bytes:new Uint8Array(asset.bytes),width:asset.width,height:asset.height,maxWidth:Math.max(1,Math.round(asset.width*scale)),maxHeight:Math.max(1,Math.round(asset.height*scale)),pass:pass+1,canResize:asset.canResize});
+          if(result==null)continue;
+          const optimized=asBytes(result),dimensions=pngInfo(optimized);if(!dimensions)fail('invalidOptimizedImage','Image optimization must return PNG data.');
+          if((!asset.canResize&&(dimensions.width!==asset.width||dimensions.height!==asset.height))||dimensions.width>asset.width||dimensions.height>asset.height)continue;
+          const current=replacements.get(asset.key)?.bytes||asset.bytes;if(optimized.length>=current.length)continue;
+          // Keep one canonical geometry change relative to the untouched original.
+          for(const alias of asset.aliases)replacements.set(alias.key,{bytes:optimized,sx:asset.width/dimensions.width,sy:asset.height/dimensions.height});changed=true;
+        }
+        if(changed)bytes=(await encode()).bytes;if(bytes.length<=maxBytes)break;
       }
-      passes=pass+1;if(changed)bytes=await encode();
+      passes=pass+1;
     }
   }
   if(bytes.length>maxBytes)fail('sizeLimit','The customized SVGA cannot fit within the selected size limit without further source optimization.',{actualBytes:bytes.length,maxBytes});
   progress({phase:'done',progress:100});
-  return {bytes,mime:'application/octet-stream',info:{...model.info,imageCount:model.info.imageCount+1},imageKey:key,optimized:replacements.size>0,optimizedImages:replacements.size,optimizationPasses:passes,size:bytes.length};
+  const imageKeys=layers.map(layer=>layer.key),imageKey=layers.find(layer=>layer.kind==='text')?.key||imageKeys[0];
+  const losslessAssets=assets.filter(asset=>replacements.get(asset.key)===losslessCandidates.get(asset.key)&&losslessCandidates.has(asset.key));
+  const lossless={optimizedImages:losslessAssets.length,imageBytesSaved:losslessAssets.reduce((sum,asset)=>sum+asset.bytes.length-replacements.get(asset.key).bytes.length,0),packagingBytesSaved:baseline.packagingBytesSaved,bytesSaved:(baseline.nativeBytes??baseline.bytes.length)-losslessBytes,beforeBytes:baseline.nativeBytes??baseline.bytes.length,afterBytes:losslessBytes};
+  lossless.savedBytes=lossless.bytesSaved;lossless.baselineBytes=lossless.beforeBytes;
+  return {bytes,mime:'application/octet-stream',info:{...model.info,imageCount:model.info.imageCount+layers.length},imageKey,imageKeys,optimized:replacements.size>0||lossless.bytesSaved>0,optimizedImages:replacements.size,optimizationPasses:passes,lossless,size:bytes.length};
 }
