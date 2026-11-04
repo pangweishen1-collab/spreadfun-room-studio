@@ -299,3 +299,33 @@
 - Purple cricket source preview/import passed with the existing ten files and purple background. Production build was checked at 375px with no horizontal overflow, controls inside the full resized iframe, and return from Avatar frames retained the green files, sound flag and current video. Clean browser error/warning log empty.
 - Build contains 341 inventoried static files plus Pages API routing files. Every shipped static byte matched the build manifest; temporary browser diagnosis code was removed. A fast chained automation check toggled the sound input without a reproduced source path; separate clean upload/export/download/navigation checks retained the flag correctly, so no speculative product fix was added.
 - Release authorization is the user's explicit request to merge and publish. API worker/D1 data and migrations are unchanged. Live deployment receipt and post-deploy artifact checks are recorded separately under the dice chat work/release-v1.11.0 directory.
+
+
+## 本地资源包补齐 · 2026-11-04（未发布）
+
+- 紫色打包增加预览实际使用的 dice.skel、dice.atlas、preview.png 和 README；图集页名保持 preview.png。原图、声音时间表、音频及当前绑定视频继续保留，不生成原生 .spine 工程。
+- test:dice 全套通过，紫色会话测试新增运行资源字节/清单校验，共 12 组；绿色、声音及输入回归通过。实际本地网页完成板球十图导入、带声 6 秒视频和完整包下载，控制台无错误。
+- 当前交付 ZIP 位于骰子聊天 outputs/骰子资源包：绿色海龟 1,524,323 字节；紫色板球 1,927,548 字节。原图字节、视频绑定和图集页引用已校验。正式站仍为 v1.11.0，本轮未部署。
+
+
+## 本地大骰子原图修正 · 2026-11-04（未发布）
+
+- 文件夹中大骰子.png优先于icon.png；缺图时不再用sz_0/sz_1平面图伪装大图，显示补传提示。
+- 新增按revision更新hero的本地接口，保留原六面/runtime/audio/anchor和原视频Blob；更新candidate后旧视频不再下载。文件URL按原文件hash区分，避免换图仍读取旧图。
+- 海龟真实文件夹上传显示正确立体海龟，视频和ZIP使用相同原图，SHA256=e8d402d339633f98fa19be4221c49733457c8b73040fc3d3d5d083a5b66c32e7。绿色大图版ZIP1,561,676字节，包含867,210字节6秒视频。真实网页另验证只六图提示缺大图、仅补传大图保留六面预览。
+- green/purple后端定向测试覆盖原图字节、连续不同图hash URL、旧视频失效、失败/陈旧revision不修改原会话；渲染器验证缺大图不读取平面替代。正式站仍为v1.11.0，本轮未部署。
+
+## 本地绿色 anchor 插槽修正 · 2026-11-04（未发布）
+
+- anchor 插槽直接挂在 root，实际引用上传或内置同一张粉色 anchor.png；30×30 图片附件 scaleX/scaleY=6，世界尺寸180×180，slot和attachment alpha均为0。独立images/anchor.png与图集anchor区域同步生成，静态贴图数14；六面翻滚仍为Mesh/Deform，缩放峰值1.3，不增加序列帧。
+- 旧绿色会话读取时仅迁移一次并更新资源缓存键、revision与candidate；原图、声音、anchor和旧视频Blob保留，旧视频不再公开或混入新ZIP。test:dice全套通过；最后补充的六面定向测试10组通过，覆盖默认/自传不同锚点和迁移幂等。
+- 真实网页完成默认anchor与显式用户anchor两条导出流程，控制台无错误。最终绿色-海龟-anchor根骨骼6倍.zip为1,567,181字节，内同次MP4为872,171字节，解码6.00秒、720×1600、30fps/180帧，AAC单声道48kHz。上传PNG、anchor和两MP3原文件字节保持。
+- 独立官方spine-core4.2.120检查两份实际下载包的12动作：每spin305个采样、每standby3个采样，root关联、6倍/180×180、透明度和六点落地均通过。images/anchor.png与atlas区域RGBA逐像素相同；相对原图仅4个半透明角像素G通道74→73（Canvas量化，alpha229不变），不声称派生图与原图所有RGBA字节一致；res/anchor.png保持原文件。报告在骰子聊天work/anchor-qa。未打开Spine Editor，未部署。
+
+## 本地交付包前缀与精简结构 · 2026-11-04（未发布）
+
+- 以用户 Desktop/dice_green_sea_turtle 目录为交付结构：ZIP 名与唯一根文件夹均为 dice_green_<主题> / dice_purple_<主题>。根目录仅同名 .skel/.atlas/.png、res/ 和 sound/；hero统一icon.png，点数按槽位规范命名，内容字节保持。视频独立下载，不再附带任何JSON、README、build-info、manifest、images或原始anchor。anchor继续保留在实际图集中。
+- 绿色原生二进制写出使用当前生成JSON的region、非加权mesh/deform、RGBA、drawOrder、translate/scale和events。官方4.2.120 JSON/Binary Runtime对3组几何和12动作共5587时间样本比对，最大世界坐标差0.00001526逻辑像素（float32量化）；1.3缩放、6个结果、root下隐藏6倍anchor、声音时序均一致。未知功能明确拒绝，未生成伪造的.spine。
+- 紫色仅对已知SHA256原模板补充原生roll(0秒)和six(仅spin_6的0.6秒)事件，所有非事件结构、附件、曲线逐值不变；输出5810字节，事件直接引用sound/。fingerprint不匹配或重复patch明确拒绝。紫色anchor继续原模板all→root/隐藏6倍和透明图集区域，未改为绿色新绑定。
+- 真实本地网页以用户整目录导入，自动识别dice_green_sea_turtle，下载609273字节ZIP、恰13文件(core3+res8+sound2)；板球以cricket名称下载dice_purple_cricket.zip，975514字节、恰15文件(core3+res10+sound2)。两色原图、声音字节与输入一致，atlas页引用、PNG CRC与官方Runtime12动作独立审计通过。单独视频dice_purple_cricket.mp4为6秒、约931KiB，未进入资源包。控制台无错误。
+- 复现脚本及实际包检查在骰子聊天work/compact-package-qa；交付ZIP在outputs/骰子资源包。test:dice全套通过（绿色11组、紫色13组，另含新增二进制数值对比和固定模板声音测试），生产构建343文件通过。正式站仍v1.11.0，本轮未部署、未打开Spine Editor；目标游戏尚需使用匹配的Spine4.2 Runtime接入。

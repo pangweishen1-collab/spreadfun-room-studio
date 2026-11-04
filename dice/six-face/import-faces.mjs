@@ -11,7 +11,7 @@ function classify(file){
  if((m=/^(?:sz[ -]?|face[_ -]?)([1-6])$/.exec(stem)))return {point:Number(m[1]),priority:1};
  if((m=/^([1-6])$/.exec(stem)))return {point:Number(m[1]),priority:2};
  if(/^sz_?0$/.test(stem))return {point:'zero',priority:stem==='sz_0'?0:1};
- if(stem==='icon'||stem==='大骰子')return {point:'hero',priority:stem==='icon'?0:1};
+ if(stem==='icon'||stem==='大骰子')return {point:'hero',priority:stem==='大骰子'?0:1};
  return {unknown:true};
 }
 export function selectFaceFiles(files){
@@ -27,7 +27,7 @@ export function selectFaceFiles(files){
  const chosen={};
  for(const [point,group]of groups){
   const priority=Math.min(...group.map(x=>x.priority)),best=group.filter(x=>x.priority===priority);
-  if(optionalLabels[point]&&best.length!==1){warnings.push(optionalLabels[point]+'存在重复文件，已忽略该可选素材'+(point==='hero'?'并使用第1面作为封面':''));continue;}
+  if(optionalLabels[point]&&best.length!==1){warnings.push(optionalLabels[point]+'存在重复文件，已忽略该可选素材'+(point==='hero'?'；请补传大骰子.png':''));continue;}
   if(best.length!==1)throw issue((point==='hero'?'大图':'第'+point+'面')+'有重复文件：'+best.map(x=>x.file.name).join('、'),'duplicate_faces',{duplicates:best.map(x=>x.file.name)});
   chosen[point]=best[0].file;
   if(priority===2)warnings.push('已按数字文件名将'+best[0].file.name+'作为第'+point+'面；请确认它不是旧滚动角度图');
@@ -44,7 +44,7 @@ export function selectFaceFiles(files){
  for(const key of ['hero','zero'])if(chosen[key]){
   const f=chosen[key];
   if(!Number.isSafeInteger(f.size)||f.size<=0||f.size>FACE_IMPORT_LIMITS.maxFileBytes||bytes+f.size>FACE_IMPORT_LIMITS.maxTotalBytes){
-   warnings.push(optionalLabels[key]+'为空或超过读取限制，已忽略该可选素材'+(key==='hero'?'并使用第1面作为封面':''));delete chosen[key];
+   warnings.push(optionalLabels[key]+'为空或超过读取限制，已忽略该可选素材'+(key==='hero'?'；请补传大骰子.png':''));delete chosen[key];
   }else bytes+=f.size;
  }
  return {faces,hero:chosen.hero||null,extras:chosen.zero?[chosen.zero]:[],warnings};
@@ -94,7 +94,7 @@ export async function decodeFaceFiles(files,{signal}={}){
    const h=await boundedRead(pngHeader(optional[key],signal),signal);
    if(pixels+h.width*h.height>FACE_IMPORT_LIMITS.maxTotalPixels)throw issue(optionalLabels[key]+'超过剩余解码像素限制','total_pixels_too_large');
    pixels+=h.width*h.height;headers.push([key,h]);entries.push([key,optional[key]]);
-  }catch(error){if(error.name==='AbortError')throw error;selected.warnings.push(optionalLabels[key]+'无法读取：'+error.message+'；已忽略该可选素材'+(key==='hero'?'并使用第1面作为封面':''));optional[key]=null;}
+  }catch(error){if(error.name==='AbortError')throw error;selected.warnings.push(optionalLabels[key]+'无法读取：'+error.message+'；已忽略该可选素材'+(key==='hero'?'；请补传大骰子.png':''));optional[key]=null;}
  }
  checkAbort(signal);const byKey=Object.fromEntries(headers),urls=new Set(),liveImages=new Set();let disposed=false;
  const dispose=()=>{if(disposed)return;disposed=true;for(const img of liveImages)img.src='';for(const u of urls)URL.revokeObjectURL(u);liveImages.clear();urls.clear();};
@@ -103,7 +103,7 @@ export async function decodeFaceFiles(files,{signal}={}){
  const failed=settled.find((x,i)=>!optionalLabels[entries[i][0]]&&x.status==='rejected');if(failed){dispose();throw failed.reason;}
  for(const key of ['hero','zero']){
   const i=entries.findIndex(([name])=>name===key);
-  if(i>=0&&settled[i].status==='rejected'){selected.warnings.push(optionalLabels[key]+'解码失败，已忽略该可选素材'+(key==='hero'?'并使用第1面作为封面':''));optional[key]=null;}
+  if(i>=0&&settled[i].status==='rejected'){selected.warnings.push(optionalLabels[key]+'解码失败，已忽略该可选素材'+(key==='hero'?'；请补传大骰子.png':''));optional[key]=null;}
  }
  const result=Object.fromEntries(settled.filter(x=>x.status==='fulfilled').map(x=>x.value));
  const extras=optional.zero?[optional.zero]:[],sources=[...Object.values(selected.faces),...(optional.hero?[optional.hero]:[]),...extras];

@@ -70,7 +70,9 @@ export function buildSpineJson(prepared) {
     {name:'shadow',bone:'shadow_size',attachment:'shadow',color:'ffffff00'},
     ...FACE.map(f => ({name:'face_'+f.point,bone:bodyBone,attachment:'mesh_'+f.point,color:'ffffff00'})),
     {name:'result',bone:'all',attachment:'sz_1'}];
-  const attachments={anchor:{anchor:{type:'region',path:'white',width:30,height:30,color:'ffffff00'}},
+  // Slots have no transform in Spine: scale the region attachment while keeping
+  // the slot directly on root, independent of the rolling dice bones.
+  const attachments={anchor:{anchor:{type:'region',path:'anchor',width:30,height:30,scaleX:6,scaleY:6,color:'ffffff00'}},
     shadow:{shadow:{type:'region',path:'white',width:108,height:18,color:'214d23ff'}},
     result:Object.fromEntries(FACE.map(f => ['sz_'+f.point,{type:'region',path:'flat_'+f.point,width:faceWidth,height:faceHeight,x:offsetX,y:offsetY}]))};
   for (const f of FACE) {
@@ -138,8 +140,10 @@ function abortIf(signal) {
 const align16 = n => Math.ceil(n/16)*16;
 function layout(width,height) {
   for (const columns of [3,4]) {
-    const regions=Array.from({length:13},(_,i) => ({name:i===12?'white':`${i%2?'roll':'flat'}_${Math.floor(i/2)+1}`,
-      x:i%columns*(width+4)+2,y:Math.floor(i/columns)*(height+4)+2,width:i===12?64:width,height:i===12?16:height}));
+    const regions=Array.from({length:12},(_,i) => ({name:`${i%2?'roll':'flat'}_${Math.floor(i/2)+1}`,
+      x:i%columns*(width+4)+2,y:Math.floor(i/columns)*(height+4)+2,width,height}));
+    const bottom=Math.ceil(12/columns)*(height+4)+2;
+    regions.push({name:'white',x:2,y:bottom,width:64,height:16},{name:'anchor',x:70,y:bottom,width:30,height:30});
     const w=align16(Math.max(...regions.map(r => r.x+r.width))+2),h=align16(Math.max(...regions.map(r => r.y+r.height))+2);
     if (w<=2048&&h<=2048) return {width:w,height:h,columns,padding:2,regions};
   }
@@ -156,8 +160,9 @@ function extrude(atlas,image,r) {
   for(const [sx,sy,dx,dy] of [[0,0,x-1,y-1],[w-1,0,x+w,y-1],[0,h-1,x-1,y+h],[w-1,h-1,x+w,y+h]])pixel(sx,sy,dx,dy);
 }
 
-export async function buildSpineAssets(prepared,{name='自定义骰子',signal}={}) {
+export async function buildSpineAssets(prepared,{name='自定义骰子',signal,anchorImage}={}) {
   abortIf(signal);
+  if(!size(anchorImage).every(value=>value>0))throw Error('缺少有效的 anchor.png');
   const geo=geometry(prepared),[left,top,cropW,cropH]=geo.crop;
   // Validate all six before allocating or producing any output.
   for (let p=1;p<=6;p++) {
@@ -196,6 +201,8 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal}=
   const whiteData=white.context.getImageData(0,0,64,16).data;
   for(let at=0;at<whiteData.length;at+=4)whiteData.set([255,255,255],at);
   images.white={width:64,height:16,data:whiteData};
+  const anchor=make(30,30);anchor.context.drawImage(anchorImage,0,0,30,30);
+  images.anchor={width:30,height:30,data:anchor.context.getImageData(0,0,30,30).data};
   const page={width:packing.width,height:packing.height,data:new Uint8Array(packing.width*packing.height*4)};
   for(const region of packing.regions)extrude(page,images[region.name],region);
   const atlasPage='dice.png',lines=[atlasPage,`size: ${packing.width},${packing.height}`,'format: RGBA8888',
@@ -205,12 +212,13 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal}=
   const atlasText=lines.join('\n')+'\n',json=buildSpineJson(prepared);
   const encoded=await encodeRgbaPng(page.width,page.height,page.data,{signal}),textureBlob=encoded.blob;
   const metadata={name:String(name).trim().slice(0,120)||'自定义骰子',format:'Spine 4.2 JSON; MeshAttachment + DeformTimeline',
-    spine:'4.2.43',imageSequences:0,staticImages:13,faceMeshes:6,faceMeshVertices:25,hull:16,
+    spine:'4.2.43',imageSequences:0,staticImages:14,faceMeshes:6,faceMeshVertices:25,hull:16,
+    anchor:{slot:'anchor',bone:'root',attachment:'anchor',image:'images/anchor.png',width:30,height:30,scaleX:6,scaleY:6,opacity:0},
     crop:geo.crop,sourceSize:geo.sourceSize,cropOffset:[...prepared.cropOffset],logicalSize:[geo.faceWidth,geo.faceHeight],
     logicalOffset:[geo.offsetX,geo.offsetY],rasterScale,atlas:packing,rollEnd:.6,settleEnd:.633333,zoomPeak:ZOOM_PEAK,
     pngEncoding:encoded.method,transparentRgb:'Flat alpha-zero RGB copied from corresponding opaque rolling texture; raw RGBA atlas with one-pixel extrusion.',
     animations:Object.keys(json.animations),notes:['Derived images are browser-normalized; no byte-for-byte original RGB equivalence is claimed.',
-      'Original images are retained separately; no native .spine or binary .skel is fabricated.',
+      'Original images are retained separately; .skel game data is written by the browser packager; native .spine still requires the Editor.',
       'Spine 4.2 mesh/deform JSON support is required; Editor and target game acceptance remain separate checks.']};
   const files={'dice.json':new Blob([JSON.stringify(json)],{type:'application/json'}),
     'dice.atlas':new Blob([atlasText],{type:'text/plain'}),'dice.png':textureBlob,
@@ -219,14 +227,15 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal}=
   files['README.txt']=new Blob([
     '骰子 Spine 资源包\n\n'+
     '这是新建的 Spine 4.2 JSON 骨架，包含 spin_1..6 和 standby_1..6、六面 Mesh、Deform、RGBA 与 drawOrder 时间线。\n'+
-    '旋转使用数值顶点关键帧；13张图片都是静态贴图，不含逐帧图片序列。\n'+
+    '旋转使用数值顶点关键帧；14张图片都是静态贴图，不含逐帧图片序列。\n'+
+    'anchor 插槽直接挂在 root；引用 images/anchor.png，30×30 图片附件缩放为 6×6（180×180），插槽与附件不透明度均为 0，不参与翻滚或缩放时间线。\n'+
     '使用 dice.json + dice.atlas + dice.png；images/ 为编辑器使用的独立贴图。Runtime 必须支持 Spine 4.2 JSON 与网格变形。\n'+
     'source-png/（如提供）保留原始文件。派生平面图的全透明像素回填对应滚动贴图的边缘颜色；图集直接写入 RGBA 并挤出一像素边缘，PNG 编码不经过 Canvas.toBlob。派生贴图不声称与原始 PNG 的所有 RGB 字节相同。\n'+
-    '当前包没有伪造 .skel 或 .spine。原生工程/二进制需用匹配版本的 Spine Editor 导入、保存或导出。\n'+
+    '浏览器资源打包可生成真实 Spine 4.2 .skel 运行数据；原生 .spine 工程仍需匹配版本的 Spine Editor。\n'+
     '浏览器预览通过不代表 Spine Editor 或目标游戏已经验收；请在实际目标 Runtime 中检查动作、图集与透明边缘。\n'
   ],{type:'text/plain;charset=utf-8'});
   files['manifest.json']=new Blob([JSON.stringify({name:metadata.name,format:metadata.format,spine:metadata.spine,
-    atlasPage,animations:metadata.animations,staticImages:13,imageSequences:0,
+    atlasPage,animations:metadata.animations,staticImages:14,imageSequences:0,
     files:Object.entries(files).map(([path,blob]) => ({path,bytes:blob.size}))},null,2)],{type:'application/json'});
   abortIf(signal);
   return {json,atlasText,textureBlob,atlasPage,files,metadata};

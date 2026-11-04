@@ -70,11 +70,11 @@ function toast(key, values) {
   node.textContent = t(key, values); node.hidden = false;
   toastTimer = setTimeout(() => { node.hidden = true; }, 3500);
 }
-function download(url, extension) {
+function download(url, extension, name=session?.resourceName) {
   if (typeof url !== 'string' || !url.startsWith('blob:')) throw issue('invalidDownload');
   const anchor = document.createElement('a');
   anchor.href = url;
-  anchor.download = ((session?.name || t('defaultName')).replace(/[\/:*?"<>|]/g, '_')) + extension;
+  anchor.download = ((name || session?.name || t('defaultName')).replace(/[\\/:*?"<>|]/g, '_')) + extension;
   if (window.parent !== window) {
     window.parent.postMessage({type:'fun-dice-download', url, fileName:anchor.download}, location.origin);
     return;
@@ -131,6 +131,8 @@ function render() {
   $('preview-empty').querySelector('h3').textContent = t(grade === 'green' ? 'greenEmptyTitle' : 'previewEmptyTitle');
   $('asset-grid').setAttribute('aria-label',t(grade === 'green' ? 'greenAssetStatus' : 'assetStatus'));
   $('grade-upload-hint').textContent=t(grade === 'green' ? 'greenUploadHint' : 'purpleUploadHint');
+  $('hero-hint').hidden=!session || Boolean(session.candidate.icon);
+  $('hero-hint').textContent=t('missingHero');
   document.querySelectorAll('[data-grade]').forEach(button => {
     const active = button.dataset.grade === grade;
     button.disabled = locked; button.classList.toggle('is-active', active); button.setAttribute('aria-pressed', String(active));
@@ -247,7 +249,18 @@ async function importPending() {
 }
 async function stageFiles(files) {
   if (!files.length) throw issue('noFiles');
+  if(!$('dice-name').value.trim()){
+    const folders=new Set(files.flatMap(file=>(file.webkitRelativePath||'').replace(/\\/g,'/').split('/').slice(0,-1))
+      .filter(part=>/^dice_(?:green|purple)_.+/i.test(part)));
+    if(folders.size===1)$('dice-name').value=[...folders][0];
+  }
+  if (files.length===1 && /^(?:大骰子|icon)\.png$/i.test(files[0].name.normalize('NFKC').trim()) && session && !pending.size) {
+    const next=await api(`/api/preview/${session.id}/hero`,{method:'POST',body:{expectedRevision:session.revision,file:files[0]}});
+    await loadSession(next,true); toast('heroUpdated'); return;
+  }
   if (grade === 'green') return stageGreen(files);
+  // Prefer the explicit hero when old folders also contain an icon alias.
+  if (files.some(file=>file.name.normalize('NFKC').trim().toLowerCase()==='大骰子.png')) files=files.filter(file=>file.name.normalize('NFKC').trim().toLowerCase()!=='icon.png');
   const sidecars=files.filter(file=>/^anchor\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(file.name));
   files=files.filter(file=>!sidecars.includes(file));
   const unknown = files.filter(file => !slotFor(file.name));
@@ -376,7 +389,7 @@ $('clear-pending').addEventListener('click', () => { if (busy) return; releasePe
 $('reload-preview').addEventListener('click', () => run('loadingPreview', async () => { if (session) await loadSession(await api('/api/preview/' + session.id)); }));
 $('game-canvas').addEventListener('click', () => { if (!busy && previewReady && !pending.size && !settingsDirty()) { void audio.unlock().catch(()=>{}); renderer.play(); } });
 $('export-video').addEventListener('click', () => run('recording', exportVideo));
-$('download-bundle').addEventListener('click', () => run('bundling', async () => { if (!session || pending.size || settingsDirty()) return; const result=await api(`/api/preview/${session.id}/bundle`); download(result.url,'.zip'); toast('downloadStarted'); }));
+$('download-bundle').addEventListener('click', () => run('bundling', async () => { if (!session || pending.size || settingsDirty()) return; const result=await api(`/api/preview/${session.id}/bundle`); download(result.url,'.zip',result.name); toast('downloadStarted'); }));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)audio.stop();});
 window.addEventListener('beforeunload', () => { audio.dispose(); pending.forEach(file => URL.revokeObjectURL(file.previewUrl)); renderer?.pause(); });
 embedded = connectEmbedded(renderer, {onFiles:importFiles, isBusy:() => busy});

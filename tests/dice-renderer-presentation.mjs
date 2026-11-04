@@ -128,3 +128,11 @@ assert.equal(await stalePatch, false);
 ready('new-hero', raceStart);
 assert.equal(await full, true); assert.equal(racing.candidate, fullCandidate);
 console.log(JSON.stringify({passed: true, checks: ['preload/cache', 'no pending blank frame', 'playback continuity', 'no runtime reload', 'identity/revision commit', 'centered title', 'subtitle removed', 'latest update wins', 'asset mismatch', 'recording guard', 'clear/full-load races', 'failure/retry']}));
+
+// A missing hero must not be replaced by a flat result face.
+const noHeroStart=requests.length;
+const noHero=new GameRenderer(canvas);
+await noHero.load(candidate('without-hero','green',{icon:null,png:{sz_1:'flat-result-face'}}));
+assert.equal(noHero.icon,null);
+assert.ok(!requests.slice(noHeroStart).some(image=>image.src==='flat-result-face'));
+noHero.clear();

@@ -12,6 +12,14 @@ const SOUND_NAMES=['dice_roll','sound_ui_dice6'];
 const DEFAULT_AUDIO=Object.fromEntries(SOUND_NAMES.map(name=>[name,`/dice/assets/audio/${name}.mp3`]));
 const DEFAULT_ANCHOR='/dice/assets/anchor.png';
 
+export function resourceName(name,grade){
+  const suffix=Array.from(String(name||'').normalize('NFKC').trim()
+    .replace(/^(?:dice_(?:green|purple)_)+/i,'').replace(/\.(?:zip|skel|atlas|png|json)$/i,'')
+    .toLowerCase().replace(/[^\p{L}\p{N}_-]+/gu,'_').replace(/^[_-]+|[_-]+$/g,''))
+    .slice(0,48).join('').replace(/[_-]+$/,'');
+  return 'dice_'+(grade==='purple'?'purple':'green')+'_'+(suffix||'custom');
+}
+
 export class PreviewError extends Error {
   constructor(message, status=400, details={}) {
     super(message); this.name='PreviewError'; this.status=status; this.payload={error:message, ...details};
@@ -19,20 +27,27 @@ export class PreviewError extends Error {
 }
 
 export function slotFor(name) {
-  if (typeof name !== 'string' || /[/\\]/.test(name) || !/\.png$/i.test(name)) return null;
+  if(typeof name!=='string')return null;
+  name=name.normalize('NFKC').trim();
+  if (/[/\\]/.test(name) || !/\.png$/i.test(name)) return null;
   const stem=name.slice(0,-4).toLowerCase(), slot=stem==='icon'?'大骰子':stem;
   return SLOTS.includes(slot)?slot:null;
 }
 
 export function validateFiles(entries) {
   if (!Array.isArray(entries) || entries.length>30) throw new PreviewError('请上传完整的十张 PNG',400,{missing:SLOTS.map(s=>s+'.png'),extra:[],duplicates:[]});
-  const mapped=new Map(), extra=[], duplicates=[];
+  const groups=new Map(),mapped=new Map(), extra=[], duplicates=[];
   for (const entry of entries) {
     if (!entry || typeof entry.name!=='string') throw new PreviewError('上传文件信息不完整');
     const slot=slotFor(entry.name);
     if (!slot) extra.push(entry.name);
-    else if (mapped.has(slot)) duplicates.push(slot+'.png');
-    else mapped.set(slot,{...entry,slot});
+    else {const list=groups.get(slot)||[];list.push({...entry,slot});groups.set(slot,list);}
+  }
+  for(const [slot,list]of groups){
+    const priority=entry=>entry.name.normalize('NFKC').trim().toLowerCase()==='大骰子.png'?0:1;
+    const best=slot==='大骰子'?list.filter(entry=>priority(entry)===Math.min(...list.map(priority))):list;
+    if(best.length>1)duplicates.push(slot+'.png');
+    mapped.set(slot,best[0]);
   }
   const missing=SLOTS.filter(s=>!mapped.has(s)).map(s=>s+'.png');
   if (missing.length || extra.length || duplicates.length) {
@@ -272,36 +287,49 @@ export function createLocalPreview(dependencies={}) {
     })().catch(error=>{defaultAssets.delete(path);throw error;}));
     const blob=await defaultAssets.get(path);if(!(blob instanceof Blob)||!blob.size)throw new PreviewError('默认交付素材为空');return blob;
   }
+  async function renderGreen(files,options={}){
+    const anchor=files.find(file=>file.slot==='anchor');
+    const image=await decode(anchor?.blob||await defaultAsset(DEFAULT_ANCHOR),'anchor.png',{allowEmpty:true});
+    try{return await renderSix(files,{...options,anchorImage:image.drawable});}
+    finally{image.close?.();}
+  }
   async function read(id) {
     const record=await storage.get(id);
     if(!record)throw new PreviewError('预览会话不存在',404);
-    if(record.mode==='all' && record.point===1)return record;
+    const anchor=record.runtime.metadata?.anchor;
+    const migrateAnchor=record.runtime.kind==='six-face'&&!(anchor?.bone==='root'&&anchor.scaleX===6&&anchor.scaleY===6&&anchor.opacity===0);
+    if(record.mode==='all' && record.point===1&&!migrateAnchor)return record;
     const migrated={...record,mode:'all',point:1,revision:record.revision+1,candidateId:uuid()};
+    if(migrateAnchor){
+      migrated.runtime=await renderGreen(record.files,{name:record.name});
+      migrated.runtime.warnings=[...new Set([...(record.runtime.warnings||[]),...(migrated.runtime.warnings||[])])];
+    }
     // Uploaded PNGs and old video Blobs remain stored; binding/profile hides old output.
     await storage.put(migrated,{revision:record.revision,candidateId:record.candidateId});
     return migrated;
   }
   function publicSession(record) {
-    const files=record.files.map(({blob,alphaArea,...file})=>({...file,url:url(`${record.id}/file/${file.slot}`,blob)}));
+    const files=record.files.map(({blob,alphaArea,...file})=>({...file,url:url(`${record.id}/file/${file.slot}/${file.sha256||record.revision}`,blob)}));
     const audio=audioURLs(record),audioFiles=Object.fromEntries(SOUND_NAMES.map(name=>{const item=record.audio?.[name];return [name,{name:item?.name||name+'.mp3',size:item?.blob?.size??null,sha256:item?.sha256||null,url:audio[name],default:!item?.blob}];}));
-    const anchor=record.anchor?{...Object.fromEntries(Object.entries(record.anchor).filter(([k])=>k!=='blob'&&k!=='alphaArea')),url:url(`${record.id}/file/anchor`,record.anchor.blob)}:
+    const anchor=record.anchor?{...Object.fromEntries(Object.entries(record.anchor).filter(([k])=>k!=='blob'&&k!=='alphaArea')),url:url(`${record.id}/file/anchor/${record.anchor.sha256||record.revision}`,record.anchor.blob)}:
       {name:'anchor.png',url:DEFAULT_ANCHOR,default:true,hidden:true};
     anchor.hidden=true;
     const sixFace=record.runtime.kind==='six-face',png=Object.fromEntries(files.map(f=>[f.slot,f.url]));
-    const icon=png['大骰子']||png.sz_0||png.sz_1;png['大骰子']??=icon;png.anchor??=anchor.url;
+    const runtimeKey=sixFace?(record.runtime.metadata?.anchor?'six-face-anchor-root-6x':'six-face'):record.resolvedComposition;
+    const icon=png['大骰子']||null;png.anchor??=anchor.url;
     const candidate={id:record.candidateId,version:record.revision,name:record.name,template:'green',previewGrade:record.grade,
       kind:sixFace?'six-face':'template',...(sixFace?{json:record.runtime.json,geometry:record.runtime.geometry,warnings:record.runtime.warnings||[]}:{skel:dependencies.templateURL||'/dice/assets/template.skel'}),
       atlasPage:record.runtime.atlasPage||'preview.png',
-      atlas:url(`${record.id}/runtime/${sixFace?'six-face':record.resolvedComposition}/atlas`,new Blob([record.runtime.atlasText],{type:'text/plain'})),
-      texture:url(`${record.id}/runtime/${sixFace?'six-face':record.resolvedComposition}/texture`,record.runtime.texture),png,icon,anchor,audio,soundEnabled:record.soundEnabled!==false};
+      atlas:url(`${record.id}/runtime/${runtimeKey}/atlas`,new Blob([record.runtime.atlasText],{type:'text/plain'})),
+      texture:url(`${record.id}/runtime/${runtimeKey}/texture`,record.runtime.texture),png,icon,anchor,audio,soundEnabled:record.soundEnabled!==false};
     let video=null;
     if(validVideo(record.video,record)) {const {blob,...metadata}=record.video;video={...metadata,url:url(`${record.id}/video/${metadata.sha256}`,blob)};}
     const videoAvailable=dependencies.videoAvailable??Boolean(globalThis.VideoEncoder||globalThis.MediaRecorder);
-    return {id:record.id,revision:record.revision,...Object.fromEntries(SETTING_KEYS.map(k=>[k,k==='soundEnabled'?record[k]!==false:record[k]])),
+    return {id:record.id,revision:record.revision,resourceName:resourceName(record.name,record.grade),...Object.fromEntries(SETTING_KEYS.map(k=>[k,k==='soundEnabled'?record[k]!==false:record[k]])),
       created:record.created,files,candidate,video,videoAvailable,videoUnavailableReason:videoAvailable?null:'当前浏览器不支持视频导出，请使用 Chrome',
       resolvedComposition:record.resolvedComposition,compositionDetection:record.compositionDetection,
       kind:candidate.kind,warnings:record.runtime.warnings||[],anchor,audio:audioFiles,audioURLs:audio,
-      needsUpload:record.grade==='green'&&!sixFace};
+      heroMissing:!icon,needsUpload:record.grade==='green'&&!sixFace};
   }
   async function importSession(payload,{signal}={}) {
     const aborted=()=>{if(signal?.aborted)throw new DOMException('操作已取消','AbortError');};aborted();
@@ -347,7 +375,7 @@ export function createLocalPreview(dependencies={}) {
     }
     const detection=settings.grade==='green'?{resolvedComposition:'faces',compositionDetection:{method:'six_original_flat_faces',detected:'faces'}}:detectComposition(files,settings.composition);
     const record={id:uuid(),candidateId:uuid(),revision:1,...settings,...detection,files,audio,anchor:files.find(file=>file.slot==='anchor')||null,video:null,created:Math.floor(Date.now()/1000)};
-    try{record.runtime=settings.grade==='green'?await renderSix(files,{name:settings.name,signal}):await render(files,record.resolvedComposition);}
+    try{record.runtime=settings.grade==='green'?await renderGreen(files,{name:settings.name,signal}):await render(files,record.resolvedComposition);}
     catch(error){throw error instanceof PreviewError||error.name==='AbortError'?error:new PreviewError(error.message||'六面资源生成失败');}
     if(settings.grade==='green'&&(!record.runtime?.json||!record.runtime?.texture||!record.runtime?.atlasText))throw new PreviewError('六面资源生成不完整');
     if(settings.grade==='green')record.runtime.warnings=[...importWarnings,...(record.runtime.warnings||[])];
@@ -369,6 +397,23 @@ export function createLocalPreview(dependencies={}) {
     await storage.put(next,{revision:record.revision,candidateId:record.candidateId});
     return publicSession(next);
   }
+  async function updateHero(id,payload) {
+    const record=await read(id);
+    if(!payload||!Number.isInteger(payload.expectedRevision)||payload.expectedRevision!==record.revision)throw new PreviewError('预览已更新，请刷新后重试',409);
+    const file=payload.file;
+    if(typeof File!=='function'||!(file instanceof File))throw new PreviewError('请选择大骰子.png或icon.png原文件');
+    const name=file.name.normalize('NFKC').trim().toLowerCase();
+    if(!['大骰子.png','icon.png'].includes(name))throw new PreviewError('大图文件名需为大骰子.png或icon.png');
+    if(!file.size||file.size>MAX_PNG)throw new PreviewError('大图PNG为空或超过12 MiB');
+    if(record.files.filter(item=>item.slot!=='大骰子').reduce((sum,item)=>sum+item.blob.size,0)+file.size>48*1024*1024)throw new PreviewError('所选 PNG 合计不能超过48 MiB');
+    const dimensions=inspectPNG(new Uint8Array(await file.arrayBuffer()),'大骰子',file.name);
+    const image=await decode(file,file.name);let alphaArea;
+    try{alphaArea=image.alphaArea;if(!(alphaArea>0))throw new PreviewError('大图PNG没有清晰可见的内容');}finally{image.close?.();}
+    const replacement={name:file.name,slot:'大骰子',blob:file,...dimensions,alphaArea,sha256:await hash(file)};
+    const next={...record,files:[...record.files.filter(item=>item.slot!=='大骰子'),replacement],revision:record.revision+1,candidateId:uuid()};
+    await storage.put(next,{revision:record.revision,candidateId:record.candidateId});
+    return publicSession(next);
+  }
   async function video(id,options) {
     const record=await read(id),headers=new Headers(options.headers),revision=Number(headers.get('X-Preview-Revision'));
     if(!Number.isInteger(revision)||revision!==record.revision||headers.get('X-Candidate-Id')!==record.candidateId)throw new PreviewError('预览已更新，请重新录制当前版本',409);
@@ -387,33 +432,31 @@ export function createLocalPreview(dependencies={}) {
   }
   async function bundle(id) {
     const record=await read(id),zip=await (dependencies.zipFactory||zipFactory)();
-    const config={id,revision:record.revision,...Object.fromEntries(SETTING_KEYS.map(k=>[k,record[k]])),
-      resolvedComposition:record.resolvedComposition,compositionDetection:record.compositionDetection,
-      kind:record.runtime.kind||'template',files:record.files.map(({blob,alphaArea,...file})=>file),video:null,audio:{}};
-    config.soundEnabled=record.soundEnabled!==false;
-    for(const file of record.files) zip.file('res/'+file.name,file.blob);
+    const name=resourceName(record.name,record.grade);
+    const add=(path,content)=>zip.file(name+'/'+path,content);
+    // Only game runtime files, canonical source PNGs and the two audio files.
+    for(const file of record.files)if(file.slot!=='anchor')
+      add('res/'+(file.slot==='大骰子'?'icon':file.slot)+'.png',file.blob);
+    let skeleton;
     if(record.runtime.kind==='six-face'){
-      for(const [path,blob]of Object.entries(record.runtime.files||{}))zip.file(path,blob);
-      config.geometry=record.runtime.geometry;config.warnings=record.runtime.warnings||[];
-      config.runtime={json:'dice.json',atlas:'dice.atlas',texture:record.runtime.atlasPage||'dice.png',format:'Spine 4.2 JSON'};
+      const {writeSpineBinary}=await import('./six-face/spine-binary.mjs');
+      const json=structuredClone(record.runtime.json);
+      json.skeleton.images='./res/';json.skeleton.audio='./sound/';
+      skeleton=writeSpineBinary(json);
+    }else{
+      const {patchTemplateSounds}=await import('./template-sounds.mjs');
+      const original=await defaultAsset(dependencies.templateURL||'/dice/assets/template.skel');
+      skeleton=await patchTemplateSounds(new Uint8Array(await original.arrayBuffer()));
     }
-    const anchor=record.anchor||{name:'anchor.png',blob:await defaultAsset(DEFAULT_ANCHOR)};
-    if(!record.anchor)zip.file('res/'+anchor.name,anchor.blob);
-    config.anchor={file:'res/'+anchor.name,hidden:true,sha256:anchor.sha256||await hash(anchor.blob)};
-    for(const name of SOUND_NAMES){
-      const item=record.audio?.[name],blob=item?.blob||await defaultAsset(DEFAULT_AUDIO[name]),path='audio/'+name+'.mp3';
-      zip.file(path,blob);config.audio[name]={file:path,name:item?.name||name+'.mp3',sha256:item?.sha256||await hash(blob),default:!item?.blob};
-    }
-    zip.file('sound-timeline.json',JSON.stringify({roundSeconds:2,enabled:record.soundEnabled!==false,audio:config.audio,
-      animations:Object.fromEntries(Array.from({length:6},(_,i)=>['spin_'+(i+1),[{name:'dice_roll',time:0},...(i===5?[{name:'sound_ui_dice6',time:.6}]:[])]]))},null,2));
-    if(validVideo(record.video,record)) {
-      zip.file('preview.mp4',record.video.blob);
-      config.video={file:'preview.mp4',...Object.fromEntries(['sha256','profile','duration','fps','frameCount','width','height','method','processingMs'].map(k=>[k,record.video[k]]))};
-    }
-    zip.file('preview.json',JSON.stringify(config,null,2));
+    add(name+'.skel',new Blob([skeleton],{type:'application/octet-stream'}));
+    add(name+'.atlas',record.runtime.atlasText.replace(/^[^\r\n]+/,name+'.png'));
+    add(name+'.png',record.runtime.texture);
+    for(const sound of SOUND_NAMES)
+      add('sound/'+sound+'.mp3',record.audio?.[sound]?.blob||await defaultAsset(DEFAULT_AUDIO[sound]));
     const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}}),latest=await read(id);
-    if(latest.revision!==record.revision||latest.candidateId!==record.candidateId||latest.video?.sha256!==record.video?.sha256)throw new PreviewError('打包期间预览已更新，请重新打包',409);
-    return {url:url(`${id}/bundle/${record.revision}/${record.video?.sha256||'none'}`,blob)};
+    if(latest.revision!==record.revision||latest.candidateId!==record.candidateId)
+      throw new PreviewError('打包期间预览已更新，请重新打包',409);
+    return {name,url:url(id+'/bundle/compact-v1/'+record.revision,blob)};
   }
   async function api(path,options={}) {
     const method=(options.method||'GET').toUpperCase();
@@ -423,6 +466,7 @@ export function createLocalPreview(dependencies={}) {
     if(method==='POST') {
       let payload;try{payload=typeof options.body==='string'?JSON.parse(options.body):options.body;}catch{throw new PreviewError('请求内容需要是对象');}
       if(path==='/api/preview/import')return importSession(payload,options);
+      if((match=/^\/api\/preview\/([a-f0-9]{32})\/hero$/.exec(path)))return updateHero(match[1],payload);
       if((match=/^\/api\/preview\/([a-f0-9]{32})\/settings$/.exec(path)))return settings(match[1],payload);
     }
     throw new PreviewError('预览接口不存在',404);

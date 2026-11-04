@@ -115,7 +115,8 @@ export class GameRenderer {
         data = new spine.SkeletonBinary(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(assets.require(candidate.skel));
       }
       const [background, icon] = await Promise.all([
-        loadBackground(candidate), loadImage(candidate.icon || candidate.png['大骰子'] || candidate.png.sz_1),
+        loadBackground(candidate),
+        candidate.icon || candidate.png['大骰子'] ? loadImage(candidate.icon || candidate.png['大骰子']) : Promise.resolve(null),
       ]);
       if (id !== this.loadId || presentationId !== this.presentationId) { assets?.dispose(); software?.dispose(); return false; }
       const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons};
@@ -267,10 +268,12 @@ export class GameRenderer {
     ctx.strokeText(title, 412, 468, 232);
     ctx.fillStyle = '#fff';
     ctx.fillText(title, 412, 468, 232);
-    ctx.drawImage(this.icon, 65, 335, 240, 240);
-    ctx.fillStyle = '#fff';
-    ctx.beginPath(); ctx.arc(259, 520, 23, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = '#343b45'; ctx.beginPath(); ctx.moveTo(253, 509); ctx.lineTo(253, 531); ctx.lineTo(270, 520); ctx.closePath(); ctx.fill();
+    if (this.icon) {
+      ctx.drawImage(this.icon, 65, 335, 240, 240);
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.arc(259, 520, 23, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#343b45'; ctx.beginPath(); ctx.moveTo(253, 509); ctx.lineTo(253, 531); ctx.lineTo(270, 520); ctx.closePath(); ctx.fill();
+    }
 
     const all = this.mode === 'all';
     const selected = this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target;

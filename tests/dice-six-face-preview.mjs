@@ -3,8 +3,8 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {deflateSync} from 'node:zlib';
-import {createLocalPreview,validateSixFaceFiles,GREEN_SLOTS,VIDEO_PROFILE} from '../dice/local-preview.mjs';
+import {deflateSync,inflateSync} from 'node:zlib';
+import {createLocalPreview,validateSixFaceFiles,GREEN_SLOTS,VIDEO_PROFILE,resourceName} from '../dice/local-preview.mjs';
 import {buildSpineAssets} from '../dice/six-face/spine-builder.mjs';
 import {CanvasSpineRenderer} from '../dice/six-face/canvas-spine.mjs';
 const checks=[],crcTable=Uint32Array.from({length:256},(_,n)=>{for(let k=0;k<8;k++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0;});
@@ -12,16 +12,26 @@ function chunk(type,data=Buffer.alloc(0)){
  const bytes=Buffer.concat([Buffer.from(type),data]),result=Buffer.alloc(data.length+12);result.writeUInt32BE(data.length);bytes.copy(result,4);let crc=0xffffffff;
  for(const byte of bytes)crc=crcTable[(crc^byte)&255]^(crc>>>8);result.writeUInt32BE((crc^0xffffffff)>>>0,result.length-4);return result;
 }
-function png(size=200,empty=false){
+function png(size=200,empty=false,color=[34,150,215]){
  const header=Buffer.alloc(13);header.writeUInt32BE(size);header.writeUInt32BE(size,4);header.set([8,6,0,0,0],8);
  const data=Buffer.alloc((size*4+1)*size);
- for(let y=35;y<Math.min(166,size);y++)for(let x=35;x<Math.min(166,size);x++)data.set([34,150,215,empty?0:255],y*(size*4+1)+1+x*4);
+ const start=size===30?0:35,end=size===30?30:Math.min(166,size);
+ for(let y=start;y<end;y++)for(let x=start;x<end;x++)data.set([...color,empty?0:255],y*(size*4+1)+1+x*4);
  return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',header),chunk('IDAT',deflateSync(data)),chunk('IEND')]);
 }
-const allocated=[],clearCalls=[];
+function rgbaPNG(bytes){
+ const b=Buffer.from(bytes),width=b.readUInt32BE(16),height=b.readUInt32BE(20),parts=[];
+ assert.equal(b[24],8);assert.equal(b[25],6);assert.equal(b[28],0);
+ for(let at=8;at+12<=b.length;){const length=b.readUInt32BE(at),type=b.toString('ascii',at+4,at+8);if(type==='IDAT')parts.push(b.subarray(at+8,at+8+length));at+=length+12;}
+ const rows=inflateSync(Buffer.concat(parts)),data=new Uint8Array(width*height*4);
+ assert.equal(rows.length,(width*4+1)*height);
+ for(let y=0;y<height;y++){const at=y*(width*4+1);assert.equal(rows[at],0,'Fixture/raw RGBA encoder uses PNG filter0');data.set(rows.subarray(at+1,at+1+width*4),y*width*4);}
+ return {width,height,data};
+}
+const DEFAULT_ANCHOR_COLOR=[42,80,120],CUSTOM_ANCHOR_COLOR=[230,100,35],allocated=[],clearCalls=[],anchorDraws=[],decodedAnchors=[];
 globalThis.document={createElement(){const image={width:0,height:0,getContext(){return {
- drawImage(){},beginPath(){},ellipse(){},fill(){},fillRect(){},save(){},restore(){},moveTo(){},lineTo(){},closePath(){},clip(){},setTransform(){},
- clearRect(...args){clearCalls.push(args);},getImageData(){const data=new Uint8ClampedArray(image.width*image.height*4);for(let i=0;i<data.length;i+=4)data.set([34,150,215,255],i);return {data};}
+ drawImage(source){image.drawn=source;if(source.fixturePixels)anchorDraws.push(source);},beginPath(){},ellipse(){},fill(){},fillRect(){},save(){},restore(){},moveTo(){},lineTo(){},closePath(){},clip(){},setTransform(){},
+ clearRect(...args){clearCalls.push(args);},getImageData(){if(image.drawn?.fixturePixels){assert.equal(image.width,30);assert.equal(image.height,30);return {data:new Uint8ClampedArray(image.drawn.fixturePixels)};}const data=new Uint8ClampedArray(image.width*image.height*4);for(let i=0;i<data.length;i+=4)data.set([34,150,215,255],i);return {data};}
  };}};allocated.push(image);return image;}};
 const context={console};vm.createContext(context);vm.runInContext(await readFile(new URL('../dice/vendor/spine-webgl.js',import.meta.url),'utf8'),context);const S=context.spine;
 const zipContext={setTimeout,clearTimeout,setImmediate,Uint8Array,ArrayBuffer};vm.createContext(zipContext);
@@ -36,13 +46,21 @@ const prepared={sourceSize:200,crop:[35,35,131,131],cropOffset:[.5,.5],normaliza
 for(let p=1;p<=6;p++){prepared.landingImages[p]={width:200,height:200};prepared.textures[p]={width:131,height:131};}
 const deps={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvailable:true,
  createObjectURL:blob=>{const key='blob:green-'+(++serial);urls.set(key,blob);return key;},revokeObjectURL:key=>urls.delete(key),
- decodePNG:async(blob,name)=>{if(failOptionalDecode&&/^(?:icon|sz_0)\.png$/.test(name))throw Error('injected optional decode failure');return {alphaArea:16000,close(){}};},
+ decodePNG:async(blob,name)=>{
+  if(failOptionalDecode&&/^(?:icon|sz_0)\.png$/.test(name))throw Error('injected optional decode failure');
+  if(name==='anchor.png'){
+   const raw=rgbaPNG(await blob.arrayBuffer()),drawable={width:raw.width,height:raw.height,fixturePixels:raw.data,closed:false};decodedAnchors.push(drawable);
+   return {alphaArea:raw.data.filter((value,index)=>index%4===3&&value>=16).length,drawable,close(){drawable.closed=true;}};
+  }
+  return {alphaArea:16000,close(){}};
+ },
  renderSixFace:async(files,options)=>{renderCount++;if(failBuild)throw Error('injected six-face build failure');
   assert.equal(files.filter(file=>GREEN_SLOTS.includes(file.slot)).length,6);
+  assert.equal(options.anchorImage,decodedAnchors[decodedAnchors.length-1]);assert.equal(options.anchorImage.closed,false);assert.equal(options.anchorImage.width,30);assert.equal(options.anchorImage.height,30);
   const assets=await buildSpineAssets(prepared,options);return {kind:'six-face',json:assets.json,atlasText:assets.atlasText,texture:assets.textureBlob,atlasPage:assets.atlasPage,
    geometry:{sourceSize:200,crop:[35,35,131,131],cropOffset:[.5,.5],normalization:{resampled:false}},warnings:['fixture warning'],files:assets.files,metadata:assets.metadata};
  },
- fetchAsset:async path=>new Blob([path.endsWith('.png')?png(30,true):Buffer.from('ID3-default-audio')],{type:path.endsWith('.png')?'image/png':'audio/mpeg'}),
+ fetchAsset:async path=>new Blob([path.endsWith('.png')?png(30,false,DEFAULT_ANCHOR_COLOR):Buffer.from('ID3-default-audio')],{type:path.endsWith('.png')?'image/png':'audio/mpeg'}),
  zipFactory:async()=>{const entries=new Map();return {file(name,value){entries.set(name,value);},async generateAsync(){const zip=new JSZip();for(const [name,value]of entries)zip.file(name,value instanceof Blob?new Uint8Array(await value.arrayBuffer()):value);return new Blob([await zip.generateAsync({type:'uint8array'})],{type:'application/zip'});}};},
  prepareVideo:async(input,options)=>{lastVideoOptions=options;const blob=new Blob(['MP4-contract'],{type:'video/mp4'});Object.defineProperty(blob,'videoInfo',{value:{width:720,height:1600,duration:6,fps:30,frameCount:180}});return blob;}
 };
@@ -54,13 +72,14 @@ for(const files of [required.slice(1),[...required,required[0]]])assert.throws((
 assert.equal(validateSixFaceFiles([...required,{name:'1.png'}])[0].name,'sz_1.png');
 const first=await post('/api/preview/import',payload),stored=await storage.get(first.id);
 assert.equal(first.kind,'six-face');assert.equal(first.candidate.kind,'six-face');assert.equal(first.candidate.atlasPage,'dice.png');assert.equal(first.candidate.json.skeleton.spine,'4.2.43');
-assert.equal(first.needsUpload,false);assert.equal(first.files.length,6);assert.equal(first.candidate.icon,first.candidate.png.sz_1);assert.equal(first.candidate.png['大骰子'],first.candidate.png.sz_1);
+assert.equal(first.needsUpload,false);assert.equal(first.files.length,6);assert.equal(first.candidate.icon,null);assert.equal(first.heroMissing,true);assert.equal(first.candidate.png['大骰子'],undefined);
 assert.deepEqual(first.candidate.geometry,{sourceSize:200,crop:[35,35,131,131],cropOffset:[.5,.5],normalization:{resampled:false}});
 assert.deepEqual(first.candidate.warnings,['fixture warning']);assert.equal(first.soundEnabled,true);assert.equal(first.candidate.audio.dice_roll,'/dice/assets/audio/dice_roll.mp3');
 assert.equal(first.audio.dice_roll.default,true);assert.equal(first.anchor.hidden,true);
 assert.equal(stored.runtime.metadata.zoomPeak,1.3);assert.doesNotThrow(()=>structuredClone(stored));
+assert.equal(stored.runtime.metadata.staticImages,14);
 for(const file of first.files)assert.deepEqual(new Uint8Array(await urls.get(file.url).arrayBuffer()),new Uint8Array(await required.find(input=>input.name===file.name).arrayBuffer()));
-checks.push('six_native_files_preserved_geometry_is_serializable_icon_fallback_and_public_audio_anchor_contract');
+checks.push('six_native_files_preserved_geometry_is_serializable_missing_hero_is_explicit_and_public_audio_anchor_contract');
 
 const atlas=new S.TextureAtlas(stored.runtime.atlasText),data=new S.SkeletonJson(new S.AtlasAttachmentLoader(atlas)).readSkeletonData(stored.runtime.json);
 assert.equal(data.animations.length,12);assert.equal(data.slots[0].name,'anchor');assert.equal(data.slots[0].boneData.name,'root');assert.equal(data.slots[0].color.a,0);
@@ -72,6 +91,55 @@ for(let point=1;point<=6;point++){
   assert.equal(skeleton.drawOrder[0].data.name,'anchor');assert.equal(skeleton.findSlot('anchor').color.a,0);assert.equal(skeleton.findSlot('anchor').getAttachment().color.a,0);
   assert.ok(Math.abs(skeleton.findBone('daxiao_1').scaleX-scale)<1e-6);assert.ok(Math.abs(skeleton.findBone('shadow_size').scaleX-scale)<1e-6);
  }
+}
+function assertRootAnchor(runtime){
+ const atlas=new S.TextureAtlas(runtime.atlasText),data=new S.SkeletonJson(new S.AtlasAttachmentLoader(atlas)).readSkeletonData(runtime.json);
+ assert.equal(atlas.regions.length,14);assertRootAnchorData(data);
+}
+function assertRootAnchorData(data){
+ assert.equal(data.animations.length,12);
+ for(const animation of data.animations){
+  const skeleton=new S.Skeleton(data);
+  for(const time of [0,.3,.6,.633333,2]){
+   animation.apply(skeleton,-1,time,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);skeleton.updateWorldTransform(S.Physics.update);
+   const slot=skeleton.findSlot('anchor'),attachment=slot.getAttachment(),vertices=new Float32Array(8);
+   assert.equal(slot.bone.data.name,'root');assert.equal(slot.color.a,0);assert.equal(attachment.path,'anchor');assert.equal(attachment.width,30);assert.equal(attachment.height,30);assert.equal(attachment.scaleX,6);assert.equal(attachment.scaleY,6);assert.equal(attachment.color.a,0);
+   attachment.computeWorldVertices(slot,vertices,0,2);const xs=Array.from(vertices).filter((v,i)=>i%2===0),ys=Array.from(vertices).filter((v,i)=>i%2===1);
+   assert.ok(Math.abs(Math.max(...xs)-Math.min(...xs)-180)<1e-5);assert.ok(Math.abs(Math.max(...ys)-Math.min(...ys)-180)<1e-5);
+   assert.ok(Math.abs((Math.max(...xs)+Math.min(...xs))/2)<1e-5);assert.ok(Math.abs((Math.max(...ys)+Math.min(...ys))/2)<1e-5);
+  }
+ }
+}
+async function assertAnchorPixels(runtime,color){
+ const loose=rgbaPNG(await runtime.files['images/anchor.png'].arrayBuffer()),page=rgbaPNG(await runtime.texture.arrayBuffer()),region=new S.TextureAtlas(runtime.atlasText).findRegion('anchor');
+ assert.deepEqual([loose.width,loose.height,region.width,region.height],[30,30,30,30]);
+ for(let at=0;at<loose.data.length;at+=4)assert.deepEqual(Array.from(loose.data.subarray(at,at+4)),[...color,255]);
+ for(let y=0;y<30;y++){const at=((region.y+y)*page.width+region.x)*4;assert.deepEqual(page.data.subarray(at,at+120),loose.data.subarray(y*120,(y+1)*120));}
+ assertRootAnchor(runtime);
+}
+await assertAnchorPixels(stored.runtime,DEFAULT_ANCHOR_COLOR);assert.ok(anchorDraws.length);assert(decodedAnchors.every(image=>image.closed));
+checks.push('actual_default_anchor_pixels_reach_loose_png_and_atlas_and_all_12_official_runtime_actions_keep_hidden_root_180_square');
+async function compactBundle(result,record){
+ const name=result.name;assert.equal(name,resourceName(record.name,record.grade));assert.match(name,/^dice_green_/);assert(!name.endsWith('.zip'));
+ const zip=await JSZip.loadAsync(new Uint8Array(await urls.get(result.url).arrayBuffer())),root=name+'/';
+ const source=record.files.filter(file=>file.slot!=='anchor'),sourcePath=file=>'res/'+(file.slot==='大骰子'?'icon':file.slot)+'.png';
+ const expected=[name+'.skel',name+'.atlas',name+'.png',...source.map(sourcePath),'sound/dice_roll.mp3','sound/sound_ui_dice6.mp3'].map(path=>root+path).sort();
+ assert.deepEqual(Object.keys(zip.files).filter(path=>!zip.files[path].dir).sort(),expected);
+ for(const file of source)assert.deepEqual(await zip.file(root+sourcePath(file)).async('uint8array'),new Uint8Array(await file.blob.arrayBuffer()));
+ const atlasText=await zip.file(root+name+'.atlas').async('string');assert.equal(atlasText,record.runtime.atlasText.replace(/^[^\r\n]+/,name+'.png'));
+ assert.deepEqual(await zip.file(root+name+'.png').async('uint8array'),new Uint8Array(await record.runtime.texture.arrayBuffer()));
+ const atlas=new S.TextureAtlas(atlasText),bytes=await zip.file(root+name+'.skel').async('uint8array');
+ const data=new S.SkeletonBinary(new S.AtlasAttachmentLoader(atlas)).readSkeletonData(new Uint8Array(bytes));
+ assert.equal(data.version,'4.2.43');assertRootAnchorData(data);assert.equal(data.audioPath,'./sound/');
+ for(const event of data.events){const path=(data.audioPath+event.audioPath).replace(/^\.\//,'');assert.equal(path,'sound/'+event.name+'.mp3');assert.ok(zip.file(root+path));}
+ assert.deepEqual(Array.from(data.events,event=>event.name),['dice_roll','sound_ui_dice6']);
+ for(let point=1;point<=6;point++){
+  const skeleton=new S.Skeleton(data),events=[],animation=data.findAnimation('spin_'+point);
+  animation.apply(skeleton,-1,animation.duration,false,events,1,S.MixBlend.replace,S.MixDirection.mixIn);
+  assert.deepEqual(events.map(event=>event.data.name),['dice_roll',...(point===6?['sound_ui_dice6']:[])]);
+ }
+ for(const sound of ['dice_roll','sound_ui_dice6'])assert.deepEqual(await zip.file(root+'sound/'+sound+'.mp3').async('uint8array'),new Uint8Array(record.audio?.[sound]?await record.audio[sound].blob.arrayBuffer():Buffer.from('ID3-default-audio')));
+ return {zip,root,data};
 }
 const software=new CanvasSpineRenderer(atlas,{},{width:720,height:1600}),skeleton=new S.Skeleton(data);skeleton.setToSetupPose();data.findAnimation('spin_1').apply(skeleton,-1,.3,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);skeleton.updateWorldTransform(S.Physics.update);
 software.draw({save(){},restore(){},drawImage(){}},skeleton,1600);assert.ok(clearCalls.some(call=>call[2]===720&&call[3]===1600));software.dispose();
@@ -90,37 +158,72 @@ assert.equal(video.profile,VIDEO_PROFILE);assert.equal(lastVideoOptions.soundEna
 const refresh=createLocalPreview(deps),restored=await refresh.api('/api/preview/'+first.id);assert.deepEqual(restored.candidate.json,renamed.candidate.json);assert.equal(restored.candidate.id,renamed.candidate.id);
 checks.push('grade_change_requires_upload_name_and_sound_settings_preserve_runtime_urls_refresh_and_video_audio_options');
 
-const extras=[new File([png(240)],'大骰子.png',{type:'image/png'}),new File([png()],'sz_0.png',{type:'image/png'}),new File([png(30,true)],'anchor.png',{type:'image/png'}),
+const extras=[new File([png(240)],'大骰子.png',{type:'image/png'}),new File([png()],'sz_0.png',{type:'image/png'}),new File([png(30,false,CUSTOM_ANCHOR_COLOR)],'anchor.png',{type:'image/png'}),
  new File(['ID3-roll-original'],'dice_roll.mp3',{type:'audio/mpeg'}),new File(['ID3-six-original'],'sound_ui_dice6.mp3',{type:'audio/mpeg'})];
 const custom=await post('/api/preview/import',{...payload,name:'带附件',files:Object.fromEntries([...required,...extras].map(file=>[file.name,file]))});
 assert.equal(custom.files.length,9);assert.equal(custom.candidate.icon,custom.candidate.png['大骰子']);assert.equal(custom.audio.dice_roll.default,false);assert.equal(custom.anchor.default,undefined);
+await assertAnchorPixels((await storage.get(custom.id)).runtime,CUSTOM_ANCHOR_COLOR);assert(decodedAnchors.every(image=>image.closed));
 assert.deepEqual(new Uint8Array(await urls.get(custom.candidate.audio.dice_roll).arrayBuffer()),new Uint8Array(await extras[3].arrayBuffer()));
-const customBundle=await adapter.api('/api/preview/'+custom.id+'/bundle'),zip=await JSZip.loadAsync(new Uint8Array(await urls.get(customBundle.url).arrayBuffer()));
-for(const file of [...required,...extras.filter(file=>file.name.endsWith('.png'))])assert.deepEqual(new Uint8Array(await zip.file('res/'+file.name).async('uint8array')),new Uint8Array(await file.arrayBuffer()));
-for(const file of extras.filter(file=>file.name.endsWith('.mp3')))assert.deepEqual(new Uint8Array(await zip.file('audio/'+file.name).async('uint8array')),new Uint8Array(await file.arrayBuffer()));
-for(const path of ['dice.json','dice.atlas','dice.png','images/flat_6.png','images/roll_6.png','build-info.json','manifest.json','README.txt','sound-timeline.json'])assert.ok(zip.file(path),path);
-assert.equal(zip.file('dice.skel'),null);assert.equal(zip.file('dice.spine'),null);
-assert.equal(JSON.parse(await zip.file('preview.json').async('string')).anchor.hidden,true);
-const defaultBundle=await adapter.api('/api/preview/'+first.id+'/bundle'),defaultZip=await JSZip.loadAsync(new Uint8Array(await urls.get(defaultBundle.url).arrayBuffer()));
-assert.ok(defaultZip.file('audio/dice_roll.mp3')&&defaultZip.file('audio/sound_ui_dice6.mp3')&&defaultZip.file('res/anchor.png')&&defaultZip.file('preview.mp4'));
-checks.push('optional_zero_hero_anchor_and_two_original_mp3s_preserved_in_green_zip_with_real_spine_files_and_defaults');
+const customBundle=await adapter.api('/api/preview/'+custom.id+'/bundle');await compactBundle(customBundle,await storage.get(custom.id));
+const defaultBundle=await adapter.api('/api/preview/'+first.id+'/bundle');await compactBundle(defaultBundle,await storage.get(first.id));
+assert.equal((await adapter.api('/api/preview/'+first.id)).video.sha256,video.sha256,'Compact packaging omits MP4 without invalidating a valid video');
+checks.push('compact_green_zip_has_only_named_binary_atlas_texture_canonical_original_res_and_sound_with_official_runtime_anchor_and_events');
+assert.equal(resourceName('ＤＩＣＥ＿ＰＵＲＰＬＥ＿ＤＩＣＥ＿ＧＲＥＥＮ＿Sea Turtle','green'),'dice_green_sea_turtle');
+assert.equal(resourceName('dice_green_海龟','purple'),'dice_purple_海龟');assert.equal(resourceName('dice_green_dice_purple_','green'),'dice_green_custom');
+const safeName=resourceName('../海龟 / A:B?🐢','green');assert.match(safeName,/^dice_green_[\p{L}\p{N}_-]+$/u);assert(!safeName.includes('..'));
+const limited=resourceName('龟'.repeat(80),'green');assert.equal(Array.from(limited.slice('dice_green_'.length)).length,48);assert(Buffer.byteLength(limited+'.atlas','utf8')<255);
+checks.push('resource_names_nfkc_lowercase_sanitize_prefix_once_correct_grade_and_bound_unicode_suffix');
 
 const aliases=['ＳＺ＿１.ＰＮＧ','sz2.png','face3.png','FACE_4.PNG','face-5.png','6.png'].map(name=>new File([png()],name,{type:'image/png'}));
 const aliasFiles=[...aliases,new File([png()],'sz_2.png',{type:'image/png'}),new File([png(240)],'icon.png',{type:'image/png'}),new File([png(240)],'大骰子.png',{type:'image/png'})];
 const aliasSession=await post('/api/preview/import',{...payload,name:'别名骰面',files:aliasFiles});
 assert.equal(aliasSession.files.find(file=>file.slot==='sz_1').name,'ＳＺ＿１.ＰＮＧ');assert.equal(aliasSession.files.find(file=>file.slot==='sz_2').name,'sz_2.png');
-assert.equal(aliasSession.files.find(file=>file.slot==='sz_6').name,'6.png');assert.equal(aliasSession.files.find(file=>file.slot==='大骰子').name,'icon.png');
+assert.equal(aliasSession.files.find(file=>file.slot==='sz_6').name,'6.png');assert.equal(aliasSession.files.find(file=>file.slot==='大骰子').name,'大骰子.png');
 assert.ok(aliasSession.warnings.some(text=>text.includes('优先采用'))&&aliasSession.warnings.some(text=>text.includes('数字文件名')));
 for(const file of aliasSession.files)assert.deepEqual(new Uint8Array(await urls.get(file.url).arrayBuffer()),new Uint8Array(await aliasFiles.find(input=>input.name===file.name).arrayBuffer()));
 const badOptionals=[new File(['broken hero'],'icon.png',{type:'image/png'}),new File(['broken zero'],'sz_0.png',{type:'image/png'})];
 const fallback=await post('/api/preview/import',{...payload,files:[...required,...badOptionals]});
-assert.equal(fallback.files.length,6);assert.equal(fallback.candidate.icon,fallback.candidate.png.sz_1);assert.ok(fallback.warnings.filter(text=>text.includes('已忽略')).length>=2);
+assert.equal(fallback.files.length,6);assert.equal(fallback.candidate.icon,null);assert.equal(fallback.heroMissing,true);assert.ok(fallback.warnings.filter(text=>text.includes('已忽略')).length>=2);
 failOptionalDecode=true;let decodeFallback;
 try{decodeFallback=await post('/api/preview/import',{...payload,files:[...required,new File([png(240)],'icon.png'),new File([png()],'sz_0.png')]});}finally{failOptionalDecode=false;}
-assert.equal(decodeFallback.files.length,6);assert.equal(decodeFallback.candidate.icon,decodeFallback.candidate.png.sz_1);assert.ok(decodeFallback.warnings.some(text=>text.includes('decode failure')));
+assert.equal(decodeFallback.files.length,6);assert.equal(decodeFallback.candidate.icon,null);assert.equal(decodeFallback.heroMissing,true);assert.ok(decodeFallback.warnings.some(text=>text.includes('decode failure')));
 const duplicateHero=await post('/api/preview/import',{...payload,files:[...required,new File([png(240)],'icon.png'),new File([png(240)],'icon.png')]});
 assert.equal(duplicateHero.files.length,6);assert.ok(duplicateHero.warnings.some(text=>text.includes('重复')));
 checks.push('api_accepts_nfkc_sz_face_and_digit_aliases_canonical_priority_preserves_original_names_and_optional_corrupt_or_duplicate_hero_zero_fall_back');
+
+// Hero-only changes must never rerun or replace the six-face animation.
+const heroBase=await post('/api/preview/import',{...payload,name:'只补传大图'}),heroBefore=await storage.get(heroBase.id),heroRenders=renderCount;
+await adapter.api(`/api/preview/${heroBase.id}/video`,{method:'POST',headers:{'X-Preview-Revision':'1','X-Candidate-Id':heroBase.candidate.id},body:new Blob(['hero-video'],{type:'video/h264'})});
+const previousVideo=(await storage.get(heroBase.id)).video;
+const heroA=new File([png(240)],'大骰子.png',{type:'image/png'}),heroB=new File([png(240,false,[210,80,30])],'ＩＣＯＮ．ＰＮＧ',{type:'image/png'});
+const withHero=await post(`/api/preview/${heroBase.id}/hero`,{expectedRevision:1,file:heroA});
+assert.equal(withHero.revision,2);assert.notEqual(withHero.candidate.id,heroBase.candidate.id);assert.equal(withHero.heroMissing,false);assert.equal(withHero.candidate.icon,withHero.candidate.png['大骰子']);assert.equal(withHero.video,null);
+const replacedHero=await post(`/api/preview/${heroBase.id}/hero`,{expectedRevision:2,file:heroB});
+assert.equal(replacedHero.revision,3);assert.notEqual(replacedHero.candidate.icon,withHero.candidate.icon);assert.equal(renderCount,heroRenders);
+const heroAfter=await storage.get(heroBase.id);assert.deepEqual(heroAfter.runtime,heroBefore.runtime);assert.deepEqual(heroAfter.audio,heroBefore.audio);assert.deepEqual(heroAfter.anchor,heroBefore.anchor);
+assert.deepEqual(new Uint8Array(await heroAfter.runtime.texture.arrayBuffer()),new Uint8Array(await heroBefore.runtime.texture.arrayBuffer()));
+for(const [path,blob]of Object.entries(heroBefore.runtime.files))assert.deepEqual(new Uint8Array(await heroAfter.runtime.files[path].arrayBuffer()),new Uint8Array(await blob.arrayBuffer()));
+for(const input of required){const saved=heroAfter.files.find(f=>f.name===input.name);assert.deepEqual(new Uint8Array(await saved.blob.arrayBuffer()),new Uint8Array(await input.arrayBuffer()));}
+assert.deepEqual(new Uint8Array(await urls.get(withHero.candidate.icon).arrayBuffer()),new Uint8Array(await heroA.arrayBuffer()));
+assert.deepEqual(new Uint8Array(await urls.get(replacedHero.candidate.icon).arrayBuffer()),new Uint8Array(await heroB.arrayBuffer()));
+assert.equal(heroAfter.files.find(f=>f.slot==='大骰子').name,heroB.name);assert.deepEqual(heroAfter.video,previousVideo);
+const heroBundle=await adapter.api(`/api/preview/${heroBase.id}/bundle`);await compactBundle(heroBundle,heroAfter);
+checks.push('hero_only_two_updates_keep_six_face_runtime_and_original_bytes_use_content_bound_urls_and_hide_but_retain_old_video');
+
+const stableHero=await storage.get(heroBase.id),heroWrites=writes;
+for(const file of [null,new File([png(240)],'other.png'),new File([png()],'icon.png'),new File(['bad png'],'icon.png')]){
+ await assert.rejects(()=>post(`/api/preview/${heroBase.id}/hero`,{expectedRevision:3,file}));
+ assert.deepEqual(await storage.get(heroBase.id),stableHero);
+}
+failOptionalDecode=true;
+try{await assert.rejects(()=>post(`/api/preview/${heroBase.id}/hero`,{expectedRevision:3,file:new File([png(240)],'icon.png')}));}finally{failOptionalDecode=false;}
+await assert.rejects(()=>post(`/api/preview/${heroBase.id}/hero`,{expectedRevision:2,file:heroA}),e=>e.status===409);
+failWrite=true;try{await assert.rejects(()=>post(`/api/preview/${heroBase.id}/hero`,{expectedRevision:3,file:heroA}),/quota/);}finally{failWrite=false;}
+assert.deepEqual(await storage.get(heroBase.id),stableHero);assert.equal(writes,heroWrites);
+const racedHeroes=await Promise.allSettled([heroA,heroB].map(file=>post(`/api/preview/${heroBase.id}/hero`,{expectedRevision:3,file})));
+assert.equal(racedHeroes.filter(r=>r.status==='fulfilled').length,1);assert.equal(racedHeroes.filter(r=>r.status==='rejected'&&r.reason.status===409).length,1);
+assert.equal((await storage.get(heroBase.id)).revision,4);
+checks.push('invalid_decode_stale_or_storage_failed_hero_updates_are_atomic_and_two_concurrent_updates_have_one_cas_winner');
 
 const snapshot=structuredClone([...records]),writeCount=writes;
 failBuild=true;await assert.rejects(()=>post('/api/preview/import',payload),/six-face build failure/);failBuild=false;
@@ -129,6 +232,23 @@ const controller=new AbortController();controller.abort();await assert.rejects((
 await assert.rejects(()=>post('/api/preview/import',{...payload,files:required.slice(1)}));
 await assert.rejects(()=>post('/api/preview/import',{...payload,files:[...required,new File(['bad'],'dice_roll.mp3')]}));
 assert.equal(writes,writeCount);assert.deepEqual([...records],snapshot);
+const legacyAnchor=structuredClone(await storage.get(custom.id));
+legacyAnchor.id='a'.repeat(32);legacyAnchor.candidateId='b'.repeat(32);legacyAnchor.revision=7;
+delete legacyAnchor.runtime.metadata.anchor;legacyAnchor.runtime.metadata.staticImages=13;
+legacyAnchor.runtime.json.skins[0].attachments.anchor.anchor={type:'region',path:'white',width:30,height:30,color:'ffffff00'};
+delete legacyAnchor.runtime.files['images/anchor.png'];
+legacyAnchor.video={...structuredClone(previousVideo),revision:7,candidate:legacyAnchor.candidateId};
+records.set(legacyAnchor.id,structuredClone(legacyAnchor));
+const beforeMigrationRenders=renderCount,beforeMigrationWrites=writes;
+const migratedAnchor=await adapter.api('/api/preview/'+legacyAnchor.id),migratedRecord=await storage.get(legacyAnchor.id);
+assert.equal(migratedAnchor.revision,8);assert.notEqual(migratedAnchor.candidate.id,legacyAnchor.candidateId);assert.equal(migratedAnchor.video,null);
+assert.equal(renderCount,beforeMigrationRenders+1);assert.equal(writes,beforeMigrationWrites+1);
+assert.deepEqual(migratedRecord.files,legacyAnchor.files);assert.deepEqual(migratedRecord.audio,legacyAnchor.audio);assert.deepEqual(migratedRecord.anchor,legacyAnchor.anchor);assert.deepEqual(migratedRecord.video,legacyAnchor.video);
+assert.deepEqual(new Uint8Array(await migratedRecord.video.blob.arrayBuffer()),new Uint8Array(await legacyAnchor.video.blob.arrayBuffer()));
+await assertAnchorPixels(migratedRecord.runtime,CUSTOM_ANCHOR_COLOR);
+const again=await adapter.api('/api/preview/'+legacyAnchor.id);assert.equal(again.revision,8);assert.equal(again.candidate.id,migratedAnchor.candidate.id);assert.equal(renderCount,beforeMigrationRenders+1);assert.equal(writes,beforeMigrationWrites+1);
+const migratedBundle=await adapter.api('/api/preview/'+legacyAnchor.id+'/bundle');await compactBundle(migratedBundle,migratedRecord);
+checks.push('legacy_white_anchor_migrates_once_to_actual_custom_root_six_scale_pixels_with_one_revision_and_old_video_hidden_not_deleted');
 adapter.dispose();refresh.dispose();assert.equal(urls.size,0);
 checks.push('missing_faces_bad_audio_cancel_build_or_storage_failure_leave_all_previous_sessions_unchanged');
 console.log(JSON.stringify({ok:true,count:checks.length,checks,boundary:'Real JSON/PNG/ZIP/session contracts and official Runtime; Canvas sampling uses injected pixels, actual browser/IndexedDB/audio rendering require browser QA.'},null,2));

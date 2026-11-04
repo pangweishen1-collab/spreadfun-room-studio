@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {deflateSync} from 'node:zlib';
-import {createLocalPreview,validateFiles,validateSettings,inspectPNG,detectComposition,atlasText,SLOTS,VIDEO_PROFILE} from '../dice/local-preview.mjs';
+import {createLocalPreview,validateFiles,validateSettings,inspectPNG,detectComposition,atlasText,SLOTS,VIDEO_PROFILE,resourceName} from '../dice/local-preview.mjs';
 import {VIDEO_SPEC} from '../dice/video-export.mjs';
 process.on('uncaughtException',error=>{console.error(error?.message||String(error));process.exitCode=1;});
 
@@ -36,12 +36,13 @@ function memoryStore() {
 const jszipContext={setTimeout,clearTimeout,setImmediate,clearImmediate,Uint8Array,ArrayBuffer,TextEncoder,TextDecoder};
 vm.runInNewContext(await readFile(new URL('../vendor/jszip-3.10.1.min.js',import.meta.url),'utf8'),jszipContext);
 const JSZip=jszipContext.JSZip;
+const spineContext={console};vm.runInNewContext(await readFile(new URL('../dice/vendor/spine-webgl.js',import.meta.url),'utf8'),spineContext);const S=spineContext.spine;
 async function zipFactory() {
   const entries=new Map();return {file(name,data){entries.set(name,data);},async generateAsync(){const zip=new JSZip();for(const [name,data]of entries)zip.file(name,data instanceof Blob?new Uint8Array(await data.arrayBuffer()):data);return new Blob([await zip.generateAsync({type:'uint8array'})],{type:'application/zip'});}};
 }
 const storage=memoryStore(),urlBlobs=new Map();let serial=0,renders=0,smallDigits=false,blockVideo=null,preparedSize=null;
 const dependencies={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvailable:true,
-  fetchAsset:async path=>new Blob([path.endsWith('.png')?png(30):Buffer.from('ID3-default-audio')],{type:path.endsWith('.png')?'image/png':'audio/mpeg'}),
+  fetchAsset:async path=>path.endsWith('.skel')?new Blob([await readFile(new URL('../dice/assets/template.skel',import.meta.url))],{type:'application/octet-stream'}):new Blob([path.endsWith('.png')?png(30):Buffer.from('ID3-default-audio')],{type:path.endsWith('.png')?'image/png':'audio/mpeg'}),
   createObjectURL:blob=>{const url='blob:fixture-'+(++serial);urlBlobs.set(url,blob);return url;},revokeObjectURL:url=>urlBlobs.delete(url),zipFactory,
   decodePNG:async(blob,name)=>({alphaArea:smallDigits&&/^sz_[1-6]/.test(name)?1200:16000,close(){}}),
   renderRuntime:async(files,composition)=>{renders++;assert.equal(files.length,10);assert.ok(['faces','digits'].includes(composition));return{texture:new Blob([png(612)],{type:'image/png'}),atlasText:atlasText()};},
@@ -49,11 +50,38 @@ const dependencies={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvai
 const adapter=createLocalPreview(dependencies);
 const post=(path,body)=>adapter.api(path,{method:'POST',body:JSON.stringify(body)});
 async function rejects(operation,status=400){await assert.rejects(operation,error=>error.status===status);}
+const binaryData=(bytes,text)=>new S.SkeletonBinary(new S.AtlasAttachmentLoader(new S.TextureAtlas(text))).readSkeletonData(new Uint8Array(bytes));
+async function compactBundle(result,record){
+ const name=result.name;assert.equal(name,resourceName(record.name,record.grade));assert.match(name,/^dice_purple_/);assert(!name.endsWith('.zip'));
+ const zip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(result.url).arrayBuffer())),root=name+'/';
+ const source=record.files.filter(file=>file.slot!=='anchor'),sourcePath=file=>'res/'+(file.slot==='大骰子'?'icon':file.slot)+'.png';
+ const expected=[name+'.skel',name+'.atlas',name+'.png',...source.map(sourcePath),'sound/dice_roll.mp3','sound/sound_ui_dice6.mp3'].map(path=>root+path).sort();
+ assert.deepEqual(Object.keys(zip.files).filter(path=>!zip.files[path].dir).sort(),expected);
+ for(const file of source)assert.deepEqual(Buffer.from(await zip.file(root+sourcePath(file)).async('uint8array')),Buffer.from(await file.blob.arrayBuffer()));
+ const text=await zip.file(root+name+'.atlas').async('string');assert.equal(text,record.runtime.atlasText.replace(/^[^\r\n]+/,name+'.png'));
+ assert.deepEqual(Buffer.from(await zip.file(root+name+'.png').async('uint8array')),Buffer.from(await record.runtime.texture.arrayBuffer()));
+ const data=binaryData(await zip.file(root+name+'.skel').async('uint8array'),text),original=binaryData(await readFile(new URL('../dice/assets/template.skel',import.meta.url)),record.runtime.atlasText);
+ assert.equal(data.version,original.version);assert.equal(data.animations.length,12);
+ const bones=d=>Array.from(d.bones,b=>({name:b.name,parent:b.parent?.name||null,x:b.x,y:b.y,rotation:b.rotation,scaleX:b.scaleX,scaleY:b.scaleY}));
+ const slots=d=>Array.from(d.slots,s=>({name:s.name,bone:s.boneData.name,attachment:s.attachmentName,color:[s.color.r,s.color.g,s.color.b,s.color.a]}));
+ assert.deepEqual(bones(data),bones(original));assert.deepEqual(slots(data),slots(original));
+ const motion=a=>Array.from(a.timelines).filter(t=>!(t instanceof S.EventTimeline)).map(t=>({type:t.constructor.name,frames:Array.from(t.frames),curves:t.curves?Array.from(t.curves):null,slot:t.slotIndex??null,bone:t.boneIndex??null,attachments:t.attachmentNames?Array.from(t.attachmentNames):null}));
+ for(const a of original.animations){
+  const patched=data.findAnimation(a.name);assert.ok(patched);assert.equal(patched.duration,a.duration);assert.deepEqual(motion(patched),motion(a));
+  const events=[];patched.apply(new S.Skeleton(data),-1,patched.duration,false,events,1,S.MixBlend.replace,S.MixDirection.mixIn);
+  assert.deepEqual(events.map(e=>e.data.name),a.name.startsWith('spin_')?['dice_roll',...(a.name==='spin_6'?['sound_ui_dice6']:[])]:[]);
+ }
+ assert.deepEqual(Array.from(data.events,e=>e.name),['dice_roll','sound_ui_dice6']);
+ for(const e of data.events){assert.equal(e.audioPath,'sound/'+e.name+'.mp3');assert.ok(zip.file(root+e.audioPath));}
+ for(const sound of ['dice_roll','sound_ui_dice6'])assert.deepEqual(Buffer.from(await zip.file(root+'sound/'+sound+'.mp3').async('uint8array')),record.audio?.[sound]?Buffer.from(await record.audio[sound].blob.arrayBuffer()):Buffer.from('ID3-default-audio'));
+ return {zip,root,data};
+}
 
 assert.equal(validateFiles(files)[0].slot,'大骰子');
-for(const [entries,key] of [[files.slice(1),'missing'],[[...files,{name:'extra.png'}],'extra'],[[...files,{name:'大骰子.png'}],'duplicates']]) {
+for(const [entries,key] of [[files.slice(1),'missing'],[[...files,{name:'extra.png'}],'extra'],[[...files,{name:'icon.png'}],'duplicates']]) {
   assert.throws(()=>validateFiles(entries),error=>error.payload[key].length>0);
 }
+assert.equal(validateFiles([...files,{...files[0],name:'大骰子.png'}])[0].name,'大骰子.png');
 assert.throws(()=>validateSettings({...payload,point:true}));assert.throws(()=>validateSettings(null));
 for(const invalid of [{mode:'unknown'},{point:0},{point:7},{point:null}])assert.throws(()=>validateSettings({...payload,...invalid}));
 for(const mode of ['all','single','continuous'])assert.deepEqual(
@@ -116,11 +144,9 @@ const video=await adapter.api(`/api/preview/${first.id}/video`,{method:'POST',he
 assert.equal(video.profile,VIDEO_PROFILE);assert.equal(video.frameCount,180);assert.equal(video.revision,2);assert.equal(video.candidate,second.candidate.id);
 const savedVideo=structuredClone((await storage.get(first.id)).video);
 const bundled=await adapter.api(`/api/preview/${first.id}/bundle`);
-const zip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(bundled.url).arrayBuffer()));
-const zipNames=Object.keys(zip.files).filter(name=>!zip.files[name].dir);
-assert.deepEqual(zipNames.sort(),['preview.json','preview.mp4','res/anchor.png','audio/dice_roll.mp3','audio/sound_ui_dice6.mp3','sound-timeline.json',...files.map(f=>'res/'+f.name)].sort());
-for(const file of files)assert.deepEqual(Buffer.from(await zip.file('res/'+file.name).async('uint8array')),Buffer.from(file.data.split(',')[1],'base64'));
-const config=JSON.parse(await zip.file('preview.json').async('string'));assert.equal(config.video.duration,6);assert.equal(config.video.frameCount,180);assert.equal(config.video.profile,VIDEO_PROFILE);assert.equal(config.mode,'all');assert.equal(config.point,1);assert.equal(config.soundEnabled,true);
+await compactBundle(bundled,await storage.get(first.id));assert.equal(bundled.name,'dice_purple_紫色十图更名');
+assert.equal((await adapter.api(`/api/preview/${first.id}`)).video.sha256,video.sha256,'Packaging omits video without mutating its valid session cache');
+checks.push('compact_purple_zip_only_named_runtime_canonical_res_and_sound_preserves_original_motion_with_real_binary_audio_events');
 const beforeOversize=await storage.get(first.id),writesBeforeOversize=storage.writes;
 preparedSize=VIDEO_SPEC.maxBytes+1;
 try {await rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}));}
@@ -141,16 +167,14 @@ assert.equal(boundaryVideo.size,1_000_000);assert.equal(boundaryVideo.profile,VI
 const boundaryRecord=await storage.get(boundarySession.id);
 assert.equal(boundaryRecord.video.blob.size,1_000_000);
 assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video.sha256,boundaryVideo.sha256);
-const boundaryBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundle`),boundaryZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(boundaryBundle.url).arrayBuffer()));
-assert.equal((await boundaryZip.file('preview.mp4').async('uint8array')).length,1_000_000);
-for(const file of files)assert.deepEqual(Buffer.from(await boundaryZip.file('res/'+file.name).async('uint8array')),Buffer.from(file.data.split(',')[1],'base64'));
+const boundaryBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundle`);await compactBundle(boundaryBundle,boundaryRecord);
+assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video.size,1_000_000);
 const oversizedCache=structuredClone(boundaryRecord);
 oversizedCache.video={...oversizedCache.video,blob:new Blob([new Uint8Array(VIDEO_SPEC.maxBytes+1)],{type:'video/mp4'}),size:1,sha256:'over-budget-cached-video'};
 storage.records.set(boundarySession.id,oversizedCache);
 const oversizeCacheWrites=storage.writes;
 assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video,null,'Actual Blob size overrides a misleading metadata size');
-const oversizeBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundle`),oversizeZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(oversizeBundle.url).arrayBuffer()));
-assert.equal(oversizeZip.file('preview.mp4'),null);assert.equal(JSON.parse(await oversizeZip.file('preview.json').async('string')).video,null);
+const oversizeBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundle`);await compactBundle(oversizeBundle,oversizedCache);
 assert.equal((await storage.get(boundarySession.id)).video.blob.size,1_000_001);assert.equal(storage.writes,oversizeCacheWrites);
 checks.push('exactly_1mb_final_video_is_public_and_zipped_raw_intermediates_may_exceed_1mb_and_oversized_cached_blobs_are_hidden_without_deletion');
 
@@ -160,16 +184,14 @@ v2Record.video={...savedVideo,profile:'loop6-v2',revision:v2Session.revision,can
 storage.records.set(v2Session.id,structuredClone(v2Record));
 const v2Writes=storage.writes;
 assert.equal((await adapter.api(`/api/preview/${v2Session.id}`)).video,null);
-const v2Bundle=await adapter.api(`/api/preview/${v2Session.id}/bundle`),v2Zip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(v2Bundle.url).arrayBuffer()));
-assert.equal(v2Zip.file('preview.mp4'),null);assert.equal(JSON.parse(await v2Zip.file('preview.json').async('string')).video,null);
-for(const file of files)assert.deepEqual(Buffer.from(await v2Zip.file('res/'+file.name).async('uint8array')),Buffer.from(file.data.split(',')[1],'base64'));
+const v2Bundle=await adapter.api(`/api/preview/${v2Session.id}/bundle`);await compactBundle(v2Bundle,v2Record);
 assert.equal(storage.writes,v2Writes);assert.deepEqual((await storage.get(v2Session.id)).video,v2Record.video);
 assert.deepEqual(Buffer.from(await (await storage.get(v2Session.id)).video.blob.arrayBuffer()),Buffer.from(await savedVideo.blob.arrayBuffer()));
 checks.push('fully_bound_v2_video_is_retained_in_storage_but_not_offered_for_download_or_added_to_zip');
 const third=await post(`/api/preview/${first.id}/settings`,{expectedRevision:2,name:'仙人掌改名'});assert.equal(third.video,null);
 assert.deepEqual((await storage.get(first.id)).video,savedVideo);
 await rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}),409);
-checks.push('real_jszip_contains_only_original_res_configuration_and_current_bound_mp4_then_settings_invalidate_video');
+checks.push('compact_zip_excludes_even_current_video_while_session_settings_still_invalidate_and_retain_bound_mp4');
 
 let release;blockVideo={promise:new Promise(resolve=>{release=resolve;})};
 const pending=adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers:{...headers,'X-Preview-Revision':'3','X-Candidate-Id':third.candidate.id},body:input});
@@ -180,8 +202,7 @@ assert.deepEqual((await storage.get(first.id)).video,savedVideo);
 const oldRecord=await storage.get(first.id);oldRecord.video={...savedVideo,profile:'loop6-v1',revision:fourth.revision,candidate:fourth.candidate.id};storage.records.set(first.id,oldRecord);
 const oldProfileWrites=storage.writes;
 assert.equal((await adapter.api(`/api/preview/${first.id}`)).video,null);
-const oldBundle=await adapter.api(`/api/preview/${first.id}/bundle`),oldZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(oldBundle.url).arrayBuffer()));
-assert.equal(oldZip.file('preview.mp4'),null);assert.ok((await storage.get(first.id)).video.blob);
+const oldBundle=await adapter.api(`/api/preview/${first.id}/bundle`);await compactBundle(oldBundle,oldRecord);assert.ok((await storage.get(first.id)).video.blob);
 assert.equal(storage.writes,oldProfileWrites);
 assert.deepEqual((await storage.get(first.id)).video,oldRecord.video);
 assert.equal((await storage.get(first.id)).video.duration,6);
@@ -204,11 +225,7 @@ for(const [index,mode] of ['single','continuous','all'].entries()) {
   assert.equal(again.revision,8);assert.equal(again.candidate.id,migrated.candidate.id);assert.equal(storage.writes,writes+1);
   await rejects(()=>post(`/api/preview/${legacy.id}/settings`,{expectedRevision:7,name:'stale'}),409);
   await rejects(()=>adapter.api(`/api/preview/${legacy.id}/video`,{method:'POST',headers:{...headers,'X-Preview-Revision':'7','X-Candidate-Id':legacy.candidateId},body:input}),409);
-  const migratedBundle=await adapter.api(`/api/preview/${legacy.id}/bundle`),migratedZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(migratedBundle.url).arrayBuffer()));
-  assert.equal(migratedZip.file('preview.mp4'),null);
-  const migratedConfig=JSON.parse(await migratedZip.file('preview.json').async('string'));
-  assert.equal(migratedConfig.mode,'all');assert.equal(migratedConfig.point,1);assert.equal(migratedConfig.revision,8);
-  for(const file of files)assert.deepEqual(Buffer.from(await migratedZip.file('res/'+file.name).async('uint8array')),Buffer.from(file.data.split(',')[1],'base64'));
+  const migratedBundle=await adapter.api(`/api/preview/${legacy.id}/bundle`);await compactBundle(migratedBundle,stored);
 }
 checks.push('legacy_single_continuous_and_all_point6_migrate_once_with_cas_new_candidate_and_unchanged_originals_runtime_and_video_blobs');
 
@@ -224,6 +241,17 @@ assert.equal(migrationResults.filter(r=>r.status==='fulfilled').length,1);
 assert.equal(migrationResults.filter(r=>r.status==='rejected'&&r.reason.status===409).length,1);
 assert.equal((await storage.get(concurrentLegacy.id)).revision,12);
 checks.push('migration_write_failure_preserves_legacy_record_and_concurrent_reads_cannot_double_increment_revision');
+
+const purpleHeroBase=await post('/api/preview/import',payload),purpleBefore=await storage.get(purpleHeroBase.id),purpleRenderCount=renders;
+const purpleHero=new File([png(240,254)],'大骰子.png',{type:'image/png'});
+const purpleUpdated=await adapter.api(`/api/preview/${purpleHeroBase.id}/hero`,{method:'POST',body:{expectedRevision:1,file:purpleHero}});
+assert.equal(purpleUpdated.revision,2);assert.equal(purpleUpdated.grade,'purple');assert.equal(purpleUpdated.heroMissing,false);assert.notEqual(purpleUpdated.candidate.icon,purpleHeroBase.candidate.icon);
+assert.equal(renders,purpleRenderCount);assert.deepEqual((await storage.get(purpleHeroBase.id)).runtime,purpleBefore.runtime);
+assert.deepEqual(Buffer.from(await urlBlobs.get(purpleUpdated.candidate.icon).arrayBuffer()),Buffer.from(await purpleHero.arrayBuffer()));
+const bothHeroes=await post('/api/preview/import',{...payload,name:'dice_green_dice_purple_板球',files:[...files,{...files[0],name:'大骰子.png'}]});
+assert.equal(bothHeroes.files.find(f=>f.slot==='大骰子').name,'大骰子.png');
+const prefixedBundle=await adapter.api(`/api/preview/${bothHeroes.id}/bundle`);assert.equal(prefixedBundle.name,'dice_purple_板球');await compactBundle(prefixedBundle,await storage.get(bothHeroes.id));
+checks.push('purple_hero_only_updates_keep_runtime_and_direct_import_prefers_named_large_dice_over_icon');
 
 adapter.dispose();restored.dispose();assert.equal(urlBlobs.size,0);
 console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Pure session/PNG/ZIP/CAS logic with injected Canvas and storage. Real browser Canvas, IndexedDB, Spine and video module require browser QA.'},null,2));
