@@ -1,3 +1,5 @@
+import { VIDEO_SPEC } from './video-export.mjs';
+
 const loadImage = src => new Promise((resolve, reject) => {
   const image = new Image();
   image.onload = () => resolve(image);
@@ -275,13 +277,14 @@ export class GameRenderer {
     return state;
   }
 
-  async loopEncoderConfig() {
+  async loopEncoderConfig(baselineOnly = false) {
     if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return null;
-    for (const hardwareAcceleration of ['prefer-hardware', 'no-preference']) {
+    const codecs = baselineOnly ? ['avc1.420028'] : ['avc1.640028', 'avc1.4d0028', 'avc1.420028'];
+    for (const codec of codecs) for (const hardwareAcceleration of ['prefer-hardware', 'no-preference']) {
       const config = {
-        codec: 'avc1.420028', width: 720, height: 1600,
-        framerate: 30, bitrate: 6_000_000, hardwareAcceleration,
-        // Quality mode must not drop submitted frames. Baseline AVC has no B frames.
+        codec, width: 720, height: 1600,
+        framerate: 30, bitrate: VIDEO_SPEC.bitrate, hardwareAcceleration,
+        // Quality mode preserves every frame; prefer more efficient AVC profiles.
         latencyMode: 'quality', avc: { format: 'annexb' },
       };
       try {
@@ -292,11 +295,11 @@ export class GameRenderer {
     return null;
   }
 
-  async recordLoop(seconds = 6) {
+  async recordLoop(seconds = 6, baselineOnly = false) {
     this.validateRecording(seconds);
     const saved = Object.fromEntries(['mode', 'target', 'elapsed', 'sequence', 'playing', 'stopAfterRound', 'wasPlaying'].map(key => [key, this[key]]));
     const sourceData = this.data, sourceLoad = this.loadId;
-    let encoder, watchdog, abortError, rejectFailure;
+    let encoder, watchdog, abortError, rejectFailure, retryBaseline = false;
     const failure = new Promise((_, reject) => { rejectFailure = reject; });
     // Error signals can arrive during a synchronous draw batch, before its await.
     failure.catch(() => {});
@@ -324,7 +327,7 @@ export class GameRenderer {
     document.addEventListener('visibilitychange', checkVisibility);
     watchdog = setTimeout(() => abort(new Error('视频录制超时，请重试')), 30_000);
     try {
-      const config = await wait(this.loopEncoderConfig());
+      const config = await wait(this.loopEncoderConfig(baselineOnly));
       check();
       if (!config) {
         this.offlineEncoding = false;
@@ -338,7 +341,7 @@ export class GameRenderer {
         output: chunk => {
           if (abortError) return;
           if (chunk.timestamp <= lastTimestamp || (!chunks.length && chunk.type !== 'key')) {
-            abort(new Error('视频编码帧顺序异常，请重试'));
+            abort(Object.assign(new Error('视频编码帧顺序异常，请重试'), {retryBaseline:config.codec !== 'avc1.420028'}));
             return;
           }
           lastTimestamp = chunk.timestamp;
@@ -364,6 +367,9 @@ export class GameRenderer {
       check();
       if (chunks.length !== frames) throw new Error('视频编码帧数不完整，请重试');
       return new Blob(chunks, { type: 'video/h264' });
+    } catch (error) {
+      if (!baselineOnly && error?.retryBaseline) retryBaseline = true;
+      else throw error;
     } finally {
       clearTimeout(watchdog);
       document.removeEventListener('visibilitychange', checkVisibility);
@@ -379,6 +385,9 @@ export class GameRenderer {
         this.status();
       }
     }
+    // Some implementations reorder High/Main frames. Retry Baseline once only
+    // after restoring the preview and releasing the first encoder's resources.
+    if (retryBaseline) return this.recordLoop(seconds, true);
   }
 
   async recordRealtime(seconds, loop = false) {
@@ -389,7 +398,7 @@ export class GameRenderer {
     try {
       if (loop) this.drawLoopFrame(0);
       stream = this.canvas.captureStream(30);
-      recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 6_000_000 });
+      recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: loop ? VIDEO_SPEC.bitrate : 6_000_000 });
       return await new Promise((resolve, reject) => {
         const chunks = [];
         let settled = false, stopRequested = false;

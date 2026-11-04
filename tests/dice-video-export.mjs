@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {prepareVideo, inspectVideo, VIDEO_SPEC} from '../dice/video-export.mjs';
 
-const fixture = process.argv[2] || '/Users/muzi/Documents/Codex/2026-11-03/wo1/outputs/骰子预览-仙人掌-6秒循环.mp4';
+const fixture = process.argv[2] || '/Users/muzi/Documents/Codex/2026-11-03/wo1/outputs/骰子压缩-v1.9.4-线上.mp4';
 const ffmpeg = process.argv[3] || '/Applications/VapToolMac.app/Contents/Java/mac/ffmpeg';
 const run = args => execFileSync(ffmpeg, ['-v', 'error', '-nostdin', ...args], {maxBuffer: 64 * 1024 * 1024});
 const annex = (file, count) => run(['-i', file, '-map', '0:v:0', '-an', '-c:v', 'copy', ...(count ? ['-frames:v', String(count)] : []), '-bsf:v', 'h264_mp4toannexb', '-f', 'h264', 'pipe:1']);
@@ -28,10 +28,12 @@ function slices(bytes) {
 const folder = await mkdtemp(path.join(tmpdir(), 'dice-video-export-'));
 try {
   const original = await readFile(fixture), raw = annex(fixture), inputBytes = Buffer.from(raw);
+  assert.ok(original.length <= VIDEO_SPEC.maxBytes, 'Packet-copy fixture must meet the current one-megabyte export budget');
   const started = performance.now(), output = await prepareVideo(new Blob([raw], {type: 'video/h264'}));
   const muxMs = performance.now() - started, target = path.join(folder, 'copied.mp4');
   await writeFile(target, new Uint8Array(await output.arrayBuffer()));
   assert.equal(output.type, 'video/mp4');
+  assert.ok(output.size <= VIDEO_SPEC.maxBytes);
   assert.equal(output.videoInfo.method, 'h264_copy_mux');
   assert.ok(Object.isFrozen(output.videoInfo));
   for (const name of ['width','height','fps','frameCount','duration','profile']) assert.equal(output.videoInfo[name], VIDEO_SPEC[name]);

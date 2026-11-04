@@ -1,5 +1,6 @@
 import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads } from './upload-input.mjs';
+import { VIDEO_SPEC } from './video-export.mjs';
 import { localApi } from './local-preview.mjs';
 import { GameRenderer } from '/dice/renderer.js';
 import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js';
@@ -8,7 +9,7 @@ const $ = id => document.getElementById(id);
 const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, index) => 'sz_' + index)];
 let session = null, pending = new Map(), grade = 'green', busy = false;
 let renderer = null, previewReady = false, hasCanvas = false, loadingPreview = false;
-let activity = null, notice = null, currentError = null, playback = null, hasPlayed = false, toastTimer;
+let activity = null, notice = null, currentError = null, toastTimer;
 let embedded = null;
 
 function issue(key, values) { return Object.assign(new Error(key), {key, values}); }
@@ -28,7 +29,7 @@ function settingsDirty() {
   return Object.keys(values).some(key => values[key] !== session[key]);
 }
 function currentVideo(video = session?.video) {
-  return video?.profile === 'loop6-v2' && video.duration === 6 && video.fps === 30 && video.frameCount === 180
+  return video?.profile === VIDEO_SPEC.profile && video.size > 0 && video.size <= VIDEO_SPEC.maxBytes && video.duration === 6 && video.fps === 30 && video.frameCount === 180
     && video.width === 720 && video.height === 1600 && video.revision === session.revision
     && video.candidate === session.candidate?.id ? video : null;
 }
@@ -86,15 +87,6 @@ function renderAssets() {
   $('asset-grid').replaceChildren(grid);
   $('file-count').textContent = files.size + ' / 10 PNG';
 }
-function renderPlayback() {
-  let key = 'notLoaded', values;
-  if (previewReady) {
-    key = playback?.playing ? (session?.mode === 'all' ? 'playing' : 'playingPoint') : hasPlayed ? 'paused' : 'readyToPlay';
-    values = {point:playback?.target || session?.point || 1};
-  }
-  $('playback-status').textContent = t(key, values);
-  $('play-preview').setAttribute('aria-pressed', String(Boolean(playback?.playing)));
-}
 function render() {
   const dirty = settingsDirty(), draft = pending.size > 0;
   const usable = Boolean(session) && !draft && !dirty;
@@ -124,7 +116,6 @@ function render() {
   });
   $('apply-settings').hidden = !dirty || draft;
   $('apply-settings').disabled = locked;
-  ['play-preview','pause-preview','reset-preview'].forEach(id => { $(id).disabled = locked || !ready; });
   $('export-video').disabled = locked || !usable || (!clip && (!ready || !session?.videoAvailable));
   $('export-video').querySelector('span').textContent = t(clip ? 'downloadExistingVideo' : 'exportVideo');
   $('download-bundle').disabled = locked || !usable;
@@ -160,7 +151,7 @@ function render() {
   else if (session) videoKey = 'videoOptional';
   $('video-details').textContent = ['videoEmpty','videoOptional'].includes(videoKey) ? '' : t(videoKey, videoValues);
   $('video-details').hidden = !session || ['videoEmpty','videoOptional'].includes(videoKey);
-  renderAssets(); renderPlayback();
+  renderAssets();
 }
 async function run(key, operation) {
   if (busy) return;
@@ -177,13 +168,12 @@ async function loadSession(next, reusePresentation = false) {
     return;
   }
   session = next; fillSettings(next); previewReady = false;
-  loadingPreview = true; hasPlayed = false; render();
+  loadingPreview = true; render();
   try {
     if (!renderer) throw issue('rendererFailed');
     await renderer.load(next.candidate);
     renderer.configure(next.mode, next.point);
     previewReady = true; hasCanvas = true;
-    hasPlayed = true;
     renderer.play();
   } catch (error) {
     if (error.key === 'rendererFailed') throw error;
@@ -284,7 +274,7 @@ function openDialog(id) { const dialog=$(id); if (!dialog.open) dialog.showModal
 
 applyTranslations();
 try {
-  renderer = new GameRenderer($('game-canvas'), state => { playback=state; renderPlayback(); });
+  renderer = new GameRenderer($('game-canvas'));
   renderer.setLooping(true, 2);
 }
 catch { currentError = issue('rendererFailed'); }
@@ -303,11 +293,7 @@ $('apply-settings').addEventListener('click', () => run('updatingSettings', save
 $('import-preview').addEventListener('click', () => run('buildingPreview', importPending));
 $('clear-pending').addEventListener('click', () => { if (busy) return; releasePending(); if (session) fillSettings(session); currentError=null; notice=null; toast('replacementCancelled'); render(); });
 $('reload-preview').addEventListener('click', () => run('loadingPreview', async () => { if (session) await loadSession(await api('/api/preview/' + session.id)); }));
-function play(action) { if (busy || !previewReady || pending.size || settingsDirty()) return; hasPlayed=true; renderer[action](); renderPlayback(); }
-$('play-preview').addEventListener('click', () => play('play'));
-$('pause-preview').addEventListener('click', () => play('pause'));
-$('reset-preview').addEventListener('click', () => play('reset'));
-$('game-canvas').addEventListener('click', () => play('play'));
+$('game-canvas').addEventListener('click', () => { if (!busy && previewReady && !pending.size && !settingsDirty()) renderer.play(); });
 $('export-video').addEventListener('click', () => run('recording', exportVideo));
 $('download-bundle').addEventListener('click', () => run('bundling', async () => { if (!session || pending.size || settingsDirty()) return; const result=await api(`/api/preview/${session.id}/bundle`); download(result.url,'.zip'); toast('downloadStarted'); }));
 window.addEventListener('beforeunload', () => { pending.forEach(file => URL.revokeObjectURL(file.previewUrl)); renderer?.pause(); });

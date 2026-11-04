@@ -1,7 +1,8 @@
 // Reuse the same locally bundled MP4 muxer/codec pipeline as vap-engine.mjs.
 // Annex B takes a packet-copy path: no decoder, encoder, server, or FFmpeg.
 const media = () => import('../vendor/mediabunny/mediabunny.mjs');
-export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6, profile: 'loop6-v2'});
+export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6,
+  profile: 'loop6-v3-1mb', bitrate: 1_400_000, maxBytes: 1_000_000});
 const MAX_BYTES = 64 * 1024 * 1024;
 const fail = message => { throw new Error(message); };
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -190,7 +191,7 @@ function matches(info) {
     Math.abs(info.duration - 6) < .0001 && Math.abs(info.fps - 30) < .001 && info.codec === 'avc' && info.constantFrameRate;
 }
 
-async function transcodeFallback(blob, M) {
+async function transcodeFallback(blob, M, bitrate = VIDEO_SPEC.bitrate) {
   const source = await openVideo(blob, M);
   let output, iterator, canvas;
   try {
@@ -199,14 +200,14 @@ async function transcodeFallback(blob, M) {
     if (!await source.track.canDecode()) fail('当前浏览器无法解码录制视频，请使用最新版 Chrome 或 Edge');
     let codec;
     for (const candidate of ['avc1.640028','avc1.4d0028','avc1.420028']) {
-      if (await M.canEncodeVideo('avc', {width: 720, height: 1600, frameRate: 30, fullCodecString: candidate, quality: new M.Quality({bitrate: 6_000_000})})) { codec = candidate; break; }
+      if (await M.canEncodeVideo('avc', {width: 720, height: 1600, frameRate: 30, fullCodecString: candidate, quality: new M.Quality({bitrate})})) { codec = candidate; break; }
     }
     if (!codec) fail('当前浏览器无法生成 H.264 MP4，请使用最新版 Chrome 或 Edge');
     canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(720, 1600) : Object.assign(document.createElement('canvas'), {width: 720, height: 1600});
     const context = canvas.getContext('2d');
     if (!context) fail('无法创建视频导出画布');
     const targetOutput = makeOutput(M); output = targetOutput.output;
-    const encoded = new M.CanvasSource(canvas, {codec: 'avc', fullCodecString: codec, quality: new M.Quality({bitrate: 6_000_000}), latencyMode: 'quality', keyFrameInterval: 2});
+    const encoded = new M.CanvasSource(canvas, {codec: 'avc', fullCodecString: codec, quality: new M.Quality({bitrate}), latencyMode: 'quality', keyFrameInterval: 2});
     output.addVideoTrack(encoded, {frameRate: 30});
     const sink = new M.CanvasSink(source.track, {poolSize: 2, width: 720, height: 1600, fit: 'fill'});
     iterator = sink.canvasesAtTimestamps(Array.from({length: 180}, (_, index) => Math.min(index / 30, Math.max(0, source.duration - .04))));
@@ -237,6 +238,14 @@ export async function prepareVideo(blob) {
     if (mime === 'video/mp4' && matches(await inspectVideo(blob))) { result = new Blob([blob], {type: 'video/mp4'}); method = 'mp4_passthrough'; }
     else { result = await transcodeFallback(blob, M); method = 'fallback_transcode'; }
   } else fail('不支持的录制视频格式，请重新导出');
+  // Keep the fast packet-copy path for the usual native output. A bounded
+  // retry handles encoders that overshoot their target without scaling frames.
+  const source = mime === 'video/h264' || mime === 'video/avc' ? result : blob;
+  for (const bitrate of [1_250_000, 1_050_000]) {
+    if (result.size <= VIDEO_SPEC.maxBytes) break;
+    result = await transcodeFallback(source, M, bitrate); method = 'size_limited_transcode';
+  }
+  if (result.size > VIDEO_SPEC.maxBytes) fail('视频压缩后仍超过 1 MB，请重新生成');
   const info = await inspectVideo(result);
   if (!matches(info)) fail('视频规格校验未通过，请重新导出');
   Object.defineProperty(result, 'videoInfo', {value: Object.freeze({...VIDEO_SPEC, ...info, method}), enumerable: false});

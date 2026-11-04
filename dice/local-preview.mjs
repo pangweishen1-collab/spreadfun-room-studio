@@ -1,6 +1,7 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
+import { VIDEO_SPEC } from './video-export.mjs';
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
-export const VIDEO_PROFILE = 'loop6-v2';
+export const VIDEO_PROFILE = VIDEO_SPEC.profile;
 const REGIONS = ['1', '2', 'anchor', ...Array.from({length:6}, (_, i) => `sz_${i+1}`)];
 const SETTING_KEYS = ['name', 'grade', 'mode', 'point', 'composition'];
 const MAX_PNG = 12 * 1024 * 1024;
@@ -180,7 +181,7 @@ export function createIndexedDBStorage(indexedDB=globalThis.indexedDB) {
 }
 
 function validVideo(video,record) {
-  return video?.blob instanceof Blob&&video.profile===VIDEO_PROFILE&&video.duration===6&&video.fps===30&&video.frameCount===180&&video.width===720&&video.height===1600&&video.revision===record.revision&&video.candidate===record.candidateId;
+  return video?.blob instanceof Blob&&video.blob.size>0&&video.blob.size<=VIDEO_SPEC.maxBytes&&video.profile===VIDEO_PROFILE&&video.duration===6&&video.fps===30&&video.frameCount===180&&video.width===720&&video.height===1600&&video.revision===record.revision&&video.candidate===record.candidateId;
 }
 async function sha256(blob) {return [...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(v=>v.toString(16).padStart(2,'0')).join('');}
 let zipLoading;
@@ -258,6 +259,7 @@ export function createLocalPreview(dependencies={}) {
     const started=performance.now(),module=dependencies.prepareVideo?null:await import('./video-export.mjs');
     const blob=await (dependencies.prepareVideo||module.prepareVideo)(options.body);
     if(!(blob instanceof Blob)||!blob.size)throw new PreviewError('视频校验失败，请重新导出');
+    if(blob.size>VIDEO_SPEC.maxBytes)throw new PreviewError('视频超过 1 MB，请重新生成');
     const info=blob.videoInfo||(module?.inspectVideo?await module.inspectVideo(blob):null);
     if(!info||info.width!==720||info.height!==1600||Math.abs(info.duration-6)>.02||Math.abs(info.fps-30)>.01||info.frameCount!==180)throw new PreviewError('视频规格需为 6 秒、30 帧/秒、720×1600，共 180 帧');
     const stored={blob,profile:VIDEO_PROFILE,width:720,height:1600,duration:6,fps:30,frameCount:180,

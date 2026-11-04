@@ -4,6 +4,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {deflateSync} from 'node:zlib';
 import {createLocalPreview,validateFiles,validateSettings,inspectPNG,detectComposition,atlasText,SLOTS,VIDEO_PROFILE} from '../dice/local-preview.mjs';
+import {VIDEO_SPEC} from '../dice/video-export.mjs';
 process.on('uncaughtException',error=>{console.error(error?.message||String(error));process.exitCode=1;});
 
 const checks=[],table=Array.from({length:256},(_,v)=>{for(let i=0;i<8;i++)v=v&1?0xedb88320^(v>>>1):v>>>1;return v>>>0;});
@@ -38,12 +39,12 @@ const JSZip=jszipContext.JSZip;
 async function zipFactory() {
   const entries=new Map();return {file(name,data){entries.set(name,data);},async generateAsync(){const zip=new JSZip();for(const [name,data]of entries)zip.file(name,data instanceof Blob?new Uint8Array(await data.arrayBuffer()):data);return new Blob([await zip.generateAsync({type:'uint8array'})],{type:'application/zip'});}};
 }
-const storage=memoryStore(),urlBlobs=new Map();let serial=0,renders=0,smallDigits=false,blockVideo=null;
+const storage=memoryStore(),urlBlobs=new Map();let serial=0,renders=0,smallDigits=false,blockVideo=null,preparedSize=null;
 const dependencies={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvailable:true,
   createObjectURL:blob=>{const url='blob:fixture-'+(++serial);urlBlobs.set(url,blob);return url;},revokeObjectURL:url=>urlBlobs.delete(url),zipFactory,
   decodePNG:async(blob,name)=>({alphaArea:smallDigits&&/^sz_[1-6]/.test(name)?1200:16000,close(){}}),
   renderRuntime:async(files,composition)=>{renders++;assert.equal(files.length,10);assert.ok(['faces','digits'].includes(composition));return{texture:new Blob([png(612)],{type:'image/png'}),atlasText:atlasText()};},
-  prepareVideo:async blob=>{if(blockVideo)await blockVideo.promise;const output=new Blob([blob],{type:'video/mp4'});Object.defineProperty(output,'videoInfo',{value:{profile:VIDEO_PROFILE,width:720,height:1600,duration:6,fps:30,frameCount:180,method:'h264_copy_mux'}});return output;}};
+  prepareVideo:async blob=>{if(blockVideo)await blockVideo.promise;const output=new Blob([preparedSize===null?blob:new Uint8Array(preparedSize)],{type:'video/mp4'});Object.defineProperty(output,'videoInfo',{value:{profile:VIDEO_PROFILE,width:720,height:1600,duration:6,fps:30,frameCount:180,method:'h264_copy_mux'}});return output;}};
 const adapter=createLocalPreview(dependencies);
 const post=(path,body)=>adapter.api(path,{method:'POST',body:JSON.stringify(body)});
 async function rejects(operation,status=400){await assert.rejects(operation,error=>error.status===status);}
@@ -56,7 +57,8 @@ assert.throws(()=>validateSettings({...payload,point:true}));assert.throws(()=>v
 for(const invalid of [{mode:'unknown'},{point:0},{point:7},{point:null}])assert.throws(()=>validateSettings({...payload,...invalid}));
 for(const mode of ['all','single','continuous'])assert.deepEqual(
   validateSettings({...payload,mode,point:6}),{name:'仙人掌',grade:'green',mode:'all',point:1,composition:'auto'});
-assert.equal(VIDEO_PROFILE,'loop6-v2');
+assert.equal(VIDEO_PROFILE,'loop6-v3-1mb');
+assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_000_000);
 assert.equal(inspectPNG(new Uint8Array(png(200)),'sz_0').width,200);
 const corrupted=new Uint8Array(png(200));corrupted[40]^=1;assert.throws(()=>inspectPNG(corrupted,'sz_0'));
 assert.throws(()=>inspectPNG(new Uint8Array(png(240)),'sz_0'));
@@ -108,14 +110,59 @@ checks.push('auto_detection_override_independent_sessions_and_refresh_restore_ke
 const headers={'Content-Type':'video/h264','X-Preview-Revision':'2','X-Candidate-Id':second.candidate.id};
 const input=new Blob(['procedural-video-fixture'],{type:'video/h264'});
 const video=await adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input});
-assert.equal(video.profile,'loop6-v2');assert.equal(video.frameCount,180);assert.equal(video.revision,2);assert.equal(video.candidate,second.candidate.id);
+assert.equal(video.profile,'loop6-v3-1mb');assert.equal(video.frameCount,180);assert.equal(video.revision,2);assert.equal(video.candidate,second.candidate.id);
 const savedVideo=structuredClone((await storage.get(first.id)).video);
 const bundled=await adapter.api(`/api/preview/${first.id}/bundle`);
 const zip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(bundled.url).arrayBuffer()));
 const zipNames=Object.keys(zip.files).filter(name=>!zip.files[name].dir);
 assert.deepEqual(zipNames.sort(),['preview.json','preview.mp4',...files.map(f=>'res/'+f.name)].sort());
 for(const file of files)assert.deepEqual(Buffer.from(await zip.file('res/'+file.name).async('uint8array')),Buffer.from(file.data.split(',')[1],'base64'));
-const config=JSON.parse(await zip.file('preview.json').async('string'));assert.equal(config.video.duration,6);assert.equal(config.video.frameCount,180);assert.equal(config.video.profile,'loop6-v2');assert.equal(config.mode,'all');assert.equal(config.point,1);
+const config=JSON.parse(await zip.file('preview.json').async('string'));assert.equal(config.video.duration,6);assert.equal(config.video.frameCount,180);assert.equal(config.video.profile,'loop6-v3-1mb');assert.equal(config.mode,'all');assert.equal(config.point,1);
+const beforeOversize=await storage.get(first.id),writesBeforeOversize=storage.writes;
+preparedSize=VIDEO_SPEC.maxBytes+1;
+try {await rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}));}
+finally {preparedSize=null;}
+assert.equal(storage.writes,writesBeforeOversize);
+assert.deepEqual(await storage.get(first.id),beforeOversize);
+assert.deepEqual(Buffer.from(await (await storage.get(first.id)).video.blob.arrayBuffer()),Buffer.from(await savedVideo.blob.arrayBuffer()));
+assert.equal((await adapter.api(`/api/preview/${first.id}`)).video.url,video.url);
+checks.push('over_1mb_prepared_mp4_is_rejected_without_committing_or_replacing_the_previous_session_video');
+
+const boundarySession=await post('/api/preview/import',{...payload,name:'恰好一MB'});
+const boundaryHeaders={'Content-Type':'video/h264','X-Preview-Revision':'1','X-Candidate-Id':boundarySession.candidate.id};
+preparedSize=VIDEO_SPEC.maxBytes;
+let boundaryVideo;
+try {boundaryVideo=await adapter.api(`/api/preview/${boundarySession.id}/video`,{method:'POST',headers:boundaryHeaders,body:new Blob([new Uint8Array(VIDEO_SPEC.maxBytes+1)],{type:'video/h264'})});}
+finally {preparedSize=null;}
+assert.equal(boundaryVideo.size,1_000_000);assert.equal(boundaryVideo.profile,VIDEO_PROFILE);
+const boundaryRecord=await storage.get(boundarySession.id);
+assert.equal(boundaryRecord.video.blob.size,1_000_000);
+assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video.sha256,boundaryVideo.sha256);
+const boundaryBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundle`),boundaryZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(boundaryBundle.url).arrayBuffer()));
+assert.equal((await boundaryZip.file('preview.mp4').async('uint8array')).length,1_000_000);
+for(const file of files)assert.deepEqual(Buffer.from(await boundaryZip.file('res/'+file.name).async('uint8array')),Buffer.from(file.data.split(',')[1],'base64'));
+const oversizedCache=structuredClone(boundaryRecord);
+oversizedCache.video={...oversizedCache.video,blob:new Blob([new Uint8Array(VIDEO_SPEC.maxBytes+1)],{type:'video/mp4'}),size:1,sha256:'over-budget-cached-video'};
+storage.records.set(boundarySession.id,oversizedCache);
+const oversizeCacheWrites=storage.writes;
+assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video,null,'Actual Blob size overrides a misleading metadata size');
+const oversizeBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundle`),oversizeZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(oversizeBundle.url).arrayBuffer()));
+assert.equal(oversizeZip.file('preview.mp4'),null);assert.equal(JSON.parse(await oversizeZip.file('preview.json').async('string')).video,null);
+assert.equal((await storage.get(boundarySession.id)).video.blob.size,1_000_001);assert.equal(storage.writes,oversizeCacheWrites);
+checks.push('exactly_1mb_final_video_is_public_and_zipped_raw_intermediates_may_exceed_1mb_and_oversized_cached_blobs_are_hidden_without_deletion');
+
+const v2Session=await post('/api/preview/import',{...payload,name:'历史v2视频'});
+const v2Record=await storage.get(v2Session.id);
+v2Record.video={...savedVideo,profile:'loop6-v2',revision:v2Session.revision,candidate:v2Session.candidate.id};
+storage.records.set(v2Session.id,structuredClone(v2Record));
+const v2Writes=storage.writes;
+assert.equal((await adapter.api(`/api/preview/${v2Session.id}`)).video,null);
+const v2Bundle=await adapter.api(`/api/preview/${v2Session.id}/bundle`),v2Zip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(v2Bundle.url).arrayBuffer()));
+assert.equal(v2Zip.file('preview.mp4'),null);assert.equal(JSON.parse(await v2Zip.file('preview.json').async('string')).video,null);
+for(const file of files)assert.deepEqual(Buffer.from(await v2Zip.file('res/'+file.name).async('uint8array')),Buffer.from(file.data.split(',')[1],'base64'));
+assert.equal(storage.writes,v2Writes);assert.deepEqual((await storage.get(v2Session.id)).video,v2Record.video);
+assert.deepEqual(Buffer.from(await (await storage.get(v2Session.id)).video.blob.arrayBuffer()),Buffer.from(await savedVideo.blob.arrayBuffer()));
+checks.push('fully_bound_v2_video_is_retained_in_storage_but_not_offered_for_download_or_added_to_zip');
 const third=await post(`/api/preview/${first.id}/settings`,{expectedRevision:2,name:'仙人掌改名'});assert.equal(third.video,null);
 assert.deepEqual((await storage.get(first.id)).video,savedVideo);
 await rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}),409);
