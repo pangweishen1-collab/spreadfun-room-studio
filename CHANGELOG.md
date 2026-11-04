@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.10.0 - 2026-11-04
+
+### Custom avatar frames
+
+- Add a PNG, JPG or WebP image layer to an uploaded SVGA. Drag, resize with a locked aspect ratio, center, replace or remove it; text can be left empty for image-only customization.
+- Compress SVGA packages and PNG assets losslessly in a local worker, choosing the smaller complete-file candidate. Preserve decoded RGBA, original dimensions, all animation frames and audio. If lossless output exceeds 3,000,000 bytes, show an error instead of resizing or dropping frames.
+- Keep font style presets collapsed and add filled photo-stack and palette icons to the centered tabs. Labels and icons remain intact across Chinese/English changes and narrow layouts.
+
 ## 1.9.4 - 2026-11-04
 
 ### Dice preview export

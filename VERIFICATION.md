@@ -281,3 +281,11 @@
 - 320px中英与375px手机无横向溢出：三工具空态高度360px、插图96×72、可见主按钮44px；头像载入后254px预览完整，输入16px。错误替换后头像保留选帧与下载、Banner保留两结果、Room跳过无效文件保留输出；无控制台错误。
 - 本地共享统计增量正好10生成/6下载：Room4/2、Avatar2/2、Banner4/2。无效文件、语言和切工具未额外计数。上述文件操作只在本地隔离数据库；生产发布仅做资源/样式和无计数预览复核，未写测试事件。系统减动/后台由真实JS在平台替身中定向核验，未修改用户系统设置。
 - 源码、线上字节核验、Worker版本及截图见上层tool-feedback-test-results/verification.json。
+
+## Avatar image layers and lossless SVGA · v1.10.0 · 2026-11-04
+
+- Added one editable PNG/JPG/WebP picture above the original animation and below text, with drag, aspect-locked resize, numeric width, center, replacement/removal and keyboard nudge. Blank text permits image-only export. Font presets are collapsed by default; both centered tabs include filled icons, retained through language changes.
+- Custom exports use lossless PNG repacking and container compression in a local worker; the complete smaller candidate wins. Pixel RGBA (including zero-alpha RGB), dimensions, original animation frames, unknown records and audio are preserved. The 3,000,000-byte limit rejects oversized lossless results without silently resizing or dropping frames. Complex PNG dialects remain untouched.
+- Local independent PNG checks:40 passed. Same-content protobuf image+text111,916→102,392B; image-only85,821→80,321B; legacy ZIP113,351→103,901B. All decoded PNG pixels and timeline/geometry checks passed. Real top3 download retained240×240,40frames,20FPS and17 source PNGs exactly. Sample gains and timings depend on assets/device.
+- Final merged v1.9.4 baseline: full npm test passed including current dice-loop regression. Pages build emitted329 public files; new JS/worker/codec/vendor asset bytes matched the manifest, and the footer identifiesv1.10.0. Actual production-build preview export produced102,390B SVGA in351.8ms, byte-identical to the pixel-verified artifact, plus240×240 WebP; browser error/warning log empty. Chinese/English320px tabs and both selected states previously verified without overflow or lost icons.
+- No database migration or schema/API change. Deployment and live-verification receipts are saved outside the public source; native SDK certification is outside this browser release check.
