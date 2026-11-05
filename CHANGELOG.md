@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.13.1 - 2026-11-05
+
+### Shared dice upload flow
+
+- Green and purple now use the same complete-six-face upload contract and controls. Remove the purple composition selector and automatic numeral/base guessing for new uploads; keep file, folder, drop, paste, incremental completion and hero replacement.
+- Preserve existing auto/digits sessions when renaming, restoring grade caches or exporting. Keep optional legacy source PNGs and the existing purple05 animation/resource format.
+
 ## 1.13.0 - 2026-11-05
 
 ### Purple dice motion 05
