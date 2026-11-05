@@ -1,7 +1,8 @@
 # 更新记录
 
-## 1.15.0 - 2026-11-05 (local review)
+## 1.15.0 - 2026-11-05
 
+- Use a fixed purple UI display scale so preview and video do not add a second time-varying zoom outside the exported native05 animation.
 - Keep purple dice on the silhouette gyro05 structure for all uploaded shapes, including high-coverage square art. Preserve the approved motion curve and rebuild older purple geometry using a versioned native cache.
 - Remove the blue mat behind the two upload areas, give green and purple separate hover motion and pale grade colors, and tint the compact replacement cards to match.
 - Avoid repeated face-opacity decoding and reuse the validated PNG buffer for hashing. Cache identical per-mesh animation samples within each build without changing generated timelines.
