@@ -1,5 +1,7 @@
-// Event routing only. The shared UploadPaste parser and real browser are separate checks.
+// Upload event routing and actual preview controller contracts; real browser checks are separate.
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import vm from 'node:vm';
 import {bindDiceUploads} from '../dice/upload-input.mjs';
 
 class ClassList {
@@ -277,4 +279,59 @@ const checks=[];
   releaseRead(); await Promise.all(first.results);assert.deepEqual(committed,[fileA]);assert.equal(h.state.busy,false);
   h.dispose();checks.push('directory_enumeration_starts_inside_import_transaction_and_blocks_overlapping_uploads');
 }
-console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Mock DOM/Event/FileList and UploadPaste registration contract only; native clipboard, file/directory pickers, failed-session preservation and browser layout require real browser QA.'},null,2));
+{
+  // Execute the actual controller functions without booting its DOM/event shell.
+  const source=await readFile(new URL('../dice/preview-app.js',import.meta.url),'utf8');
+  const fields=Object.fromEntries(['dice-name','sound-enabled','preview-mode','preview-point'].map(id=>[id,{value:'',checked:true}]));
+  const calls=[],six=Array.from({length:6},(_,i)=>Object.freeze({name:`sz_${i+1}.png`}));
+  let app,serial=0,importFailure=null,loadFailure=null;
+  const context={document:{getElementById:id=>{assert.ok(fields[id],`unexpected controller DOM access: ${id}`);return fields[id];}},
+    URL:{revokeObjectURL(){}},VIDEO_SPEC:{profile:'test'},t:key=>key,
+    DiceAudio:class {ready=true;setEnabled(){}async load(){}stop(){}},
+    localApi:async(path,options)=>{
+      const body=typeof options.body==='string'?JSON.parse(options.body):options.body;calls.push({path,body});
+      if(importFailure)throw importFailure;
+      const previous=app.state().session,isImport=path==='/api/preview/import';
+      return {...body,id:isImport?`new-${++serial}`:previous.id,revision:isImport?1:previous.revision+1,
+        resolvedComposition:body.composition==='auto'?'digits':body.composition,candidate:{id:`candidate-${++serial}`,audio:{}}};
+    }};
+  const executed={...context,loadCandidate:async()=>{if(loadFailure)throw loadFailure;}};
+  vm.createContext(executed);
+  vm.runInContext(source.slice(source.indexOf('const $ ='),source.indexOf('\napplyTranslations();'))+`
+    render=()=>{}; toast=()=>{};
+    globalThis.app={settings,settingsDirty,importPending,saveSettings,loadSession,switchGrade,
+      setSession(value,nextGrade=value?.grade||'green'){session=value;grade=nextGrade;if(value)fillSettings(value);},
+      setPending(files){releasePending();files.forEach((original,i)=>pending.set(GREEN_SLOTS[i],{original,previewUrl:'blob:'+i}));},
+      clearCache(){gradeSessions.clear();},state(){return {session,grade,pending};}};
+    renderer={data:{},async load(candidate){await loadCandidate(candidate);},async patchPresentation(){return true;},configure(){},play(){},clear(){}};
+  `,executed);app=executed.app;
+  const legacy=composition=>({id:`old-${composition}`,revision:1,name:'旧骰子',grade:'purple',mode:'all',point:1,composition,resolvedComposition:'digits',soundEnabled:true,candidate:{id:`old-${composition}`,audio:{}}});
+  for(const nextGrade of ['green','purple']){
+    app.setSession(null,nextGrade);fields['dice-name'].value='新骰子';app.setPending(six);await app.importPending();
+    assert.equal(calls.at(-1).body.grade,nextGrade);assert.equal(calls.at(-1).body.composition,'faces');
+    assert.deepEqual(Array.from(calls.at(-1).body.files),six);assert.equal(app.state().pending.size,0);assert.equal(app.settingsDirty(),false);
+  }
+  checks.push('actual_controller_new_green_and_purple_six_face_imports_use_faces');
+  for(const composition of ['auto','digits']){
+    app.setSession(legacy(composition));assert.equal(app.settingsDirty(),false);assert.equal(app.settings().composition,composition);
+    fields['dice-name'].value='已改名';assert.equal(app.settingsDirty(),true);await app.saveSettings();
+    assert.equal(calls.at(-1).body.composition,composition);assert.equal(app.state().session.composition,composition);assert.equal(app.settingsDirty(),false);
+    app.setSession({...legacy(composition),mode:'single',point:6});app.setPending(six);await app.importPending();
+    assert.equal(calls.at(-1).body.composition,'faces');assert.equal(calls.at(-1).body.mode,'all');assert.equal(calls.at(-1).body.point,1);
+  }
+  checks.push('actual_controller_legacy_auto_digits_are_clean_rename_preserves_composition_and_replacement_always_uses_faces');
+  const previous=legacy('digits');app.setSession(previous);app.setPending(six);
+  importFailure=Error('import rejected');await assert.rejects(()=>app.importPending(),error=>error===importFailure);
+  assert.equal(app.state().session,previous);assert.equal(app.state().pending.size,6);importFailure=null;
+  loadFailure=Error('renderer rejected');await assert.rejects(()=>app.importPending(),error=>error.key==='previewLoadFailed'&&error.cause===loadFailure);
+  assert.equal(app.state().session,previous);assert.equal(app.state().grade,'purple');assert.equal(app.state().pending.size,6);loadFailure=null;
+  checks.push('actual_controller_failed_import_or_renderer_load_preserves_previous_session_and_pending_sources');
+  app.clearCache();app.setPending([]);
+  const green={...legacy('faces'),id:'cached-green',grade:'green'},purple=legacy('auto');
+  await app.loadSession(green);await app.switchGrade('purple');assert.equal(app.state().session,null);assert.equal(app.settings().composition,'faces');
+  await app.loadSession(purple);const beforeSwitch=calls.length;
+  await app.switchGrade('green');assert.equal(app.state().session,green);assert.equal(app.settingsDirty(),false);
+  await app.switchGrade('purple');assert.equal(app.state().session,purple);assert.equal(app.settingsDirty(),false);assert.equal(app.settings().composition,'auto');assert.equal(calls.length,beforeSwitch);
+  checks.push('actual_controller_grade_cache_restores_each_composition_without_reimport_or_dirty_settings');
+}
+console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Mock DOM/Event/FileList, UploadPaste registration and actual preview controller contracts; native clipboard, file/directory pickers, rendering and browser layout require real browser QA.'},null,2));

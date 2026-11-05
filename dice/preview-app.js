@@ -28,7 +28,7 @@ function syncRound(status) {
 function issue(key, values) { return Object.assign(new Error(key), {key, values}); }
 function settings() {
   return {name:$('dice-name').value.trim(), grade, mode:'all',
-    point:1, composition:grade === 'green' ? 'faces' : $('composition').value, soundEnabled:$('sound-enabled').checked};
+    point:1, composition:grade === 'green' ? 'faces' : session?.composition || 'faces', soundEnabled:$('sound-enabled').checked};
 }
 function settingsDirty() {
   if (!session) return false;
@@ -45,7 +45,6 @@ function fillSettings(value) {
   grade = value.grade;
   $('preview-mode').value = 'all';
   $('preview-point').value = '1';
-  $('composition').value = value.composition;
   $('sound-enabled').checked = value.soundEnabled !== false; audio.setEnabled(value.soundEnabled !== false);
 }
 function releasePending() {
@@ -117,13 +116,11 @@ function render() {
   $('dice-name').disabled = locked;
   $('preview-mode').disabled = locked;
   $('preview-point').disabled = locked || $('preview-mode').value !== 'single';
-  $('composition').disabled = locked;
-  $('composition-section').hidden = grade === 'green';
   $('sound-enabled').disabled = locked;
   $('audio-warning').textContent=audioWarning; $('audio-warning').hidden=!audioWarning;
   $('preview-empty').querySelector('h3').textContent = t(grade === 'green' ? 'greenEmptyTitle' : 'previewEmptyTitle');
   $('asset-grid').setAttribute('aria-label',t(grade === 'green' ? 'greenAssetStatus' : 'assetStatus'));
-  $('grade-upload-hint').textContent=t(grade === 'green' ? 'greenUploadHint' : 'purpleUploadHint');
+  $('grade-upload-hint').textContent=t('greenUploadHint');
   $('hero-hint').hidden=!session || Boolean(session.candidate.icon);
   $('hero-hint').textContent=t('missingHero');
   document.querySelectorAll('[data-grade]').forEach(button => {
@@ -156,10 +153,6 @@ function render() {
   else if (draft) uploadStatus.textContent = t('replacingFiles');
   else if (dirty) { uploadStatus.textContent = t('settingsPending'); uploadStatus.dataset.state = 'pending'; }
   else { uploadStatus.textContent = notice?.key === 'videoInvalidated' ? t(notice.key) : ''; uploadStatus.dataset.state = 'pending'; }
-  const composition = draft || dirty ? (settings().composition === 'auto' ? null : settings().composition) : session?.resolvedComposition;
-  $('composition-status').textContent = composition ? t(composition === 'digits' ? 'digitsShort' : 'facesShort') : t('automatic');
-  $('composition-status').dataset.state = composition ? 'applied' : '';
-  $('composition-hint').textContent = t('compositionHint') + (session?.composition === 'auto' && composition ? ' ' + t(composition === 'digits' ? 'detectedDigits' : 'detectedFaces') : '');
   let videoKey = 'videoEmpty', videoValues;
   if (session && (draft || dirty)) videoKey = 'videoInvalidated';
   else if (clip) { videoKey = 'videoReady'; videoValues = {size:bytes(clip.size || 0)}; }
@@ -212,7 +205,7 @@ async function loadSession(next, reusePresentation = false) {
 }
 async function importPending() {
   if (requiredSlots().some(slot=>!pending.has(slot))) throw issue(grade === 'green' ? 'greenIncomplete' : 'incompleteFiles');
-  const values = settings();
+  const values = {...settings(), composition:'faces'};
   if (!values.name || values.name.length > 80) throw issue('nameRequired');
   activity = {key:'buildingPreview'}; render();
   const next=await api('/api/preview/import', {method:'POST',body:{...values,files:[...[...pending.values()].map(f=>f.original),...greenExtras]}});
@@ -286,7 +279,7 @@ async function switchGrade(nextGrade) {
   const stored=gradeSessions.get(grade);
   try {
     if (stored) await loadSession(stored);
-    else { session=null; previewReady=false; hasCanvas=false; renderer?.clear(); $('dice-name').value=''; $('composition').value='auto'; $('sound-enabled').checked=true; audio.setEnabled(true); audioWarning=''; }
+    else { session=null; previewReady=false; hasCanvas=false; renderer?.clear(); $('dice-name').value=''; $('sound-enabled').checked=true; audio.setEnabled(true); audioWarning=''; }
     currentError=null; notice=null; render();
   } catch(error) { grade=beforeGrade;session=before;if(before)fillSettings(before);throw error; }
 }
@@ -332,7 +325,7 @@ $('author-button').addEventListener('click', () => openDialog('author-dialog'));
 $('close-author').addEventListener('click', () => $('author-dialog').close());
 $('dice-name').addEventListener('input', () => { if (!busy) render(); });
 $('dice-name').addEventListener('change', settingsChanged);
-['preview-mode','preview-point','composition','sound-enabled'].forEach(id => $(id).addEventListener('change', settingsChanged));
+['preview-mode','preview-point','sound-enabled'].forEach(id => $(id).addEventListener('change', settingsChanged));
 document.querySelectorAll('[data-grade]').forEach(button => button.addEventListener('click', () => { if (!busy && grade!==button.dataset.grade) return run(null,()=>switchGrade(button.dataset.grade)); }));
 $('apply-settings').addEventListener('click', () => run('updatingSettings', saveSettings));
 $('import-preview').addEventListener('click', () => run('buildingPreview', importPending));
