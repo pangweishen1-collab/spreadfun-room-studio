@@ -1,5 +1,14 @@
 # 更新记录
 
+## 1.13.0 - 2026-11-05
+
+### Purple dice motion 05
+
+- Generate purple dice with the approved tilted-gyro motion and a 1.5x scale peak as native Spine 4.2 mesh/deform data. Preview, video and compact SKEL export use the same animation data, with six spin and six standby actions and no image sequences.
+- Accept six complete point faces for either grade. Purple also preserves optional hero, sz_0 and legacy angle images, supports base-plus-numeral composition, and rebuilds older purple template sessions without changing original PNG/MP3 files.
+- Keep invisible root anchor, roll/six-result sound events and the existing compact delivery structure. Purple ZIP folders, SKEL, atlas, PNG and atlas-page references consistently use the dice_purple_ prefix.
+- Preserve the current green motion and improve native purple Canvas fallback when WebGL is unavailable or loses its context. The native mesh, side-wall shading and short trail adapt the selected web study rather than reproduce its nine-exposure shader pixel for pixel.
+
 ## 1.12.1 - 2026-11-04
 
 ### Dice landing fixes

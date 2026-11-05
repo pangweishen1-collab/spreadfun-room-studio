@@ -8,13 +8,12 @@ import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/d
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
-const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, index) => 'sz_' + index)];
 let session = null, pending = new Map(), grade = 'green', busy = false;
 let renderer = null, previewReady = false, hasCanvas = false, loadingPreview = false;
 let activity = null, notice = null, currentError = null, toastTimer;
 let embedded = null, audioWarning='', audioSignature='';
 const gradeSessions = new Map(), audio = new DiceAudio();
-const requiredSlots = () => grade === 'green' ? GREEN_SLOTS : SLOTS;
+const requiredSlots = () => GREEN_SLOTS;
 let greenExtras = [];
 function greenSlot(file) {
  const name=file.name.normalize('NFKC').trim().toLowerCase(),stem=name.replace(/\.png$/i,'');
@@ -27,12 +26,6 @@ function syncRound(status) {
 }
 
 function issue(key, values) { return Object.assign(new Error(key), {key, values}); }
-function slotFor(name) {
-  if (!/\.png$/i.test(name) || /[/\\]/.test(name)) return null;
-  const stem = name.slice(0, -4);
-  const slot = stem.toLowerCase() === 'icon' ? '大骰子' : stem.toLowerCase();
-  return SLOTS.includes(slot) ? slot : null;
-}
 function settings() {
   return {name:$('dice-name').value.trim(), grade, mode:'all',
     point:1, composition:grade === 'green' ? 'faces' : $('composition').value, soundEnabled:$('sound-enabled').checked};
@@ -217,35 +210,13 @@ async function loadSession(next, reusePresentation = false) {
     throw Object.assign(issue('previewLoadFailed'), {cause:error});
   } finally { loadingPreview = false; render(); }
 }
-async function readPng(file, slot) {
-  if (!file.size || file.size > 12 * 1024 * 1024) throw issue('tooLarge', {file:file.name});
-  const signature = new Uint8Array(await file.slice(0, 8).arrayBuffer());
-  if (![137,80,78,71,13,10,26,10].every((value,index) => signature[index] === value)) throw issue('invalidPng', {file:file.name});
-  const previewUrl = URL.createObjectURL(file);
-  try {
-    const image = new Image();
-    await new Promise((resolve,reject) => { image.onload = resolve; image.onerror = () => reject(issue('invalidPng', {file:file.name})); image.src = previewUrl; });
-    const expected = slot === '大骰子' ? 240 : 200;
-    if (image.naturalWidth !== expected || image.naturalHeight !== expected) throw issue('invalidSize', {file:file.name, size:`${expected} × ${expected}`});
-    const data = await new Promise((resolve,reject) => {
-      const reader = new FileReader(); reader.onload = () => resolve(reader.result); reader.onerror = () => reject(issue('readFailed', {file:file.name})); reader.readAsDataURL(file);
-    });
-    return {name:file.name, slot, data, previewUrl, width:expected, height:expected, size:file.size};
-  } catch (error) { URL.revokeObjectURL(previewUrl); throw error; }
-}
 async function importPending() {
   if (requiredSlots().some(slot=>!pending.has(slot))) throw issue(grade === 'green' ? 'greenIncomplete' : 'incompleteFiles');
   const values = settings();
   if (!values.name || values.name.length > 80) throw issue('nameRequired');
   activity = {key:'buildingPreview'}; render();
-  if (grade === 'green') {
-    const next=await api('/api/preview/import', {method:'POST',body:{...values,files:[...[...pending.values()].map(f=>f.original),...greenExtras]}});
-    await loadSession(next); releasePending(); toast('greenImportSuccess'); return;
-  }
-  const next = await api('/api/preview/import', {method:'POST',body: {...values, files:[...SLOTS.map(slot => { const file=pending.get(slot); return {name:file.name, data:file.data}; }),...greenExtras]}});
-  await loadSession(next);
-  releasePending();
-  toast('importSuccess');
+  const next=await api('/api/preview/import', {method:'POST',body:{...values,files:[...[...pending.values()].map(f=>f.original),...greenExtras]}});
+  await loadSession(next); releasePending(); toast(grade === 'green' ? 'greenImportSuccess' : 'importSuccess');
 }
 async function stageFiles(files) {
   if (!files.length) throw issue('noFiles');
@@ -258,29 +229,7 @@ async function stageFiles(files) {
     const next=await api(`/api/preview/${session.id}/hero`,{method:'POST',body:{expectedRevision:session.revision,file:files[0]}});
     await loadSession(next,true); toast('heroUpdated'); return;
   }
-  if (grade === 'green') return stageGreen(files);
-  // Prefer the explicit hero when old folders also contain an icon alias.
-  if (files.some(file=>file.name.normalize('NFKC').trim().toLowerCase()==='大骰子.png')) files=files.filter(file=>file.name.normalize('NFKC').trim().toLowerCase()!=='icon.png');
-  const sidecars=files.filter(file=>/^anchor\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(file.name));
-  files=files.filter(file=>!sidecars.includes(file));
-  const unknown = files.filter(file => !slotFor(file.name));
-  if (unknown.length) throw issue('unknownFiles', {files:unknown.map(file => file.name).join(', ')});
-  const seen = new Set(), duplicates = [];
-  files.forEach(file => { const slot=slotFor(file.name); if (seen.has(slot)) duplicates.push(file.name); seen.add(slot); });
-  if (duplicates.length) throw issue('duplicateFiles', {files:duplicates.join(', ')});
-  const results = await Promise.allSettled(files.map(file => readPng(file, slotFor(file.name))));
-  const failed = results.find(result => result.status === 'rejected');
-  if (failed) { results.forEach(result => { if (result.status === 'fulfilled') URL.revokeObjectURL(result.value.previewUrl); }); throw failed.reason; }
-  if (files.length === 10) releasePending();
-  greenExtras=sidecars;
-  for (const result of results) {
-    const file = result.value, previous = pending.get(file.slot);
-    if (previous) URL.revokeObjectURL(previous.previewUrl);
-    pending.set(file.slot, file);
-  }
-  if (!$('dice-name').value.trim()) $('dice-name').value = t('defaultName');
-  render();
-  if (pending.size === 10) await importPending();
+  return stageGreen(files);
 }
 async function saveSettings() {
   if (!session || pending.size || !settingsDirty()) return;
@@ -348,14 +297,16 @@ async function stageGreen(files) {
   // Canonical sz_N beats legacy 1.png/2.png included in old resource folders.
   const chosen=[];
   for(const [slot,list] of groups) {
-    const priority=f=>f.name.normalize('NFKC').toLowerCase()===slot+'.png'?0:/^\d\.png$/i.test(f.name)?2:1;
+    const priority=f=>f.name.normalize('NFKC').trim().toLowerCase()===slot+'.png'?0:/^\d\.png$/i.test(f.name)?2:1;
     const best=Math.min(...list.map(priority)),matches=list.filter(f=>priority(f)===best);
     if(matches.length!==1)throw issue('duplicateFiles',{files:matches.map(f=>f.name).join(', ')});
     chosen.push([slot,matches[0]]);
   }
   if(!chosen.length)throw issue('greenIncomplete');
   if(chosen.length===6)releasePending();
-  const extras=usable.filter(f=>!greenSlot(f) && /^(?:icon|大骰子|sz_?0|anchor)\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(f.name.normalize('NFKC').trim()));
+  const selected=new Set(chosen.map(([,file])=>file));
+  const extras=usable.filter(f=>!selected.has(f) && (/^(?:icon|大骰子|sz_?0|anchor)\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(f.name.normalize('NFKC').trim())
+    ||grade==='purple'&&/^[12]\.png$/i.test(f.name.normalize('NFKC').trim())));
   greenExtras.push(...extras);
   for(const [slot,file]of chosen) {
     const old=pending.get(slot);if(old)URL.revokeObjectURL(old.previewUrl);

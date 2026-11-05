@@ -3,6 +3,7 @@ import { VIDEO_SPEC } from './video-export.mjs';
 import {generateSixFaceRuntime} from './six-face/runtime.mjs';
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
+import {generatePurpleGyroRuntime,PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/runtime.mjs';
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
 export const GREEN_SLOTS = Array.from({length:6},(_,i)=>`sz_${i+1}`);
 export const VIDEO_PROFILE = VIDEO_SPEC.profile;
@@ -12,6 +13,7 @@ const MAX_PNG = 12 * 1024 * 1024;
 const SOUND_NAMES=['dice_roll','sound_ui_dice6'];
 const DEFAULT_AUDIO=Object.fromEntries(SOUND_NAMES.map(name=>[name,`/dice/assets/audio/${name}.mp3`]));
 const DEFAULT_ANCHOR='/dice/assets/anchor.png';
+const generatedRuntime=runtime=>runtime?.kind==='six-face'||runtime?.kind==='purple-gyro';
 
 export function resourceName(name,grade){
   const suffix=Array.from(String(name||'').normalize('NFKC').trim()
@@ -151,6 +153,22 @@ export function validateSixFaceFiles(entries) {
   Object.defineProperty(result,'warnings',{value:selected.warnings});
   return result;
 }
+export function validatePurpleFiles(entries) {
+  const normalized=entry=>String(entry?.name||'').normalize('NFKC').trim().toLowerCase();
+  const canonical=new Set(entries.flatMap(entry=>{
+    const match=/^(?:sz[_ -]?|face[_ -]?)([12])\.png$/.exec(normalized(entry));return match?[match[1]]:[];
+  }));
+  // Old folders use 1/2 for angle art. Keep them as source extras when a
+  // canonical face for that point exists; bare 1..6 can still be face aliases.
+  const angles=entries.filter(entry=>{const match=/^([12])\.png$/.exec(normalized(entry));return match&&canonical.has(match[1]);});
+  const result=validateSixFaceFiles(entries.filter(entry=>!angles.includes(entry)));
+  for(const slot of ['1','2']){
+    const matches=angles.filter(entry=>normalized(entry)===slot+'.png');
+    if(matches.length>1)throw new PreviewError('重复：'+slot+'.png',400,{duplicates:[slot+'.png']});
+    if(matches[0]){const entry=matches[0];result.push({...entry,name:entry.name,...(entry instanceof Blob?{blob:entry}:{}),slot});}
+  }
+  return result;
+}
 async function originalBlob(entry,audio=false) {
   if(entry.blob instanceof Blob)return entry.blob;
   if(audio){
@@ -162,8 +180,16 @@ async function originalBlob(entry,audio=false) {
 }
 
 export function detectComposition(files,requested='auto') {
-  const areas=Object.fromEntries(files.map(f=>[f.slot,f.alphaArea]));
-  const ratios=Array.from({length:6},(_,i)=>areas[`sz_${i+1}`]/Math.max(1,areas.sz_0));
+  if(!files.some(file=>file.slot==='sz_0')){
+    if(requested==='digits')throw new PreviewError('分离点数素材需要 sz_0.png 底图');
+    return {resolvedComposition:'faces',compositionDetection:{method:'six_faces_without_sz_0',detected:'faces',ratios:{}}};
+  }
+  const faces=files.filter(file=>/^sz_[0-6]$/.test(file.slot));
+  const sized=faces.every(file=>Number.isFinite(file.width)&&file.width>0&&Number.isFinite(file.height)&&file.height>0);
+  // Match prepareFaces' square contain normalization before comparing opacity.
+  // Keep dimensionless legacy records/tests in their original shared units.
+  const areas=Object.fromEntries(faces.map(file=>[file.slot,file.alphaArea/(sized?Math.max(file.width,file.height)**2:1)]));
+  const ratios=Array.from({length:6},(_,i)=>areas[`sz_${i+1}`]/Math.max(Number.EPSILON,areas.sz_0));
   const sorted=[...ratios].sort((a,b)=>a-b);
   const detected=(sorted[2]+sorted[3])/2<.6&&Math.max(...ratios)<.85?'digits':'faces';
   return {resolvedComposition:requested==='auto'?detected:requested,
@@ -273,6 +299,7 @@ export function createLocalPreview(dependencies={}) {
   const decode=dependencies.decodePNG||decodePNG;
   const render=dependencies.renderRuntime||((files,composition)=>renderRuntime(files,composition,decode));
   const renderSix=dependencies.renderSixFace||generateSixFaceRuntime;
+  const renderGyro=dependencies.renderPurpleGyro||generatePurpleGyroRuntime;
   const hash=dependencies.hash||sha256, uuid=dependencies.uuid||(()=>crypto.randomUUID().replaceAll('-',''));
   const objectURL=dependencies.createObjectURL||(blob=>URL.createObjectURL(blob));
   const revoke=dependencies.revokeObjectURL||(url=>URL.revokeObjectURL(url));
@@ -294,16 +321,29 @@ export function createLocalPreview(dependencies={}) {
     try{return await renderSix(files,{...options,anchorImage:image.drawable});}
     finally{image.close?.();}
   }
+  async function renderPurple(files,options={}){
+    const anchor=files.find(file=>file.slot==='anchor');
+    const image=await decode(anchor?.blob||await defaultAsset(DEFAULT_ANCHOR),'anchor.png',{allowEmpty:true});
+    try{return await renderGyro(files,{...options,anchorImage:image.drawable});}
+    finally{image.close?.();}
+  }
+  function renderNative(record,options={}){
+    return record.grade==='purple'
+      ?renderPurple(record.files,{name:record.name,composition:record.resolvedComposition,...options})
+      :renderGreen(record.files,{name:record.name,...options});
+  }
   async function read(id) {
     const record=await storage.get(id);
     if(!record)throw new PreviewError('预览会话不存在',404);
     const anchor=record.runtime.metadata?.anchor;
-    const migrateAnchor=record.runtime.kind==='six-face'&&!(anchor?.bone==='root'&&anchor.scaleX===6&&anchor.scaleY===6&&anchor.opacity===0);
-    const migrateMotion=record.runtime.kind==='six-face'&&record.runtime.metadata?.motionVersion!==SIX_FACE_MOTION_VERSION;
+    const migrateAnchor=generatedRuntime(record.runtime)&&!(anchor?.bone==='root'&&anchor.scaleX===6&&anchor.scaleY===6&&anchor.opacity===0);
+    const migrateMotion=record.grade==='purple'
+      ?record.runtime.kind!=='purple-gyro'||record.runtime.metadata?.motionVersion!==PURPLE_GYRO_MOTION_VERSION
+      :record.runtime.kind==='six-face'&&record.runtime.metadata?.motionVersion!==SIX_FACE_MOTION_VERSION;
     if(record.mode==='all' && record.point===1&&!migrateAnchor&&!migrateMotion)return record;
     const migrated={...record,mode:'all',point:1,revision:record.revision+1,candidateId:uuid()};
     if(migrateAnchor||migrateMotion){
-      migrated.runtime=await renderGreen(record.files,{name:record.name});
+      migrated.runtime=await renderNative(record);
       migrated.runtime.warnings=[...new Set([...(record.runtime.warnings||[]),...(migrated.runtime.warnings||[])])];
     }
     // Uploaded PNGs and old video Blobs remain stored; binding/profile hides old output.
@@ -316,11 +356,12 @@ export function createLocalPreview(dependencies={}) {
     const anchor=record.anchor?{...Object.fromEntries(Object.entries(record.anchor).filter(([k])=>k!=='blob'&&k!=='alphaArea')),url:url(`${record.id}/file/anchor/${record.anchor.sha256||record.revision}`,record.anchor.blob)}:
       {name:'anchor.png',url:DEFAULT_ANCHOR,default:true,hidden:true};
     anchor.hidden=true;
-    const sixFace=record.runtime.kind==='six-face',png=Object.fromEntries(files.map(f=>[f.slot,f.url]));
-    const runtimeKey=sixFace?('six-face/'+(record.runtime.metadata?.motionVersion||'legacy')):record.resolvedComposition;
+    const generated=generatedRuntime(record.runtime),png=Object.fromEntries(files.map(f=>[f.slot,f.url]));
+    const runtimeKey=generated?(record.runtime.kind+'/'+(record.runtime.metadata?.motionVersion||'legacy')+
+      (record.runtime.kind==='purple-gyro'?'/'+record.resolvedComposition:'')):record.resolvedComposition;
     const icon=png['大骰子']||null;png.anchor??=anchor.url;
-    const candidate={id:record.candidateId,version:record.revision,name:record.name,template:'green',previewGrade:record.grade,
-      kind:sixFace?'six-face':'template',...(sixFace?{json:record.runtime.json,geometry:record.runtime.geometry,warnings:record.runtime.warnings||[]}:{skel:dependencies.templateURL||'/dice/assets/template.skel'}),
+    const candidate={id:record.candidateId,version:record.revision,name:record.name,template:record.grade,previewGrade:record.grade,
+      kind:generated?record.runtime.kind:'template',...(generated?{json:record.runtime.json,geometry:record.runtime.geometry,warnings:record.runtime.warnings||[]}:{skel:dependencies.templateURL||'/dice/assets/template.skel'}),
       atlasPage:record.runtime.atlasPage||'preview.png',
       atlas:url(`${record.id}/runtime/${runtimeKey}/atlas`,new Blob([record.runtime.atlasText],{type:'text/plain'})),
       texture:url(`${record.id}/runtime/${runtimeKey}/texture`,record.runtime.texture),png,icon,anchor,audio,soundEnabled:record.soundEnabled!==false};
@@ -331,7 +372,7 @@ export function createLocalPreview(dependencies={}) {
       created:record.created,files,candidate,video,videoAvailable,videoUnavailableReason:videoAvailable?null:'当前浏览器不支持视频导出，请使用 Chrome',
       resolvedComposition:record.resolvedComposition,compositionDetection:record.compositionDetection,
       kind:candidate.kind,warnings:record.runtime.warnings||[],anchor,audio:audioFiles,audioURLs:audio,
-      heroMissing:!icon,needsUpload:record.grade==='green'&&!sixFace};
+      heroMissing:!icon,needsUpload:record.grade==='green'&&record.runtime.kind!=='six-face'};
   }
   async function importSession(payload,{signal}={}) {
     const aborted=()=>{if(signal?.aborted)throw new DOMException('操作已取消','AbortError');};aborted();
@@ -344,17 +385,16 @@ export function createLocalPreview(dependencies={}) {
     }
     const anchors=pngEntries.filter(entry=>/^anchor\.png$/i.test(entry.name||''));
     if(anchors.length>1)throw new PreviewError('重复：anchor.png');
-    const entries=settings.grade==='green'?validateSixFaceFiles(pngEntries):[
-      ...validateFiles(pngEntries.filter(entry=>!/^anchor\.png$/i.test(entry.name||''))),...anchors.map(entry=>({...entry,slot:'anchor'}))];
+    const entries=settings.grade==='green'?validateSixFaceFiles(pngEntries):validatePurpleFiles(pngEntries);
     const importWarnings=[...(entries.warnings||[])];
     if(settings.grade==='green'&&settings.composition==='digits')throw new PreviewError('绿色六面需要完整骰面，请选择 faces 或 auto');
     let totalBytes=0;
     for(const entry of entries) {
       aborted();
-      const optional=settings.grade==='green'&&['大骰子','sz_0'].includes(entry.slot);
+      const optional=['大骰子','sz_0','1','2'].includes(entry.slot)&&!(settings.grade==='purple'&&settings.composition==='digits'&&entry.slot==='sz_0');
       try{
       const blob=await originalBlob(entry),bytes=new Uint8Array(await blob.arrayBuffer());
-      const flexible=settings.grade==='green'||entry.slot==='anchor',dimensions=inspectPNG(bytes,entry.slot,entry.name,{flexible});
+      const dimensions=inspectPNG(bytes,entry.slot,entry.name,{flexible:true});
       if(totalBytes+blob.size>48*1024*1024)throw new PreviewError('所选 PNG 合计不能超过48 MiB');
       let alphaArea=0;
       if(settings.grade!=='green'||!GREEN_SLOTS.includes(entry.slot)){
@@ -377,10 +417,10 @@ export function createLocalPreview(dependencies={}) {
     }
     const detection=settings.grade==='green'?{resolvedComposition:'faces',compositionDetection:{method:'six_original_flat_faces',detected:'faces'}}:detectComposition(files,settings.composition);
     const record={id:uuid(),candidateId:uuid(),revision:1,...settings,...detection,files,audio,anchor:files.find(file=>file.slot==='anchor')||null,video:null,created:Math.floor(Date.now()/1000)};
-    try{record.runtime=settings.grade==='green'?await renderGreen(files,{name:settings.name,signal}):await render(files,record.resolvedComposition);}
+    try{record.runtime=await renderNative(record,{signal});}
     catch(error){throw error instanceof PreviewError||error.name==='AbortError'?error:new PreviewError(error.message||'六面资源生成失败');}
-    if(settings.grade==='green'&&(!record.runtime?.json||!record.runtime?.texture||!record.runtime?.atlasText))throw new PreviewError('六面资源生成不完整');
-    if(settings.grade==='green')record.runtime.warnings=[...importWarnings,...(record.runtime.warnings||[])];
+    if(!record.runtime?.json||!record.runtime?.texture||!record.runtime?.atlasText)throw new PreviewError('六面资源生成不完整');
+    record.runtime.warnings=[...importWarnings,...(record.runtime.warnings||[])];
     aborted();
     await storage.put(record);
     return publicSession(record);
@@ -389,13 +429,14 @@ export function createLocalPreview(dependencies={}) {
     const record=await read(id);
     if(!payload||!Number.isInteger(payload.expectedRevision)||payload.expectedRevision!==record.revision)throw new PreviewError('预览已更新，请刷新后重试',409);
     const settings=validateSettings(payload,record);
-    if(settings.grade!==record.grade)throw new PreviewError(settings.grade==='green'?'绿色等级需要上传六张完整骰面':'紫色等级需要上传完整的十张 PNG',409,
-      {needsUpload:true,grade:settings.grade,required:(settings.grade==='green'?GREEN_SLOTS:SLOTS).map(slot=>slot+'.png')});
+    if(settings.grade!==record.grade)throw new PreviewError(settings.grade==='green'?'绿色等级需要上传六张完整骰面':'紫色等级需要上传六张完整骰面',409,
+      {needsUpload:true,grade:settings.grade,required:GREEN_SLOTS.map(slot=>slot+'.png')});
     if(record.runtime.kind==='six-face'&&settings.composition==='digits')throw new PreviewError('绿色六面需要完整骰面，请选择 faces 或 auto');
     if(SETTING_KEYS.every(k=>settings[k]===(k==='soundEnabled'?record[k]!==false:record[k])))return publicSession(record);
     const detection=record.runtime.kind==='six-face'?{resolvedComposition:'faces',compositionDetection:record.compositionDetection}:detectComposition(record.files,settings.composition);
     const next={...record,...settings,revision:record.revision+1,candidateId:uuid(),...detection};
-    if(next.resolvedComposition!==record.resolvedComposition)next.runtime=await render(next.files,next.resolvedComposition);
+    if(next.resolvedComposition!==record.resolvedComposition)next.runtime=generatedRuntime(record.runtime)
+      ?await renderNative(next):await render(next.files,next.resolvedComposition);
     await storage.put(next,{revision:record.revision,candidateId:record.candidateId});
     return publicSession(next);
   }
@@ -440,7 +481,7 @@ export function createLocalPreview(dependencies={}) {
     for(const file of record.files)if(file.slot!=='anchor')
       add('res/'+(file.slot==='大骰子'?'icon':file.slot)+'.png',file.blob);
     let skeleton;
-    if(record.runtime.kind==='six-face'){
+    if(generatedRuntime(record.runtime)){
       const {writeSpineBinary}=await import('./six-face/spine-binary.mjs');
       const json=structuredClone(record.runtime.json);
       json.skeleton.images='./res/';json.skeleton.audio='./sound/';

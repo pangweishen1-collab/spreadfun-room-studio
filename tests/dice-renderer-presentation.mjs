@@ -5,7 +5,7 @@ globalThis.Image = class {
   set src(value) { this._src = value; requests.push(this); }
   get src() { return this._src; }
 };
-globalThis.document = {hidden: false, addEventListener() {}, createElement() { return {}; }};
+globalThis.document = {hidden: false, addEventListener() {}, createElement() { return {listeners:{},addEventListener(type,listener){this.listeners[type]=listener;}}; }};
 globalThis.requestAnimationFrame = () => {};
 const context = {
   clearRect(...args) { calls.push(['clear', ...args]); },
@@ -127,7 +127,6 @@ await settle(); ready(purple, raceStart);
 assert.equal(await stalePatch, false);
 ready('new-hero', raceStart);
 assert.equal(await full, true); assert.equal(racing.candidate, fullCandidate);
-console.log(JSON.stringify({passed: true, checks: ['preload/cache', 'no pending blank frame', 'playback continuity', 'no runtime reload', 'identity/revision commit', 'centered title', 'subtitle removed', 'latest update wins', 'asset mismatch', 'recording guard', 'clear/full-load races', 'failure/retry']}));
 
 // A missing hero must not be replaced by a flat result face.
 const noHeroStart=requests.length;
@@ -136,3 +135,16 @@ await noHero.load(candidate('without-hero','green',{icon:null,png:{sz_1:'flat-re
 assert.equal(noHero.icon,null);
 assert.ok(!requests.slice(noHeroStart).some(image=>image.src==='flat-result-face'));
 noHero.clear();
+
+// Context loss must keep generated purple/green animation on the same native
+// geometry, while legacy template candidates retain their pause behavior.
+for(const kind of ['six-face','purple-gyro']){
+ let softwareCalls=0,prevented=false;
+ retained.candidate={...retained.candidate,kind,geometry:{sourceSize:200,crop:[35,35,130,130],cropOffset:[0,0]}};
+ retained.mode='all';retained.playing=true;retained.gpuLost=false;retained.software={draw(_ctx,skeleton,height){assert.equal(height,1600);assert.ok(skeleton.scaleX>0);softwareCalls++;}};
+ retained.layer.listeners.webglcontextlost({preventDefault(){prevented=true;}});
+ assert.equal(prevented,true);assert.equal(retained.gpuLost,true);assert.equal(retained.playing,true,kind+' must not pause when its Canvas fallback exists');
+ retained.draw(.2283);assert.equal(softwareCalls,6,'All six generated faces draw through Canvas after GPU loss');
+}
+retained.candidate={...retained.candidate,kind:'template'};retained.playing=true;retained.layer.listeners.webglcontextlost({preventDefault(){}});assert.equal(retained.playing,false,'Legacy template cannot silently claim a software fallback');
+console.log(JSON.stringify({passed: true, checks: ['preload/cache', 'no pending blank frame', 'playback continuity', 'no runtime reload', 'identity/revision commit', 'centered title', 'subtitle removed', 'latest update wins', 'asset mismatch', 'recording guard', 'clear/full-load races', 'failure/retry', 'native green/purple context loss retains six-face Canvas fallback']}));

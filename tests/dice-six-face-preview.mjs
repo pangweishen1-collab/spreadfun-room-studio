@@ -203,7 +203,7 @@ software.draw({save(){},restore(){},drawImage(){}},skeleton,1600);assert.ok(clea
 checks.push('official_42_runtime_loads_12_animations_hidden_root_anchor_depth_order_events_and_13_zoom_with_sized_canvas_fallback');
 
 const originalRecord=structuredClone(await storage.get(first.id));
-await assert.rejects(()=>post(`/api/preview/${first.id}/settings`,{expectedRevision:1,grade:'purple'}),error=>error.status===409&&error.payload.needsUpload&&error.payload.required.length===10);
+await assert.rejects(()=>post(`/api/preview/${first.id}/settings`,{expectedRevision:1,grade:'purple'}),error=>error.status===409&&error.payload.needsUpload&&error.payload.required.length===6);
 assert.deepEqual(await storage.get(first.id),originalRecord);
 const renamed=await post(`/api/preview/${first.id}/settings`,{expectedRevision:1,name:'海龟更名',soundEnabled:false});
 assert.equal(renamed.revision,2);assert.equal(renamed.soundEnabled,false);assert.equal(renderCount,1);

@@ -9,6 +9,7 @@ const loadImage = src => new Promise((resolve, reject) => {
 });
 
 const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
+const generatedCandidate = candidate => candidate?.kind === 'six-face' || candidate?.kind === 'purple-gyro';
 const backgroundImages = new Map();
 const loadBackground = candidate => {
   const src = previewGrade(candidate) === 'purple' ? '/dice/assets/ui/bg_紫.webp' : '/dice/assets/ui/bg_绿.webp';
@@ -57,7 +58,7 @@ export class GameRenderer {
     if (!this.ctx) throw new Error('浏览器无法创建预览画布');
     this.layer.addEventListener?.('webglcontextlost', event => {
       event.preventDefault(); this.gpuLost = true;
-      if (this.candidate?.kind !== 'six-face') this.pause();
+      if (!generatedCandidate(this.candidate)) this.pause();
     });
     this.onStatus = onStatus;
     this.mode = 'all';
@@ -86,7 +87,7 @@ export class GameRenderer {
     let assets, software, data;
     try {
       let atlas, texture;
-      if (candidate.kind === 'six-face') {
+      if (generatedCandidate(candidate)) {
         const [text, image] = await Promise.all([
           fetch(candidate.atlas).then(r => { if (!r.ok) throw new Error('图集读取失败'); return r.text(); }),
           loadImage(candidate.texture),
@@ -286,7 +287,7 @@ export class GameRenderer {
       animation.apply(skeleton, -1, Math.min(time, animation.duration), false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
       skeleton.x = all ? [198, 363, 529][index % 3] : 363;
       skeleton.y = 1600 - (all ? (index < 3 ? 720 : 903) : 810);
-      if (this.candidate.kind === 'six-face') {
+      if (generatedCandidate(this.candidate)) {
         const {crop,sourceSize,cropOffset} = this.candidate.geometry;
         const ratio = Math.max(crop[2],crop[3])/sourceSize;
         const size = (all ? 172 : 300) * Math.min(1,.655/ratio);
