@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.15.0 - 2026-11-05 (local review)
+
+- Keep purple dice on the silhouette gyro05 structure for all uploaded shapes, including high-coverage square art. Preserve the approved motion curve and rebuild older purple geometry using a versioned native cache.
+- Remove the blue mat behind the two upload areas, give green and purple separate hover motion and pale grade colors, and tint the compact replacement cards to match.
+- Avoid repeated face-opacity decoding and reuse the validated PNG buffer for hashing. Cache identical per-mesh animation samples within each build without changing generated timelines.
+- Preserve unsaved name and sound edits when switching preview backgrounds, including drafts without replacement files. Keep the background update scoped to previewGrade and leave pending edits available to apply.
+
 ## 1.14.0 - 2026-11-05
 
 ### Dice upload grade and preview backgrounds

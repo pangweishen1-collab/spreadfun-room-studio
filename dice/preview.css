@@ -281,3 +281,30 @@ html.embedded .page-shell { flex:none; }
  .preview-empty p { font-size:11px; line-height:18px; }
  .preview-upload-actions .button { font-size:12px; }
 }
+
+/* Each grade owns its upload feedback; the shared blue upload mat stays clear. */
+#preview-empty {
+ --ft-upload-background:transparent; --ft-upload-hover-background:transparent;
+ --ft-upload-drag-background:transparent; --ft-upload-border:transparent;
+ --ft-upload-hover-stroke:transparent; --ft-upload-drag-stroke:transparent; --ft-upload-focus:transparent;
+}
+.ft-ui .preview-card[data-has-canvas='false'] .preview-stage { border-color:transparent; background:transparent; overflow:visible; }
+.upload-grade-card { transition:transform 240ms var(--ft-ease),border-color 180ms ease,background-color 180ms ease,box-shadow 240ms ease; }
+.upload-grade-card .feedback-image { transition:transform 240ms var(--ft-ease); }
+.replacement-grade-card[data-upload-grade='green'] { background:color-mix(in srgb,var(--color-replace) 6%,var(--color-surface)); }
+.replacement-grade-card[data-upload-grade='purple'] { background:color-mix(in srgb,var(--color-purple) 6%,var(--color-surface)); }
+@media (hover:hover) and (pointer:fine) {
+ .upload-grade-card.green:not([aria-disabled='true']):hover { transform:translateY(-5px); border-color:var(--color-replace); background:color-mix(in srgb,var(--color-replace) 10%,var(--color-surface)); box-shadow:0 12px 28px color-mix(in srgb,var(--color-replace) 13%,transparent); }
+ .upload-grade-card.purple:not([aria-disabled='true']):hover { transform:translateY(-3px) scale(1.01); border-color:var(--color-purple); background:color-mix(in srgb,var(--color-purple) 10%,var(--color-surface)); box-shadow:0 8px 30px color-mix(in srgb,var(--color-purple) 18%,transparent); }
+ .upload-grade-card.green:not([aria-disabled='true']):hover .feedback-image { animation:green-upload-hop 420ms var(--ft-ease) both; }
+ .upload-grade-card.purple:not([aria-disabled='true']):hover .feedback-image { animation:purple-upload-turn 520ms var(--ft-ease) both; }
+}
+@keyframes green-upload-hop { 0% {transform:none} 45% {transform:translateY(-10px) rotate(-8deg)} 75% {transform:translateY(-3px) rotate(3deg)} 100% {transform:translateY(-5px)} }
+@keyframes purple-upload-turn { 0% {transform:none} 45% {transform:translateY(-5px) rotate(14deg) scale(1.14)} 75% {transform:translateY(-3px) rotate(-5deg) scale(1.07)} 100% {transform:translateY(-4px) rotate(5deg) scale(1.08)} }
+@media (prefers-reduced-motion:reduce) {
+ .upload-grade-card,.upload-grade-card .feedback-image { transition:none; animation:none!important; transform:none!important; }
+}
+@media (forced-colors:active) {
+ .upload-grade-card,.replacement-grade-card { background:Canvas!important; border-color:CanvasText!important; }
+ .upload-grade-card:focus-visible { outline-color:Highlight; }
+}

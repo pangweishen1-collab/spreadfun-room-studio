@@ -41,11 +41,11 @@ const spineContext={console};vm.runInNewContext(await readFile(new URL('../dice/
 async function zipFactory() {
   const entries=new Map();return {file(name,data){entries.set(name,data);},async generateAsync(){const zip=new JSZip();for(const [name,data]of entries)zip.file(name,data instanceof Blob?new Uint8Array(await data.arrayBuffer()):data);return new Blob([await zip.generateAsync({type:'uint8array'})],{type:'application/zip'});}};
 }
-const storage=memoryStore(),urlBlobs=new Map();let serial=0,renders=0,smallDigits=false,blockVideo=null,preparedSize=null,failPurpleBuild=false;
+const storage=memoryStore(),urlBlobs=new Map(),decodeNames=[];let serial=0,renders=0,smallDigits=false,blockVideo=null,preparedSize=null,failPurpleBuild=false;
 const dependencies={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvailable:true,
   fetchAsset:async path=>path.endsWith('.skel')?new Blob([await readFile(new URL('../dice/assets/template.skel',import.meta.url))],{type:'application/octet-stream'}):new Blob([path.endsWith('.png')?png(30):Buffer.from('ID3-default-audio')],{type:path.endsWith('.png')?'image/png':'audio/mpeg'}),
   createObjectURL:blob=>{const url='blob:fixture-'+(++serial);urlBlobs.set(url,blob);return url;},revokeObjectURL:url=>urlBlobs.delete(url),zipFactory,
-  decodePNG:async(blob,name)=>({alphaArea:smallDigits&&/^sz_[1-6]/.test(name)?1200:16000,drawable:name==='anchor.png'?{width:30,height:30}:undefined,close(){}}),
+  decodePNG:async(blob,name)=>{decodeNames.push(name);return {alphaArea:smallDigits&&/^sz_[1-6]/.test(name)?1200:16000,drawable:name==='anchor.png'?{width:30,height:30}:undefined,close(){}};},
   renderRuntime:async()=>assert.fail('New purple sessions must not use the legacy template renderer'),
   renderPurpleGyro:async(files,options)=>{renders++;if(failPurpleBuild)throw Error('injected purple-gyro build failure');assert.equal(files.filter(file=>/^sz_[1-6]$/.test(file.slot)).length,6);assert.ok(['faces','digits'].includes(options.composition));assert.equal(options.anchorImage.width,30);return nativeRuntimeFixture(options);},
   prepareVideo:async blob=>{if(blockVideo)await blockVideo.promise;const output=new Blob([preparedSize===null?blob:new Uint8Array(preparedSize)],{type:'video/mp4'});Object.defineProperty(output,'videoInfo',{value:{profile:VIDEO_PROFILE,width:720,height:1600,duration:6,fps:30,frameCount:180,method:'h264_copy_mux'}});return output;}};
@@ -338,6 +338,21 @@ assert.equal(legacyView.previewGrade,'purple');assert.equal(legacyView.candidate
 const legacyNoop=await post(`/api/preview/${legacyBackground.id}/settings`,{expectedRevision:8,previewGrade:'purple'});
 assert.equal(legacyNoop.revision,8);assert.equal(storage.writes,legacyWrites);assert.deepEqual(await storage.get(legacyBackground.id),legacyBackground);
 checks.push('legacy_sessions_without_preview_grade_default_to_source_grade_without_migration_or_noop_revision');
+
+const decodeStart=decodeNames.length,explicitFaces=await post('/api/preview/import',{...payload,name:'完整面免重复识别',composition:'faces'}),explicitRecord=await storage.get(explicitFaces.id),explicitRenders=renders;
+assert.equal(decodeNames.slice(decodeStart).filter(name=>/^sz_[1-6]\.png$/.test(name)).length,0,'Explicit complete faces go directly to native validation instead of a duplicate alpha decode');
+assert.ok(explicitRecord.files.filter(file=>/^sz_[1-6]$/.test(file.slot)).every(file=>file.alphaArea===null));
+await post(`/api/preview/${explicitFaces.id}/settings`,{expectedRevision:1,previewGrade:'green'});
+assert.equal(decodeNames.slice(decodeStart).filter(name=>/^sz_[1-6]\.png$/.test(name)).length,0);assert.equal(renders,explicitRenders);
+const scanStart=decodeNames.length,automaticFaces=await post(`/api/preview/${explicitFaces.id}/settings`,{expectedRevision:2,composition:'auto'});
+assert.equal(automaticFaces.resolvedComposition,'faces');assert.equal(decodeNames.slice(scanStart).filter(name=>/^sz_[1-6]\.png$/.test(name)).length,6);assert.equal(renders,explicitRenders);
+const scanned=await storage.get(explicitFaces.id);assert.ok(scanned.files.filter(file=>/^sz_[1-6]$/.test(file.slot)).every(file=>file.alphaArea===16000));
+for(const item of scanned.files)assert.deepEqual(Buffer.from(await item.blob.arrayBuffer()),Buffer.from(files.find(file=>file.name===item.name).data.split(',')[1],'base64'));
+const cachedScan=decodeNames.length;await post(`/api/preview/${explicitFaces.id}/settings`,{expectedRevision:3,previewGrade:'purple'});assert.equal(decodeNames.length,cachedScan);
+const deferredDigits=await post('/api/preview/import',{...payload,name:'延迟自动识别数字',composition:'faces'}),digitRenders=renders;
+smallDigits=true;let autoDigits;try{autoDigits=await post(`/api/preview/${deferredDigits.id}/settings`,{expectedRevision:1,composition:'auto'});}finally{smallDigits=false;}
+assert.equal(autoDigits.resolvedComposition,'digits');assert.equal(renders,digitRenders+1);assert.equal((await storage.get(deferredDigits.id)).runtime.metadata.composition,'digits');
+checks.push('explicit_faces_skip_six_duplicate_alpha_decodes_background_edits_stay_fast_and_later_auto_scans_once_with_original_bytes_and_digit_detection_preserved');
 
 adapter.dispose();restored.dispose();assert.equal(urlBlobs.size,0);
 console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Pure session/PNG/ZIP/CAS logic with injected Canvas and storage. Real browser Canvas, IndexedDB, Spine and video module require browser QA.'},null,2));

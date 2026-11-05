@@ -340,6 +340,17 @@ const againNoop=await post(`/api/preview/${custom.id}/settings`,{expectedRevisio
 await assert.rejects(()=>post(`/api/preview/${custom.id}/settings`,{expectedRevision:backgroundAgain.revision,grade:'purple'}),error=>error.status===409&&error.payload.needsUpload===true);
 const restoredBackground=await refresh.api(`/api/preview/${custom.id}`);assert.equal(restoredBackground.previewGrade,'green');assert.equal(restoredBackground.kind,'six-face');
 checks.push('green_source_uses_either_preview_background_without_runtime_rebuild_or_prefix_source_audio_anchor_changes_and_invalidates_only_bound_video');
+class CountedPNG extends File{reads=0;async arrayBuffer(){this.reads++;return super.arrayBuffer();}}
+const countedFaces=GREEN_SLOTS.map(slot=>new CountedPNG([png()],slot+'.png',{type:'image/png'}));
+const oneReadSession=await post('/api/preview/import',{...payload,name:'复用原始PNG校验缓冲',files:countedFaces});
+assert.ok(countedFaces.every(file=>file.reads===1),'CRC inspection and SHA must share the same complete source buffer');
+const expectedSHA=[...new Uint8Array(await crypto.subtle.digest('SHA-256',png()))].map(value=>value.toString(16).padStart(2,'0')).join('');
+assert.ok((await storage.get(oneReadSession.id)).files.every(file=>file.sha256===expectedSHA));
+const countedHero=new CountedPNG([png(240)],'大骰子.png',{type:'image/png'});
+const oneReadHero=await post(`/api/preview/${oneReadSession.id}/hero`,{expectedRevision:1,file:countedHero});assert.equal(countedHero.reads,1);
+const heroStored=(await storage.get(oneReadHero.id)).files.find(file=>file.slot==='大骰子');
+assert.deepEqual(new Uint8Array(await heroStored.blob.arrayBuffer()),new Uint8Array(png(240)));
+checks.push('source_png_inspection_and_SHA_share_one_arraybuffer_for_six_face_import_and_hero_update_without_changing_source_bytes_or_hash');
 adapter.dispose();refresh.dispose();assert.equal(urls.size,0);
 checks.push('missing_faces_bad_audio_cancel_build_or_storage_failure_leave_all_previous_sessions_unchanged');
 console.log(JSON.stringify({ok:true,count:checks.length,checks,boundary:'Real JSON/PNG/ZIP/session contracts and official Runtime; Canvas sampling uses injected pixels, actual browser/IndexedDB/audio rendering require browser QA.'},null,2));

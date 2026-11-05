@@ -5,7 +5,7 @@ import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
 import {deflateSync} from 'node:zlib';
 import {gyroAt} from '../dice/purple-gyro/motion.mjs';
-import {buildPurpleSpineJson,inferPurpleBodyModel,PURPLE_GYRO_MOTION_VERSION} from '../dice/purple-gyro/spine-builder.mjs';
+import {buildPurpleSpineJson,inferPurpleBodyModel,PURPLE_GYRO_MOTION_VERSION,PURPLE_GYRO_BODY_VERSION} from '../dice/purple-gyro/spine-builder.mjs';
 import {generatePurpleGyroRuntime} from '../dice/purple-gyro/runtime.mjs';
 import {writeSpineBinary} from '../dice/six-face/spine-binary.mjs';
 import {preparedFixture,fixtureAtlasText,installPixelCanvas,rgbaPNG,readRgbaPNG} from './helpers/purple-fixtures.mjs';
@@ -18,16 +18,13 @@ assert.ok(gyroAt(.2283).rotation[8]<0,'This approved motion really turns its fro
 checks.push('motion_matrix_offset_zoom_matches_independent_approved05_golden_samples_including_actual_back_exposure');
 
 const pixelsOf=(width,height,alphaAt)=>{const data=new Uint8ClampedArray(width*height*4);for(let y=0;y<height;y++)for(let x=0;x<width;x++)data.set([26,144,215,alphaAt(x,y)],(y*width+x)*4);return {width,height,data};};
-for(const [image,kind] of [
- [pixelsOf(4,4,(x,y)=>x>0&&x<3&&y>0&&y<3?0:255),'silhouette-bulging'],
- [pixelsOf(4,4,(x,y)=>x>0&&x<3&&y>0&&y<3&&!(x===1&&y===1)?0:255),'rounded-six-face'],
- [pixelsOf(4,4,(x,y)=>x>0&&x<3&&y>0&&y<3?31:255),'silhouette-bulging'],
- [pixelsOf(4,4,(x,y)=>x>0&&x<3&&y>0&&y<3?32:255),'rounded-six-face'],
- [pixelsOf(3,4,()=>255),'rounded-six-face'],[pixelsOf(74,100,()=>255),'silhouette-bulging'],
- [pixelsOf(133,100,()=>255),'rounded-six-face'],[pixelsOf(134,100,()=>255),'silhouette-bulging'],
- [pixelsOf(4,4,()=>0),'silhouette-bulging'],[undefined,'silhouette-bulging'],
-])assert.equal(inferPurpleBodyModel(image).kind,kind,'Body-model classification has explicit alpha, coverage and aspect thresholds');
-checks.push('automatic_body_model_selection_preserves_strict_coverage_and_inclusive_aspect_boundaries');
+for(const image of [
+ pixelsOf(4,4,(x,y)=>x>0&&x<3&&y>0&&y<3?0:255),pixelsOf(4,4,(x,y)=>x>0&&x<3&&y>0&&y<3&&!(x===1&&y===1)?0:255),
+ pixelsOf(4,4,(x,y)=>x>0&&x<3&&y>0&&y<3?31:255),pixelsOf(4,4,(x,y)=>x>0&&x<3&&y>0&&y<3?32:255),
+ pixelsOf(3,4,()=>255),pixelsOf(74,100,()=>255),pixelsOf(133,100,()=>255),pixelsOf(134,100,()=>255),pixelsOf(4,4,()=>255),pixelsOf(4,4,()=>0),undefined,
+]){const model=inferPurpleBodyModel(image);assert.equal(model.kind,'silhouette-bulging','Purple square turtle/panda themes must not select a six-face cube');assert.equal(model.version,PURPLE_GYRO_BODY_VERSION);assert.equal(model.inferred,false);}
+assert.notEqual(PURPLE_GYRO_MOTION_VERSION,'purple-gyro05-v1','Old cached cube proxies must rebuild without changing the approved05 curve');
+checks.push('purple_body_is_always_silhouette_across_coverage_aspect_and_alpha_boundaries_and_old_cube_cache_version_is_invalidated');
 
 const context={console};vm.runInNewContext(await readFile(new URL('../dice/vendor/spine-webgl.js',import.meta.url),'utf8'),context);const S=context.spine;
 function decoded(json,atlasText=fixtureAtlasText()){
@@ -69,6 +66,7 @@ function meshAndExposureContract(source,data){
  return {main,blur};
 }
 const json=buildPurpleSpineJson(preparedFixture),{original,binary,bytes}=decoded(json);
+assert.deepEqual(buildPurpleSpineJson({...preparedFixture,bodyModel:{kind:'rounded-six-face'}}),json,'A legacy prepared cube override cannot reactivate the removed purple six-face rig');
 assert.deepEqual([...writeSpineBinary(json)],[...bytes],'The exact source JSON writes deterministic binary');
 assert.equal(binary.version,'4.2.43');assert.equal(binary.animations.length,12);
 assert.deepEqual(Array.from(binary.animations,a=>a.name).sort(),Array.from({length:6},(_,i)=>['spin_'+(i+1),'standby_'+(i+1)]).flat().sort());
@@ -138,16 +136,17 @@ function actualRuntimeContract(generated){
   for(let i=0;i<uv.length;i+=2){const x=(uv[i]-.5)*flat.width,y=(.5-uv[i+1])*flat.height;near(positions[i],bone.a*x+bone.b*y+bone.worldX,'inferred model landing worldX',.01);near(positions[i+1],bone.c*x+bone.d*y+bone.worldY,'inferred model landing worldY',.01);}
   for(const slot of rollSlots(after))assert.equal(slot.color.a,0);near(pose(data,'spin_'+point,.591668).skeleton.findBone('daxiao_1').scaleX,1,'inferred model settled zoom');
  }
- continuousContract(data);return {kind:generated.metadata.bodyModel.kind,meshes:{main:exposure.main.length,blur:exposure.blur.length},staticImages:generated.metadata.staticImages,binary:pair.bytes.length,binaryDeflate:deflateSync(pair.bytes).length,atlas:generated.texture.size};
+ continuousContract(data);return {kind:generated.metadata.bodyModel.kind,coverage:generated.metadata.bodyModel.coverage,meshes:{main:exposure.main.length,blur:exposure.blur.length},staticImages:generated.metadata.staticImages,binary:pair.bytes.length,binaryDeflate:deflateSync(pair.bytes).length,atlas:generated.texture.size};
 }
-async function retainedImageContract(generated,kind){
- assert.equal(generated.metadata.bodyModel.kind,kind);assert.equal(generated.metadata.staticImages,generated.metadata.atlas.regions.length);assert.equal(generated.metadata.imageSequences,0);assert.equal(generated.metadata.nativeExposures,3);
- const rounded=kind==='rounded-six-face',expectedRegions=[...Array.from({length:6},(_,i)=>'flat_'+(i+1)),...Array.from({length:rounded?6:1},(_,i)=>'roll_'+(i+1)),...(rounded?[]:['soft_wall']),'white','anchor'].sort(),regionNames=generated.metadata.atlas.regions.map(region=>region.name).sort();
+async function retainedImageContract(generated){
+ assert.equal(generated.metadata.bodyModel.kind,'silhouette-bulging');assert.equal(generated.metadata.bodyVersion,PURPLE_GYRO_BODY_VERSION);assert.equal(generated.metadata.staticImages,generated.metadata.atlas.regions.length);assert.equal(generated.metadata.imageSequences,0);assert.equal(generated.metadata.nativeExposures,3);
+ assert.equal(generated.metadata.faceMeshes,2);assert.equal(generated.metadata.sideMeshes,32);assert.equal(generated.metadata.blurMeshes,68);
+ const expectedRegions=[...Array.from({length:6},(_,i)=>'flat_'+(i+1)),'roll_1','soft_wall','white','anchor'].sort(),regionNames=generated.metadata.atlas.regions.map(region=>region.name).sort();
  assert.deepEqual(regionNames,expectedRegions,'The selected body model retains only the static texture regions it uses');
  assert.deepEqual(Object.keys(generated.files).filter(path=>path.startsWith('images/')).map(path=>path.slice(7,-4)).sort(),expectedRegions);
  const usedPaths=new Set(Object.values(generated.json.skins[0].attachments).flatMap(map=>Object.values(map).map(attachment=>attachment.path)));for(const name of usedPaths)assert.ok(expectedRegions.includes(name),'Every mesh and region references a retained image');
- if(!rounded)for(let point=2;point<=6;point++){assert.ok(!generated.atlasText.includes('\nroll_'+point+'\n'));assert.equal(generated.files['images/roll_'+point+'.png'],undefined);}
- const manifest=JSON.parse(await generated.files['manifest.json'].text());assert.equal(manifest.staticImages,regionNames.length);assert.equal(manifest.imageSequences,0);assert.deepEqual(manifest.files.map(file=>file.path).sort(),Object.keys(generated.files).filter(path=>path!=='manifest.json').sort());
+ for(let point=2;point<=6;point++){assert.ok(!generated.atlasText.includes('\nroll_'+point+'\n'));assert.equal(generated.files['images/roll_'+point+'.png'],undefined);}
+ const manifest=JSON.parse(await generated.files['manifest.json'].text());assert.equal(manifest.bodyVersion,PURPLE_GYRO_BODY_VERSION);assert.equal(manifest.staticImages,regionNames.length);assert.equal(manifest.imageSequences,0);assert.deepEqual(manifest.files.map(file=>file.path).sort(),Object.keys(generated.files).filter(path=>path!=='manifest.json').sort());
  for(const file of manifest.files)assert.equal(file.bytes,generated.files[file.path].size,'Manifest byte counts describe the actual retained assets');
 }
 
@@ -165,11 +164,11 @@ try{
  const originals=await Promise.all(inputs.map(async input=>Buffer.from(await input.blob.arrayBuffer()))),anchorPixels=new Uint8ClampedArray(30*30*4);for(let i=0;i<anchorPixels.length;i+=4)anchorPixels.set([255,80,221,255],i);
  generated=await generatePurpleGyroRuntime(inputs,{name:'dice_purple_数字主题',composition:'digits',anchorImage:{width:30,height:30,data:anchorPixels}});
  assert.equal(generated.kind,'purple-gyro');assert.equal(generated.metadata.motionVersion,PURPLE_GYRO_MOTION_VERSION);assert.equal(generated.metadata.zoomPeak,1.5);assert.equal(generated.metadata.imageSequences,0);assert.equal(generated.metadata.staticImages,generated.metadata.atlas.regions.length);assert.equal(generated.metadata.resolvedComposition,'digits');
- await retainedImageContract(generated,'rounded-six-face');
+ await retainedImageContract(generated);assert.ok(generated.metadata.bodyModel.coverage>.75,'High-coverage theme fixture exercises the removed cube fallback');
  const flat=readRgbaPNG(await generated.files['images/flat_1.png'].arrayBuffer()),roll=readRgbaPNG(await generated.files['images/roll_1.png'].arrayBuffer());
  let blue=0,red=0;for(let i=0;i<flat.data.length;i+=4){if(flat.data[i+3]&&flat.data[i+2]>200&&flat.data[i]<50)blue++;if(flat.data[i+3]&&flat.data[i]>200&&flat.data[i+1]<100)red++;}
  assert.ok(blue>10000,'Digits composition must keep the original full theme body, not output floating numerals');assert.ok(red>50,'Digit pixels remain visible on the composited body');
- for(let i=3;i<roll.data.length;i+=4)assert.equal(roll.data[i],255,'The rounded body uses opaque edge-filled roll textures so all six joined faces remain full');
+ assert.equal(roll.data[3],0,'High-coverage square purple themes keep their original transparent outline instead of opaque cube faces');
  const atlasPixels=readRgbaPNG(await generated.texture.arrayBuffer()),anchorRegion=generated.metadata.atlas.regions.find(region=>region.name==='anchor');assert.deepEqual(Array.from(atlasPixels.data.slice(((anchorRegion.y+15)*atlasPixels.width+anchorRegion.x+15)*4,((anchorRegion.y+15)*atlasPixels.width+anchorRegion.x+15)*4+4)),[255,80,221,255],'The supplied anchor pixels actually reach the final atlas');assert.deepEqual(Array.from(readRgbaPNG(await generated.files['images/anchor.png'].arrayBuffer()).data.slice(0,4)),[255,80,221,255]);
  for(const [name,image] of [['flat_1',flat],['roll_1',roll]]){const r=generated.metadata.atlas.regions.find(region=>region.name===name);assert.equal(r.width,image.width);for(let y=0;y<r.height;y++)assert.deepEqual(atlasPixels.data.slice(((r.y+y)*atlasPixels.width+r.x)*4,((r.y+y)*atlasPixels.width+r.x+r.width)*4),image.data.slice(y*r.width*4,(y+1)*r.width*4),'Raw alpha/RGB image data survives atlas decoding/repacking for '+name);}
  assert.deepEqual(await Promise.all(inputs.map(async input=>Buffer.from(await input.blob.arrayBuffer()))),originals,'Uploaded source PNG bytes remain untouched');
@@ -178,17 +177,17 @@ try{
  await assert.rejects(()=>generatePurpleGyroRuntime(inputs.slice(1),{composition:'digits',anchorImage:{width:30,height:30,data:anchorPixels}}),/sz_0/);
  const fullFaces=inputs.slice(1).map((input,index)=>{const image=new Uint8ClampedArray(base);for(let y=90;y<100;y++)for(let x=84+index*2;x<94+index*2;x++)image.set([245,52,47,255],(y*size+x)*4);return {...input,blob:new Blob([rgbaPNG(size,size,image)],{type:'image/png'})};});
  const faces=await generatePurpleGyroRuntime(fullFaces,{composition:'auto',anchorImage:{width:30,height:30,data:anchorPixels}});assert.equal(faces.metadata.resolvedComposition,'faces');assert.ok(faces.warnings.some(warning=>/未提供sz_0/.test(warning)));assert.equal(decoded(faces.json,faces.atlasText).binary.animations.length,12);
- await retainedImageContract(faces,'rounded-six-face');
+ await retainedImageContract(faces);
  const sparse=pixelsOf(size,size,(x,y)=>x>=35&&x<165&&y>=35&&y<165&&(Math.abs(x-100)<16||Math.abs(y-100)<16)?255:0),sparseInputs=[{slot:'sz_0',name:'sz_0.png',blob:new Blob([rgbaPNG(size,size,sparse.data)],{type:'image/png'})},...fullFaces.map((input,index)=>{const data=new Uint8ClampedArray(sparse.data);for(let y=90;y<100;y++)for(let x=84+index*2;x<94+index*2;x++)data.set([245,52,47,255],(y*size+x)*4);return {...input,blob:new Blob([rgbaPNG(size,size,data)],{type:'image/png'})};})];
  const sparseOriginals=await Promise.all(sparseInputs.map(async input=>Buffer.from(await input.blob.arrayBuffer()))),silhouette=await generatePurpleGyroRuntime(sparseInputs,{composition:'faces',anchorImage:{width:30,height:30,data:anchorPixels}});
- await retainedImageContract(silhouette,'silhouette-bulging');assert.ok(silhouette.metadata.bodyModel.coverage<.75);
+ await retainedImageContract(silhouette);assert.ok(silhouette.metadata.bodyModel.coverage<.75);
  const silhouetteRoll=readRgbaPNG(await silhouette.files['images/roll_1.png'].arrayBuffer());assert.equal(silhouetteRoll.data[3],0,'The low-coverage model keeps its transparent silhouette instead of a filled rectangle');assert.ok(silhouetteRoll.data.some((value,index)=>index%4===3&&value===255));assert.ok(silhouetteRoll.data[2]>200,'Transparent silhouette edges retain theme colour bleed instead of dark RGB fringes');
  const silhouetteAtlas=readRgbaPNG(await silhouette.texture.arrayBuffer());
  for(const name of ['flat_1','roll_1']){const image=readRgbaPNG(await silhouette.files['images/'+name+'.png'].arrayBuffer()),region=silhouette.metadata.atlas.regions.find(region=>region.name===name);for(let y=0;y<region.height;y++)assert.deepEqual(silhouetteAtlas.data.slice(((region.y+y)*silhouetteAtlas.width+region.x)*4,((region.y+y)*silhouetteAtlas.width+region.x+region.width)*4),image.data.slice(y*region.width*4,(y+1)*region.width*4),'The irregular atlas preserves all flat/roll alpha and hidden RGB pixels');}
  for(const [slot,map] of Object.entries(silhouette.json.skins[0].attachments))if(/^gyro_side_/.test(slot)){const wall=map.side;assert.ok(wall.uvs.length>=20,'Irregular side walls use multiple depth rings rather than a flat quad');assert.ok(wall.triangles.length>=24);}
  generatedModels.push(actualRuntimeContract(silhouette));assert.deepEqual(await Promise.all(sparseInputs.map(async input=>Buffer.from(await input.blob.arrayBuffer()))),sparseOriginals,'Irregular uploaded source PNG bytes remain untouched');
  assert.equal(fixture.urls.size,0,'All temporary decoding Blob URLs are released on success and failure');
- checks.push('real_asset_pipeline_automatically_selects_rounded_and_irregular_bodies_composes_digits_preserves_sources_and_releases_decode_resources');
+ checks.push('real_asset_pipeline_uses_irregular05_for_both_square_and_sparse_themes_composes_digits_preserves_sources_and_releases_decode_resources');
 }finally{fixture.restore();}
 
 console.log(JSON.stringify({passed:true,checks,poseSamples,meshSlots:{main:mainRollNames.length,blur:blurRollNames.length},models:generatedModels,referenceHash:reference.sha256,bytes:{binary:bytes.length,binaryDeflate:deflateSync(bytes).length},boundary:'Official Spine4.2 JSON/binary and real asset algorithms with deterministic pixel Canvas fixtures. Editor, target game GPU, final artwork quality and real browser video remain separate acceptance.'},null,2));

@@ -1,5 +1,5 @@
 // Approved purple motion 05, sampled as native Spine numeric deformation.
-export const PURPLE_GYRO_MOTION_VERSION='purple-gyro05-v1';
+export const PURPLE_GYRO_MOTION_VERSION='purple-gyro05-v2-silhouette';
 export const GYRO={rollEnd:.54,clearAt:.535,landAt:.54,zoomPeak:1.5,zoomPeakAt:.3,zoomEnd:.591667,duration:.633333};
 const TAU=Math.PI*2,identity=[1,0,0,0,1,0,0,0,1];
 export const clamp=(x,a=0,b=1)=>Math.max(a,Math.min(b,x));

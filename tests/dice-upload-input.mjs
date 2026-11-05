@@ -459,6 +459,19 @@ const checks=[];
   }
   checks.push('actual_controller_background_roundtrips_post_only_preview_grade_and_revision_preserving_source_animation_prefix_assets_and_metadata');
 
+  const dirtyOriginal=fixtureSession('purple','auto');app.reset(dirtyOriginal);
+  fields['dice-name'].value='未保存的新名称';fields['sound-enabled'].checked=false;
+  assert.equal(app.state().pending.size,0);assert.equal(app.settingsDirty(),true);const beforeDirty=calls.length;
+  for(const nextBackground of ['green','purple']){
+    const previous=app.state().session;await app.switchBackground(nextBackground);
+    assert.deepEqual({...calls.at(-1).body},{expectedRevision:previous.revision,previewGrade:nextBackground},'Background changes do not silently submit dirty name or mute inputs');
+    assert.equal(app.state().session.name,dirtyOriginal.name);assert.equal(app.state().session.soundEnabled,true);assert.equal(app.state().session.grade,'purple');assert.equal(app.state().session.candidate.kind,'purple-gyro');assert.equal(app.state().session.resourceName,dirtyOriginal.resourceName);
+    assert.equal(fields['dice-name'].value,'未保存的新名称');assert.equal(fields['sound-enabled'].checked,false);assert.equal(audioChanges.at(-1),false,'The unsaved mute input and live audio remain in sync');
+    assert.equal(app.state().pending.size,0);assert.equal(app.state().uploadGrade,null);assert.equal(app.settingsDirty(),true,'Unsaved name and mute remain available for the explicit apply action');
+  }
+  assert.equal(calls.length,beforeDirty+2);
+  checks.push('actual_controller_background_roundtrip_preserves_unsaved_name_and_mute_without_pending_files_or_implicitly_applying_them');
+
   const original=fixtureSession('green'),extras=[Object.freeze({name:'anchor.png'}),Object.freeze({name:'dice_roll.mp3'})];app.reset(original);app.selectUploadGrade('purple');app.setPending(six.slice(0,2),extras);
   fields['dice-name'].value='紫色草稿';fields['sound-enabled'].checked=false;const pending=app.state().pending,beforeDraft=calls.length,revokedBeforeBackground=revoked.length;
   assert.throws(()=>app.selectUploadGrade('green'),error=>error.key==='finishPendingUpload');assert.equal(app.state().pending,pending);assert.equal(app.state().pending.size,2);assert.equal(app.state().uploadGrade,'purple');assert.equal(calls.length,beforeDraft);

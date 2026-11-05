@@ -1,16 +1,19 @@
-import {GYRO,PURPLE_GYRO_MOTION_VERSION,clamp,smooth,gyroAt,transform} from './motion.mjs';
+import {PURPLE_GYRO_MOTION_VERSION,clamp,smooth,gyroAt,transform} from './motion.mjs';
 export {PURPLE_GYRO_MOTION_VERSION};
+export const PURPLE_GYRO_BODY_VERSION='silhouette-only-v2';
 const round=x=>Math.round(x*100)/100,time=x=>Math.round(x*1e6)/1e6;
 const TIMES=[...new Set([...Array.from({length:66},(_,i)=>time(Math.min(i/120,.54))),.47,.535,.54,.58,.591667,.6,.633333])].sort((a,b)=>a-b);
 const ORDER=[0,1,2,3,4,9,14,19,24,23,22,21,20,15,10,5,6,7,8,11,12,13,16,17,18];
 const UV=ORDER.flatMap(i=>[i%5/4,Math.floor(i/5)/4]),TRI=[];
 for(let y=0;y<4;y++)for(let x=0;x<4;x++){const a=y*5+x;TRI.push(...[a,a+5,a+1,a+1,a+5,a+6].map(i=>ORDER.indexOf(i)));}
-const FACES=[{point:1,n:[0,0,1],u:[1,0,0],v:[0,1,0]},{point:6,n:[0,0,-1],u:[-1,0,0],v:[0,1,0]},{point:3,n:[1,0,0],u:[0,0,-1],v:[0,1,0]},{point:4,n:[-1,0,0],u:[0,0,1],v:[0,1,0]},{point:2,n:[0,1,0],u:[1,0,0],v:[0,0,-1]},{point:5,n:[0,-1,0],u:[1,0,0],v:[0,0,1]}];
 export function inferPurpleBodyModel(image){
- const {width:w,height:h,data}=image||{};if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||data?.length!==w*h*4)return {kind:'silhouette-bulging',coverage:0,aspect:1,inferred:true};
+ // Grade fixes the rig. Coverage remains useful diagnostics, but must never
+ // turn a square purple theme into the green-style six-face cube.
+ const model={kind:'silhouette-bulging',version:PURPLE_GYRO_BODY_VERSION,inferred:false,rule:'purple grade always uses front/back and bulging silhouette side walls'};
+ const {width:w,height:h,data}=image||{};if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||data?.length!==w*h*4)return {...model,coverage:0,aspect:1};
  let l=w,t=h,r=0,b=0,count=0;for(let y=0;y<h;y++)for(let x=0;x<w;x++)if(data[(y*w+x)*4+3]>=32){count++;l=Math.min(l,x);t=Math.min(t,y);r=Math.max(r,x+1);b=Math.max(b,y+1);}
  const width=r-l,height=b-t,coverage=width>0&&height>0?count/(width*height):0,aspect=height>0?width/height:1;
- return {kind:coverage>.75&&aspect>=.75&&aspect<=1.33?'rounded-six-face':'silhouette-bulging',coverage,aspect,inferred:true,rule:'alpha32 bbox occupancy > .75; .75 <= aspect <= 1.33'};
+ return {...model,coverage,aspect};
 }
 function geometry(p){
  const crop=p?.crop,s=Number(p?.sourceSize),offset=p?.cropOffset;
@@ -56,27 +59,22 @@ function alphaDepthSampler(image){
  };
 }
 export function buildPurpleSpineJson(prepared,{name='自定义紫色骰子'}={}){
- const geo=geometry(prepared),contour=prepared.contour?resample(prepared.contour,32):contourFromPixels(prepared.bodyPixels),half=.42,rounded=(prepared.bodyModel?.kind??inferPurpleBodyModel(prepared.bodyPixels).kind)==='rounded-six-face',grid=[0,.215,.5,.785,1],faceUV=rounded?ORDER.flatMap(i=>[grid[i%5],grid[Math.floor(i/5)]]):UV;
+ const geo=geometry(prepared),contour=prepared.contour?resample(prepared.contour,32):contourFromPixels(prepared.bodyPixels),half=.42,faceUV=UV;
  const setup=faceUV.map((v,i)=>round((i%2?.5-v:v-.5)*(i%2?geo.height:geo.width)));
- const depth=rounded?null:alphaDepthSampler(prepared.bodyPixels);
+ const depth=alphaDepthSampler(prepared.bodyPixels);
  const physical=(u,v,back=false)=>{const z=(back?-1:1)*(depth?depth(u,v):half*(.7+.3*Math.sin(Math.PI*clamp(u))*Math.sin(Math.PI*clamp(v)))),factor=(4-z)/4.725;return [(u-.5)*geo.width/100*factor,(.5-v)*geo.height/100*factor,z];};
  const meshPoints=back=>ORDER.map(i=>physical(i%5/4,Math.floor(i/5)/4,back));
- const roundPoint=(face,u,v)=>{const p=face.n.map((n,k)=>n*.5+face.u[k]*(u-.5)+face.v[k]*(v-.5)),core=p.map(x=>clamp(x,-.285,.285)),delta=p.map((x,k)=>x-core[k]),length=Math.hypot(...delta),position=core.map((x,k)=>x+delta[k]/length*.215),scale=(4-half)/4.725;return [position[0]*geo.width/100*scale,position[1]*geo.height/100*scale,position[2]*half*2];};
- const roundPoints=face=>ORDER.map(i=>roundPoint(face,grid[i%5],1-grid[Math.floor(i/5)]));
  const project=(p,m)=>{const q=transform(m,p),scale=100*4.725/(4-q[2]);return [round(q[0]*scale),round(q[1]*scale)];};
  const attachments={anchor:{anchor:{type:'region',path:'anchor',width:30,height:30,scaleX:6,scaleY:6,color:'ffffff00'}},shadow:{shadow:{type:'region',path:'white',width:108,height:18,color:'29113fff'}},result:Object.fromEntries(Array.from({length:6},(_,i)=>['sz_'+(i+1),{type:'region',path:'flat_'+(i+1),width:geo.width,height:geo.height}]))};
  const meshes=[];
  const addFace=(slot,back,layer)=>{
-  const mesh={type:'mesh',path:back?(rounded?'roll_6':'flat_6'):'roll_1',width:geo.width,height:geo.height,uvs:[...faceUV],triangles:back&&!rounded?TRI.flatMap((v,i)=>i%3===0?[TRI[i],TRI[i+2],TRI[i+1]]:[]):[...TRI],vertices:[...setup],hull:16};
+  const mesh={type:'mesh',path:back?'flat_6':'roll_1',width:geo.width,height:geo.height,uvs:[...faceUV],triangles:back?TRI.flatMap((v,i)=>i%3===0?[TRI[i],TRI[i+2],TRI[i+1]]:[]):[...TRI],vertices:[...setup],hull:16};
   attachments[slot]={[back?'roll_back':'roll_front']:mesh};
   if(!back)for(let p=1;p<=6;p++)attachments[slot]['land_front_'+p]={...mesh,path:'flat_'+p,uvs:[...faceUV],triangles:[...TRI],vertices:[...setup]};
-  meshes.push({slot,name:back?'roll_back':'roll_front',points:rounded?roundPoints(FACES[back?1:0]):meshPoints(back),normal:[0,0,back?-1:1],ghost:layer!==2,layer,timeOffset:layer===0?-1/140:layer===1?1/140:0,ghostAlpha:layer===0?.22:.16,back,front:!back,setup});
+  meshes.push({slot,name:back?'roll_back':'roll_front',points:meshPoints(back),normal:[0,0,back?-1:1],ghost:layer!==2,layer,timeOffset:layer===0?-1/140:layer===1?1/140:0,ghostAlpha:layer===0?.22:.16,back,front:!back,setup});
  };
  addFace('gyro_blur_back',true,0);addFace('gyro_blur_front',false,0);addFace('gyro_blur_future_back',true,1);addFace('gyro_blur_future_front',false,1);
- if(rounded)for(let i=0;i<4;i++){
-  const face=FACES[i+2],slot='gyro_side_'+String(i).padStart(2,'0');attachments[slot]={side:{type:'mesh',path:'roll_'+face.point,uvs:[...faceUV],triangles:[...TRI],vertices:[...setup],width:geo.width,height:geo.height,hull:16}};meshes.push({slot,name:'side',points:roundPoints(face),normal:face.n,side:true,setup,layer:2,timeOffset:0});
- }
- else for(let i=0;i<32;i++){
+ for(let i=0;i<32;i++){
   const a=contour[i],b=contour[(i+1)%32],slot='gyro_side_'+String(i).padStart(2,'0');
   const ring=[0,.25,.5,.75,1],order=[0,1,3,5,7,9,8,6,4,2],at=(p,v)=>{const f=physical(...p),back=physical(...p,true),bulge=1+.12*Math.sin(Math.PI*v);return [(f[0]*(1-v)+back[0]*v)*bulge,(f[1]*(1-v)+back[1]*v)*bulge,f[2]*Math.cos(Math.PI*v)];},raw=ring.flatMap(v=>[at(a,v),at(b,v)]),points=order.map(n=>raw[n]),dx=(b[0]-a[0])*geo.width,dy=-(b[1]-a[1])*geo.height,len=Math.hypot(dx,dy)||1,uv=order.flatMap(n=>[(i+n%2)/32,ring[Math.floor(n/2)]]),vertices=uv.map((v,k)=>k%2?round((v-.5)*2):round((v-i/32)*32*2-1)),triangles=[];
   for(let j=0;j<4;j++){const a=j*2;triangles.push(...[a,a+1,a+2,a+1,a+3,a+2].map(n=>order.indexOf(n)));}
@@ -95,10 +93,15 @@ export function buildPurpleSpineJson(prepared,{name='自定义紫色骰子'}={})
  }
  addFace('gyro_back',true,2);addFace('gyro_front',false,2);
  const slots=[{name:'anchor',bone:'root',attachment:'anchor',color:'ffffff00'},{name:'shadow',bone:'shadow_size',attachment:'shadow',color:'ffffff00'},...meshes.map(m=>({name:m.slot,bone:'daxiao_1',attachment:m.name,color:'ffffff00'})),{name:'result',bone:'daxiao_1',attachment:'sz_1'}];
- const frame=(mesh,t)=>{const sample=mesh.ghost?Math.max(0,t+mesh.timeOffset):t,pose=gyroAt(sample),world=mesh.points.map(p=>transform(pose.rotation,p)),normal=transform(pose.rotation,mesh.normal),center=world.reduce((a,p)=>a.map((v,k)=>v+p[k]/world.length),[0,0,0]),facing=normal[0]*-center[0]+normal[1]*-center[1]+normal[2]*(4-center[2]);return {pose,world,normal,center,facing};};
- const visible=(mesh,t)=>{if(t>=.54)return 0;const f=frame(mesh,t),fade=smooth(f.facing/.16)*(rounded&&!mesh.front?1-smooth((t-.47)/.07):1);if(mesh.ghost)return fade*mesh.ghostAlpha*smooth(t/.06)*(1-smooth((t-.43)/(.535-.43)));return fade;};
+ const frameCache=new Map();
+ const frame=(mesh,t)=>{
+  const key=mesh.slot+':'+t;if(frameCache.has(key))return frameCache.get(key);
+  const sample=mesh.ghost?Math.max(0,t+mesh.timeOffset):t,pose=gyroAt(sample),world=mesh.points.map(p=>transform(pose.rotation,p)),normal=transform(pose.rotation,mesh.normal),center=world.reduce((a,p)=>a.map((v,k)=>v+p[k]/world.length),[0,0,0]),facing=normal[0]*-center[0]+normal[1]*-center[1]+normal[2]*(4-center[2]),value={pose,world,normal,center,facing};
+  frameCache.set(key,value);return value;
+ };
+ const visible=(mesh,t)=>{if(t>=.54)return 0;const f=frame(mesh,t),fade=smooth(f.facing/.16);if(mesh.ghost)return fade*mesh.ghostAlpha*smooth(t/.06)*(1-smooth((t-.43)/(.535-.43)));return fade;};
  const deformCache=new Map();
- const deformedVertices=(mesh,t)=>{const key=mesh.slot+':'+t;if(!deformCache.has(key)){const f=frame(mesh,t),master=gyroAt(t),ratio=mesh.ghost?f.pose.zoom/master.zoom:1,delta=mesh.ghost?[(f.pose.offset[0]-master.offset[0])/master.zoom,-(f.pose.offset[1]-master.offset[1])/master.zoom]:[0,0],landing=rounded&&mesh.front?smooth((t-.47)/.07):0;deformCache.set(key,mesh.points.flatMap(p=>project(p,f.pose.rotation)).map((v,i)=>round((v*ratio+delta[i%2])*(1-landing)+mesh.setup[i]*landing-mesh.setup[i])));}return [...deformCache.get(key)];};
+ const deformedVertices=(mesh,t)=>{const key=mesh.slot+':'+t;if(!deformCache.has(key)){const f=frame(mesh,t),master=gyroAt(t),ratio=mesh.ghost?f.pose.zoom/master.zoom:1,delta=mesh.ghost?[(f.pose.offset[0]-master.offset[0])/master.zoom,-(f.pose.offset[1]-master.offset[1])/master.zoom]:[0,0];deformCache.set(key,mesh.points.flatMap(p=>project(p,f.pose.rotation)).map((v,i)=>round(v*ratio+delta[i%2]-mesh.setup[i])));}return [...deformCache.get(key)];};
  const animations={};
  for(let point=1;point<=6;point++){
   const data={slots:{},bones:{daxiao_1:{scale:[{x:1,y:1},{time:.3,x:1.5,y:1.5},{time:.591667,x:1,y:1},{time:.6,x:1,y:1},{time:.633333,x:1,y:1}]},dice_1:{translate:TIMES.map(t=>{const p=gyroAt(t);return {time:t,x:round(p.offset[0]),y:round(-p.offset[1])};})}},attachments:{default:{}},drawOrder:[],events:[{time:0,name:'dice_roll'},...(point===6?[{time:.6,name:'sound_ui_dice6'}]:[])]};

@@ -282,7 +282,7 @@ export function createIndexedDBStorage(indexedDB=globalThis.indexedDB) {
 function validVideo(video,record) {
   return video?.blob instanceof Blob&&video.blob.size>0&&video.blob.size<=VIDEO_SPEC.maxBytes&&video.profile===VIDEO_PROFILE&&video.duration===6&&video.fps===30&&video.frameCount===180&&video.width===720&&video.height===1600&&video.revision===record.revision&&video.candidate===record.candidateId;
 }
-async function sha256(blob) {return [...new Uint8Array(await crypto.subtle.digest('SHA-256',await blob.arrayBuffer()))].map(v=>v.toString(16).padStart(2,'0')).join('');}
+async function sha256(blob,bytes) {return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes||await blob.arrayBuffer()))].map(v=>v.toString(16).padStart(2,'0')).join('');}
 let zipLoading;
 async function zipFactory() {
   if(!globalThis.JSZip) {
@@ -333,6 +333,16 @@ export function createLocalPreview(dependencies={}) {
     return record.grade==='purple'
       ?renderPurple(record.files,{name:record.name,composition:record.resolvedComposition,...options})
       :renderGreen(record.files,{name:record.name,...options});
+  }
+  async function resolveComposition(files,requested){
+    if(!files.some(file=>file.slot==='sz_0'))return detectComposition(files,requested);
+    const missing=files.filter(file=>/^sz_[0-6]$/.test(file.slot)&&!Number.isFinite(file.alphaArea));
+    if(requested!=='auto'&&missing.length)return {resolvedComposition:requested,compositionDetection:{method:'explicit_'+requested,detected:requested,ratios:{}}};
+    for(const file of missing){
+      const image=await decode(file.blob,file.name);
+      try{file.alphaArea=image.alphaArea;}finally{image.close?.();}
+    }
+    return detectComposition(files,requested);
   }
   async function read(id) {
     const record=await storage.get(id);
@@ -390,6 +400,7 @@ export function createLocalPreview(dependencies={}) {
     const entries=settings.grade==='green'?validateSixFaceFiles(pngEntries):validatePurpleFiles(pngEntries);
     const importWarnings=[...(entries.warnings||[])];
     if(settings.grade==='green'&&settings.composition==='digits')throw new PreviewError('绿色六面需要完整骰面，请选择 faces 或 auto');
+    const needsFaceAlpha=settings.grade==='purple'&&settings.composition==='auto'&&entries.some(entry=>entry.slot==='sz_0');
     let totalBytes=0;
     for(const entry of entries) {
       aborted();
@@ -398,11 +409,13 @@ export function createLocalPreview(dependencies={}) {
       const blob=await originalBlob(entry),bytes=new Uint8Array(await blob.arrayBuffer());
       const dimensions=inspectPNG(bytes,entry.slot,entry.name,{flexible:true});
       if(totalBytes+blob.size>48*1024*1024)throw new PreviewError('所选 PNG 合计不能超过48 MiB');
-      let alphaArea=0;
-      if(settings.grade!=='green'||!GREEN_SLOTS.includes(entry.slot)){
+      let alphaArea=settings.grade==='purple'&&GREEN_SLOTS.includes(entry.slot)?null:0;
+      // Explicit full faces are decoded and validated by the native generator.
+      // Only automatic composition with a base needs a second alpha-area read.
+      if(!GREEN_SLOTS.includes(entry.slot)||needsFaceAlpha){
         const image=await decode(blob,entry.name,{allowEmpty:entry.slot==='anchor'});try{alphaArea=image.alphaArea;}finally{image.close?.();}
       }
-      files.push({name:entry.name,slot:entry.slot,blob,...dimensions,alphaArea,sha256:await hash(blob)});
+      files.push({name:entry.name,slot:entry.slot,blob,...dimensions,alphaArea,sha256:await hash(blob,bytes)});
       totalBytes+=blob.size;
       }catch(error){
         if(!optional||error.name==='AbortError')throw error;
@@ -417,7 +430,7 @@ export function createLocalPreview(dependencies={}) {
       if(!(head[0]===73&&head[1]===68&&head[2]===51)&&!(head[0]===255&&(head[1]&224)===224))throw new PreviewError(entry.name+'：需要有效 MP3');
       audio[entry.sound]={name:entry.name,blob,size:blob.size,sha256:await hash(blob)};
     }
-    const detection=settings.grade==='green'?{resolvedComposition:'faces',compositionDetection:{method:'six_original_flat_faces',detected:'faces'}}:detectComposition(files,settings.composition);
+    const detection=settings.grade==='green'?{resolvedComposition:'faces',compositionDetection:{method:'six_original_flat_faces',detected:'faces'}}:await resolveComposition(files,settings.composition);
     const record={id:uuid(),candidateId:uuid(),revision:1,...settings,...detection,files,audio,anchor:files.find(file=>file.slot==='anchor')||null,video:null,created:Math.floor(Date.now()/1000)};
     try{record.runtime=await renderNative(record,{signal});}
     catch(error){throw error instanceof PreviewError||error.name==='AbortError'?error:new PreviewError(error.message||'六面资源生成失败');}
@@ -435,7 +448,7 @@ export function createLocalPreview(dependencies={}) {
       {needsUpload:true,grade:settings.grade,required:GREEN_SLOTS.map(slot=>slot+'.png')});
     if(record.runtime.kind==='six-face'&&settings.composition==='digits')throw new PreviewError('绿色六面需要完整骰面，请选择 faces 或 auto');
     if(SETTING_KEYS.every(k=>settings[k]===settingValue(record,k)))return publicSession(record);
-    const detection=record.runtime.kind==='six-face'?{resolvedComposition:'faces',compositionDetection:record.compositionDetection}:detectComposition(record.files,settings.composition);
+    const detection=record.runtime.kind==='six-face'?{resolvedComposition:'faces',compositionDetection:record.compositionDetection}:await resolveComposition(record.files,settings.composition);
     const next={...record,...settings,revision:record.revision+1,candidateId:uuid(),...detection};
     if(next.resolvedComposition!==record.resolvedComposition)next.runtime=generatedRuntime(record.runtime)
       ?await renderNative(next):await render(next.files,next.resolvedComposition);
@@ -451,10 +464,10 @@ export function createLocalPreview(dependencies={}) {
     if(!['大骰子.png','icon.png'].includes(name))throw new PreviewError('大图文件名需为大骰子.png或icon.png');
     if(!file.size||file.size>MAX_PNG)throw new PreviewError('大图PNG为空或超过12 MiB');
     if(record.files.filter(item=>item.slot!=='大骰子').reduce((sum,item)=>sum+item.blob.size,0)+file.size>48*1024*1024)throw new PreviewError('所选 PNG 合计不能超过48 MiB');
-    const dimensions=inspectPNG(new Uint8Array(await file.arrayBuffer()),'大骰子',file.name);
+    const bytes=new Uint8Array(await file.arrayBuffer()),dimensions=inspectPNG(bytes,'大骰子',file.name);
     const image=await decode(file,file.name);let alphaArea;
     try{alphaArea=image.alphaArea;if(!(alphaArea>0))throw new PreviewError('大图PNG没有清晰可见的内容');}finally{image.close?.();}
-    const replacement={name:file.name,slot:'大骰子',blob:file,...dimensions,alphaArea,sha256:await hash(file)};
+    const replacement={name:file.name,slot:'大骰子',blob:file,...dimensions,alphaArea,sha256:await hash(file,bytes)};
     const next={...record,files:[...record.files.filter(item=>item.slot!=='大骰子'),replacement],revision:record.revision+1,candidateId:uuid()};
     await storage.put(next,{revision:record.revision,candidateId:record.candidateId});
     return publicSession(next);

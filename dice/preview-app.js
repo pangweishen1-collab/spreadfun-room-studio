@@ -285,7 +285,7 @@ function selectUploadGrade(nextGrade) {
 }
 async function switchBackground(nextGrade) {
   if (!session || !['green','purple'].includes(nextGrade) || previewGrade === nextGrade) return;
-  const draft = pending.size ? {name:$('dice-name').value, soundEnabled:$('sound-enabled').checked} : null;
+  const draft = pending.size || settingsDirty() ? {name:$('dice-name').value, soundEnabled:$('sound-enabled').checked} : null;
   const hadVideo = Boolean(currentVideo());
   const next = await post(`/api/preview/${session.id}/settings`, {expectedRevision:session.revision, previewGrade:nextGrade});
   try { await loadSession(next, true); }
