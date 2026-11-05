@@ -120,7 +120,6 @@ function render() {
   $('audio-warning').textContent=audioWarning; $('audio-warning').hidden=!audioWarning;
   $('preview-empty').querySelector('h3').textContent = t(grade === 'green' ? 'greenEmptyTitle' : 'previewEmptyTitle');
   $('asset-grid').setAttribute('aria-label',t(grade === 'green' ? 'greenAssetStatus' : 'assetStatus'));
-  $('grade-upload-hint').textContent=t('greenUploadHint');
   $('hero-hint').hidden=!session || Boolean(session.candidate.icon);
   $('hero-hint').textContent=t('missingHero');
   document.querySelectorAll('[data-grade]').forEach(button => {

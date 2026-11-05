@@ -63,6 +63,7 @@
 .field :is(input, select, textarea):disabled { color: var(--ft-color-disabled-text); border-color: var(--ft-color-disabled-border); background: var(--ft-color-disabled-surface); opacity: 1; }
 .field :is(input, select, textarea)[aria-invalid='true'] { border-color: var(--ft-color-field-error); }
 .field-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+.grade-field { margin: 0 0 20px; }
 .grade-switch { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .grade-option { display: flex; align-items: center; justify-content: center; gap: 8px; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--color-rule-strong); border-radius: var(--ft-radius-input); background: var(--color-surface); color: var(--color-secondary); font-size: 14px; line-height: 20px; }
 .grade-option span { min-width: 0; overflow-wrap: anywhere; }

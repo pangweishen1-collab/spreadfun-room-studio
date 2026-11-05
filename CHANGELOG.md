@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.13.2 - 2026-11-05
+
+### Dice preview scale and controls
+
+- Move the grade selector directly below the upload heading and remove its explanatory caption.
+- Increase purple settled display size by 15% in preview and video, blending from 0.47 to 0.60 seconds to retain the existing fast-turn bounds. Preserve green sizing and native resource registration.
+
 ## 1.13.1 - 2026-11-05
 
 ### Shared dice upload flow

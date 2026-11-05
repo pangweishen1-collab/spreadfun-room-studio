@@ -10,6 +10,11 @@ const loadImage = src => new Promise((resolve, reject) => {
 
 const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
 const generatedCandidate = candidate => candidate?.kind === 'six-face' || candidate?.kind === 'purple-gyro';
+export const purplePresentationGain = time => {
+  const t = ((time % 2) + 2) % 2;
+  const u = Math.max(0, Math.min(1, (t - .47) / .13));
+  return 1 + .15 * u * u * (3 - 2 * u);
+};
 const backgroundImages = new Map();
 const loadBackground = candidate => {
   const src = previewGrade(candidate) === 'purple' ? '/dice/assets/ui/bg_紫.webp' : '/dice/assets/ui/bg_绿.webp';
@@ -278,6 +283,7 @@ export class GameRenderer {
 
     const all = this.mode === 'all';
     const selected = this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target;
+    const presentationGain = purple ? purplePresentationGain(time) : 1;
     if (gpu) this.scene.begin();
     for (let index = 0; index < (all ? 6 : 1); index++) {
       const skeleton = this.skeletons[index];
@@ -290,11 +296,11 @@ export class GameRenderer {
       if (generatedCandidate(this.candidate)) {
         const {crop,sourceSize,cropOffset} = this.candidate.geometry;
         const ratio = Math.max(crop[2],crop[3])/sourceSize;
-        const size = (all ? 172 : 300) * Math.min(1,.655/ratio);
+        const size = (all ? 172 : 300) * Math.min(1,.655/ratio) * presentationGain;
         skeleton.scaleX = skeleton.scaleY = size/200;
         skeleton.x -= cropOffset[0]*size/sourceSize;
         skeleton.y += cropOffset[1]*size/sourceSize;
-      } else skeleton.scaleX = skeleton.scaleY = all ? 0.9 : 1.6;
+      } else skeleton.scaleX = skeleton.scaleY = (all ? 0.9 : 1.6) * presentationGain;
       skeleton.updateWorldTransform(spine.Physics.update);
       if (gpu) this.scene.drawSkeleton(skeleton, false);
       else this.software?.draw(ctx, skeleton, 1600);
