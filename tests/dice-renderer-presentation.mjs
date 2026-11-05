@@ -56,9 +56,7 @@ async function initialLoad(GameRenderer, from = 0) {
   return renderer;
 }
 
-const {GameRenderer,purplePresentationGain} = await import('../dice/renderer.js?presentation-test');
-for(const [time,gain] of [[0,1],[.3,1],[.47,1],[.535,1.075],[.6,1.15],[1.9,1.15],[2.3,1]])
-  assert.ok(Math.abs(purplePresentationGain(time)-gain)<1e-10,'Purple settles to its larger display size without enlarging the fast turn');
+const {GameRenderer} = await import('../dice/renderer.js?presentation-test');
 const renderer = await initialLoad(GameRenderer);
 assert.equal(requests.filter(image => image.src === green).length, 1);
 assert.equal(requests.filter(image => image.src === purple).length, 1, 'Both backgrounds are preloaded');
@@ -150,8 +148,11 @@ for(const kind of ['six-face','purple-gyro']){
  retained.draw(.2283);assert.equal(softwareCalls,6,'All six generated faces draw through Canvas after GPU loss');
  const gain=kind==='purple-gyro'?1.15:1;
  for(const grade of ['green','purple']){
-  retained.candidate.previewGrade=grade;retained.draw(.6);
-  assert.ok(retained.skeletons.every(s=>Math.abs(s.scaleX-.86*gain)<1e-10),'Background selection never changes source-grade presentation size');
+  retained.candidate.previewGrade=grade;
+  for(const time of [0,.1,.3,.47,.535,.54,.6,1.9,2.3]){
+   retained.draw(time);
+   assert.ok(retained.skeletons.every(s=>Math.abs(s.scaleX-.86*gain)<1e-10),'UI sizing is constant across time/background; the exported native animation is the only changing zoom curve');
+  }
  }
 }
 retained.candidate={...retained.candidate,kind:'template'};retained.playing=true;retained.layer.listeners.webglcontextlost({preventDefault(){}});assert.equal(retained.playing,false,'Legacy template cannot silently claim a software fallback');

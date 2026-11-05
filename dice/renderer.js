@@ -10,11 +10,8 @@ const loadImage = src => new Promise((resolve, reject) => {
 
 const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
 const generatedCandidate = candidate => candidate?.kind === 'six-face' || candidate?.kind === 'purple-gyro';
-export const purplePresentationGain = time => {
-  const t = ((time % 2) + 2) % 2;
-  const u = Math.max(0, Math.min(1, (t - .47) / .13));
-  return 1 + .15 * u * u * (3 - 2 * u);
-};
+// UI sizing stays constant: all animation and zoom come from the exported Spine data.
+const PURPLE_PRESENTATION_SCALE = 1.15;
 const backgroundImages = new Map();
 const loadBackground = candidate => {
   const src = previewGrade(candidate) === 'purple' ? '/dice/assets/ui/bg_紫.webp' : '/dice/assets/ui/bg_绿.webp';
@@ -283,7 +280,7 @@ export class GameRenderer {
 
     const all = this.mode === 'all';
     const selected = this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target;
-    const presentationGain = this.candidate.template === 'purple' ? purplePresentationGain(time) : 1;
+    const presentationGain = this.candidate.template === 'purple' ? PURPLE_PRESENTATION_SCALE : 1;
     if (gpu) this.scene.begin();
     for (let index = 0; index < (all ? 6 : 1); index++) {
       const skeleton = this.skeletons[index];
