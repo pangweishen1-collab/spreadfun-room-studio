@@ -93,6 +93,7 @@ const newerCandidate = candidate('newer', 'purple');
 const newer = renderer.patchPresentation(newerCandidate);
 assert.deepEqual(await Promise.all([older, newer]), [false, true]);
 assert.equal(renderer.candidate, newerCandidate, 'Late older updates cannot overwrite the latest presentation');
+assert.equal(await renderer.patchPresentation(candidate('different-engine','green',{kind:'purple-gyro'})),false,'A different source engine cannot presentation-patch the existing runtime');
 for (const key of ['skel','atlas','texture','atlasPage']) {
   assert.equal(await renderer.patchPresentation(candidate('different-assets', 'green', {[key]: 'different'})), false);
 }
@@ -142,14 +143,15 @@ noHero.clear();
 // geometry, while legacy template candidates retain their pause behavior.
 for(const kind of ['six-face','purple-gyro']){
  let softwareCalls=0,prevented=false;
- retained.candidate={...retained.candidate,kind,geometry:{sourceSize:200,crop:[35,35,130,130],cropOffset:[0,0]}};
+ retained.candidate={...retained.candidate,kind,template:kind==='purple-gyro'?'purple':'green',geometry:{sourceSize:200,crop:[35,35,130,130],cropOffset:[0,0]}};
  retained.mode='all';retained.playing=true;retained.gpuLost=false;retained.software={draw(_ctx,skeleton,height){assert.equal(height,1600);assert.ok(skeleton.scaleX>0);softwareCalls++;}};
  retained.layer.listeners.webglcontextlost({preventDefault(){prevented=true;}});
  assert.equal(prevented,true);assert.equal(retained.gpuLost,true);assert.equal(retained.playing,true,kind+' must not pause when its Canvas fallback exists');
  retained.draw(.2283);assert.equal(softwareCalls,6,'All six generated faces draw through Canvas after GPU loss');
- for(const [grade,gain] of [['green',1],['purple',1.15]]){
+ const gain=kind==='purple-gyro'?1.15:1;
+ for(const grade of ['green','purple']){
   retained.candidate.previewGrade=grade;retained.draw(.6);
-  assert.ok(retained.skeletons.every(s=>Math.abs(s.scaleX-.86*gain)<1e-10),'Both native backends use the grade presentation size');
+  assert.ok(retained.skeletons.every(s=>Math.abs(s.scaleX-.86*gain)<1e-10),'Background selection never changes source-grade presentation size');
  }
 }
 retained.candidate={...retained.candidate,kind:'template'};retained.playing=true;retained.layer.listeners.webglcontextlost({preventDefault(){}});assert.equal(retained.playing,false,'Legacy template cannot silently claim a software fallback');

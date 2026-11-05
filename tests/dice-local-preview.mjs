@@ -87,7 +87,9 @@ assert.equal(validateFiles([...files,{...files[0],name:'大骰子.png'}])[0].nam
 assert.throws(()=>validateSettings({...payload,point:true}));assert.throws(()=>validateSettings(null));
 for(const invalid of [{mode:'unknown'},{point:0},{point:7},{point:null}])assert.throws(()=>validateSettings({...payload,...invalid}));
 for(const mode of ['all','single','continuous'])assert.deepEqual(
-  validateSettings({...payload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',mode:'all',point:1,composition:'auto',soundEnabled:true});
+  validateSettings({...payload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',previewGrade:'purple',mode:'all',point:1,composition:'auto',soundEnabled:true});
+assert.equal(validateSettings({...payload,previewGrade:'green'}).previewGrade,'green');
+for(const previewGrade of ['unknown',null,true])assert.throws(()=>validateSettings({...payload,previewGrade}));
 assert.equal(VIDEO_PROFILE,'loop6-v4-audio-1mb');
 assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_000_000);
 assert.equal(inspectPNG(new Uint8Array(png(200)),'sz_0').width,200);
@@ -100,6 +102,7 @@ checks.push('canonical_alias_missing_extra_duplicates_png_crc_dimensions_setting
 const first=await post('/api/preview/import',payload);
 assert.equal(first.revision,1);assert.equal(first.resolvedComposition,'faces');assert.equal(first.kind,'purple-gyro');assert.equal(first.candidate.kind,'purple-gyro');assert.equal(first.candidate.template,'purple');assert.equal(first.candidate.atlasPage,'dice.png');assert.ok(first.candidate.json);assert.equal(first.candidate.skel,undefined);
 assert.equal(first.candidate.previewGrade,'purple');assert.equal(first.files.find(f=>f.slot==='大骰子').name,'icon.png');
+assert.equal(first.grade,'purple');assert.equal(first.previewGrade,'purple');
 for(const file of first.files)assert.deepEqual(Buffer.from(await urlBlobs.get(file.url).arrayBuffer()),Buffer.from(files.find(f=>f.name===file.name).data.split(',')[1],'base64'));
 const before=structuredClone(await storage.get(first.id));
 const invalid=structuredClone(payload);invalid.files.find(file=>file.name==='sz_1.png').data='data:image/png;base64,broken';await rejects(()=>post('/api/preview/import',invalid));
@@ -305,6 +308,36 @@ const bothHeroes=await post('/api/preview/import',{...payload,name:'dice_green_d
 assert.equal(bothHeroes.files.find(f=>f.slot==='大骰子').name,'大骰子.png');
 const prefixedBundle=await adapter.api(`/api/preview/${bothHeroes.id}/bundle`);assert.equal(prefixedBundle.name,'dice_purple_板球');await compactBundle(prefixedBundle,await storage.get(bothHeroes.id));
 checks.push('purple_hero_only_updates_keep_runtime_and_direct_import_prefers_named_large_dice_over_icon');
+
+const displayBase=await post('/api/preview/import',{...payload,name:'dice_purple_背景切换'});
+const displayHeaders={'Content-Type':'video/h264','X-Preview-Revision':String(displayBase.revision),'X-Candidate-Id':displayBase.candidate.id};
+await adapter.api(`/api/preview/${displayBase.id}/video`,{method:'POST',headers:displayHeaders,body:new Blob(['display-video'],{type:'video/h264'})});
+const displayBefore=await storage.get(displayBase.id),displayRenders=renders;
+const changedBackground=await post(`/api/preview/${displayBase.id}/settings`,{expectedRevision:1,previewGrade:'green'}),displayAfter=await storage.get(displayBase.id);
+assert.equal(changedBackground.id,displayBase.id);assert.equal(changedBackground.revision,2);assert.notEqual(changedBackground.candidate.id,displayBase.candidate.id);
+assert.equal(changedBackground.grade,'purple');assert.equal(changedBackground.previewGrade,'green');assert.equal(changedBackground.candidate.template,'purple');assert.equal(changedBackground.candidate.previewGrade,'green');assert.equal(changedBackground.kind,'purple-gyro');assert.equal(changedBackground.resourceName,'dice_purple_背景切换');
+assert.equal(renders,displayRenders);assert.equal(changedBackground.video,null);
+for(const key of ['runtime','files','audio','anchor','video'])assert.deepEqual(displayAfter[key],displayBefore[key]);
+assert.deepEqual(changedBackground.candidate.json,displayBase.candidate.json);
+for(const key of ['atlas','texture','icon'])assert.equal(changedBackground.candidate[key],displayBase.candidate[key]);
+await compactBundle(await adapter.api(`/api/preview/${displayBase.id}/bundle`),displayAfter);
+await rejects(()=>adapter.api(`/api/preview/${displayBase.id}/video`,{method:'POST',headers:displayHeaders,body:new Blob(['late-display-video'],{type:'video/h264'})}),409);
+const retainedBackground=await post(`/api/preview/${displayBase.id}/settings`,{expectedRevision:2,name:'背景更名'});
+assert.equal(retainedBackground.previewGrade,'green');assert.equal(retainedBackground.candidate.previewGrade,'green');assert.equal(retainedBackground.candidate.template,'purple');assert.equal(renders,displayRenders);
+const displayStable=await storage.get(displayBase.id),displayWrites=storage.writes;
+for(const values of [{expectedRevision:1,previewGrade:'purple'},{expectedRevision:3,grade:'green'},{expectedRevision:3,previewGrade:'invalid'}])await assert.rejects(()=>post(`/api/preview/${displayBase.id}/settings`,values));
+storage.fail=true;try{await assert.rejects(()=>post(`/api/preview/${displayBase.id}/settings`,{expectedRevision:3,previewGrade:'purple'}));}finally{storage.fail=false;}
+assert.equal(storage.writes,displayWrites);assert.deepEqual(await storage.get(displayBase.id),displayStable);
+const purpleRestored=await restored.api(`/api/preview/${displayBase.id}`);assert.equal(purpleRestored.previewGrade,'green');assert.equal(purpleRestored.grade,'purple');assert.equal(purpleRestored.kind,'purple-gyro');
+checks.push('purple_preview_background_switch_preserves_source_grade_native_JSON_assets_prefix_and_audio_anchor_with_old_video_invalidated_and_CAS_failures_atomic');
+
+const legacyBackground={...structuredClone(displayStable),id:'5'.repeat(32),candidateId:'6'.repeat(32),revision:8};delete legacyBackground.previewGrade;
+storage.records.set(legacyBackground.id,structuredClone(legacyBackground));
+const legacyWrites=storage.writes,legacyView=await adapter.api(`/api/preview/${legacyBackground.id}`);
+assert.equal(legacyView.previewGrade,'purple');assert.equal(legacyView.candidate.previewGrade,'purple');
+const legacyNoop=await post(`/api/preview/${legacyBackground.id}/settings`,{expectedRevision:8,previewGrade:'purple'});
+assert.equal(legacyNoop.revision,8);assert.equal(storage.writes,legacyWrites);assert.deepEqual(await storage.get(legacyBackground.id),legacyBackground);
+checks.push('legacy_sessions_without_preview_grade_default_to_source_grade_without_migration_or_noop_revision');
 
 adapter.dispose();restored.dispose();assert.equal(urlBlobs.size,0);
 console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Pure session/PNG/ZIP/CAS logic with injected Canvas and storage. Real browser Canvas, IndexedDB, Spine and video module require browser QA.'},null,2));

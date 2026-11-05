@@ -16,7 +16,7 @@ class Node {
   addEventListener(type,listener){if(!this.listeners.has(type))this.listeners.set(type,new Set());this.listeners.get(type).add(listener);}
   removeEventListener(type,listener){this.listeners.get(type)?.delete(listener);}
   contains(node){for(;node;node=node.parentNode)if(node===this)return true;return false;}
-  matches(selector){return selector.split(',').some(part=>part.trim().toUpperCase()===this.tagName);}
+  matches(selector){return selector.split(',').some(part=>{const value=part.trim(),attribute=/^\[([^\]]+)\]$/.exec(value);return attribute?this.attributes.has(attribute[1]):value.toUpperCase()===this.tagName;});}
   closest(selector){for(let node=this;node;node=node.parentNode)if(node.matches?.(selector))return node;return null;}
   setAttribute(name,value){this.attributes.set(name,String(value));}
   getAttribute(name){return this.attributes.get(name)??null;}
@@ -40,14 +40,17 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
 function harness(onBatch,options={}) {
   const document=new Node('document');document.isDocument=true;document.activeElement=null;
   const stage=new Node('section',document),primaryZone=new Node('div',stage),replacementZone=new Node('div',document),canvas=new Node('canvas',stage);
-  const primaryButton=new Node('button',primaryZone),replacementButton=new Node('button',replacementZone);
-  const primaryLabel=new Node('span',primaryButton),replacementLabel=new Node('span',replacementButton);
+  const cards=zone=>options.cards?['green','purple'].map(grade=>{const card=new Node('div',zone);card.setAttribute('data-upload-grade',grade);card.setAttribute('role','group');card.setAttribute('tabindex','0');return card;}):[];
+  const primaryCards=cards(primaryZone),replacementCards=cards(replacementZone);
+  const buttons=(zone,cards)=>cards.length?cards.map(card=>new Node('button',card)):[new Node('button',zone)];
+  const primaryButtons=buttons(primaryZone,primaryCards),replacementButtons=buttons(replacementZone,replacementCards);
+  const primaryLabels=primaryButtons.map(button=>new Node('span',button)),replacementLabels=replacementButtons.map(button=>new Node('span',button));
+  const [primaryButton]=primaryButtons,[replacementButton]=replacementButtons,[primaryLabel]=primaryLabels,[replacementLabel]=replacementLabels;
   const input=new Node('input',document),state={busy:false,preview:false,active:true},batches=[],registrations=[];
   const folderInput=options.folder?new Node('input',document):undefined;
-  const primaryFolderButton=options.folder?new Node('button',primaryZone):undefined;
-  const replacementFolderButton=options.folder?new Node('button',replacementZone):undefined;
-  const primaryFolderLabel=options.folder?new Node('span',primaryFolderButton):undefined;
-  const replacementFolderLabel=options.folder?new Node('span',replacementFolderButton):undefined;
+  const primaryFolderButtons=options.folder?buttons(primaryZone,primaryCards):[],replacementFolderButtons=options.folder?buttons(replacementZone,replacementCards):[];
+  const primaryFolderLabels=primaryFolderButtons.map(button=>new Node('span',button)),replacementFolderLabels=replacementFolderButtons.map(button=>new Node('span',button));
+  const [primaryFolderButton]=primaryFolderButtons,[replacementFolderButton]=replacementFolderButtons,[primaryFolderLabel]=primaryFolderLabels,[replacementFolderLabel]=replacementFolderLabels;
   let value='selected',pickerCount=0,folderValue='folder-selected',folderPickerCount=0,emptyFolderCount=0;
   input.files=liveFiles([]);
   Object.defineProperty(input,'value',{get:()=>value,set:next=>{value=next;if(next==='')input.files.source.length=0;}});
@@ -58,9 +61,10 @@ function harness(onBatch,options={}) {
     folderInput.click=()=>{folderPickerCount++;};
   }
   const paste={register(config){const entry={config:{isActive:()=>true,isBusy:()=>false,...config},active:true};registrations.push(entry);return()=>{entry.active=false;};}};
-  const binding=bindDiceUploads({primaryZone,replacementZone,input,primaryButton,replacementButton,
+  const binding=bindDiceUploads({primaryZone,replacementZone,input,...(options.cards?{primaryButtons,replacementButtons}:{primaryButton,replacementButton}),
     isBusy:()=>state.busy,hasPreview:()=>state.preview,isActive:()=>state.active,onFiles:files=>{batches.push(files);return onBatch?.(files);},paste,document,
-    onDirectory:options.onDirectory,folderInput,primaryFolderButton,replacementFolderButton,onEmptyFolder:()=>{emptyFolderCount++;return options.onEmptyFolder?.();}});
+    onTarget:options.onTarget,onError:options.onError,onDirectory:options.onDirectory,folderInput,
+    ...(options.cards?{primaryFolderButtons,replacementFolderButtons}:{primaryFolderButton,replacementFolderButton}),onEmptyFolder:()=>{emptyFolderCount++;return options.onEmptyFolder?.();}});
   const dispose=typeof binding==='function'?binding:()=>binding.dispose();
   function routePaste(files,target=document){
     const event={target},active=registrations.filter(entry=>entry.active&&entry.config.isActive(event));
@@ -69,6 +73,7 @@ function harness(onBatch,options={}) {
     return selected.config.onFiles(files);
   }
   return {document,primaryZone,replacementZone,canvas,primaryButton,replacementButton,primaryLabel,replacementLabel,input,state,batches,registrations,dispose,routePaste,
+    primaryCards,replacementCards,primaryButtons,replacementButtons,primaryLabels,replacementLabels,primaryFolderButtons,replacementFolderButtons,primaryFolderLabels,replacementFolderLabels,
     folderInput,primaryFolderButton,replacementFolderButton,primaryFolderLabel,replacementFolderLabel,
     get pickerCount(){return pickerCount;},get folderPickerCount(){return folderPickerCount;},get emptyFolderCount(){return emptyFolderCount;}};
 }
@@ -280,58 +285,195 @@ const checks=[];
   h.dispose();checks.push('directory_enumeration_starts_inside_import_transaction_and_blocks_overlapping_uploads');
 }
 {
+  let h,selected='green';const routes=[],imports=[];
+  h=harness(files=>imports.push({grade:selected,files}),{cards:true,folder:true,onTarget(event,zone){
+    const card=event?.target.closest('[data-upload-grade]')||h.document.activeElement?.closest('[data-upload-grade]');
+    if(card&&zone.contains(card))selected=card.getAttribute('data-upload-grade');
+    routes.push({event,zone,grade:selected});
+  }});
+  assert.equal(h.registrations.length,2,'Two cards in each zone share the original two clipboard registrations');
+  for(const labels of [h.primaryLabels,h.replacementLabels])for(let index=0;index<labels.length;index++){
+    const before=h.pickerCount;labels[index].emit('click');assert.equal(h.pickerCount,before+1);assert.equal(selected,index?'purple':'green');
+    const calls=routes.length;h.document.activeElement=h.primaryCards[1-index];h.input.files=liveFiles([fileA]);h.input.emit('change');
+    assert.equal(routes.length,calls,'File input change retains the grade chosen before opening the native picker');assert.equal(imports.at(-1).grade,index?'purple':'green');
+  }
+  for(const labels of [h.primaryFolderLabels,h.replacementFolderLabels])for(let index=0;index<labels.length;index++){
+    const before=h.folderPickerCount,pickers=h.pickerCount;labels[index].emit('click');assert.equal(h.folderPickerCount,before+1);assert.equal(h.pickerCount,pickers);
+    const calls=routes.length;h.document.activeElement=h.replacementCards[1-index];h.folderInput.files=liveFiles([fileB]);h.folderInput.emit('change');
+    assert.equal(routes.length,calls,'Folder input change also retains the selected source');assert.equal(imports.at(-1).grade,index?'purple':'green');
+  }
+  for(const [zone,cards] of [[h.primaryZone,h.primaryCards],[h.replacementZone,h.replacementCards]]){
+    const caption=new Node('span',cards[1]),before=h.pickerCount;caption.emit('click');assert.equal(h.pickerCount,before+1);assert.equal(routes.at(-1).zone,zone);assert.equal(selected,'purple');
+    for(const key of ['Enter',' ']){const count=h.pickerCount,calls=routes.length,event=cards[0].emit('keydown',{key});assert.equal(event.defaultPrevented,true);assert.equal(h.pickerCount,count+1);assert.equal(routes.length,calls+1);assert.equal(selected,'green');}
+  }
+  const calls=routes.length,pickers=h.pickerCount;h.primaryLabels[1].emit('keydown',{key:'Enter'});assert.equal(routes.length,calls);assert.equal(h.pickerCount,pickers);
+  h.primaryLabels[1].emit('click');assert.equal(routes.length,calls+1);assert.equal(h.pickerCount,pickers+1,'Nested buttons use one native keyboard click, without delegated key activation');
+  h.primaryCards[0].setAttribute('tabindex','-1');const unfocused=h.primaryCards[0].emit('keydown',{key:'Enter'});assert.equal(unfocused.defaultPrevented,false);assert.equal(h.pickerCount,pickers+1);
+  const beforeDispose=routes.length;h.dispose();for(const button of [...h.primaryButtons,...h.replacementButtons,...h.primaryFolderButtons,...h.replacementFolderButtons])button.emit('click');assert.equal(routes.length,beforeDispose);
+  checks.push('two_grade_cards_share_pickers_and_clipboard_routes_and_keep_picker_source_through_file_changes_without_keyboard_double_activation');
+}
+{
+  let h,selected='green';const routes=[],imports=[];
+  h=harness(files=>imports.push({grade:selected,files}),{cards:true,onTarget(event,zone){
+    const card=event?.target.closest('[data-upload-grade]')||h.document.activeElement?.closest('[data-upload-grade]');
+    if(card&&zone.contains(card))selected=card.getAttribute('data-upload-grade');routes.push({event,zone,grade:selected});
+  }});
+  const child=new Node('span',h.primaryCards[1]);const drop=child.emit('drop',{dataTransfer:{types:['Files'],files:[fileA]}});await Promise.all(drop.results);
+  assert.equal(drop.defaultPrevented,true);assert.equal(imports.at(-1).grade,'purple');assert.equal(routes.at(-1).zone,h.primaryZone);
+  h.primaryCards[0].focus();await h.routePaste([fileB]);assert.equal(imports.at(-1).grade,'green');assert.equal(routes.at(-1).event,undefined);assert.equal(routes.at(-1).zone,h.primaryZone);
+  h.state.preview=true;h.replacementCards[1].focus();await h.routePaste([fileA]);assert.equal(imports.at(-1).grade,'purple');assert.equal(routes.at(-1).zone,h.replacementZone);
+  new Node('textarea',h.document).focus();await h.routePaste([fileB]);assert.equal(imports.at(-1).grade,'purple','Untargeted paste retains the selected source grade');
+  const count=routes.length;await h.routePaste([]);h.replacementCards[0].emit('drop',{dataTransfer:{types:['text/plain'],files:[]}});assert.equal(routes.length,count,'Empty paste and nonfile drops do not change source selection');
+  h.dispose();checks.push('targeted_card_drop_and_focused_or_untargeted_paste_route_one_source_grade_before_import');
+}
+{
+  for(const fail of [false,true]){
+    const error=Error('source selection failed'),errors=[];let calls=0;
+    const h=harness(undefined,{cards:true,folder:true,onTarget(){calls++;if(fail)throw error;return false;},onError:failure=>errors.push(failure)});
+    h.primaryLabels[1].emit('click');h.primaryFolderLabels[1].emit('click');h.replacementCards[1].emit('keydown',{key:'Enter'});
+    const drop=h.replacementCards[0].emit('drop',{dataTransfer:{types:['Files'],files:[fileA]}});await Promise.all(drop.results);await h.routePaste([fileB]);
+    assert.equal(calls,5);assert.equal(h.pickerCount,0);assert.equal(h.folderPickerCount,0);assert.equal(h.batches.length,0);
+    assert.deepEqual(errors,fail?Array(5).fill(error):[],'Target hook errors reach onError once and cancel the corresponding action');h.dispose();
+  }
+  let calls=0;const h=harness(undefined,{cards:true,folder:true,onTarget(){calls++;}});
+  for(const blocked of ['busy','inactive']){
+    h.state.busy=blocked==='busy';h.state.active=blocked!=='inactive';
+    for(const card of [...h.primaryCards,...h.replacementCards]){card.emit('click');card.emit('keydown',{key:'Enter'});card.emit('drop',{dataTransfer:{types:['Files'],files:[fileA]}});}
+    for(const button of [...h.primaryButtons,...h.replacementButtons,...h.primaryFolderButtons,...h.replacementFolderButtons])button.emit('click');
+    for(const registration of h.registrations)await registration.config.onFiles([fileA]);
+    h.input.files=liveFiles([fileA]);h.input.emit('change');h.folderInput.files=liveFiles([fileB]);h.folderInput.emit('change');
+  }
+  h.state.busy=false;h.state.active=true;h.state.preview=true;
+  h.primaryCards[1].emit('click');h.primaryCards[1].emit('keydown',{key:' '});h.primaryCards[1].emit('drop',{dataTransfer:{types:['Files'],files:[fileA]}});h.primaryFolderLabels[1].emit('click');
+  await h.registrations.find(registration=>registration.config.zone===h.primaryZone).config.onFiles([fileA]);
+  assert.equal(calls,0,'Busy, inactive and hidden primary actions never call the target hook');assert.equal(h.pickerCount,0);assert.equal(h.folderPickerCount,0);assert.equal(h.batches.length,0);
+  h.replacementLabels[1].emit('click');assert.equal(calls,1);assert.equal(h.pickerCount,1);h.dispose();
+  checks.push('target_hook_false_or_error_cancels_all_routes_and_busy_inactive_or_hidden_actions_never_select_or_import');
+}
+{
+  let h,selected='green',releaseRead,committed;const order=[];
+  h=harness(undefined,{cards:true,folder:true,onTarget(event,zone){
+    const card=event.target.closest('[data-upload-grade]');assert.ok(zone.contains(card));selected=card.getAttribute('data-upload-grade');order.push('target:'+selected);
+  },onDirectory:async provider=>{
+    order.push('transaction:'+selected);h.state.busy=true;
+    try {const files=await provider();committed={grade:selected,files};}finally{h.state.busy=false;}
+  }});
+  const directory={name:'res',isDirectory:true,createReader(){order.push('enumerate:'+selected);let page=0;return {readEntries(resolve){if(page++===0)releaseRead=()=>resolve([{name:fileA.name,isFile:true,file(resolve){resolve(fileA);}}]);else resolve([]);}};}};
+  const transfer={types:['Files'],items:[{webkitGetAsEntry:()=>directory}],files:[]},drop=h.primaryCards[1].emit('drop',{dataTransfer:transfer});
+  assert.deepEqual(order,['target:purple','transaction:purple','enumerate:purple']);assert.equal(h.state.busy,true);
+  h.primaryCards[0].focus();h.primaryCards[0].emit('click');h.primaryCards[0].emit('keydown',{key:'Enter'});h.primaryFolderLabels[0].emit('click');await h.routePaste([fileB]);
+  h.replacementCards[0].emit('drop',{dataTransfer:transfer});assert.equal(selected,'purple');assert.equal(order.length,3);assert.equal(h.pickerCount,0);assert.equal(h.folderPickerCount,0);
+  releaseRead();await Promise.all(drop.results);assert.deepEqual(committed,{grade:'purple',files:[fileA]});assert.equal(h.state.busy,false);assert.equal(order.length,3,'Directory completion does not rerun the hook against changed focus');
+  h.dispose();checks.push('directory_target_is_selected_before_enumeration_transaction_and_retained_while_focus_changes_or_busy_routes_fire');
+}
+{
   // Execute the actual controller functions without booting its DOM/event shell.
   const source=await readFile(new URL('../dice/preview-app.js',import.meta.url),'utf8');
   const fields=Object.fromEntries(['dice-name','sound-enabled','preview-mode','preview-point'].map(id=>[id,{value:'',checked:true}]));
-  const calls=[],six=Array.from({length:6},(_,i)=>Object.freeze({name:`sz_${i+1}.png`}));
-  let app,serial=0,importFailure=null,loadFailure=null;
+  const calls=[],renderCalls=[],revoked=[],audioChanges=[],six=Array.from({length:6},(_,i)=>Object.freeze({name:`sz_${i+1}.png`,sha256:`original-${i+1}`}));
+  let app,serial=0,importFailure=null,settingsFailure=null,loadFailure=null,patchFailure=null,patchAccepted=true;
+  const runtimeKind=grade=>grade==='purple'?'purple-gyro':'six-face';
+  const fixtureSession=(grade='purple',composition='faces')=>({id:`old-${grade}-${composition}`,revision:1,name:'旧骰子',grade,previewGrade:grade,mode:'all',point:1,composition,resolvedComposition:composition==='faces'?'faces':'digits',soundEnabled:true,
+    resourceName:`dice_${grade}_fixture`,files:six,anchor:{sha256:'original-anchor'},audio:{dice_roll:{sha256:'original-audio'}},
+    candidate:{id:`old-candidate-${grade}-${composition}`,kind:runtimeKind(grade),template:grade,previewGrade:grade,runtimeIdentity:`original-runtime-${grade}`,json:{marker:`original-json-${grade}`},geometry:{marker:`original-geometry-${grade}`},atlas:`original-atlas-${grade}`,texture:`original-texture-${grade}`,audio:{dice_roll:'original-roll-audio'}}});
   const context={document:{getElementById:id=>{assert.ok(fields[id],`unexpected controller DOM access: ${id}`);return fields[id];}},
-    URL:{revokeObjectURL(){}},VIDEO_SPEC:{profile:'test'},t:key=>key,
-    DiceAudio:class {ready=true;setEnabled(){}async load(){}stop(){}},
+    URL:{createObjectURL:()=>`blob:controller-${++serial}`,revokeObjectURL:value=>revoked.push(value)},VIDEO_SPEC:{profile:'test'},t:key=>key,
+    DiceAudio:class {ready=true;setEnabled(value){audioChanges.push(value);}async load(){}async unlock(){}stop(){}},
     localApi:async(path,options)=>{
       const body=typeof options.body==='string'?JSON.parse(options.body):options.body;calls.push({path,body});
-      if(importFailure)throw importFailure;
       const previous=app.state().session,isImport=path==='/api/preview/import';
-      return {...body,id:isImport?`new-${++serial}`:previous.id,revision:isImport?1:previous.revision+1,
-        resolvedComposition:body.composition==='auto'?'digits':body.composition,candidate:{id:`candidate-${++serial}`,audio:{}}};
+      if(isImport){
+        if(importFailure)throw importFailure;
+        const id=`new-${++serial}`,kind=runtimeKind(body.grade);
+        return {...body,id,revision:1,resourceName:`dice_${body.grade}_fixture`,resolvedComposition:'faces',
+          candidate:{id:`candidate-${++serial}`,kind,template:body.grade,previewGrade:body.previewGrade,json:{marker:kind},geometry:{marker:id},atlas:id+'/atlas',texture:id+'/texture',audio:{}}};
+      }
+      assert.equal(path,`/api/preview/${previous.id}/settings`);if(settingsFailure)throw settingsFailure;
+      const {expectedRevision,...changes}=body;assert.equal(expectedRevision,previous.revision,'Controller submits the currently committed revision');
+      return {...previous,...changes,revision:previous.revision+1,
+        candidate:{...previous.candidate,id:`candidate-${++serial}`,previewGrade:changes.previewGrade??previous.previewGrade}};
     }};
-  const executed={...context,loadCandidate:async()=>{if(loadFailure)throw loadFailure;}};
+  const executed={...context,loadCandidate:async candidate=>{renderCalls.push({type:'load',candidate,state:app.state()});if(loadFailure)throw loadFailure;},
+    patchCandidate:async candidate=>{renderCalls.push({type:'patch',candidate});if(patchFailure)throw patchFailure;return patchAccepted;}};
   vm.createContext(executed);
   vm.runInContext(source.slice(source.indexOf('const $ ='),source.indexOf('\napplyTranslations();'))+`
     render=()=>{}; toast=()=>{};
-    globalThis.app={settings,settingsDirty,importPending,saveSettings,loadSession,switchGrade,
-      setSession(value,nextGrade=value?.grade||'green'){session=value;grade=nextGrade;if(value)fillSettings(value);},
-      setPending(files){releasePending();files.forEach((original,i)=>pending.set(GREEN_SLOTS[i],{original,previewUrl:'blob:'+i}));},
-      clearCache(){gradeSessions.clear();},state(){return {session,grade,pending};}};
-    renderer={data:{},async load(candidate){await loadCandidate(candidate);},async patchPresentation(){return true;},configure(){},play(){},clear(){}};
+    globalThis.app={settings,settingsDirty,importFiles,importPending,stageFiles,saveSettings,loadSession,selectUploadGrade,switchBackground,releasePending,
+      reset(value=null){releasePending();session=value;grade=value?.grade||'green';previewGrade=value?.previewGrade||grade;currentError=null;notice=null;
+        previewReady=hasCanvas=Boolean(value);loadingPreview=false;busy=false;audioSignature='';renderer.candidate=value?.candidate||null;
+        if(value)fillSettings(value);else{$('dice-name').value='';$('sound-enabled').checked=true;}},
+      setPending(files,extras=[]){releasePending(false);greenExtras=extras;files.forEach(original=>pending.set(greenSlot(original),{slot:greenSlot(original),original,previewUrl:URL.createObjectURL(original)}));},
+      state(){return {session,grade,uploadGrade,previewGrade,pending,extras:greenExtras,previewReady,hasCanvas,loadingPreview,currentError,notice,rendererCandidate:renderer.candidate};}};
+    renderer={data:{},candidate:null,async load(candidate){await loadCandidate(candidate);this.candidate=candidate;return true;},
+      async patchPresentation(candidate){const accepted=await patchCandidate(candidate);if(accepted)this.candidate=candidate;return accepted;},configure(){},play(){},clear(){}};
   `,executed);app=executed.app;
-  const legacy=composition=>({id:`old-${composition}`,revision:1,name:'旧骰子',grade:'purple',mode:'all',point:1,composition,resolvedComposition:'digits',soundEnabled:true,candidate:{id:`old-${composition}`,audio:{}}});
+
+  app.reset();assert.equal(app.state().uploadGrade,null);assert.equal(app.state().previewGrade,'green');assert.equal(app.state().session,null);
+  fields['dice-name'].value='未选择源';app.setPending(six);const beforeExplicit=calls.length;
+  await assert.rejects(()=>app.importPending(),error=>error.key==='chooseUploadGrade');assert.equal(calls.length,beforeExplicit);assert.equal(app.state().pending.size,6);
+  app.reset();await app.importFiles([six[0]]);assert.equal(app.state().currentError.key,'chooseUploadGrade');assert.equal(app.state().pending.size,0);assert.equal(calls.length,beforeExplicit);
+  assert.throws(()=>app.selectUploadGrade('invalid'),error=>error.key==='chooseUploadGrade');assert.equal(app.state().uploadGrade,null);
+  checks.push('actual_controller_requires_explicit_source_selection_before_first_import_without_committing_an_animation_grade');
+
   for(const nextGrade of ['green','purple']){
-    app.setSession(null,nextGrade);fields['dice-name'].value='新骰子';app.setPending(six);await app.importPending();
-    assert.equal(calls.at(-1).body.grade,nextGrade);assert.equal(calls.at(-1).body.composition,'faces');
+    app.reset();app.selectUploadGrade(nextGrade);assert.equal(app.state().grade,'green','Selecting a card changes only the upload target until a preview successfully loads');
+    fields['dice-name'].value='新骰子';app.setPending(six);await app.importPending();
+    assert.equal(calls.at(-1).body.grade,nextGrade);assert.equal(calls.at(-1).body.previewGrade,nextGrade);assert.equal(calls.at(-1).body.composition,'faces');assert.equal(calls.at(-1).body.mode,'all');assert.equal(calls.at(-1).body.point,1);
     assert.deepEqual(Array.from(calls.at(-1).body.files),six);assert.equal(app.state().pending.size,0);assert.equal(app.settingsDirty(),false);
+    assert.equal(app.state().grade,nextGrade);assert.equal(app.state().session.grade,nextGrade);assert.equal(app.state().uploadGrade,null);assert.equal(app.state().previewGrade,nextGrade);
+    assert.equal(app.state().session.candidate.kind,runtimeKind(nextGrade));assert.ok(app.state().session.resourceName.startsWith(`dice_${nextGrade}_`));
   }
-  checks.push('actual_controller_new_green_and_purple_six_face_imports_use_faces');
+  checks.push('actual_controller_successful_green_and_purple_source_imports_use_faces_and_commit_the_matching_animation_and_prefix');
+
   for(const composition of ['auto','digits']){
-    app.setSession(legacy(composition));assert.equal(app.settingsDirty(),false);assert.equal(app.settings().composition,composition);
+    app.reset(fixtureSession('purple',composition));assert.equal(app.settingsDirty(),false);assert.equal(app.settings().composition,composition);
     fields['dice-name'].value='已改名';assert.equal(app.settingsDirty(),true);await app.saveSettings();
     assert.equal(calls.at(-1).body.composition,composition);assert.equal(app.state().session.composition,composition);assert.equal(app.settingsDirty(),false);
-    app.setSession({...legacy(composition),mode:'single',point:6});app.setPending(six);await app.importPending();
+    assert.equal(app.state().session.grade,'purple');assert.equal(app.state().session.candidate.kind,'purple-gyro');
+    app.reset({...fixtureSession('purple',composition),mode:'single',point:6});app.selectUploadGrade('purple');app.setPending(six);await app.importPending();
     assert.equal(calls.at(-1).body.composition,'faces');assert.equal(calls.at(-1).body.mode,'all');assert.equal(calls.at(-1).body.point,1);
   }
   checks.push('actual_controller_legacy_auto_digits_are_clean_rename_preserves_composition_and_replacement_always_uses_faces');
-  const previous=legacy('digits');app.setSession(previous);app.setPending(six);
-  importFailure=Error('import rejected');await assert.rejects(()=>app.importPending(),error=>error===importFailure);
-  assert.equal(app.state().session,previous);assert.equal(app.state().pending.size,6);importFailure=null;
-  loadFailure=Error('renderer rejected');await assert.rejects(()=>app.importPending(),error=>error.key==='previewLoadFailed'&&error.cause===loadFailure);
-  assert.equal(app.state().session,previous);assert.equal(app.state().grade,'purple');assert.equal(app.state().pending.size,6);loadFailure=null;
-  checks.push('actual_controller_failed_import_or_renderer_load_preserves_previous_session_and_pending_sources');
-  app.clearCache();app.setPending([]);
-  const green={...legacy('faces'),id:'cached-green',grade:'green'},purple=legacy('auto');
-  await app.loadSession(green);await app.switchGrade('purple');assert.equal(app.state().session,null);assert.equal(app.settings().composition,'faces');
-  await app.loadSession(purple);const beforeSwitch=calls.length;
-  await app.switchGrade('green');assert.equal(app.state().session,green);assert.equal(app.settingsDirty(),false);
-  await app.switchGrade('purple');assert.equal(app.state().session,purple);assert.equal(app.settingsDirty(),false);assert.equal(app.settings().composition,'auto');assert.equal(calls.length,beforeSwitch);
-  checks.push('actual_controller_grade_cache_restores_each_composition_without_reimport_or_dirty_settings');
+
+  for(const previous of [null,fixtureSession('green')]){
+    app.reset(previous);app.selectUploadGrade('purple');fields['dice-name'].value='新紫色';app.setPending(six);const pending=app.state().pending;
+    importFailure=Error('import rejected');await assert.rejects(()=>app.importPending(),error=>error===importFailure);
+    assert.equal(app.state().session,previous);assert.equal(app.state().grade,'green');assert.equal(app.state().previewGrade,'green');assert.equal(app.state().pending,pending);assert.equal(app.state().pending.size,6);assert.equal(app.state().uploadGrade,'purple');importFailure=null;
+    loadFailure=Error('renderer rejected');await assert.rejects(()=>app.importPending(),error=>error.key==='previewLoadFailed'&&error.cause===loadFailure);
+    assert.equal(app.state().session,previous);assert.equal(app.state().grade,'green');assert.equal(app.state().previewGrade,'green');assert.equal(app.state().pending,pending);assert.equal(app.state().uploadGrade,'purple');assert.equal(app.state().rendererCandidate,previous?.candidate||null);assert.equal(app.state().hasCanvas,Boolean(previous));
+    assert.equal(renderCalls.at(-1).state.grade,'green','Even while the replacement renderer loads, the committed source remains the old grade');loadFailure=null;
+  }
+  checks.push('actual_controller_first_or_replacement_import_and_renderer_failures_preserve_committed_source_background_preview_and_pending_files');
+
+  for(const sourceGrade of ['green','purple']){
+    const original=fixtureSession(sourceGrade,sourceGrade==='purple'?'auto':'faces');app.reset(original);
+    for(const nextBackground of [sourceGrade==='green'?'purple':'green',sourceGrade]){
+      const prior=app.state().session,before=calls.length;await app.switchBackground(nextBackground);
+      assert.equal(calls.length,before+1);assert.deepEqual({...calls.at(-1).body},{expectedRevision:prior.revision,previewGrade:nextBackground});
+      const next=app.state().session;assert.equal(next.grade,sourceGrade);assert.equal(app.state().grade,sourceGrade);assert.equal(next.previewGrade,nextBackground);assert.equal(app.state().previewGrade,nextBackground);
+      for(const key of ['name','resourceName','composition','resolvedComposition','files','anchor','audio'])assert.equal(next[key],original[key],'Background switching retains '+key);
+      for(const key of ['kind','template','runtimeIdentity','json','geometry','atlas','texture','audio'])assert.equal(next.candidate[key],original.candidate[key],'Background switching cannot replace runtime '+key);
+      assert.equal(next.revision,prior.revision+1);assert.notEqual(next.candidate.id,prior.candidate.id);assert.equal(renderCalls.at(-1).type,'patch');assert.equal(app.state().uploadGrade,null);assert.equal(app.settingsDirty(),false);
+    }
+    const count=calls.length;await app.switchBackground(sourceGrade);await app.switchBackground('invalid');assert.equal(calls.length,count,'Same or invalid backgrounds do not issue writes');
+  }
+  checks.push('actual_controller_background_roundtrips_post_only_preview_grade_and_revision_preserving_source_animation_prefix_assets_and_metadata');
+
+  const original=fixtureSession('green'),extras=[Object.freeze({name:'anchor.png'}),Object.freeze({name:'dice_roll.mp3'})];app.reset(original);app.selectUploadGrade('purple');app.setPending(six.slice(0,2),extras);
+  fields['dice-name'].value='紫色草稿';fields['sound-enabled'].checked=false;const pending=app.state().pending,beforeDraft=calls.length,revokedBeforeBackground=revoked.length;
+  assert.throws(()=>app.selectUploadGrade('green'),error=>error.key==='finishPendingUpload');assert.equal(app.state().pending,pending);assert.equal(app.state().pending.size,2);assert.equal(app.state().uploadGrade,'purple');assert.equal(calls.length,beforeDraft);
+  await app.switchBackground('purple');assert.equal(calls.length,beforeDraft+1);assert.deepEqual({...calls.at(-1).body},{expectedRevision:original.revision,previewGrade:'purple'});
+  assert.equal(app.state().grade,'green');assert.equal(app.state().session.grade,'green');assert.equal(app.state().uploadGrade,'purple');assert.equal(app.state().pending,pending);assert.equal(app.state().extras,extras);
+  assert.equal(fields['dice-name'].value,'紫色草稿');assert.equal(fields['sound-enabled'].checked,false);assert.equal(audioChanges.at(-1),false,'Restoring the draft mute checkbox also restores the audio player state');assert.equal(revoked.length,revokedBeforeBackground,'Background-only updates keep all draft preview URLs alive');assert.deepEqual(Array.from(pending.values(),file=>file.original),six.slice(0,2));
+  const beforePartial=calls.length;await app.stageFiles([six[2]]);assert.equal(calls.length,beforePartial);assert.equal(app.state().pending.size,3);assert.equal(app.state().uploadGrade,'purple');assert.equal(app.state().session.candidate.kind,'six-face');
+  settingsFailure=Error('background write rejected');const beforeFailure=app.state().session;await assert.rejects(()=>app.switchBackground('green'),error=>error===settingsFailure);settingsFailure=null;
+  assert.equal(app.state().session,beforeFailure);assert.equal(app.state().previewGrade,'purple');assert.equal(app.state().pending,pending);assert.equal(fields['dice-name'].value,'紫色草稿');assert.equal(fields['sound-enabled'].checked,false);
+  patchFailure=Error('background image rejected');await assert.rejects(()=>app.switchBackground('green'),error=>error===patchFailure);patchFailure=null;
+  const committedFailure=app.state().session;assert.equal(committedFailure.id,beforeFailure.id);assert.equal(committedFailure.revision,beforeFailure.revision+1);assert.equal(committedFailure.previewGrade,'green');assert.equal(committedFailure.grade,'green');assert.equal(committedFailure.resourceName,beforeFailure.resourceName);
+  assert.equal(app.state().rendererCandidate,beforeFailure.candidate,'The last complete rendered frame is retained after the server already accepted the background change');assert.equal(app.state().previewReady,false,'The retained old frame cannot be exported as the newly committed background');assert.equal(app.state().hasCanvas,true);
+  assert.equal(app.state().pending,pending);assert.equal(app.state().uploadGrade,'purple');assert.equal(fields['dice-name'].value,'紫色草稿');assert.equal(fields['sound-enabled'].checked,false);assert.equal(audioChanges.at(-1),false);assert.equal(revoked.length,revokedBeforeBackground);
+  await app.switchBackground('purple');assert.deepEqual({...calls.at(-1).body},{expectedRevision:committedFailure.revision,previewGrade:'purple'});assert.equal(app.state().previewReady,true);assert.equal(renderCalls.at(-1).type,'load','A failed presentation reloads safely rather than reusing the stale frame');assert.equal(app.state().rendererCandidate,app.state().session.candidate);assert.equal(audioChanges.at(-1),false);
+  const recovered=app.state().session;app.releasePending();assert.equal(app.state().uploadGrade,null);assert.equal(app.state().pending.size,0);assert.equal(app.state().grade,'green');assert.equal(app.state().session,recovered);
+  checks.push('actual_controller_partial_source_mixing_is_rejected_and_background_success_or_failure_keeps_draft_audio_and_current_revision_for_safe_reload');
 }
 console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Mock DOM/Event/FileList, UploadPaste registration and actual preview controller contracts; native clipboard, file/directory pickers, rendering and browser layout require real browser QA.'},null,2));

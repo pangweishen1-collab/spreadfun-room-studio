@@ -8,7 +8,8 @@ export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) =>
 export const GREEN_SLOTS = Array.from({length:6},(_,i)=>`sz_${i+1}`);
 export const VIDEO_PROFILE = VIDEO_SPEC.profile;
 const REGIONS = ['1', '2', 'anchor', ...Array.from({length:6}, (_, i) => `sz_${i+1}`)];
-const SETTING_KEYS = ['name', 'grade', 'mode', 'point', 'composition', 'soundEnabled'];
+const SETTING_KEYS = ['name', 'grade', 'previewGrade', 'mode', 'point', 'composition', 'soundEnabled'];
+const settingValue=(record,key)=>key==='soundEnabled'?record[key]!==false:key==='previewGrade'?(record.previewGrade||record.grade):record[key];
 const MAX_PNG = 12 * 1024 * 1024;
 const SOUND_NAMES=['dice_roll','sound_ui_dice6'];
 const DEFAULT_AUDIO=Object.fromEntries(SOUND_NAMES.map(name=>[name,`/dice/assets/audio/${name}.mp3`]));
@@ -65,10 +66,11 @@ export function validateFiles(entries) {
 
 export function validateSettings(payload, previous={name:'骰子预览',grade:'green',mode:'all',point:1,composition:'auto',soundEnabled:true}) {
   if (!payload || typeof payload!=='object' || Array.isArray(payload)) throw new PreviewError('请求内容需要是对象');
-  const result=Object.fromEntries(SETTING_KEYS.map(k=>[k,Object.hasOwn(payload,k)?payload[k]:k==='soundEnabled'?(previous[k]??true):previous[k]]));
+  const result=Object.fromEntries(SETTING_KEYS.map(k=>[k,Object.hasOwn(payload,k)?payload[k]:k==='soundEnabled'?(previous[k]??true):k==='previewGrade'?(previous.previewGrade??payload.grade??previous.grade):previous[k]]));
   if(typeof result.name!=='string' || !result.name.trim() || result.name.trim().length>80) throw new PreviewError('请填写 1～80 字的预览名称');
   result.name=result.name.trim();
   if(!['green','purple'].includes(result.grade)) throw new PreviewError('请选择绿色或紫色等级背景');
+  if(!['green','purple'].includes(result.previewGrade)) throw new PreviewError('请选择绿色或紫色预览背景');
   if(!['all','single','continuous'].includes(result.mode)) throw new PreviewError('预览模式需为 all、single 或 continuous');
   if(!Number.isInteger(result.point) || result.point<1 || result.point>6) throw new PreviewError('点数需为 1～6 的整数');
   if(!['auto','faces','digits'].includes(result.composition)) throw new PreviewError('素材类型需为 auto、faces 或 digits');
@@ -360,7 +362,7 @@ export function createLocalPreview(dependencies={}) {
     const runtimeKey=generated?(record.runtime.kind+'/'+(record.runtime.metadata?.motionVersion||'legacy')+
       (record.runtime.kind==='purple-gyro'?'/'+record.resolvedComposition:'')):record.resolvedComposition;
     const icon=png['大骰子']||null;png.anchor??=anchor.url;
-    const candidate={id:record.candidateId,version:record.revision,name:record.name,template:record.grade,previewGrade:record.grade,
+    const candidate={id:record.candidateId,version:record.revision,name:record.name,template:record.grade,previewGrade:settingValue(record,'previewGrade'),
       kind:generated?record.runtime.kind:'template',...(generated?{json:record.runtime.json,geometry:record.runtime.geometry,warnings:record.runtime.warnings||[]}:{skel:dependencies.templateURL||'/dice/assets/template.skel'}),
       atlasPage:record.runtime.atlasPage||'preview.png',
       atlas:url(`${record.id}/runtime/${runtimeKey}/atlas`,new Blob([record.runtime.atlasText],{type:'text/plain'})),
@@ -368,7 +370,7 @@ export function createLocalPreview(dependencies={}) {
     let video=null;
     if(validVideo(record.video,record)) {const {blob,...metadata}=record.video;video={...metadata,url:url(`${record.id}/video/${metadata.sha256}`,blob)};}
     const videoAvailable=dependencies.videoAvailable??Boolean(globalThis.VideoEncoder||globalThis.MediaRecorder);
-    return {id:record.id,revision:record.revision,resourceName:resourceName(record.name,record.grade),...Object.fromEntries(SETTING_KEYS.map(k=>[k,k==='soundEnabled'?record[k]!==false:record[k]])),
+    return {id:record.id,revision:record.revision,resourceName:resourceName(record.name,record.grade),...Object.fromEntries(SETTING_KEYS.map(k=>[k,settingValue(record,k)])),
       created:record.created,files,candidate,video,videoAvailable,videoUnavailableReason:videoAvailable?null:'当前浏览器不支持视频导出，请使用 Chrome',
       resolvedComposition:record.resolvedComposition,compositionDetection:record.compositionDetection,
       kind:candidate.kind,warnings:record.runtime.warnings||[],anchor,audio:audioFiles,audioURLs:audio,
@@ -432,7 +434,7 @@ export function createLocalPreview(dependencies={}) {
     if(settings.grade!==record.grade)throw new PreviewError(settings.grade==='green'?'绿色等级需要上传六张完整骰面':'紫色等级需要上传六张完整骰面',409,
       {needsUpload:true,grade:settings.grade,required:GREEN_SLOTS.map(slot=>slot+'.png')});
     if(record.runtime.kind==='six-face'&&settings.composition==='digits')throw new PreviewError('绿色六面需要完整骰面，请选择 faces 或 auto');
-    if(SETTING_KEYS.every(k=>settings[k]===(k==='soundEnabled'?record[k]!==false:record[k])))return publicSession(record);
+    if(SETTING_KEYS.every(k=>settings[k]===settingValue(record,k)))return publicSession(record);
     const detection=record.runtime.kind==='six-face'?{resolvedComposition:'faces',compositionDetection:record.compositionDetection}:detectComposition(record.files,settings.composition);
     const next={...record,...settings,revision:record.revision+1,candidateId:uuid(),...detection};
     if(next.resolvedComposition!==record.resolvedComposition)next.runtime=generatedRuntime(record.runtime)

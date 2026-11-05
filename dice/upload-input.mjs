@@ -1,7 +1,9 @@
 // Both upload surfaces share the existing file validation and clipboard parser.
 export function bindDiceUploads({primaryZone, replacementZone, input, primaryButton,
-  replacementButton, isBusy, hasPreview, onFiles, isActive = () => true,
-  onDirectory, onError, folderInput, primaryFolderButton, replacementFolderButton, onEmptyFolder = () => {},
+  replacementButton, primaryButtons = [primaryButton], replacementButtons = [replacementButton],
+  isBusy, hasPreview, onFiles, isActive = () => true, onTarget,
+  onDirectory, onError, folderInput, primaryFolderButton, replacementFolderButton,
+  primaryFolderButtons = [primaryFolderButton], replacementFolderButtons = [replacementFolderButton], onEmptyFolder = () => {},
   paste = window.UploadPaste, document = window.document}) {
   const cleanups = [];
   const listen = (node, type, handler) => {
@@ -15,18 +17,27 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
   const hasFiles = event => Array.from(event.dataTransfer?.types || []).includes('Files')
     || Boolean(event.dataTransfer?.files?.length);
   const clearHover = zone => zone.classList.remove('upload-hover', 'is-dragging');
-  for (const [zone, button, active] of [
-    [primaryZone, primaryButton, () => isActive() && !hasPreview()],
-    [replacementZone, replacementButton, isActive],
+  const selectTarget = (event, zone, active) => {
+    if (!active() || isBusy()) return false;
+    try { return onTarget?.(event, zone) !== false; }
+    catch (error) { if (onError) { onError(error); return false; } throw error; }
+  };
+  for (const [zone, buttons, folderButtons, active] of [
+    [primaryZone, primaryButtons, primaryFolderButtons, () => isActive() && !hasPreview()],
+    [replacementZone, replacementButtons, replacementFolderButtons, isActive],
   ]) {
-    const choose = () => { if (active() && !isBusy()) input.click(); };
-    listen(button, 'click', event => { event.stopPropagation(); choose(); });
+    const choose = event => { if (selectTarget(event, zone, active)) input.click(); };
+    for (const button of new Set(buttons || [])) if (button)
+      listen(button, 'click', event => { event.stopPropagation(); choose(event); });
     listen(zone, 'click', event => {
-      if (!event.target.closest('button,input')) choose();
+      if (!event.target.closest('button,input')) choose(event);
     });
     listen(zone, 'keydown', event => {
-      if (event.target === zone && active() && !isBusy() && ['Enter', ' '].includes(event.key)) {
-        event.preventDefault(); choose();
+      const card = event.target.closest('[data-upload-grade]');
+      const focusedCard = card === event.target && zone.contains(card) && card.getAttribute('tabindex') === '0'
+        && !card.closest('button,input');
+      if ((event.target === zone || focusedCard) && active() && !isBusy() && ['Enter', ' '].includes(event.key)) {
+        event.preventDefault(); choose(event);
       }
     });
     listen(zone, 'dragover', event => {
@@ -41,6 +52,7 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
       clearHover(zone);
       if (!active() || isBusy()) return;
       const transfer=event.dataTransfer;
+      if (!hasFiles(event) || !selectTarget(event, zone, active)) return;
       if (Array.from(transfer?.items || []).some(item=>item.webkitGetAsEntry?.()?.isDirectory)) {
         if (onDirectory) return onDirectory(()=>readDropFiles(transfer));
         return readDropFiles(transfer).then(importFiles).catch(error=>onError ? onError(error) : Promise.reject(error));
@@ -48,8 +60,17 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
       return importFiles(transfer?.files);
     });
     const unregister = paste?.register({zone, isActive:active, isBusy,
-      onFiles:files => active() ? importFiles(files) : undefined});
+      onFiles:value => {
+        if (!active() || isBusy()) return;
+        const files=Array.from(value || []);
+        if (files.length && selectTarget(undefined, zone, active)) return importFiles(files);
+      }});
     if (unregister) cleanups.push(unregister);
+    if (folderInput) for (const button of new Set(folderButtons || [])) if (button)
+      listen(button, 'click', event => {
+        event.stopPropagation();
+        if (selectTarget(event, zone, active)) folderInput.click();
+      });
   }
   listen(input, 'change', () => {
     const files = Array.from(input.files || []);
@@ -57,13 +78,6 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
     return importFiles(files);
   });
   if (folderInput) {
-    for (const [button, active] of [
-      [primaryFolderButton, () => isActive() && !hasPreview()],
-      [replacementFolderButton, isActive],
-    ]) if (button) listen(button, 'click', event => {
-      event.stopPropagation();
-      if (active() && !isBusy()) folderInput.click();
-    });
     listen(folderInput, 'change', () => {
       // Directory pickers include sidecar files; PNGs retain their original names.
       const files = Array.from(folderInput.files || []);

@@ -1,5 +1,14 @@
 # 更新记录
 
+## 1.14.0 - 2026-11-05
+
+### Dice upload grade and preview backgrounds
+
+- Split the empty preview into green and purple upload areas. Choose the source grade before file, folder, drop or paste imports; keep complete-six-face validation and incremental uploads. Green generates cube roll; purple generates tilted gyro 05.
+- Separate preview backgrounds from source grade. Changing backgrounds reuses the current runtime and playback, preserves native animation, PNGs, anchor, audio and resource prefix, and invalidates only the prior video. Remove stale per-grade session caches.
+- Increase the loaded preview to a 400px-wide, aspect-preserved phone canvas. Retain compact grade-specific replacement controls after upload, including keyboard and clipboard support.
+- Preserve partial drafts and mute state through background changes, reject mixed-grade partial uploads, and retain current revision after a failed background load so preview retry remains usable.
+
 ## 1.13.2 - 2026-11-05
 
 ### Dice preview scale and controls

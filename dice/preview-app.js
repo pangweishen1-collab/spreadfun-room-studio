@@ -8,11 +8,11 @@ import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/d
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
-let session = null, pending = new Map(), grade = 'green', busy = false;
+let session = null, pending = new Map(), grade = 'green', uploadGrade = null, previewGrade = 'green', busy = false;
 let renderer = null, previewReady = false, hasCanvas = false, loadingPreview = false;
 let activity = null, notice = null, currentError = null, toastTimer;
 let embedded = null, audioWarning='', audioSignature='';
-const gradeSessions = new Map(), audio = new DiceAudio();
+const audio = new DiceAudio();
 const requiredSlots = () => GREEN_SLOTS;
 let greenExtras = [];
 function greenSlot(file) {
@@ -27,7 +27,7 @@ function syncRound(status) {
 
 function issue(key, values) { return Object.assign(new Error(key), {key, values}); }
 function settings() {
-  return {name:$('dice-name').value.trim(), grade, mode:'all',
+  return {name:$('dice-name').value.trim(), grade, previewGrade, mode:'all',
     point:1, composition:grade === 'green' ? 'faces' : session?.composition || 'faces', soundEnabled:$('sound-enabled').checked};
 }
 function settingsDirty() {
@@ -42,14 +42,14 @@ function currentVideo(video = session?.video) {
 }
 function fillSettings(value) {
   $('dice-name').value = value.name;
-  grade = value.grade;
+  grade = value.grade; previewGrade = value.previewGrade || value.grade;
   $('preview-mode').value = 'all';
   $('preview-point').value = '1';
   $('sound-enabled').checked = value.soundEnabled !== false; audio.setEnabled(value.soundEnabled !== false);
 }
-function releasePending() {
+function releasePending(resetTarget = true) {
   pending.forEach(file => URL.revokeObjectURL(file.previewUrl));
-  pending = new Map(); greenExtras = [];
+  pending = new Map(); greenExtras = []; if (resetTarget) uploadGrade = null;
 }
 const api = localApi;
 const post = (path, body) => api(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
@@ -106,10 +106,13 @@ function render() {
   document.querySelector('.preview-card').dataset.hasCanvas = String(hasCanvas);
   $('preview-empty').setAttribute('aria-busy', String(locked));
   $('preview-empty').setAttribute('aria-disabled', String(locked));
-  $('choose-files').disabled = locked; $('res-file-input').disabled = locked;
-  $('choose-preview-files').disabled = locked;
-  ['choose-preview-folder','choose-folder','res-folder-input'].forEach(id => { $(id).disabled = locked; });
-  $('choose-files').querySelector('span').textContent = t('replaceFiles');
+  ['choose-files','choose-folder','choose-purple-files','choose-purple-folder','choose-preview-files','choose-preview-folder','choose-preview-purple-files','choose-preview-purple-folder','res-file-input','res-folder-input'].forEach(id => { $(id).disabled = locked; });
+  $('upload-zone').hidden = !hasCanvas;
+  $('background-field').hidden = !session;
+  document.querySelectorAll('[data-upload-grade]').forEach(card => {
+    card.classList.toggle('is-selected', card.dataset.uploadGrade === (draft ? uploadGrade : session?.grade));
+    card.setAttribute('aria-disabled', String(locked));
+  });
   $('pending-actions').hidden = !draft;
   $('import-preview').disabled = locked || requiredSlots().some(slot=>!pending.has(slot));
   $('clear-pending').disabled = locked;
@@ -118,12 +121,11 @@ function render() {
   $('preview-point').disabled = locked || $('preview-mode').value !== 'single';
   $('sound-enabled').disabled = locked;
   $('audio-warning').textContent=audioWarning; $('audio-warning').hidden=!audioWarning;
-  $('preview-empty').querySelector('h3').textContent = t(grade === 'green' ? 'greenEmptyTitle' : 'previewEmptyTitle');
   $('asset-grid').setAttribute('aria-label',t(grade === 'green' ? 'greenAssetStatus' : 'assetStatus'));
   $('hero-hint').hidden=!session || Boolean(session.candidate.icon);
   $('hero-hint').textContent=t('missingHero');
-  document.querySelectorAll('[data-grade]').forEach(button => {
-    const active = button.dataset.grade === grade;
+  document.querySelectorAll('[data-preview-grade]').forEach(button => {
+    const active = button.dataset.previewGrade === previewGrade;
     button.disabled = locked; button.classList.toggle('is-active', active); button.setAttribute('aria-pressed', String(active));
   });
   $('apply-settings').hidden = !dirty || draft;
@@ -139,12 +141,10 @@ function render() {
   $('error-message').textContent = currentError ? errorText(currentError) : '';
   $('preview-loading').hidden = !loadingPreview || hasCanvas;
   $('preview-empty').hidden = hasCanvas;
-  $('preview-empty').querySelector('.feedback-image').src = '/dice/assets/fun-toolkit/assets/feedback/' + (currentError ? 'empty-error.svg' : 'empty-upload.svg');
-  $('preview-empty').querySelector('h3').textContent = t(currentError ? 'previewErrorTitle' : grade === 'green' ? 'greenEmptyTitle' : 'previewEmptyTitle');
-  $('preview-empty').querySelector('p').textContent = currentError ? errorText(currentError) : t('previewEmptyHint');
+  $('preview-empty').querySelectorAll('.feedback-image').forEach(image => { image.src = '/dice/assets/fun-toolkit/assets/feedback/' + (currentError ? 'empty-error.svg' : 'empty-upload.svg'); });
   $('game-canvas').hidden = !hasCanvas;
   $('preview-stage').dataset.state = loadingPreview ? 'processing' : previewReady ? 'ready' : currentError ? 'error' : 'idle';
-  $('session-meta').textContent = session ? t(session.grade === 'purple' ? 'purpleBackground' : 'greenBackground') : t('notLoaded');
+  $('session-meta').textContent = session ? t(previewGrade === 'purple' ? 'purpleBackground' : 'greenBackground') : t('notLoaded');
   const missing = requiredSlots().filter(slot => !pending.has(slot));
   const uploadStatus = $('upload-status');
   uploadStatus.dataset.state = draft ? 'pending' : 'success';
@@ -178,16 +178,16 @@ async function loadSession(next, reusePresentation = false) {
   }
   if (reusePresentation && renderer && previewReady && hasCanvas
     && await renderer.patchPresentation(next.candidate)) {
-    session = next; gradeSessions.set(next.grade,next); fillSettings(next); render();
+    session = next; fillSettings(next); render();
     return;
   }
   const previous = session;
-  fillSettings(next); previewReady = false;
+  previewReady = false;
   loadingPreview = true; render();
   try {
     if (!renderer) throw issue('rendererFailed');
     await renderer.load(next.candidate);
-    session = next; gradeSessions.set(next.grade,next);
+    session = next; fillSettings(next);
     audio.setEnabled(next.soundEnabled !== false && !audioWarning);
     renderer.configure(next.mode, next.point);
     previewReady = true; hasCanvas = true;
@@ -204,7 +204,8 @@ async function loadSession(next, reusePresentation = false) {
 }
 async function importPending() {
   if (requiredSlots().some(slot=>!pending.has(slot))) throw issue(grade === 'green' ? 'greenIncomplete' : 'incompleteFiles');
-  const values = {...settings(), composition:'faces'};
+  if (!['green','purple'].includes(uploadGrade)) throw issue('chooseUploadGrade');
+  const values = {...settings(), grade:uploadGrade, previewGrade:uploadGrade, composition:'faces'};
   if (!values.name || values.name.length > 80) throw issue('nameRequired');
   activity = {key:'buildingPreview'}; render();
   const next=await api('/api/preview/import', {method:'POST',body:{...values,files:[...[...pending.values()].map(f=>f.original),...greenExtras]}});
@@ -217,7 +218,7 @@ async function stageFiles(files) {
       .filter(part=>/^dice_(?:green|purple)_.+/i.test(part)));
     if(folders.size===1)$('dice-name').value=[...folders][0];
   }
-  if (files.length===1 && /^(?:大骰子|icon)\.png$/i.test(files[0].name.normalize('NFKC').trim()) && session && !pending.size) {
+  if (files.length===1 && /^(?:大骰子|icon)\.png$/i.test(files[0].name.normalize('NFKC').trim()) && session && uploadGrade === session.grade && !pending.size) {
     const next=await api(`/api/preview/${session.id}/hero`,{method:'POST',body:{expectedRevision:session.revision,file:files[0]}});
     await loadSession(next,true); toast('heroUpdated'); return;
   }
@@ -260,8 +261,9 @@ async function exportVideo() {
 }
 function bindUploads() {
   bindDiceUploads({primaryZone:$('preview-empty'), replacementZone:$('upload-zone'),
-    primaryButton:$('choose-preview-files'), replacementButton:$('choose-files'), input:$('res-file-input'),
-    folderInput:$('res-folder-input'), primaryFolderButton:$('choose-preview-folder'), replacementFolderButton:$('choose-folder'),
+    primaryButtons:[$('choose-preview-files'),$('choose-preview-purple-files')], replacementButtons:[$('choose-files'),$('choose-purple-files')], input:$('res-file-input'),
+    folderInput:$('res-folder-input'), primaryFolderButtons:[$('choose-preview-folder'),$('choose-preview-purple-folder')], replacementFolderButtons:[$('choose-folder'),$('choose-purple-folder')],
+    onTarget:(event) => selectUploadGrade(event?.target?.closest?.('[data-upload-grade]')?.dataset.uploadGrade || document.activeElement?.closest?.('[data-upload-grade]')?.dataset.uploadGrade || uploadGrade || session?.grade),
     onDirectory:provider => run('readingFiles',async()=>stageFiles(await provider())),
     onError:error => run(null,()=>{throw error;}),
     onEmptyFolder:() => run(null, () => { throw issue('folderEmpty'); }),
@@ -269,18 +271,31 @@ function bindUploads() {
 }
 function importFiles(value) {
   const files = Array.from(value || []);
+  if (files.length && !uploadGrade) {
+    try { selectUploadGrade(session?.grade); } catch(error) { return run(null,()=>{throw error;}); }
+  }
   if (files.length) { void audio.unlock().catch(()=>{}); return run('readingFiles', () => stageFiles(files)); }
 }
-async function switchGrade(nextGrade) {
-  const beforeGrade=grade, before=session;
-  if (session) gradeSessions.set(grade,session);
-  releasePending(); grade=nextGrade; audio.stop();
-  const stored=gradeSessions.get(grade);
-  try {
-    if (stored) await loadSession(stored);
-    else { session=null; previewReady=false; hasCanvas=false; renderer?.clear(); $('dice-name').value=''; $('sound-enabled').checked=true; audio.setEnabled(true); audioWarning=''; }
-    currentError=null; notice=null; render();
-  } catch(error) { grade=beforeGrade;session=before;if(before)fillSettings(before);throw error; }
+function selectUploadGrade(nextGrade) {
+  if (!['green','purple'].includes(nextGrade)) throw issue('chooseUploadGrade');
+  if (pending.size && uploadGrade && uploadGrade !== nextGrade) throw issue('finishPendingUpload');
+  uploadGrade = nextGrade;
+  currentError = null; render();
+  return true;
+}
+async function switchBackground(nextGrade) {
+  if (!session || !['green','purple'].includes(nextGrade) || previewGrade === nextGrade) return;
+  const draft = pending.size ? {name:$('dice-name').value, soundEnabled:$('sound-enabled').checked} : null;
+  const hadVideo = Boolean(currentVideo());
+  const next = await post(`/api/preview/${session.id}/settings`, {expectedRevision:session.revision, previewGrade:nextGrade});
+  try { await loadSession(next, true); }
+  catch (error) {
+    // Settings already committed: keep its revision for a safe retry while retaining the last frame.
+    session = next; fillSettings(next); previewReady = false; audio.stop();
+    throw error;
+  }
+  finally { if (draft) { $('dice-name').value=draft.name; $('sound-enabled').checked=draft.soundEnabled; audio.setEnabled(draft.soundEnabled && !audioWarning); } }
+  notice = hadVideo && !next.video ? {key:'videoInvalidated'} : null;
 }
 async function stageGreen(files) {
   const usable=files.filter(file=> !(file.webkitRelativePath||file.name).split(/[/\\]/).some(part=>part.startsWith('.')));
@@ -295,10 +310,10 @@ async function stageGreen(files) {
     chosen.push([slot,matches[0]]);
   }
   if(!chosen.length)throw issue('greenIncomplete');
-  if(chosen.length===6)releasePending();
+  if(chosen.length===6)releasePending(false);
   const selected=new Set(chosen.map(([,file])=>file));
   const extras=usable.filter(f=>!selected.has(f) && (/^(?:icon|大骰子|sz_?0|anchor)\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(f.name.normalize('NFKC').trim())
-    ||grade==='purple'&&/^[12]\.png$/i.test(f.name.normalize('NFKC').trim())));
+    ||uploadGrade==='purple'&&/^[12]\.png$/i.test(f.name.normalize('NFKC').trim())));
   greenExtras.push(...extras);
   for(const [slot,file]of chosen) {
     const old=pending.get(slot);if(old)URL.revokeObjectURL(old.previewUrl);
@@ -325,7 +340,7 @@ $('close-author').addEventListener('click', () => $('author-dialog').close());
 $('dice-name').addEventListener('input', () => { if (!busy) render(); });
 $('dice-name').addEventListener('change', settingsChanged);
 ['preview-mode','preview-point','sound-enabled'].forEach(id => $(id).addEventListener('change', settingsChanged));
-document.querySelectorAll('[data-grade]').forEach(button => button.addEventListener('click', () => { if (!busy && grade!==button.dataset.grade) return run(null,()=>switchGrade(button.dataset.grade)); }));
+document.querySelectorAll('[data-preview-grade]').forEach(button => button.addEventListener('click', () => { if (!busy && previewGrade!==button.dataset.previewGrade) return run(null,()=>switchBackground(button.dataset.previewGrade)); }));
 $('apply-settings').addEventListener('click', () => run('updatingSettings', saveSettings));
 $('import-preview').addEventListener('click', () => run('buildingPreview', importPending));
 $('clear-pending').addEventListener('click', () => { if (busy) return; releasePending(); if (session) fillSettings(session); currentError=null; notice=null; toast('replacementCancelled'); render(); });

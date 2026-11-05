@@ -283,7 +283,7 @@ export class GameRenderer {
 
     const all = this.mode === 'all';
     const selected = this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target;
-    const presentationGain = purple ? purplePresentationGain(time) : 1;
+    const presentationGain = this.candidate.template === 'purple' ? purplePresentationGain(time) : 1;
     if (gpu) this.scene.begin();
     for (let index = 0; index < (all ? 6 : 1); index++) {
       const skeleton = this.skeletons[index];
