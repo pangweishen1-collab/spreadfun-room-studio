@@ -115,7 +115,7 @@ function render() {
     card.classList.toggle('is-selected', card.dataset.uploadGrade === (draft ? uploadGrade : session?.grade));
     card.setAttribute('aria-disabled', String(locked));
   });
-  const canRetry = draft && !locked && Boolean(currentError) && requiredSlots().every(slot=>pending.has(slot));
+  const canRetry = draft && !locked && requiredSlots().every(slot=>pending.has(slot));
   $('pending-actions').hidden = !draft || locked;
   $('import-preview').hidden = !canRetry;
   $('import-preview').disabled = !canRetry;
