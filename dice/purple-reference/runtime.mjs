@@ -5,7 +5,7 @@ import {settlingGain} from './presentation.mjs';
 import {Proxy3DRenderer} from './proxy-3d.mjs';
 import {encodeAtlasPng} from './atlas-png.mjs';
 
-export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-60fps-v2-png';
+export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-60fps-v3-png';
 const atlasPage = 'dice.png';
 const points = [1, 2, 3, 4, 5, 6];
 const fps = 60;
@@ -224,7 +224,7 @@ function shadowRegion(baseSize, canvases) {
 const jobs = frameTimes.filter(time=>time<MOTION.rollEnd)
   .flatMap(time=>(time<frontSwitch?[0]:points).map(point=>({time,point})));
 
-const motionColors = Uint8Array.from({length:256}, (_, channel) => Math.round(channel / 5) * 5);
+const motionColors = Uint8Array.from({length:256}, (_, channel) => Math.round(channel / 7) * 7);
 
 async function captureExposures(renderer, baseSize, signal) {
   const size=baseSize*renderer.displayScale;
@@ -233,14 +233,16 @@ async function captureExposures(renderer, baseSize, signal) {
     checkAbort(signal);
     const image=exposurePixels(renderer,time,point);
     const frame=trimRegion(frameName(time,point),image,size,size);
-    // Group nearly identical colors in rolling frames so PNG compresses them better.
-    // Keep alpha, transparent padding and the separately packed landing faces exact.
+    // Round only the rolling regions to a smaller set of RGBA values.
+    // The channel error is at most 3/255 and the alpha endpoints stay exact.
     const pixels=frame.pixels;
     for (let offset=0;offset<pixels.length;offset+=4) {
-      if (pixels[offset+3]===0) continue;
+      const alpha=pixels[offset+3];
+      if (alpha===0) continue;
       pixels[offset]=motionColors[pixels[offset]];
       pixels[offset+1]=motionColors[pixels[offset+1]];
       pixels[offset+2]=motionColors[pixels[offset+2]];
+      if (alpha!==255) pixels[offset+3]=Math.max(1,motionColors[alpha]);
     }
     frames.push(frame);
     if (index%4===0) await pause();
