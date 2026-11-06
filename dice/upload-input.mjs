@@ -1,3 +1,8 @@
+const isDiceFileName = name => /\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(name.normalize('NFKC').trim());
+const skipEntry = name => name.startsWith('.') || name === '__MACOSX';
+const directoryPaths = new WeakMap();
+export const diceFilePath = file => directoryPaths.get(file) || file.webkitRelativePath || '';
+
 // Both upload surfaces share the existing file validation and clipboard parser.
 export function bindDiceUploads({primaryZone, replacementZone, input, primaryButton,
   replacementButton, primaryButtons = [primaryButton], replacementButtons = [replacementButton],
@@ -83,8 +88,8 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
       const files = Array.from(folderInput.files || []);
       folderInput.value = '';
       if (!isActive() || isBusy() || !files.length) return;
-      const pngs = files.filter(file => /\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(file.name.normalize('NFKC').trim())
-        && !(file.webkitRelativePath || file.name).split(/[/\\]/).some(part => part.startsWith('.')));
+      const pngs = files.filter(file => isDiceFileName(file.name)
+        && !(file.webkitRelativePath || file.name).split(/[/\\]/).some(skipEntry));
       return pngs.length ? importFiles(pngs) : onEmptyFolder();
     });
   }
@@ -98,24 +103,37 @@ export function bindDiceUploads({primaryZone, replacementZone, input, primaryBut
   };
 }
 
+const bounded = operation => new Promise((resolve,reject)=>{
+  const timer=setTimeout(()=>reject(new Error('文件夹读取超时，请重新选择素材目录')),8000);
+  operation.then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
+});
+
+async function readEntryFiles(entries, read) {
+  const files=[];
+  // Preserve directory order and duplicate names while overlapping filesystem reads.
+  for(let offset=0;offset<entries.length;offset+=8) {
+    files.push(...await Promise.all(entries.slice(offset,offset+8).map(entry=>bounded(read(entry)))));
+  }
+  return files.filter(file=>isDiceFileName(file.name));
+}
+
 // Read all directory pages, with one bound shared by file and directory entries.
 export async function readDropFiles(transfer) {
-  const files=[], roots=Array.from(transfer.items||[]).map(item=>item.webkitGetAsEntry?.()).filter(Boolean);
+  const entries=[], roots=Array.from(transfer.items||[]).map(item=>item.webkitGetAsEntry?.()).filter(Boolean);
   if (!roots.length) return Array.from(transfer.files||[]);
   let count=0;
-  const bounded = operation => new Promise((resolve,reject)=>{
-    const timer=setTimeout(()=>reject(new Error('文件夹读取超时，请重新选择素材目录')),8000);
-    operation.then(value=>{clearTimeout(timer);resolve(value);},error=>{clearTimeout(timer);reject(error);});
-  });
   const visit = async entry => {
     if (++count>512) throw new Error('文件夹内容过多，请直接选择这一套骰子素材目录');
-    if (entry.name.startsWith('.') || entry.name==='__MACOSX') return;
-    if (entry.isFile) files.push(await bounded(new Promise((resolve,reject)=>entry.file(resolve,reject))));
-    else if (entry.isDirectory) {
+    if (skipEntry(entry.name)) return;
+    if (entry.isFile && isDiceFileName(entry.name)) entries.push(entry);
+    if (entry.isDirectory) {
       const reader=entry.createReader();
       for (;;) { const page=await bounded(new Promise((resolve,reject)=>reader.readEntries(resolve,reject))); if(!page.length) break; for(const child of page) await visit(child); }
     }
   };
   for (const root of roots) await visit(root);
-  return files.filter(file=>/\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(file.name.normalize('NFKC').trim()));
+  return readEntryFiles(entries,entry=>new Promise((resolve,reject)=>entry.file(file=>{
+    if(entry.fullPath)directoryPaths.set(file,entry.fullPath);
+    resolve(file);
+  },reject)));
 }

@@ -421,25 +421,41 @@ export function createLocalPreview(dependencies={}) {
     const importWarnings=[...(entries.warnings||[])];
     if(settings.grade==='green'&&settings.composition==='digits')throw new PreviewError('绿色六面需要完整骰面，请选择 faces 或 auto');
     const needsFaceAlpha=settings.grade==='purple'&&settings.composition==='auto'&&entries.some(entry=>entry.slot==='sz_0');
-    let totalBytes=0;
-    for(const entry of entries) {
+    const inspect=async entry=>{
+      const blob=await originalBlob(entry);
+      if(!blob.size||blob.size>MAX_PNG)throw new PreviewError(`${entry.name}：PNG 大小不合法`);
+      const bytes=new Uint8Array(await blob.arrayBuffer());
       aborted();
-      const optional=['大骰子','sz_0','1','2'].includes(entry.slot)&&!(settings.grade==='purple'&&settings.composition==='digits'&&entry.slot==='sz_0');
-      try{
-      const blob=await originalBlob(entry),bytes=new Uint8Array(await blob.arrayBuffer());
       const dimensions=inspectPNG(bytes,entry.slot,entry.name,{flexible:true});
-      if(totalBytes+blob.size>48*1024*1024)throw new PreviewError('所选 PNG 合计不能超过48 MiB');
       let alphaArea=settings.grade==='purple'&&GREEN_SLOTS.includes(entry.slot)?null:0;
       // Explicit full faces are decoded and validated by the native generator.
       // Only automatic composition with a base needs a second alpha-area read.
       if(!GREEN_SLOTS.includes(entry.slot)||needsFaceAlpha){
         const image=await decode(blob,entry.name,{allowEmpty:entry.slot==='anchor'});try{alphaArea=image.alphaArea;}finally{image.close?.();}
       }
-      files.push({name:entry.name,slot:entry.slot,blob,...dimensions,alphaArea,sha256:await hash(blob,bytes)});
-      totalBytes+=blob.size;
-      }catch(error){
-        if(!optional||error.name==='AbortError')throw error;
-        importWarnings.push(`${entry.name}：${error.message||'可选素材无法读取'}；已忽略${entry.slot==='大骰子'?'并使用主题面或第1面作为封面':''}`);
+      aborted();
+      return {name:entry.name,slot:entry.slot,blob,...dimensions,alphaArea,sha256:await hash(blob,bytes)};
+    };
+    let totalBytes=0;
+    // Keep pending buffers bounded and apply the total size limit in source order.
+    for(let offset=0;offset<entries.length;offset+=3) {
+      aborted();
+      const batch=entries.slice(offset,offset+3);
+      const results=await Promise.allSettled(batch.map(inspect));
+      aborted();
+      for(const [index,result] of results.entries()){
+        const entry=batch[index];
+        try{
+          if(result.status==='rejected')throw result.reason;
+          const file=result.value;
+          if(totalBytes+file.blob.size>48*1024*1024)throw new PreviewError('所选 PNG 合计不能超过48 MiB');
+          files.push(file);
+          totalBytes+=file.blob.size;
+        }catch(error){
+          const optional=['大骰子','sz_0','1','2'].includes(entry.slot)&&!(settings.grade==='purple'&&settings.composition==='digits'&&entry.slot==='sz_0');
+          if(!optional||error.name==='AbortError')throw error;
+          importWarnings.push(`${entry.name}：${error.message||'可选素材无法读取'}；已忽略${entry.slot==='大骰子'?'并使用主题面或第1面作为封面':''}`);
+        }
       }
     }
     for(const entry of audioEntries){

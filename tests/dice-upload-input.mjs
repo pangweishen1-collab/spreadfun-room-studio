@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
-import {bindDiceUploads} from '../dice/upload-input.mjs';
+import {bindDiceUploads,diceFilePath,readDropFiles} from '../dice/upload-input.mjs';
 
 class ClassList {
   values=new Set();
@@ -285,6 +285,21 @@ const checks=[];
   h.dispose();checks.push('directory_enumeration_starts_inside_import_transaction_and_blocks_overlapping_uploads');
 }
 {
+  const ready=[];
+  const entry=file=>({name:file.name,isFile:true,file(resolve){ready.push(()=>resolve(file));}});
+  const unused={name:'readme.txt',isFile:true,file(){assert.fail('ignored sidecars must not open a file');}};
+  const folder={name:'res',isDirectory:true,createReader(){
+    let page=0;
+    return {readEntries(resolve){resolve(page++===0?[entry(fileA),unused,entry(fileB)]:[]);}};
+  }};
+  const reading=readDropFiles({items:[{webkitGetAsEntry:()=>folder}]});
+  await flush();
+  assert.equal(ready.length,2,'filesystem reads overlap for eligible images');
+  ready.reverse().forEach(resolve=>resolve());
+  assert.deepEqual(await reading,[fileA,fileB],'completion order does not reorder eligible files');
+  checks.push('dropped_directory_skips_sidecars_before_reading_and_parallel_reads_preserve_order');
+}
+{
   let h,selected='green';const routes=[],imports=[];
   h=harness(files=>imports.push({grade:selected,files}),{cards:true,folder:true,onTarget(event,zone){
     const card=event?.target.closest('[data-upload-grade]')||h.document.activeElement?.closest('[data-upload-grade]');
@@ -377,7 +392,7 @@ const checks=[];
     resourceName:`dice_${grade}_fixture`,files:six,anchor:{sha256:'original-anchor'},audio:{dice_roll:{sha256:'original-audio'}},
     candidate:{id:`old-candidate-${grade}-${composition}`,kind:runtimeKind(grade),template:grade,previewGrade:grade,runtimeIdentity:`original-runtime-${grade}`,json:{marker:`original-json-${grade}`},geometry:{marker:`original-geometry-${grade}`},atlas:`original-atlas-${grade}`,texture:`original-texture-${grade}`,audio:{dice_roll:'original-roll-audio'}}});
   const context={document:{getElementById:id=>{assert.ok(fields[id],`unexpected controller DOM access: ${id}`);return fields[id];}},
-    URL:{createObjectURL:()=>`blob:controller-${++serial}`,revokeObjectURL:value=>revoked.push(value)},VIDEO_SPEC:{profile:'test'},t:key=>key,
+    URL:{createObjectURL:()=>`blob:controller-${++serial}`,revokeObjectURL:value=>revoked.push(value)},VIDEO_SPEC:{profile:'test'},t:key=>key,diceFilePath,
     DiceAudio:class {ready=true;setEnabled(value){audioChanges.push(value);}async load(){}async unlock(){}stop(){}},
     localApi:async(path,options)=>{
       const body=typeof options.body==='string'?JSON.parse(options.body):options.body;calls.push({path,body});

@@ -1,5 +1,5 @@
 import { connectEmbedded } from './embed.mjs';
-import { bindDiceUploads } from './upload-input.mjs';
+import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
 import { VIDEO_SPEC } from './video-export.mjs';
 import { DiceAudio } from './audio.mjs';
 import { localApi } from './local-preview.mjs';
@@ -48,7 +48,7 @@ function fillSettings(value) {
   $('sound-enabled').checked = value.soundEnabled !== false; audio.setEnabled(value.soundEnabled !== false);
 }
 function releasePending(resetTarget = true) {
-  pending.forEach(file => URL.revokeObjectURL(file.previewUrl));
+  pending.forEach(file => { if(file.previewUrl) URL.revokeObjectURL(file.previewUrl); });
   pending = new Map(); greenExtras = []; if (resetTarget) uploadGrade = null;
 }
 const api = localApi;
@@ -76,13 +76,16 @@ function download(url, extension, name=session?.resourceName) {
 function renderAssets() {
   const list = pending.size ? [...pending.values()] : session?.files || [];
   const files = new Map(list.map(file => [file.slot, file]));
+  $('file-count').textContent = requiredSlots().filter(slot=>files.has(slot)).length + ' / '+requiredSlots().length+' PNG';
+  if (!$('asset-details').open) return;
   const grid = document.createDocumentFragment();
   for (const slot of requiredSlots()) {
     const file = files.get(slot);
     const item = document.createElement('div'); item.className = 'asset-slot ' + (file ? 'ready' : 'missing');
     const thumb = document.createElement('div'); thumb.className = 'asset-thumb checkerboard';
     if (file) {
-      const image = document.createElement('img'); image.src = file.previewUrl || file.url;
+      if (file.original && !file.previewUrl) file.previewUrl = URL.createObjectURL(file.original);
+      const image = document.createElement('img'); image.decoding = 'async'; image.src = file.previewUrl || file.url;
       image.alt = file.name; image.width = 72; image.height = 72; thumb.append(image);
     } else { const mark = document.createElement('span'); mark.textContent = '—'; mark.setAttribute('aria-hidden','true'); thumb.append(mark); }
     const name = document.createElement('span'); name.className = 'asset-name';
@@ -92,7 +95,6 @@ function renderAssets() {
     item.append(thumb, name, meta); grid.append(item);
   }
   $('asset-grid').replaceChildren(grid);
-  $('file-count').textContent = requiredSlots().filter(slot=>files.has(slot)).length + ' / '+requiredSlots().length+' PNG';
 }
 function render() {
   const dirty = settingsDirty(), draft = pending.size > 0;
@@ -113,8 +115,10 @@ function render() {
     card.classList.toggle('is-selected', card.dataset.uploadGrade === (draft ? uploadGrade : session?.grade));
     card.setAttribute('aria-disabled', String(locked));
   });
-  $('pending-actions').hidden = !draft;
-  $('import-preview').disabled = locked || requiredSlots().some(slot=>!pending.has(slot));
+  const canRetry = draft && !locked && Boolean(currentError) && requiredSlots().every(slot=>pending.has(slot));
+  $('pending-actions').hidden = !draft || locked;
+  $('import-preview').hidden = !canRetry;
+  $('import-preview').disabled = !canRetry;
   $('clear-pending').disabled = locked;
   $('dice-name').disabled = locked;
   $('preview-mode').disabled = locked;
@@ -141,7 +145,6 @@ function render() {
   $('error-message').textContent = currentError ? errorText(currentError) : '';
   $('preview-loading').hidden = !loadingPreview || hasCanvas;
   $('preview-empty').hidden = hasCanvas;
-  $('preview-empty').querySelectorAll('.feedback-image').forEach(image => { image.src = '/dice/assets/fun-toolkit/assets/feedback/' + (currentError ? 'empty-error.svg' : 'empty-upload.svg'); });
   $('game-canvas').hidden = !hasCanvas;
   $('preview-stage').dataset.state = loadingPreview ? 'processing' : previewReady ? 'ready' : currentError ? 'error' : 'idle';
   $('session-meta').textContent = session ? t(previewGrade === 'purple' ? 'purpleBackground' : 'greenBackground') : t('notLoaded');
@@ -214,7 +217,7 @@ async function importPending() {
 async function stageFiles(files) {
   if (!files.length) throw issue('noFiles');
   if(!$('dice-name').value.trim()){
-    const folders=new Set(files.flatMap(file=>(file.webkitRelativePath||'').replace(/\\/g,'/').split('/').slice(0,-1))
+    const folders=new Set(files.flatMap(file=>diceFilePath(file).replace(/\\/g,'/').split('/').slice(0,-1))
       .filter(part=>/^dice_(?:green|purple)_.+/i.test(part)));
     if(folders.size===1)$('dice-name').value=[...folders][0];
   }
@@ -264,7 +267,11 @@ function bindUploads() {
     primaryButtons:[$('choose-preview-files'),$('choose-preview-purple-files')], replacementButtons:[$('choose-files'),$('choose-purple-files')], input:$('res-file-input'),
     folderInput:$('res-folder-input'), primaryFolderButtons:[$('choose-preview-folder'),$('choose-preview-purple-folder')], replacementFolderButtons:[$('choose-folder'),$('choose-purple-folder')],
     onTarget:(event) => selectUploadGrade(event?.target?.closest?.('[data-upload-grade]')?.dataset.uploadGrade || document.activeElement?.closest?.('[data-upload-grade]')?.dataset.uploadGrade || uploadGrade || session?.grade),
-    onDirectory:provider => run('readingFiles',async()=>stageFiles(await provider())),
+    onDirectory:provider => run('readingFiles',async()=>{
+      const files=await provider();
+      if (!files.length) throw issue('folderEmpty');
+      await stageFiles(files);
+    }),
     onError:error => run(null,()=>{throw error;}),
     onEmptyFolder:() => run(null, () => { throw issue('folderEmpty'); }),
     isBusy:() => busy, hasPreview:() => hasCanvas, isActive:() => embedded?.isActive() ?? true, onFiles:importFiles});
@@ -298,7 +305,7 @@ async function switchBackground(nextGrade) {
   notice = hadVideo && !next.video ? {key:'videoInvalidated'} : null;
 }
 async function stageGreen(files) {
-  const usable=files.filter(file=> !(file.webkitRelativePath||file.name).split(/[/\\]/).some(part=>part.startsWith('.')));
+  const usable=files.filter(file=> !(diceFilePath(file)||file.name).split(/[/\\]/).some(part=>part.startsWith('.')));
   const groups=new Map();
   for(const file of usable) { const slot=greenSlot(file); if(!slot)continue; const list=groups.get(slot)||[];list.push(file);groups.set(slot,list); }
   // Canonical sz_N beats legacy 1.png/2.png included in old resource folders.
@@ -316,8 +323,8 @@ async function stageGreen(files) {
     ||uploadGrade==='purple'&&/^[12]\.png$/i.test(f.name.normalize('NFKC').trim())));
   greenExtras.push(...extras);
   for(const [slot,file]of chosen) {
-    const old=pending.get(slot);if(old)URL.revokeObjectURL(old.previewUrl);
-    pending.set(slot,{slot,name:file.name,original:file,previewUrl:URL.createObjectURL(file),width:'—',height:'—'});
+    const old=pending.get(slot);if(old?.previewUrl)URL.revokeObjectURL(old.previewUrl);
+    pending.set(slot,{slot,name:file.name,original:file,width:'—',height:'—'});
   }
   if(!$('dice-name').value.trim())$('dice-name').value=t('defaultName');
   render(); if(requiredSlots().every(slot=>pending.has(slot)))await importPending();
@@ -342,6 +349,7 @@ $('dice-name').addEventListener('change', settingsChanged);
 ['preview-mode','preview-point','sound-enabled'].forEach(id => $(id).addEventListener('change', settingsChanged));
 document.querySelectorAll('[data-preview-grade]').forEach(button => button.addEventListener('click', () => { if (!busy && previewGrade!==button.dataset.previewGrade) return run(null,()=>switchBackground(button.dataset.previewGrade)); }));
 $('apply-settings').addEventListener('click', () => run('updatingSettings', saveSettings));
+$('asset-details').addEventListener('toggle', renderAssets);
 $('import-preview').addEventListener('click', () => run('buildingPreview', importPending));
 $('clear-pending').addEventListener('click', () => { if (busy) return; releasePending(); if (session) fillSettings(session); currentError=null; notice=null; toast('replacementCancelled'); render(); });
 $('reload-preview').addEventListener('click', () => run('loadingPreview', async () => { if (session) await loadSession(await api('/api/preview/' + session.id)); }));
@@ -349,6 +357,6 @@ $('game-canvas').addEventListener('click', () => { if (!busy && previewReady && 
 $('export-video').addEventListener('click', () => run('recording', exportVideo));
 $('download-bundle').addEventListener('click', () => run('bundling', async () => { if (!session || pending.size || settingsDirty()) return; const result=await api(`/api/preview/${session.id}/bundle`); download(result.url,'.zip',result.name); toast('downloadStarted'); }));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)audio.stop();});
-window.addEventListener('beforeunload', () => { audio.dispose(); pending.forEach(file => URL.revokeObjectURL(file.previewUrl)); renderer?.pause(); });
+window.addEventListener('beforeunload', () => { audio.dispose(); releasePending(); renderer?.pause(); });
 embedded = connectEmbedded(renderer, {onFiles:importFiles, isBusy:() => busy});
 render();

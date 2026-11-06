@@ -262,7 +262,7 @@ html.embedded .page-shell { flex:none; }
 .upload-grade-card.purple { background:color-mix(in srgb,var(--color-purple) 6%,var(--color-surface)); border-color:color-mix(in srgb,var(--color-purple) 24%,var(--color-surface)); }
 .upload-grade-card:focus-visible,.replacement-grade-card:focus-visible { outline:2px solid var(--color-accent); outline-offset:2px; }
 .upload-grade-card.is-selected,.replacement-grade-card.is-selected { border-color:var(--color-accent); }
-.preview-empty .feedback-image { width:96px; height:72px; }
+.preview-empty .upload-grade-icon { width:min(100%,96px); height:96px; }
 .upload-grade-card h3 { display:flex; align-items:center; gap:8px; font-size:15px; }
 .upload-motion { color:var(--color-secondary); font-size:12px; line-height:20px; }
 .preview-upload-actions { display:flex; flex-direction:column; width:100%; max-width:168px; gap:8px; }
@@ -277,7 +277,7 @@ html.embedded .page-shell { flex:none; }
  .ft-ui .preview-empty { padding:8px; gap:8px; }
  .upload-grade-card { padding:20px 8px; gap:10px; }
  .upload-grade-card h3 { font-size:13px; gap:5px; }
- .preview-empty .feedback-image { width:80px; height:60px; }
+ .preview-empty .upload-grade-icon { width:min(100%,72px); height:72px; }
  .preview-empty p { font-size:11px; line-height:18px; }
  .preview-upload-actions .button { font-size:12px; }
 }
