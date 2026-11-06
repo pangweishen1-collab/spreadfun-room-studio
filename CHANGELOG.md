@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.15.1 - 2026-11-06
+
+### Purple dice motion fidelity
+
+- Use the original 05 tilted-gyro motion for purple uploads. Keep the original exposure blur, timing and 1.5× zoom peak, and build the rolling silhouette from the uploaded art.
+- Play the same Spine 4.2 binary and atlas in the browser and in the purple ZIP. Store the brief rolling exposures in a shared, losslessly compressed atlas, with native zoom and position keys and the original six faces for the settled results.
+- Keep the green animation, grade-specific ZIP naming, invisible root anchor and sound events.
+
 ## 1.15.0 - 2026-11-05
 
 - Use a fixed purple UI display scale so preview and video do not add a second time-varying zoom outside the exported native05 animation.
