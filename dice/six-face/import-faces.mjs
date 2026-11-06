@@ -107,5 +107,5 @@ export async function decodeFaceFiles(files,{signal}={}){
  }
  const result=Object.fromEntries(settled.filter(x=>x.status==='fulfilled').map(x=>x.value));
  const extras=optional.zero?[optional.zero]:[],sources=[...Object.values(selected.faces),...(optional.hero?[optional.hero]:[]),...extras];
- return {images:Object.fromEntries([1,2,3,4,5,6].map(p=>[p,result[p]])),hero:optional.hero?result.hero:null,files:{faces:selected.faces,hero:optional.hero,extras},sources,warnings:selected.warnings,dispose};
+ return {images:Object.fromEntries([1,2,3,4,5,6].map(p=>[p,result[p]])),hero:optional.hero?result.hero:null,zero:optional.zero?result.zero:null,files:{faces:selected.faces,hero:optional.hero,extras},sources,warnings:selected.warnings,dispose};
 }

@@ -6,6 +6,8 @@ import {deflateSync} from 'node:zlib';
 import {createLocalPreview,validateFiles,validateSettings,inspectPNG,detectComposition,atlasText,SLOTS,VIDEO_PROFILE,resourceName,validatePurpleFiles} from '../dice/local-preview.mjs';
 import {VIDEO_SPEC} from '../dice/video-export.mjs';
 import {nativeRuntimeFixture} from './helpers/purple-fixtures.mjs';
+import {PURPLE_REFERENCE_MOTION_VERSION} from '../dice/purple-reference/runtime.mjs';
+import {writeSpineBinary} from '../dice/six-face/spine-binary.mjs';
 process.on('uncaughtException',error=>{console.error(error?.message||String(error));process.exitCode=1;});
 
 const checks=[],table=Array.from({length:256},(_,v)=>{for(let i=0;i<8;i++)v=v&1?0xedb88320^(v>>>1):v>>>1;return v>>>0;});
@@ -353,6 +355,47 @@ const deferredDigits=await post('/api/preview/import',{...payload,name:'延迟�
 smallDigits=true;let autoDigits;try{autoDigits=await post(`/api/preview/${deferredDigits.id}/settings`,{expectedRevision:1,composition:'auto'});}finally{smallDigits=false;}
 assert.equal(autoDigits.resolvedComposition,'digits');assert.equal(renders,digitRenders+1);assert.equal((await storage.get(deferredDigits.id)).runtime.metadata.composition,'digits');
 checks.push('explicit_faces_skip_six_duplicate_alpha_decodes_background_edits_stay_fast_and_later_auto_scans_once_with_original_bytes_and_digit_detection_preserved');
+
+// Reference 05 previews and downloads use the already generated binary.
+// A rename or preview-only background edit must not rebake that runtime.
+let referenceBuilds=0;
+const referenceAdapter=createLocalPreview({
+  ...dependencies, storage:memoryStore(), renderPurpleGyro:undefined,
+  async renderPurpleReference(_files,options) {
+    referenceBuilds++;
+    const fixture=nativeRuntimeFixture(options);
+    fixture.json.skeleton.images='./res/';
+    fixture.json.skeleton.audio='./sound/';
+    return {
+      ...fixture, kind:'purple-reference',
+      skel:new Blob([writeSpineBinary(fixture.json)],{type:'application/octet-stream'}),
+      metadata:{...fixture.metadata,motionVersion:PURPLE_REFERENCE_MOTION_VERSION},
+    };
+  },
+});
+const importedReference=await referenceAdapter.api('/api/preview/import',{method:'POST',body:payload});
+assert.equal(importedReference.kind,'purple-reference');
+const referenceBinary=urlBlobs.get(importedReference.candidate.skel);
+assert.ok(referenceBinary instanceof Blob);
+const renamedReference=await referenceAdapter.api(`/api/preview/${importedReference.id}/settings`,{
+  method:'POST',body:{expectedRevision:1,name:'原版 05 飞机',previewGrade:'green'},
+});
+assert.equal(referenceBuilds,1);
+assert.equal(renamedReference.candidate.skel,importedReference.candidate.skel);
+assert.equal(renamedReference.candidate.texture,importedReference.candidate.texture);
+const referenceZip=await referenceAdapter.api(`/api/preview/${importedReference.id}/bundle`);
+assert.match(referenceZip.name,/^dice_purple_/);
+const decodedReferenceZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(referenceZip.url).arrayBuffer()),{checkCRC32:true});
+const referenceBase=`${referenceZip.name}/${referenceZip.name}`;
+assert.deepEqual(await decodedReferenceZip.file(referenceBase+'.skel').async('uint8array'),new Uint8Array(await referenceBinary.arrayBuffer()));
+assert.deepEqual(await decodedReferenceZip.file(referenceBase+'.png').async('uint8array'),
+  new Uint8Array(await urlBlobs.get(renamedReference.candidate.texture).arrayBuffer()));
+const packagedAtlas=await decodedReferenceZip.file(referenceBase+'.atlas').async('string');
+const previewAtlas=await urlBlobs.get(renamedReference.candidate.atlas).text();
+assert.equal(packagedAtlas,previewAtlas.replace(/^[^\r\n]+/,referenceZip.name+'.png'));
+assert.equal(referenceBuilds,1);
+referenceAdapter.dispose();
+checks.push('reference05_preview_download_reuse_identical_native_binary_and_texture_after_name_and_background_changes');
 
 adapter.dispose();restored.dispose();assert.equal(urlBlobs.size,0);
 console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Pure session/PNG/ZIP/CAS logic with injected Canvas and storage. Real browser Canvas, IndexedDB, Spine and video module require browser QA.'},null,2));

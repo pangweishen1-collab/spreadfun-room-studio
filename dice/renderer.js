@@ -9,7 +9,12 @@ const loadImage = src => new Promise((resolve, reject) => {
 });
 
 const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
-const generatedCandidate = candidate => candidate?.kind === 'six-face' || candidate?.kind === 'purple-gyro';
+const referenceCandidate = candidate => candidate?.kind === 'purple-reference';
+const generatedCandidate = candidate => candidate?.kind === 'six-face' || candidate?.kind === 'purple-gyro' || referenceCandidate(candidate);
+const readAsset = (url, type, message) => fetch(url).then(response => {
+  if (!response.ok) throw new Error(message);
+  return response[type]();
+});
 // UI sizing stays constant: all animation and zoom come from the exported Spine data.
 const PURPLE_PRESENTATION_SCALE = 1.15;
 const backgroundImages = new Map();
@@ -90,22 +95,35 @@ export class GameRenderer {
     try {
       let atlas, texture;
       if (generatedCandidate(candidate)) {
-        const [text, image] = await Promise.all([
-          fetch(candidate.atlas).then(r => { if (!r.ok) throw new Error('图集读取失败'); return r.text(); }),
-          loadImage(candidate.texture),
+        const reference = referenceCandidate(candidate);
+        const useBitmap = reference && typeof createImageBitmap === 'function';
+        const [text, imageSource, binary] = await Promise.all([
+          readAsset(candidate.atlas, 'text', '图集读取失败'),
+          useBitmap ? readAsset(candidate.texture, 'blob', '图集纹理读取失败') : loadImage(candidate.texture),
+          reference ? readAsset(candidate.skel, 'arrayBuffer', 'Spine 动画读取失败') : null,
         ]);
-        atlas = new spine.TextureAtlas(text); texture = image;
+        atlas = new spine.TextureAtlas(text);
+        const image = useBitmap
+          ? await createImageBitmap(imageSource, {premultiplyAlpha:'none',colorSpaceConversion:'none'})
+          : imageSource;
+        texture = image;
+        let gpu;
+        assets = {dispose() { gpu?.dispose(); image.close?.(); }};
         if (this.context && !this.gpuLost) {
-          const gpu = new spine.GLTexture(this.context, image, false);
+          gpu = new spine.GLTexture(this.context, image, false);
           for (const page of atlas.pages) page.setTexture(gpu);
-          assets = {dispose:() => gpu.dispose()};
         } else {
-          // Canvas projection uses the same JSON/atlas and the same six result faces.
-          for (const page of atlas.pages) { page.width = image.naturalWidth; page.height = image.naturalHeight; }
+          // Canvas projection uses the same skeleton and six result faces.
+          for (const page of atlas.pages) {
+            page.width = image.naturalWidth ?? image.width;
+            page.height = image.naturalHeight ?? image.height;
+          }
           for (const region of atlas.regions) region.updateUVs?.();
-          assets = {dispose() {}};
         }
-        data = new spine.SkeletonJson(new spine.AtlasAttachmentLoader(atlas)).readSkeletonData(candidate.json);
+        const loader = new spine.AtlasAttachmentLoader(atlas);
+        data = reference
+          ? new spine.SkeletonBinary(loader).readSkeletonData(new Uint8Array(binary))
+          : new spine.SkeletonJson(loader).readSkeletonData(candidate.json);
         software = new CanvasSpineRenderer(atlas, texture, {width:720,height:1600});
       } else {
         if (!this.context || this.gpuLost) throw new Error('紫色动画需要 WebGL，请刷新或使用最新版 Chrome');
@@ -280,6 +298,10 @@ export class GameRenderer {
 
     const all = this.mode === 'all';
     const selected = this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target;
+    const reference = referenceCandidate(this.candidate);
+    // Spine attachment keys are Float32 in the package. Match their precision
+    // before sampling so a boundary frame uses the same image in preview.
+    const animationTime = reference ? Math.fround(time) : time;
     const presentationGain = this.candidate.template === 'purple' ? PURPLE_PRESENTATION_SCALE : 1;
     if (gpu) this.scene.begin();
     for (let index = 0; index < (all ? 6 : 1); index++) {
@@ -287,10 +309,12 @@ export class GameRenderer {
       const point = all ? index + 1 : selected;
       skeleton.setToSetupPose();
       const animation = this.data.findAnimation('spin_' + point);
-      animation.apply(skeleton, -1, Math.min(time, animation.duration), false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
+      animation.apply(skeleton, -1, Math.min(animationTime, animation.duration), false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
       skeleton.x = all ? [198, 363, 529][index % 3] : 363;
       skeleton.y = 1600 - (all ? (index < 3 ? 720 : 903) : 810);
-      if (generatedCandidate(this.candidate)) {
+      if (reference) {
+        skeleton.scaleX = skeleton.scaleY = all ? .86 : 1.5;
+      } else if (generatedCandidate(this.candidate)) {
         const {crop,sourceSize,cropOffset} = this.candidate.geometry;
         const ratio = Math.max(crop[2],crop[3])/sourceSize;
         const size = (all ? 172 : 300) * Math.min(1,.655/ratio) * presentationGain;
