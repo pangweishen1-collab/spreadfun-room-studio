@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.15.2 - 2026-11-06
+
+### Dice upload
+
+- Open the preview automatically when all six faces are present. Show a retry action only when the preview fails to load.
+- Skip unrelated files before reading dropped folders, validate eligible PNGs in bounded parallel batches, and load thumbnails only when the asset details are expanded.
+- Use cactus artwork for the green upload card and cricket artwork for the purple card, with optically balanced sizes.
+
 ## 1.15.1 - 2026-11-06
 
 ### Purple dice motion fidelity
