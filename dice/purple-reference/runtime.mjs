@@ -5,7 +5,7 @@ import {settlingGain} from './presentation.mjs';
 import {Proxy3DRenderer} from './proxy-3d.mjs';
 import {encodeAtlasPng} from './atlas-png.mjs';
 
-export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-60fps-v1';
+export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-60fps-v2-png';
 const atlasPage = 'dice.png';
 const points = [1, 2, 3, 4, 5, 6];
 const fps = 60;
@@ -224,13 +224,25 @@ function shadowRegion(baseSize, canvases) {
 const jobs = frameTimes.filter(time=>time<MOTION.rollEnd)
   .flatMap(time=>(time<frontSwitch?[0]:points).map(point=>({time,point})));
 
+const motionColors = Uint8Array.from({length:256}, (_, channel) => Math.round(channel / 5) * 5);
+
 async function captureExposures(renderer, baseSize, signal) {
   const size=baseSize*renderer.displayScale;
   const frames=[];
   for (const [index,{time,point}] of jobs.entries()) {
     checkAbort(signal);
     const image=exposurePixels(renderer,time,point);
-    frames.push(trimRegion(frameName(time,point),image,size,size));
+    const frame=trimRegion(frameName(time,point),image,size,size);
+    // Group nearly identical colors in rolling frames so PNG compresses them better.
+    // Keep alpha, transparent padding and the separately packed landing faces exact.
+    const pixels=frame.pixels;
+    for (let offset=0;offset<pixels.length;offset+=4) {
+      if (pixels[offset+3]===0) continue;
+      pixels[offset]=motionColors[pixels[offset]];
+      pixels[offset+1]=motionColors[pixels[offset+1]];
+      pixels[offset+2]=motionColors[pixels[offset+2]];
+    }
+    frames.push(frame);
     if (index%4===0) await pause();
   }
   return frames;
