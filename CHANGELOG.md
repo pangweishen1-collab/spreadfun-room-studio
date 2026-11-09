@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.15.5 - 2026-11-09
+
+### Dice preview
+
+- Prevent the settled face from overlapping the start of green rolls, where the 2 and 6 faces could appear to flash.
+- Restore the original crown pattern behind the title on both green and purple popups.
+- Keep uploads in the current page session. A successful replacement releases the previous preview, and a page reload starts with an empty upload form.
+
 ## 1.15.4 - 2026-11-09
 
 - Use up to 192 palette colors for purple atlas PNGs and up to 256 for green atlas PNGs when exporting dice ZIPs.
