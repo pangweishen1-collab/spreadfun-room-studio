@@ -3,7 +3,7 @@
 import {CUBE_MOTION} from './cube-roll.mjs';
 const ZOOM_PEAK=CUBE_MOTION.zoomPeak;
 import {encodeRgbaPng} from './png-rgba.mjs';
-export const SIX_FACE_MOTION_VERSION='rounded-roll-v4';
+export const SIX_FACE_MOTION_VERSION='rounded-roll-v5';
 const ROLL_START=.025;
 const LAND_START=.55,LAND_READY=.591667,HANDOFF=.6;
 const CORNER_RADIUS=.19;

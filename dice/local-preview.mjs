@@ -1,5 +1,5 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
-import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-hd2';
+import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import {generateSixFaceRuntime} from './six-face/runtime.mjs';
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
@@ -502,7 +502,7 @@ export function createLocalPreview(dependencies={}) {
     const record=await read(id),headers=new Headers(options.headers),revision=Number(headers.get('X-Preview-Revision'));
     if(!Number.isInteger(revision)||revision!==record.revision||headers.get('X-Candidate-Id')!==record.candidateId)throw new PreviewError('预览已更新，请重新录制当前版本',409);
     if(!(options.body instanceof Blob)||!options.body.size||options.body.size>90*1024*1024)throw new PreviewError('视频大小不合法');
-    const started=performance.now(),module=dependencies.prepareVideo?null:await import('./video-export.mjs?v=20261109-dice-hd2');
+    const started=performance.now(),module=dependencies.prepareVideo?null:await import('./video-export.mjs?v=20261109-dice-60fps');
     const blob=await (dependencies.prepareVideo||module.prepareVideo)(options.body,{audio:audioURLs(record),soundEnabled:record.soundEnabled!==false});
     if(!(blob instanceof Blob)||!blob.size)throw new PreviewError('视频校验失败，请重新导出');
     const {maxBytes,profile,width,height,duration,fps,frameCount}=VIDEO_SPEC;

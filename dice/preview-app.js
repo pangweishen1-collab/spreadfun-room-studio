@@ -1,10 +1,10 @@
 import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
-import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-hd2';
+import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { DiceAudio } from './audio.mjs';
-import { clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261109-dice-hd2';
-import { GameRenderer } from '/dice/renderer.js?v=20261109-dice-hd2';
-import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261109-dice-hd2';
+import { clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261109-dice-60fps';
+import { GameRenderer } from '/dice/renderer.js?v=20261109-dice-60fps';
+import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261109-dice-60fps';
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
@@ -37,8 +37,9 @@ function settingsDirty() {
   return Object.keys(values).some(key => values[key] !== session[key]);
 }
 function currentVideo(video = session?.video) {
-  return video?.profile === VIDEO_SPEC.profile && video.size > 0 && video.size <= VIDEO_SPEC.maxBytes && video.duration === 6 && video.fps === 30 && video.frameCount === 180
-    && video.width === 720 && video.height === 1600 && video.revision === session.revision
+  const {profile, maxBytes, duration, fps, frameCount, width, height} = VIDEO_SPEC;
+  return video?.profile === profile && video.size > 0 && video.size <= maxBytes && video.duration === duration && video.fps === fps && video.frameCount === frameCount
+    && video.width === width && video.height === height && video.revision === session.revision
     && video.candidate === session.candidate?.id ? video : null;
 }
 function fillSettings(value) {
@@ -55,7 +56,7 @@ function releasePending(resetTarget = true) {
 const api = localApi;
 const post = (path, body) => api(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
 function bytes(value) {
-  return value >= 1024 * 1024 ? (value / 1024 / 1024).toFixed(1) + ' MB' : Math.max(1, Math.round(value / 1024)) + ' KB';
+  return value >= 1_000_000 ? (value / 1_000_000).toFixed(2) + ' MB' : Math.max(1, Math.round(value / 1000)) + ' KB';
 }
 function toast(key, values) {
   clearTimeout(toastTimer);
@@ -158,7 +159,7 @@ function render() {
   else { uploadStatus.textContent = notice?.key === 'videoInvalidated' ? t(notice.key) : ''; uploadStatus.dataset.state = 'pending'; }
   let videoKey = 'videoEmpty', videoValues;
   if (session && (draft || dirty)) videoKey = 'videoInvalidated';
-  else if (clip) { videoKey = 'videoReady'; videoValues = {size:bytes(clip.size || 0)}; }
+  else if (clip) { videoKey = 'videoReady'; videoValues = {fps:clip.fps, size:bytes(clip.size)}; }
   else if (session && !session.videoAvailable) { videoKey = 'videoUnavailable'; videoValues = {reason:errorText(new Error(session.videoUnavailableReason || '本地 FFmpeg 不可用'))}; }
   else if (session) videoKey = 'videoOptional';
   $('video-details').textContent = ['videoEmpty','videoOptional'].includes(videoKey) ? '' : t(videoKey, videoValues);
@@ -257,7 +258,7 @@ async function exportVideo() {
   const started = performance.now();
   activity = {key:'recording'}; render();
   audio.stop();
-  const blob = await renderer.recordLoop(6);
+  const blob = await renderer.recordLoop(VIDEO_SPEC.duration);
   activity = {key:'encoding'}; render();
   const video = await api(`/api/preview/${current.id}/video`, {method:'POST', headers:{'Content-Type':blob.type, 'X-Preview-Revision':String(current.revision), 'X-Candidate-Id':current.candidate}, body:blob});
   if (session.id !== current.id || session.revision !== current.revision || session.candidate.id !== current.candidate) throw issue('videoMismatch');

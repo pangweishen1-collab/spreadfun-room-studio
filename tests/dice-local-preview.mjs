@@ -50,7 +50,7 @@ const dependencies={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvai
   decodePNG:async(blob,name)=>{decodeNames.push(name);return {alphaArea:smallDigits&&/^sz_[1-6]/.test(name)?1200:16000,drawable:name==='anchor.png'?{width:30,height:30}:undefined,close(){}};},
   renderRuntime:async()=>assert.fail('New purple sessions must not use the legacy template renderer'),
   renderPurpleGyro:async(files,options)=>{renders++;if(failPurpleBuild)throw Error('injected purple-gyro build failure');assert.equal(files.filter(file=>/^sz_[1-6]$/.test(file.slot)).length,6);assert.ok(['faces','digits'].includes(options.composition));assert.equal(options.anchorImage.width,30);return nativeRuntimeFixture(options);},
-  prepareVideo:async blob=>{if(blockVideo)await blockVideo.promise;const output=new Blob([preparedSize===null?blob:new Uint8Array(preparedSize)],{type:'video/mp4'});Object.defineProperty(output,'videoInfo',{value:{profile:VIDEO_PROFILE,width:720,height:1600,duration:6,fps:30,frameCount:180,method:'h264_copy_mux'}});return output;}};
+  prepareVideo:async blob=>{if(blockVideo)await blockVideo.promise;const output=new Blob([preparedSize===null?blob:new Uint8Array(preparedSize)],{type:'video/mp4'});Object.defineProperty(output,'videoInfo',{value:{profile:VIDEO_PROFILE,width:720,height:1600,duration:6,fps:60,frameCount:360,method:'h264_copy_mux'}});return output;}};
 const adapter=createLocalPreview(dependencies);
 const post=(path,body)=>adapter.api(path,{method:'POST',body:JSON.stringify(body)});
 async function rejects(operation,status=400){await assert.rejects(operation,error=>error.status===status);}
@@ -92,7 +92,7 @@ for(const mode of ['all','single','continuous'])assert.deepEqual(
   validateSettings({...payload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',previewGrade:'purple',mode:'all',point:1,composition:'auto',soundEnabled:true});
 assert.equal(validateSettings({...payload,previewGrade:'green'}).previewGrade,'green');
 for(const previewGrade of ['unknown',null,true])assert.throws(()=>validateSettings({...payload,previewGrade}));
-assert.equal(VIDEO_PROFILE,'loop6-v6-audio-1500kb');
+assert.equal(VIDEO_PROFILE,'loop6-v7-60fps-audio-1500kb');
 assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_500_000);
 assert.equal(inspectPNG(new Uint8Array(png(200)),'sz_0').width,200);
 const corrupted=new Uint8Array(png(200));corrupted[40]^=1;assert.throws(()=>inspectPNG(corrupted,'sz_0'));
@@ -160,7 +160,7 @@ checks.push('auto_detection_override_independent_sessions_and_refresh_restore_ke
 const headers={'Content-Type':'video/h264','X-Preview-Revision':'2','X-Candidate-Id':second.candidate.id};
 const input=new Blob(['procedural-video-fixture'],{type:'video/h264'});
 const video=await adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input});
-assert.equal(video.profile,VIDEO_PROFILE);assert.equal(video.frameCount,180);assert.equal(video.revision,2);assert.equal(video.candidate,second.candidate.id);
+assert.equal(video.profile,VIDEO_PROFILE);assert.equal(video.frameCount,360);assert.equal(video.revision,2);assert.equal(video.candidate,second.candidate.id);
 const savedVideo=structuredClone((await storage.get(first.id)).video);
 const bundled=await adapter.api(`/api/preview/${first.id}/bundle`);
 await compactBundle(bundled,await storage.get(first.id));assert.equal(bundled.name,'dice_purple_紫色十图更名');
@@ -197,16 +197,16 @@ const oversizeBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundl
 assert.equal((await storage.get(boundarySession.id)).video.blob.size,VIDEO_SPEC.maxBytes+1);assert.equal(storage.writes,oversizeCacheWrites);
 checks.push('exactly_1500kb_final_video_is_downloadable_raw_input_may_exceed_the_cap_and_oversized_cached_blobs_stay_hidden_without_deletion');
 
-const previousProfileSession=await post('/api/preview/import',{...payload,name:'旧1MB档视频'});
+const previousProfileSession=await post('/api/preview/import',{...payload,name:'旧30fps视频'});
 const previousProfileRecord=await storage.get(previousProfileSession.id);
-previousProfileRecord.video={...savedVideo,profile:'loop6-v4-audio-1mb',revision:previousProfileSession.revision,candidate:previousProfileSession.candidate.id};
+previousProfileRecord.video={...savedVideo,profile:'loop6-v6-audio-1500kb',fps:30,frameCount:180,revision:previousProfileSession.revision,candidate:previousProfileSession.candidate.id};
 storage.records.set(previousProfileSession.id,structuredClone(previousProfileRecord));
 const previousProfileWrites=storage.writes;
 assert.equal((await adapter.api(`/api/preview/${previousProfileSession.id}`)).video,null);
 const previousProfileBundle=await adapter.api(`/api/preview/${previousProfileSession.id}/bundle`);await compactBundle(previousProfileBundle,previousProfileRecord);
 assert.equal(storage.writes,previousProfileWrites);assert.deepEqual((await storage.get(previousProfileSession.id)).video,previousProfileRecord.video);
 assert.deepEqual(Buffer.from(await (await storage.get(previousProfileSession.id)).video.blob.arrayBuffer()),Buffer.from(await savedVideo.blob.arrayBuffer()));
-checks.push('previous_1mb_profile_is_retained_in_storage_but_not_offered_for_download_or_added_to_zip');
+checks.push('previous_30fps_profile_is_retained_in_storage_but_not_offered_for_download_or_added_to_zip');
 const third=await post(`/api/preview/${first.id}/settings`,{expectedRevision:2,name:'仙人掌改名'});assert.equal(third.video,null);
 assert.deepEqual((await storage.get(first.id)).video,savedVideo);
 await rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}),409);

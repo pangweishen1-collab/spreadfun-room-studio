@@ -9,7 +9,7 @@ const faces = [
 ];
 const clamp=(x,a=0,b=1)=>Math.min(b,Math.max(a,x));
 const smooth=x=>{x=clamp(x);return x*x*(3-2*x);};
-export const CUBE_MOTION=Object.freeze({rollEnd:.72,bounceEnd:.64,settleStart:.72,settleDuration:.10,turns:Object.freeze([3,2,0]),zoomEnd:.60,zoomPeak:1.3});
+export const CUBE_MOTION=Object.freeze({rollEnd:.72,bounceEnd:.64,settleStart:.72,settleDuration:.10,turns:Object.freeze([3,2,0]),zoomEnd:.60,zoomPeak:1.45});
 const multiply=(a,b)=>Array.from({length:9},(_,i)=>{const c=Math.floor(i/3),r=i%3;return a[r]*b[c*3]+a[3+r]*b[c*3+1]+a[6+r]*b[c*3+2];});
 const rx=a=>[1,0,0,0,Math.cos(a),Math.sin(a),0,-Math.sin(a),Math.cos(a)];
 const ry=a=>[Math.cos(a),0,-Math.sin(a),0,1,0,Math.sin(a),0,Math.cos(a)];

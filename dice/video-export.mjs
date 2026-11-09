@@ -2,8 +2,12 @@
 // Annex B takes a packet-copy path: no decoder, encoder, server, or FFmpeg.
 import {mixReviewAudio} from './audio.mjs';
 const media = () => import('../vendor/mediabunny/mediabunny.mjs');
-export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6,
-  profile: 'loop6-v6-audio-1500kb', bitrate: 2_500_000, maxBytes: 1_500_000});
+export const VIDEO_ROUND_SECONDS = 2;
+// 720×1600 at 60 fps exceeds the macroblock rate for AVC level 4.1.
+export const VIDEO_AVC_CODECS = Object.freeze(['avc1.64002a','avc1.4d002a','avc1.42002a']);
+const fps = 60, duration = 6;
+export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps, frameCount: fps * duration, duration,
+  profile: 'loop6-v7-60fps-audio-1500kb', bitrate: 2_500_000, maxBytes: 1_500_000});
 const MAX_BYTES = 64 * 1024 * 1024;
 const fail = message => { throw new Error(message); };
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -125,7 +129,7 @@ function annexFrames(bytes) {
   }
   flush();
   if (!sps || !hasPps || !frames[0]?.key) fail('H.264 缺少解码参数或首个关键帧');
-  if (frames.length !== VIDEO_SPEC.frameCount) fail('视频须包含完整的 180 帧');
+  if (frames.length !== VIDEO_SPEC.frameCount) fail(`视频须包含完整的 ${VIDEO_SPEC.frameCount} 帧`);
   return {frames, codec: 'avc1.' + Array.from(sps.subarray(1, 4), value => value.toString(16).padStart(2, '0')).join('')};
 }
 
@@ -138,15 +142,15 @@ async function muxAnnexB(blob, M) {
   const {frames, codec} = annexFrames(new Uint8Array(await blob.arrayBuffer()));
   const {target, output} = makeOutput(M);
   const source = new M.EncodedVideoPacketSource('avc');
-  output.addVideoTrack(source, {frameRate: VIDEO_SPEC.fps});
+  output.addVideoTrack(source, {frameRate: fps});
   try {
     await output.start();
     for (let index = 0; index < frames.length; index++) {
       const frame = frames[index];
-      await source.add(new M.EncodedPacket(frame.data, frame.key ? 'key' : 'delta', index / 30, 1 / 30), index === 0 ? {
-        decoderConfig: {codec, codedWidth: 720, codedHeight: 1600},
+      await source.add(new M.EncodedPacket(frame.data, frame.key ? 'key' : 'delta', index / fps, 1 / fps), index === 0 ? {
+        decoderConfig: {codec, codedWidth: VIDEO_SPEC.width, codedHeight: VIDEO_SPEC.height},
       } : undefined);
-      if (index % 60 === 59) await tick();
+      if (index % fps === fps - 1) await tick();
     }
     source.close();
     await output.finalize();
@@ -160,10 +164,10 @@ async function openVideo(blob, M) {
     if (!await input.canRead()) fail('无法读取录制视频，请重新导出');
     const track = await input.getPrimaryVideoTrack();
     if (!track) fail('录制文件中没有视频轨道');
-    const [width, height, duration, codec] = await Promise.all([
-      track.getDisplayWidth(), track.getDisplayHeight(), input.computeDuration(), track.getCodec(),
+    const [width, height, codec] = await Promise.all([
+      track.getDisplayWidth(), track.getDisplayHeight(), track.getCodec(),
     ]);
-    return {input, track, width, height, duration, codec};
+    return {input, track, width, height, codec};
   } catch (error) { input.dispose(); throw error; }
 }
 
@@ -182,7 +186,7 @@ export async function inspectVideo(blob) {
     const duration = end - first;
     timings.sort((a, b) => a.timestamp - b.timestamp);
     const constantFrameRate = timings.length > 0 && timings.every((timing, index) =>
-      Math.abs(timing.timestamp - first - index / 30) < .0001 && Math.abs(timing.duration - 1 / 30) < .0001);
+      Math.abs(timing.timestamp - first - index / fps) < .0001 && Math.abs(timing.duration - 1 / fps) < .0001);
     const audioTrack=await source.input.getPrimaryAudioTrack();
     const audio=audioTrack?{codec:await audioTrack.getCodec(),numberOfChannels:await audioTrack.getNumberOfChannels(),sampleRate:await audioTrack.getSampleRate()}:null;
     return {width: source.width, height: source.height, duration, fps: frameCount / duration, frameCount, codec: source.codec, constantFrameRate,audio};
@@ -190,39 +194,42 @@ export async function inspectVideo(blob) {
 }
 
 function matches(info) {
-  return info.width === 720 && info.height === 1600 && info.frameCount === 180 &&
-    Math.abs(info.duration - 6) < .0001 && Math.abs(info.fps - 30) < .001 && info.codec === 'avc' && info.constantFrameRate;
+  return info.width === VIDEO_SPEC.width && info.height === VIDEO_SPEC.height && info.frameCount === VIDEO_SPEC.frameCount &&
+    Math.abs(info.duration - duration) < .0001 && Math.abs(info.fps - fps) < .001 && info.codec === 'avc' && info.constantFrameRate;
 }
 
 async function transcodeFallback(blob, M, bitrate = 1_900_000) {
   const source = await openVideo(blob, M);
+  const {width, height, frameCount} = VIDEO_SPEC;
   let output, iterator, canvas;
   try {
-    if (source.width !== 720 || source.height !== 1600) fail('视频尺寸须为 720 × 1600');
-    if (!Number.isFinite(source.duration) || source.duration < 5.5 || source.duration > 7) fail('录制视频时长异常，请重新导出 6 秒视频');
+    if (source.width !== width || source.height !== height) fail('视频尺寸须为 720 × 1600');
+    const [first, end] = await Promise.all([source.track.getFirstTimestamp(), source.track.computeDuration()]);
+    if (!Number.isFinite(end - first) || end - first < 5.5 || end - first > 7) fail('录制视频时长异常，请重新导出 6 秒视频');
     if (!await source.track.canDecode()) fail('当前浏览器无法解码录制视频，请使用最新版 Chrome 或 Edge');
     let codec;
-    for (const candidate of ['avc1.640028','avc1.4d0028','avc1.420028']) {
-      if (await M.canEncodeVideo('avc', {width: 720, height: 1600, frameRate: 30, fullCodecString: candidate, quality: new M.Quality({bitrate})})) { codec = candidate; break; }
+    for (const candidate of VIDEO_AVC_CODECS) {
+      if (await M.canEncodeVideo('avc', {width, height, frameRate: fps, fullCodecString: candidate, quality: new M.Quality({bitrate})})) { codec = candidate; break; }
     }
     if (!codec) fail('当前浏览器无法生成 H.264 MP4，请使用最新版 Chrome 或 Edge');
-    canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(720, 1600) : Object.assign(document.createElement('canvas'), {width: 720, height: 1600});
+    canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), {width, height});
     const context = canvas.getContext('2d');
     if (!context) fail('无法创建视频导出画布');
     const targetOutput = makeOutput(M); output = targetOutput.output;
-    const encoded = new M.CanvasSource(canvas, {codec: 'avc', fullCodecString: codec, quality: new M.Quality({bitrate}), latencyMode: 'quality', keyFrameInterval: 2});
-    output.addVideoTrack(encoded, {frameRate: 30});
-    const sink = new M.CanvasSink(source.track, {poolSize: 2, width: 720, height: 1600, fit: 'fill'});
-    iterator = sink.canvasesAtTimestamps(Array.from({length: 180}, (_, index) => Math.min(index / 30, Math.max(0, source.duration - .04))));
+    const encoded = new M.CanvasSource(canvas, {codec: 'avc', fullCodecString: codec, quality: new M.Quality({bitrate}), latencyMode: 'quality', keyFrameInterval: VIDEO_ROUND_SECONDS});
+    output.addVideoTrack(encoded, {frameRate: fps});
+    const sink = new M.CanvasSink(source.track, {poolSize: 2, width, height, fit: 'fill'});
+    // Sample inside each frame's interval so even the last exact-CFR frame survives a size retry.
+    iterator = sink.canvasesAtTimestamps(Array.from({length: frameCount}, (_, index) => Math.min(first + (index + .5) / fps, end - .000001)));
     await output.start();
     let previous;
-    for (let index = 0; index < 180; index++) {
+    for (let index = 0; index < frameCount; index++) {
       const next = await iterator.next();
       if (next.value) previous = next.value.canvas;
       if (!previous) fail('录制视频缺少可解码画面');
-      context.drawImage(previous, 0, 0, 720, 1600);
-      await encoded.add(index / 30, 1 / 30, {keyFrame: index % 60 === 0});
-      if (index % 30 === 29) await tick();
+      context.drawImage(previous, 0, 0, width, height);
+      await encoded.add(index / fps, 1 / fps, {keyFrame: index % (fps * VIDEO_ROUND_SECONDS) === 0});
+      if (index % fps === fps - 1) await tick();
     }
     encoded.close(); await output.finalize();
     return new Blob([targetOutput.target.buffer], {type: 'video/mp4'});
@@ -251,7 +258,7 @@ async function muxReviewAudio(blob,buffer,M){
   const source=await openVideo(blob,M);let output,video,audio;
   try{
     const targetOutput=makeOutput(M);output=targetOutput.output;
-    video=new M.EncodedVideoPacketSource('avc');output.addVideoTrack(video,{frameRate:30});
+    video=new M.EncodedVideoPacketSource('avc');output.addVideoTrack(video,{frameRate:fps});
     if(buffer){audio=new M.AudioBufferSource({codec:'aac',quality:new M.Quality({bitrate:48_000})});output.addAudioTrack(audio);}
     const config=await source.track.getDecoderConfig();if(!config)fail('无法读取视频编码参数，请重新导出');
     await output.start();
@@ -274,7 +281,10 @@ export async function prepareVideo(blob,options={}) {
   if (mime === 'video/h264' || mime === 'video/avc') {
     result = await muxAnnexB(blob, M); method = 'h264_copy_mux';
   } else if (mime === 'video/mp4' || mime === 'video/webm') {
-    if (mime === 'video/mp4' && matches(await inspectVideo(blob))) { result = new Blob([blob], {type: 'video/mp4'}); method = 'mp4_passthrough'; }
+    const recording = await inspectVideo(blob);
+    // Allow small capture timing variation, but do not double a 30 fps recording into nominal 60 fps.
+    if (!Number.isFinite(recording.fps) || recording.fps < fps - 5) fail('录制帧率不足，请使用最新版 Chrome 或 Edge 导出 60 FPS 视频');
+    if (mime === 'video/mp4' && matches(recording)) { result = new Blob([blob], {type: 'video/mp4'}); method = 'mp4_passthrough'; }
     else { result = await transcodeFallback(blob, M); method = 'fallback_transcode'; }
   } else fail('不支持的录制视频格式，请重新导出');
   // Keep the fast packet-copy path for the usual native output. A bounded

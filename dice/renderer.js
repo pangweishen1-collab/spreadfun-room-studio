@@ -1,4 +1,4 @@
-import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-hd2';
+import { VIDEO_AVC_CODECS, VIDEO_ROUND_SECONDS, VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { CanvasSpineRenderer } from './six-face/canvas-spine.mjs';
 
 const loadImage = src => new Promise((resolve, reject) => {
@@ -56,16 +56,19 @@ const sameAssets = (current, next) => current && next &&
   ['skel', 'atlas', 'texture', 'atlasPage'].every(key => current[key] === next[key]) &&
   current.png?.['大骰子'] === next.png?.['大骰子'];
 
-// A round is exactly 60 frames (two seconds) at 30fps.
+const LOOP_ROUND_FRAMES = VIDEO_ROUND_SECONDS * VIDEO_SPEC.fps;
+const BASELINE_AVC = VIDEO_AVC_CODECS.at(-1);
+
 export const loopFrameState = (frame, mode, target) => {
   const index = Math.max(0, Math.floor(frame));
-  const sequence = Math.floor(index / 60);
+  const sequence = Math.floor(index / LOOP_ROUND_FRAMES);
+  const timestamp = Math.round(index * 1_000_000 / VIDEO_SPEC.fps);
   return {
-    elapsed: (index % 60) / 30,
+    elapsed: (index % LOOP_ROUND_FRAMES) / VIDEO_SPEC.fps,
     sequence,
     points: mode === 'all' ? [1, 2, 3, 4, 5, 6] : [mode === 'continuous' ? sequence % 6 + 1 : Number(target)],
-    timestamp: Math.round(index * 1_000_000 / 30),
-    duration: Math.round((index + 1) * 1_000_000 / 30) - Math.round(index * 1_000_000 / 30),
+    timestamp,
+    duration: Math.round((index + 1) * 1_000_000 / VIDEO_SPEC.fps) - timestamp,
   };
 };
 
@@ -95,7 +98,7 @@ export class GameRenderer {
     this.elapsed = 1.3;
     this.playing = false;
     this.autoLoop = false;
-    this.loopSeconds = 2;
+    this.loopSeconds = VIDEO_ROUND_SECONDS;
     this.visible = true;
     this.sequence = 0;
     this.last = performance.now();
@@ -204,7 +207,7 @@ export class GameRenderer {
     this.status();
   }
 
-  setLooping(enabled = true, seconds = 2) {
+  setLooping(enabled = true, seconds = VIDEO_ROUND_SECONDS) {
     if (this.recordingLoop) return false;
     if (!Number.isFinite(seconds) || seconds <= 0) throw new RangeError('循环时长须大于0秒');
     this.autoLoop = Boolean(enabled);
@@ -255,7 +258,7 @@ export class GameRenderer {
       if (!this.offlineEncoding && this.data && this.visible && !document.hidden) {
         try {
           this.recordingCheck?.();
-          this.drawLoopFrame(Math.floor((now - this.recordingStarted) * 30 / 1000));
+          this.drawLoopFrame(Math.floor((now - this.recordingStarted) * VIDEO_SPEC.fps / 1000));
         } catch (error) { this.recordingAbort?.(error); }
       }
       requestAnimationFrame(this.tick);
@@ -386,11 +389,11 @@ export class GameRenderer {
 
   async loopEncoderConfig(baselineOnly = false, bitrate = VIDEO_SPEC.bitrate) {
     if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return null;
-    const codecs = baselineOnly ? ['avc1.420028'] : ['avc1.640028', 'avc1.4d0028', 'avc1.420028'];
+    const codecs = baselineOnly ? [BASELINE_AVC] : VIDEO_AVC_CODECS;
     for (const codec of codecs) for (const hardwareAcceleration of ['prefer-hardware', 'no-preference']) {
       const config = {
-        codec, width: 720, height: 1600,
-        framerate: 30, bitrate, hardwareAcceleration,
+        codec, width: VIDEO_SPEC.width, height: VIDEO_SPEC.height,
+        framerate: VIDEO_SPEC.fps, bitrate, hardwareAcceleration,
         // Quality mode preserves every frame; prefer more efficient AVC profiles.
         latencyMode: 'quality', avc: { format: 'annexb' },
       };
@@ -402,7 +405,7 @@ export class GameRenderer {
     return null;
   }
 
-  async recordLoop(seconds = 6, baselineOnly = false, bitrate = VIDEO_SPEC.bitrate) {
+  async recordLoop(seconds = VIDEO_SPEC.duration, baselineOnly = false, bitrate = VIDEO_SPEC.bitrate) {
     this.validateRecording(seconds);
     const saved = Object.fromEntries(['mode', 'target', 'elapsed', 'sequence', 'playing', 'stopAfterRound', 'wasPlaying'].map(key => [key, this[key]]));
     const sourceData = this.data, sourceLoad = this.loadId;
@@ -448,7 +451,7 @@ export class GameRenderer {
         output: chunk => {
           if (abortError) return;
           if (chunk.timestamp <= lastTimestamp || (!chunks.length && chunk.type !== 'key')) {
-            abort(Object.assign(new Error('视频编码帧顺序异常，请重试'), {retryBaseline:config.codec !== 'avc1.420028'}));
+            abort(Object.assign(new Error('视频编码帧顺序异常，请重试'), {retryBaseline:config.codec !== BASELINE_AVC}));
             return;
           }
           lastTimestamp = chunk.timestamp;
@@ -459,12 +462,12 @@ export class GameRenderer {
         error: () => abort(new Error('视频编码失败，请重试')),
       });
       encoder.configure(config);
-      const frames = Math.round(seconds * 30);
+      const frames = Math.round(seconds * VIDEO_SPEC.fps);
       for (let index = 0; index < frames; index++) {
         check();
         const state = this.drawLoopFrame(index);
         const frame = new VideoFrame(this.canvas, { timestamp: state.timestamp, duration: state.duration });
-        try { encoder.encode(frame, { keyFrame: index % 60 === 0 }); }
+        try { encoder.encode(frame, { keyFrame: index % LOOP_ROUND_FRAMES === 0 }); }
         finally { frame.close(); }
         // Bound in-flight frames and yield without waiting for video wall time.
         if (encoder.encodeQueueSize >= 4) await wait(encoder.flush());
@@ -510,7 +513,7 @@ export class GameRenderer {
     let stream, recorder, stopTimer, watchdog, checkVisibility;
     try {
       if (loop) this.drawLoopFrame(0);
-      stream = this.canvas.captureStream(30);
+      stream = this.canvas.captureStream(loop ? VIDEO_SPEC.fps : 30);
       recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: loop ? VIDEO_SPEC.bitrate : 6_000_000 });
       return await new Promise((resolve, reject) => {
         const chunks = [];

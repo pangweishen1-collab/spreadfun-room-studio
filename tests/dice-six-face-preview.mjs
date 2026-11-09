@@ -62,7 +62,7 @@ const deps={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvailable:tr
  },
  fetchAsset:async path=>new Blob([path.endsWith('.png')?png(30,false,DEFAULT_ANCHOR_COLOR):Buffer.from('ID3-default-audio')],{type:path.endsWith('.png')?'image/png':'audio/mpeg'}),
  zipFactory:async()=>{const entries=new Map();return {file(name,value){entries.set(name,value);},async generateAsync(){const zip=new JSZip();for(const [name,value]of entries)zip.file(name,value instanceof Blob?new Uint8Array(await value.arrayBuffer()):value);return new Blob([await zip.generateAsync({type:'uint8array'})],{type:'application/zip'});}};},
- prepareVideo:async(input,options)=>{lastVideoOptions=options;const blob=new Blob(['MP4-contract'],{type:'video/mp4'});Object.defineProperty(blob,'videoInfo',{value:{width:720,height:1600,duration:6,fps:30,frameCount:180}});return blob;}
+ prepareVideo:async(input,options)=>{lastVideoOptions=options;const blob=new Blob(['MP4-contract'],{type:'video/mp4'});Object.defineProperty(blob,'videoInfo',{value:{width:720,height:1600,duration:6,fps:60,frameCount:360}});return blob;}
 };
 const adapter=createLocalPreview(deps),post=(path,body,extra={})=>adapter.api(path,{method:'POST',body,...extra});
 const required=GREEN_SLOTS.map(slot=>new File([png()],slot+'.png',{type:'image/png'}));
@@ -77,9 +77,9 @@ assert.equal(first.grade,'green');assert.equal(first.previewGrade,'green');asser
 assert.deepEqual(first.candidate.geometry,{sourceSize:200,crop:[35,35,131,131],cropOffset:[.5,.5],normalization:{resampled:false}});
 assert.deepEqual(first.candidate.warnings,['fixture warning']);assert.equal(first.soundEnabled,true);assert.equal(first.candidate.audio.dice_roll,'/dice/assets/audio/dice_roll.mp3');
 assert.equal(first.audio.dice_roll.default,true);assert.equal(first.anchor.hidden,true);
-assert.equal(stored.runtime.metadata.zoomPeak,1.3);assert.doesNotThrow(()=>structuredClone(stored));
+assert.equal(stored.runtime.metadata.zoomPeak,1.45);assert.doesNotThrow(()=>structuredClone(stored));
 assert.equal(stored.runtime.metadata.staticImages,14);
-assert.equal(stored.runtime.metadata.motionVersion,'rounded-roll-v4');
+assert.equal(stored.runtime.metadata.motionVersion,'rounded-roll-v5');
 for(const file of first.files)assert.deepEqual(new Uint8Array(await urls.get(file.url).arrayBuffer()),new Uint8Array(await required.find(input=>input.name===file.name).arrayBuffer()));
 checks.push('six_native_files_preserved_geometry_is_serializable_missing_hero_is_explicit_and_public_audio_anchor_contract');
 
@@ -161,7 +161,7 @@ for(let point=1;point<=6;point++){
 checks.push('official_animation_state_spin_standby_and_next_spin_restore_attachments_without_set_to_setup_pose');
 for(let point=1;point<=6;point++){
  assert.deepEqual(stored.runtime.json.animations['spin_'+point].events,[{time:0,name:'dice_roll'},...(point===6?[{time:.6,name:'sound_ui_dice6'}]:[])]);
- for(const [time,scale]of [[0,1],[.3,1.3],[.6,1],[.633333,1]]){
+ for(const [time,scale]of [[0,1],[.3,1.45],[.6,1],[.633333,1]]){
   const skeleton=new S.Skeleton(data);skeleton.setToSetupPose();data.findAnimation('spin_'+point).apply(skeleton,-1,time,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);skeleton.updateWorldTransform(S.Physics.update);
   assert.equal(skeleton.drawOrder[0].data.name,'anchor');assert.equal(skeleton.findSlot('anchor').color.a,0);assert.equal(skeleton.findSlot('anchor').getAttachment().color.a,0);
   assert.ok(Math.abs(skeleton.findBone('daxiao_1').scaleX-scale)<1e-6);assert.ok(Math.abs(skeleton.findBone('shadow_size').scaleX-scale)<1e-6);
@@ -331,7 +331,7 @@ legacyMotion.video={...structuredClone(previousVideo),revision:11,candidate:lega
 records.set(legacyMotion.id,structuredClone(legacyMotion));
 const motionRenders=renderCount,motionWrites=writes,migratedMotion=await adapter.api('/api/preview/'+legacyMotion.id),motionRecord=await storage.get(legacyMotion.id);
 assert.equal(migratedMotion.revision,12);assert.notEqual(migratedMotion.candidate.id,legacyMotion.candidateId);assert.equal(migratedMotion.video,null);
-assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'rounded-roll-v4');
+assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'rounded-roll-v5');
 for(let point=1;point<=6;point++)assert.ok(motionRecord.runtime.json.skins[0].attachments['face_'+point]['landed_'+point]);
 assert.deepEqual(motionRecord.files,legacyMotion.files);assert.deepEqual(motionRecord.audio,legacyMotion.audio);assert.deepEqual(motionRecord.anchor,legacyMotion.anchor);assert.deepEqual(motionRecord.video,legacyMotion.video);
 assert.deepEqual(new Uint8Array(await motionRecord.video.blob.arrayBuffer()),new Uint8Array(await legacyMotion.video.blob.arrayBuffer()));
