@@ -1,4 +1,4 @@
-export async function optimizeAtlasPng(png, level) {
+export async function optimizeAtlasPng(png, level, colorLimit = 256) {
   if (typeof Worker !== 'function') return png;
   let worker, timer;
   try {
@@ -13,7 +13,7 @@ export async function optimizeAtlasPng(png, level) {
       };
       worker.onmessageerror = () => resolve(png);
       timer = setTimeout(() => resolve(png), 12000);
-      worker.postMessage({png, level});
+      worker.postMessage({png, level, colorLimit});
     });
   } catch {
     return png;

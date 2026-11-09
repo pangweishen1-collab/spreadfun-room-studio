@@ -1,12 +1,12 @@
 import init, {optimise} from './vendor/oxipng/squoosh_oxipng.mjs';
 
-self.onmessage = async ({data:{png, level}}) => {
+self.onmessage = async ({data:{png, level, colorLimit}}) => {
   try {
     const input = await png.arrayBuffer();
     let output = new Uint8Array(input);
     try {
       const {quantizeAtlasPng} = await import('./atlas-png-palette.mjs');
-      const indexed = quantizeAtlasPng(input);
+      const indexed = quantizeAtlasPng(input, colorLimit);
       if (indexed && indexed.byteLength < input.byteLength) {
         output = new Uint8Array(indexed);
       }

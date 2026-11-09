@@ -548,7 +548,10 @@ export function createLocalPreview(dependencies={}) {
     }
     add(name+'.skel',skeleton instanceof Blob?skeleton:new Blob([skeleton],{type:'application/octet-stream'}));
     add(name+'.atlas',record.runtime.atlasText.replace(/^[^\r\n]+/,name+'.png'));
-    const texture=await optimizeAtlasPng(record.runtime.texture,record.grade==='green'?2:3);
+    const isGreen = record.grade === 'green';
+    const losslessLevel = isGreen ? 2 : 3;
+    const paletteLimit = isGreen ? 256 : 192;
+    const texture = await optimizeAtlasPng(record.runtime.texture, losslessLevel, paletteLimit);
     add(name+'.png',texture);
     for(const sound of SOUND_NAMES)
       add('sound/'+sound+'.mp3',record.audio?.[sound]?.blob||await defaultAsset(DEFAULT_AUDIO[sound]));
