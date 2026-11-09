@@ -1,5 +1,16 @@
 # 更新记录
 
+## 1.15.8 - 2026-11-09
+
+### Dice preview
+
+- Improve six-second MP4 clarity within a 1.5 MB limit. If the native encode is too large, retry from the original rendered frames.
+- Keep green dice visibly rounded while rolling, and enlarge purple dice in the preview and video export.
+
+### Gift image cutout
+
+- Reduce first-use model downloads with verified compressed chunks and a fallback to the original files. Preserve the existing cutout output.
+
 ## 1.15.7 - 2026-11-09
 
 ### Dice preview
