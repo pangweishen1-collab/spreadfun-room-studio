@@ -8,7 +8,7 @@ export async function generateSixFaceRuntime(files,{name,signal,anchorImage}={})
     .map(file=>new File([file.blob],file.name,{type:'image/png'}));
   const decoded=await decodeFaceFiles(inputs,{signal});let prepared;
   try {
-    prepared=prepareFaces(decoded.images);
+    prepared=prepareFaces(decoded.images,{removeOutline:true});
     const assets=await buildSpineAssets(prepared,{name,signal,anchorImage});
     const geometry=structuredClone(Object.fromEntries(['sourceSize','crop','cropOffset','bounds','loss','normalization']
       .map(key=>[key,prepared[key]])));

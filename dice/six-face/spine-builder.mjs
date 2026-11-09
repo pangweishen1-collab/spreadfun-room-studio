@@ -3,7 +3,7 @@
 import {CUBE_MOTION} from './cube-roll.mjs';
 const ZOOM_PEAK=CUBE_MOTION.zoomPeak;
 import {encodeRgbaPng} from './png-rgba.mjs';
-export const SIX_FACE_MOTION_VERSION='rounded-roll-v5';
+export const SIX_FACE_MOTION_VERSION='rounded-roll-v7';
 const ROLL_START=.025;
 const LAND_START=.55,LAND_READY=.591667,HANDOFF=.6;
 const CORNER_RADIUS=.19;
@@ -57,6 +57,16 @@ for (let y=0;y<edge;y++) for (let x=0;x<edge;x++) {
 }
 const points=FACE.map(f => vertexOrder.map(i => vertex(f,grid[i%side],1-grid[Math.floor(i/side)])));
 const times=[...new Set([...Array.from({length:73},(_,i) => time(i/120)),.608333,.616667,.625,.633333])].sort((a,b) => a-b);
+const rollTimes=times.filter(t => t<=HANDOFF);
+function hasFacingFacet(vertices) {
+  for (let i=0;i<triangles.length;i+=3) {
+    const a=triangles[i]*2,b=triangles[i+1]*2,c=triangles[i+2]*2;
+    const abX=vertices[b]-vertices[a],abY=vertices[b+1]-vertices[a+1];
+    const acX=vertices[c]-vertices[a],acY=vertices[c+1]-vertices[a+1];
+    if (abX*acY-abY*acX>0) return true;
+  }
+  return false;
+}
 const landingBlend = t => smooth((t-LAND_START)/(LAND_READY-LAND_START));
 const flatBlend = t => t<ROLL_START ? 1-smooth(t/ROLL_START) : landingBlend(t);
 const rollAlpha = t => t<HANDOFF ? 1 : 0;
@@ -106,7 +116,7 @@ export function buildSpineJson(prepared) {
   for (let point=1;point<=6;point++) {
     const data={slots:{},bones:{},attachments:{default:{}},drawOrder:[]},bones=data.bones;
     bones[bodyBone]={scale:[{x:1,y:1},{time:.3,x:ZOOM_PEAK,y:ZOOM_PEAK},{time:LAND_READY,x:1,y:1},{time:HANDOFF,x:1,y:1}]};
-    bones.dice_1={translate:times.filter(t => t<=.6).map(t => ({time:t,y:round(Math.sin(Math.min(t/.55,1)*Math.PI)**2*13*(1+(ZOOM_PEAK-1)*(1-Math.abs(2*clamp(t/.6)-1))))}))};
+    bones.dice_1={translate:rollTimes.map(t => ({time:t,y:round(Math.sin(Math.min(t/.55,1)*Math.PI)**2*13*(1+(ZOOM_PEAK-1)*(1-Math.abs(2*clamp(t/.6)-1))))}))};
     data.slots.shadow={rgba:rgbaTimeline(t => hex(1,.15*smooth(t/.08)*(1-landingBlend(t))))};
     bones.shadow_size={scale:bones[bodyBone].scale};
     data.slots.result={attachment:[{name:'sz_'+point}],rgba:rgbaTimeline(t => hex(1,1-rollAlpha(t)))};
@@ -124,27 +134,39 @@ export function buildSpineJson(prepared) {
     }
     for (const [i,f] of FACE.entries()) {
       const slot='face_'+f.point,name='mesh_'+f.point,setup=attachments[slot][name].vertices;
-      data.attachments.default[slot]={[name]:{deform:times.filter(t => t<=.6).map(t => ({time:t,
-        vertices:points[i].flatMap(p => project(p,rotations.get(t))).map((v,k) => round(v-setup[k]))}))}};
+      const projected=new Map(rollTimes.map(t => [t,points[i].flatMap(p => project(p,rotations.get(t)))]));
+      // A curved side is visible if any facet faces the camera. Center-normal
+      // opacity fades cut through the bevel even where it forms the silhouette.
+      const facing=new Set(rollTimes.filter(t => hasFacingFacet(projected.get(t))));
+      data.attachments.default[slot]={[name]:{deform:rollTimes.map(t => ({time:t,
+        vertices:projected.get(t).map((v,k) => round(v-setup[k]))}))}};
       if(f.point===point){
         // Deform the transparent face into and out of the roll on one slot.
         // The separate result slot appears only at the final handoff.
-        const flatFrames=times.filter(t=>t<=ROLL_START || (t>=LAND_START && t<=HANDOFF));
+        const flatFrames=rollTimes.filter(t=>t<=ROLL_START || t>=LAND_START);
         data.attachments.default[slot]['landed_'+f.point]={deform:flatFrames.map(t=>({time:t,
-          vertices:points[i].flatMap(p=>project(p,rotations.get(t))).map((v,k)=>round((v-setup[k])*(1-flatBlend(t))))}))};
+          vertices:projected.get(t).map((v,k)=>round((v-setup[k])*(1-flatBlend(t))))}))};
       }
       const flatName='landed_'+f.point;
       const attachment=f.point===point
         ? [{name:flatName},{time:ROLL_START,name},{time:LAND_START,name:flatName}]
         : [{name}];
-      data.slots[slot]={attachment,rgba:rgbaTimeline(t => {
+      const rgba=rgbaTimeline(t => {
         const n=transform(rotations.get(t),f.n),light=Math.max(0,(-.35*n[0]+.55*n[1]+n[2])/Math.hypot(.35,.55,1));
         const flat=flatBlend(t),shade=.78+.22*light;
-        // A side's bevel can still face the camera after its flat center turns away.
-        const visible=smooth((n[2]+.18)/.28);
         return hex(f.point===point?shade+(1-shade)*flat:shade,
-          rollAlpha(t)*visible*(f.point===point?1:1-flat));
-      })};
+          facing.has(t)?rollAlpha(t)*(f.point===point?1:1-flat):0);
+      });
+      for (let k=0;k<rgba.length-1;k++) {
+        const t=times[k],next=times[k+1];
+        if (t>=ROLL_START&&next<=LAND_START&&facing.has(t)!==facing.has(next)) {
+          rgba[k].curve='stepped';
+          // Align the visibility switch with 60 fps sampling even when the
+          // six-decimal key and Spine Float32 conversion round upward.
+          rgba[k+1].time=time(next-.000001);
+        }
+      }
+      data.slots[slot]={attachment,rgba};
     }
     data.events=[{time:0,name:'dice_roll'},...(point===6?[{time:.6,name:'sound_ui_dice6'}]:[])];
     animations['spin_'+point]=data;

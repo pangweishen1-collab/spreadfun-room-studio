@@ -1,5 +1,7 @@
+import {removeOuterStroke} from './outer-stroke.mjs';
+
 // Register whole canvases together. Never fit/stretch individual alpha bounds.
-export function prepareFaces(images){
+export function prepareFaces(images,{removeOutline=false}={}){
  const warnings=[],sizes={},normalization={method:'contain-full-canvas-centered',canvasSize:null,faces:{},resampled:false};
  let size=0,totalPixels=0;
  for(let p=1;p<=6;p++){
@@ -19,7 +21,9 @@ export function prepareFaces(images){
   const c=document.createElement('canvas');c.width=c.height=size;const ctx=c.getContext('2d',{willReadFrequently:true});if(!ctx)throw Error('当前浏览器无法读取骰面画布');
   if(w===size&&h===size){ctx.drawImage(image,0,0);cropSources[p]=image;}else{ctx.drawImage(image,0,0,w,h,dx,dy,dw,dh);cropSources[p]=c;normalization.resampled ||= scale!==1;}
   landingImages[p]=c;normalization.faces[p]={sourceSize:[w,h],scale,drawRect:[dx,dy,dw,dh]};
-  const pixels=ctx.getImageData(0,0,size,size);let l=size,t=size,r=0,b=0,maxAlpha=0;
+  const pixels=ctx.getImageData(0,0,size,size);
+  if(removeOutline&&removeOuterStroke(pixels)){ctx.putImageData(pixels,0,0);cropSources[p]=c;}
+  let l=size,t=size,r=0,b=0,maxAlpha=0;
   for(let y=0;y<size;y++)for(let x=0;x<size;x++){const a=pixels.data[(y*size+x)*4+3];if(a){l=Math.min(l,x);t=Math.min(t,y);r=Math.max(r,x+1);b=Math.max(b,y+1);maxAlpha=Math.max(maxAlpha,a);}}
   if(r<=l||b<=t)throw Error('第 '+p+' 面为空图或完全透明');
   if(maxAlpha<240)warnings.push('第 '+p+' 面整体透明度较低，已用可见像素扩展边缘；立体贴面会变为不透明，请核对材质');

@@ -1,5 +1,6 @@
 import { VIDEO_AVC_CODECS, VIDEO_ROUND_SECONDS, VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { CanvasSpineRenderer } from './six-face/canvas-spine.mjs';
+import { removeOuterStroke } from './six-face/outer-stroke.mjs';
 
 const loadImage = src => new Promise((resolve, reject) => {
   const image = new Image();
@@ -7,6 +8,20 @@ const loadImage = src => new Promise((resolve, reject) => {
   image.onerror = () => reject(new Error('图片加载失败，请重新生成候选包'));
   image.src = src;
 });
+
+function greenPreviewIcon(image) {
+  const canvas = document.createElement('canvas');
+  const scale = Math.min(1, 512 / Math.max(image.naturalWidth, image.naturalHeight));
+  canvas.width = Math.max(1, Math.round(image.naturalWidth * scale));
+  canvas.height = Math.max(1, Math.round(image.naturalHeight * scale));
+  const context = canvas.getContext('2d', {willReadFrequently:true});
+  if (!context) return image;
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  if (!removeOuterStroke(pixels)) return image;
+  context.putImageData(pixels, 0, 0);
+  return canvas;
+}
 
 const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
 const referenceCandidate = candidate => candidate?.kind === 'purple-reference';
@@ -167,7 +182,8 @@ export class GameRenderer {
       ]);
       if (id !== this.loadId || presentationId !== this.presentationId) { assets?.dispose(); software?.dispose(); return false; }
       const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons};
-      Object.assign(this, {assets, software, candidate, background, icon, data,
+      Object.assign(this, {assets, software, candidate, background,
+        icon:icon && candidate.kind === 'six-face' ? greenPreviewIcon(icon) : icon, data,
         skeletons:Array.from({length:6}, () => new spine.Skeleton(data))});
       try { this.draw(); }
       catch (error) { Object.assign(this, previous); throw error; }
