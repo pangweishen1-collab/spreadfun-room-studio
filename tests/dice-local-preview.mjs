@@ -92,8 +92,8 @@ for(const mode of ['all','single','continuous'])assert.deepEqual(
   validateSettings({...payload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',previewGrade:'purple',mode:'all',point:1,composition:'auto',soundEnabled:true});
 assert.equal(validateSettings({...payload,previewGrade:'green'}).previewGrade,'green');
 for(const previewGrade of ['unknown',null,true])assert.throws(()=>validateSettings({...payload,previewGrade}));
-assert.equal(VIDEO_PROFILE,'loop6-v4-audio-1mb');
-assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_000_000);
+assert.equal(VIDEO_PROFILE,'loop6-v6-audio-1500kb');
+assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_500_000);
 assert.equal(inspectPNG(new Uint8Array(png(200)),'sz_0').width,200);
 const corrupted=new Uint8Array(png(200));corrupted[40]^=1;assert.throws(()=>inspectPNG(corrupted,'sz_0'));
 assert.throws(()=>inspectPNG(new Uint8Array(png(240)),'sz_0'));
@@ -168,45 +168,45 @@ assert.equal((await adapter.api(`/api/preview/${first.id}`)).video.sha256,video.
 checks.push('compact_purple_zip_named_runtime_canonical_res_and_sound_uses_new_native_JSON_motion_with_real_binary_roundtrip');
 const beforeOversize=await storage.get(first.id),writesBeforeOversize=storage.writes;
 preparedSize=VIDEO_SPEC.maxBytes+1;
-try {await rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}));}
+try {await assert.rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}),error=>error.status===400&&/1\.5 MB/.test(error.message));}
 finally {preparedSize=null;}
 assert.equal(storage.writes,writesBeforeOversize);
 assert.deepEqual(await storage.get(first.id),beforeOversize);
 assert.deepEqual(Buffer.from(await (await storage.get(first.id)).video.blob.arrayBuffer()),Buffer.from(await savedVideo.blob.arrayBuffer()));
 assert.equal((await adapter.api(`/api/preview/${first.id}`)).video.url,video.url);
-checks.push('over_1mb_prepared_mp4_is_rejected_without_committing_or_replacing_the_previous_session_video');
+checks.push('prepared_mp4_one_byte_over_1500kb_is_rejected_without_replacing_the_previous_session_video');
 
-const boundarySession=await post('/api/preview/import',{...payload,name:'恰好一MB'});
+const boundarySession=await post('/api/preview/import',{...payload,name:'恰好1.5MB'});
 const boundaryHeaders={'Content-Type':'video/h264','X-Preview-Revision':'1','X-Candidate-Id':boundarySession.candidate.id};
 preparedSize=VIDEO_SPEC.maxBytes;
 let boundaryVideo;
 try {boundaryVideo=await adapter.api(`/api/preview/${boundarySession.id}/video`,{method:'POST',headers:boundaryHeaders,body:new Blob([new Uint8Array(VIDEO_SPEC.maxBytes+1)],{type:'video/h264'})});}
 finally {preparedSize=null;}
-assert.equal(boundaryVideo.size,1_000_000);assert.equal(boundaryVideo.profile,VIDEO_PROFILE);
+assert.equal(boundaryVideo.size,VIDEO_SPEC.maxBytes);assert.equal(boundaryVideo.profile,VIDEO_PROFILE);
 const boundaryRecord=await storage.get(boundarySession.id);
-assert.equal(boundaryRecord.video.blob.size,1_000_000);
+assert.equal(boundaryRecord.video.blob.size,VIDEO_SPEC.maxBytes);
 assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video.sha256,boundaryVideo.sha256);
 const boundaryBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundle`);await compactBundle(boundaryBundle,boundaryRecord);
-assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video.size,1_000_000);
+assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video.size,VIDEO_SPEC.maxBytes);
 const oversizedCache=structuredClone(boundaryRecord);
 oversizedCache.video={...oversizedCache.video,blob:new Blob([new Uint8Array(VIDEO_SPEC.maxBytes+1)],{type:'video/mp4'}),size:1,sha256:'over-budget-cached-video'};
 storage.records.set(boundarySession.id,oversizedCache);
 const oversizeCacheWrites=storage.writes;
 assert.equal((await adapter.api(`/api/preview/${boundarySession.id}`)).video,null,'Actual Blob size overrides a misleading metadata size');
 const oversizeBundle=await adapter.api(`/api/preview/${boundarySession.id}/bundle`);await compactBundle(oversizeBundle,oversizedCache);
-assert.equal((await storage.get(boundarySession.id)).video.blob.size,1_000_001);assert.equal(storage.writes,oversizeCacheWrites);
-checks.push('exactly_1mb_final_video_is_public_and_zipped_raw_intermediates_may_exceed_1mb_and_oversized_cached_blobs_are_hidden_without_deletion');
+assert.equal((await storage.get(boundarySession.id)).video.blob.size,VIDEO_SPEC.maxBytes+1);assert.equal(storage.writes,oversizeCacheWrites);
+checks.push('exactly_1500kb_final_video_is_downloadable_raw_input_may_exceed_the_cap_and_oversized_cached_blobs_stay_hidden_without_deletion');
 
-const v2Session=await post('/api/preview/import',{...payload,name:'历史v2视频'});
-const v2Record=await storage.get(v2Session.id);
-v2Record.video={...savedVideo,profile:'loop6-v2',revision:v2Session.revision,candidate:v2Session.candidate.id};
-storage.records.set(v2Session.id,structuredClone(v2Record));
-const v2Writes=storage.writes;
-assert.equal((await adapter.api(`/api/preview/${v2Session.id}`)).video,null);
-const v2Bundle=await adapter.api(`/api/preview/${v2Session.id}/bundle`);await compactBundle(v2Bundle,v2Record);
-assert.equal(storage.writes,v2Writes);assert.deepEqual((await storage.get(v2Session.id)).video,v2Record.video);
-assert.deepEqual(Buffer.from(await (await storage.get(v2Session.id)).video.blob.arrayBuffer()),Buffer.from(await savedVideo.blob.arrayBuffer()));
-checks.push('fully_bound_v2_video_is_retained_in_storage_but_not_offered_for_download_or_added_to_zip');
+const previousProfileSession=await post('/api/preview/import',{...payload,name:'旧1MB档视频'});
+const previousProfileRecord=await storage.get(previousProfileSession.id);
+previousProfileRecord.video={...savedVideo,profile:'loop6-v4-audio-1mb',revision:previousProfileSession.revision,candidate:previousProfileSession.candidate.id};
+storage.records.set(previousProfileSession.id,structuredClone(previousProfileRecord));
+const previousProfileWrites=storage.writes;
+assert.equal((await adapter.api(`/api/preview/${previousProfileSession.id}`)).video,null);
+const previousProfileBundle=await adapter.api(`/api/preview/${previousProfileSession.id}/bundle`);await compactBundle(previousProfileBundle,previousProfileRecord);
+assert.equal(storage.writes,previousProfileWrites);assert.deepEqual((await storage.get(previousProfileSession.id)).video,previousProfileRecord.video);
+assert.deepEqual(Buffer.from(await (await storage.get(previousProfileSession.id)).video.blob.arrayBuffer()),Buffer.from(await savedVideo.blob.arrayBuffer()));
+checks.push('previous_1mb_profile_is_retained_in_storage_but_not_offered_for_download_or_added_to_zip');
 const third=await post(`/api/preview/${first.id}/settings`,{expectedRevision:2,name:'仙人掌改名'});assert.equal(third.video,null);
 assert.deepEqual((await storage.get(first.id)).video,savedVideo);
 await rejects(()=>adapter.api(`/api/preview/${first.id}/video`,{method:'POST',headers,body:input}),409);

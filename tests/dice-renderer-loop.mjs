@@ -64,7 +64,8 @@ class MockEncoder {
       pending=[pending[0],pending[0],...pending.slice(1)];
     }
     for (const entry of pending) this.callbacks.output({
-      timestamp:entry.timestamp,type:entry.keyFrame?'key':'delta',byteLength:5,
+      timestamp:entry.timestamp,type:entry.keyFrame?'key':'delta',
+      byteLength:scenario==='oversize'&&this.config.bitrate===VIDEO_SPEC.bitrate?8500:5,
       copyTo(bytes) { bytes.set([0,0,0,1,65]); },
     });
     this.encodeQueueSize=0;
@@ -118,7 +119,8 @@ function reset(next) {
 }
 
 try {
-  assert.equal(VIDEO_SPEC.maxBytes,1_000_000,'Actual output size retains the one-megabyte gate');
+  assert.equal(VIDEO_SPEC.maxBytes,1_500_000,'Actual output size is capped at 1.5 MB');
+  assert.equal(VIDEO_SPEC.bitrate,2_500_000,'Allocate more bits for motion detail');
   const probe=makeRenderer();
   const config=await probe.loopEncoderConfig();
   assert.equal(config.bitrate,VIDEO_SPEC.bitrate,'Native encoder must use the shared export bitrate');
@@ -132,7 +134,7 @@ try {
   const blob=await native.recordLoop(VIDEO_SPEC.duration);
   const encoder=encoders[0];
   assert.equal(blob.type,'video/h264');assert.ok(blob.size>0);
-  assert.equal(encoder.config.bitrate,VIDEO_SPEC.bitrate,'Configured encoder must not regress to the old high bitrate');
+  assert.equal(encoder.config.bitrate,VIDEO_SPEC.bitrate,'The encoder uses the shared bitrate');
   assert.equal(encoder.config.avc.format,'annexb');assert.equal(encoder.config.codec,'avc1.640028');
   assert.equal(encoder.inputs.length,180);assert.equal(frames.length,180);
   assert.deepEqual(encoder.inputs.flatMap((entry,index)=>entry.keyFrame?[index]:[]),[0,60,120]);
@@ -143,6 +145,15 @@ try {
   for(const index of [0,60,120])assert.deepEqual(native.drawCalls[index],{time:0,sequence:index/60});
   await assertClean(native);
   checks.push('180_frames_keyframes_timestamps_queue_bound_and_preview_restore');
+
+  reset('oversize');
+  const oversize=makeRenderer();
+  assert.equal((await oversize.recordLoop(6)).size,180*5);
+  assert.equal(encoders.length,2,'Overshoot must encode the source exactly one more time');
+  assert.ok(encoders[1].config.bitrate<encoders[0].config.bitrate);
+  assert.deepEqual(encoders[1].inputs,encoders[0].inputs);
+  await assertClean(oversize);
+  checks.push('native_overshoot_retries_from_original_frames_at_lower_bitrate');
 
   reset('error');
   const failed=makeRenderer();

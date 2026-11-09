@@ -79,7 +79,7 @@ assert.deepEqual(first.candidate.warnings,['fixture warning']);assert.equal(firs
 assert.equal(first.audio.dice_roll.default,true);assert.equal(first.anchor.hidden,true);
 assert.equal(stored.runtime.metadata.zoomPeak,1.3);assert.doesNotThrow(()=>structuredClone(stored));
 assert.equal(stored.runtime.metadata.staticImages,14);
-assert.equal(stored.runtime.metadata.motionVersion,'flat-handoff-v3');
+assert.equal(stored.runtime.metadata.motionVersion,'rounded-roll-v4');
 for(const file of first.files)assert.deepEqual(new Uint8Array(await urls.get(file.url).arrayBuffer()),new Uint8Array(await required.find(input=>input.name===file.name).arrayBuffer()));
 checks.push('six_native_files_preserved_geometry_is_serializable_missing_hero_is_explicit_and_public_audio_anchor_contract');
 
@@ -130,6 +130,21 @@ for(let point=1;point<=6;point++){
  }
 }
 checks.push('landing_attachment_switch_is_continuous_and_becomes_an_untinted_exact_flat_plane_before_atomic_result_handoff_without_double_layers');
+for(let point=1;point<=6;point++){
+ const rolling=pose(point,.3);
+ const sides=rolling.slots.filter(slot=>slot.data.name.startsWith('face_')&&slot.color.a>.65);
+ assert.equal(sides.length,5,'The four grazing sides retain their rounded edges');
+ assert.equal(sides.filter(slot=>slot.color.a>.999).length,1,'Grazing sides fade before their flat texture faces away');
+ const boundary=sides.flatMap(slot=>{
+  const mesh=slot.getAttachment(),vertices=worldVertices(slot);
+  assert.equal(mesh.hullLength,48,'The curved band has an intermediate arc sample on both axes');
+  return Array.from({length:mesh.hullLength/2},(_,i)=>[vertices[i*2],vertices[i*2+1]]);
+ });
+ const maxX=Math.max(...boundary.map(([x])=>x)),minX=Math.min(...boundary.map(([x])=>x));
+ const maxY=Math.max(...boundary.map(([,y])=>y)),corner=Math.max(...boundary.map(([x,y])=>x+y));
+ assert.ok((maxX+maxY-corner)/(maxX-minX)>.03,'The corner is recessed even when the rolling cube faces the camera');
+}
+checks.push('rolling_cube_keeps_sampled_round_corners_and_grazing_bevels_for_all_six_actions');
 for(let point=1;point<=6;point++){
  const skeleton=new S.Skeleton(data),stateData=new S.AnimationStateData(data),next=point%6+1,last=(point+1)%6+1;stateData.defaultMix=0;
  const state=new S.AnimationState(stateData);
@@ -311,13 +326,12 @@ const migratedBundle=await adapter.api('/api/preview/'+legacyAnchor.id+'/bundle'
 checks.push('legacy_white_anchor_migrates_once_to_actual_custom_root_six_scale_pixels_with_one_revision_and_old_video_hidden_not_deleted');
 const legacyMotion=structuredClone(await storage.get(custom.id));
 legacyMotion.id='c'.repeat(32);legacyMotion.candidateId='d'.repeat(32);legacyMotion.revision=11;
-legacyMotion.runtime.metadata.motionVersion='crossfade-v1';
-for(let point=1;point<=6;point++)delete legacyMotion.runtime.json.skins[0].attachments['face_'+point]['landed_'+point];
+legacyMotion.runtime.metadata.motionVersion='flat-handoff-v3';
 legacyMotion.video={...structuredClone(previousVideo),revision:11,candidate:legacyMotion.candidateId};
 records.set(legacyMotion.id,structuredClone(legacyMotion));
 const motionRenders=renderCount,motionWrites=writes,migratedMotion=await adapter.api('/api/preview/'+legacyMotion.id),motionRecord=await storage.get(legacyMotion.id);
 assert.equal(migratedMotion.revision,12);assert.notEqual(migratedMotion.candidate.id,legacyMotion.candidateId);assert.equal(migratedMotion.video,null);
-assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'flat-handoff-v3');
+assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'rounded-roll-v4');
 for(let point=1;point<=6;point++)assert.ok(motionRecord.runtime.json.skins[0].attachments['face_'+point]['landed_'+point]);
 assert.deepEqual(motionRecord.files,legacyMotion.files);assert.deepEqual(motionRecord.audio,legacyMotion.audio);assert.deepEqual(motionRecord.anchor,legacyMotion.anchor);assert.deepEqual(motionRecord.video,legacyMotion.video);
 assert.deepEqual(new Uint8Array(await motionRecord.video.blob.arrayBuffer()),new Uint8Array(await legacyMotion.video.blob.arrayBuffer()));

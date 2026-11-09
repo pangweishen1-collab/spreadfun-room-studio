@@ -1,5 +1,5 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
-import { VIDEO_SPEC } from './video-export.mjs';
+import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-hd2';
 import {generateSixFaceRuntime} from './six-face/runtime.mjs';
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
@@ -269,7 +269,10 @@ export function clearLegacyPreviewHistory() {
 }
 
 function validVideo(video,record) {
-  return video?.blob instanceof Blob&&video.blob.size>0&&video.blob.size<=VIDEO_SPEC.maxBytes&&video.profile===VIDEO_PROFILE&&video.duration===6&&video.fps===30&&video.frameCount===180&&video.width===720&&video.height===1600&&video.revision===record.revision&&video.candidate===record.candidateId;
+  const {maxBytes,profile,duration,fps,frameCount,width,height}=VIDEO_SPEC;
+  return video?.blob instanceof Blob&&video.blob.size>0&&video.blob.size<=maxBytes&&video.profile===profile&&
+    video.duration===duration&&video.fps===fps&&video.frameCount===frameCount&&video.width===width&&video.height===height&&
+    video.revision===record.revision&&video.candidate===record.candidateId;
 }
 async function sha256(blob,bytes) {return [...new Uint8Array(await crypto.subtle.digest('SHA-256',bytes||await blob.arrayBuffer()))].map(v=>v.toString(16).padStart(2,'0')).join('');}
 let zipLoading;
@@ -499,13 +502,15 @@ export function createLocalPreview(dependencies={}) {
     const record=await read(id),headers=new Headers(options.headers),revision=Number(headers.get('X-Preview-Revision'));
     if(!Number.isInteger(revision)||revision!==record.revision||headers.get('X-Candidate-Id')!==record.candidateId)throw new PreviewError('预览已更新，请重新录制当前版本',409);
     if(!(options.body instanceof Blob)||!options.body.size||options.body.size>90*1024*1024)throw new PreviewError('视频大小不合法');
-    const started=performance.now(),module=dependencies.prepareVideo?null:await import('./video-export.mjs');
+    const started=performance.now(),module=dependencies.prepareVideo?null:await import('./video-export.mjs?v=20261109-dice-hd2');
     const blob=await (dependencies.prepareVideo||module.prepareVideo)(options.body,{audio:audioURLs(record),soundEnabled:record.soundEnabled!==false});
     if(!(blob instanceof Blob)||!blob.size)throw new PreviewError('视频校验失败，请重新导出');
-    if(blob.size>VIDEO_SPEC.maxBytes)throw new PreviewError('视频超过 1 MB，请重新生成');
+    const {maxBytes,profile,width,height,duration,fps,frameCount}=VIDEO_SPEC;
+    if(blob.size>maxBytes)throw new PreviewError(`视频超过 ${maxBytes/1_000_000} MB，请重新生成`);
     const info=blob.videoInfo||(module?.inspectVideo?await module.inspectVideo(blob):null);
-    if(!info||info.width!==720||info.height!==1600||Math.abs(info.duration-6)>.02||Math.abs(info.fps-30)>.01||info.frameCount!==180)throw new PreviewError('视频规格需为 6 秒、30 帧/秒、720×1600，共 180 帧');
-    const stored={blob,profile:VIDEO_PROFILE,width:720,height:1600,duration:6,fps:30,frameCount:180,
+    if(!info||info.width!==width||info.height!==height||Math.abs(info.duration-duration)>.02||Math.abs(info.fps-fps)>.01||info.frameCount!==frameCount)
+      throw new PreviewError(`视频规格需为 ${duration} 秒、${fps} 帧/秒、${width}×${height}，共 ${frameCount} 帧`);
+    const stored={blob,profile,width,height,duration,fps,frameCount,
       revision,candidate:record.candidateId,sha256:await hash(blob),fileName:'preview.mp4',size:blob.size,
       method:info.method||'browser_mp4',processingMs:Math.round(performance.now()-started)};
     await storage.put({...record,video:stored},{revision,candidateId:record.candidateId});

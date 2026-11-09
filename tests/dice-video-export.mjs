@@ -28,7 +28,7 @@ function slices(bytes) {
 const folder = await mkdtemp(path.join(tmpdir(), 'dice-video-export-'));
 try {
   const original = await readFile(fixture), raw = annex(fixture), inputBytes = Buffer.from(raw);
-  assert.ok(original.length <= VIDEO_SPEC.maxBytes, 'Packet-copy fixture must meet the current one-megabyte export budget');
+  assert.ok(original.length <= VIDEO_SPEC.maxBytes, 'Packet-copy fixture must meet the current export budget');
   const started = performance.now(), output = await prepareVideo(new Blob([raw], {type: 'video/h264'}));
   const muxMs = performance.now() - started, target = path.join(folder, 'copied.mp4');
   await writeFile(target, new Uint8Array(await output.arrayBuffer()));
@@ -48,6 +48,16 @@ try {
   const passthrough = await prepareVideo(new Blob([original], {type: 'video/mp4'}));
   assert.equal(passthrough.videoInfo.method, 'mp4_passthrough');
   assert.deepEqual(Buffer.from(await passthrough.arrayBuffer()), original);
+  // A valid MP4 free box reaches the cap without altering video packets.
+  const padding = Buffer.alloc(VIDEO_SPEC.maxBytes - original.length);
+  assert.ok(padding.length >= 8, 'Packet-copy fixture needs room for an MP4 free box');
+  padding.writeUInt32BE(padding.length, 0);
+  padding.write('free', 4);
+  const atLimit = await prepareVideo(new Blob([original, padding], {type: 'video/mp4'}));
+  assert.equal(atLimit.size, 1_500_000);
+  assert.equal(atLimit.videoInfo.method, 'mp4_passthrough');
+  assert.equal(atLimit.videoInfo.profile, 'loop6-v6-audio-1500kb');
+  assert.deepEqual(Buffer.from(await atLimit.arrayBuffer()), Buffer.concat([original, padding]));
   await assert.rejects(prepareVideo(new Blob([], {type: 'video/h264'})), /为空/);
   await assert.rejects(prepareVideo(new Blob([raw], {type: 'image/png'})), /不支持/);
   await assert.rejects(prepareVideo(new Blob([new Uint8Array([1,2,3,4,5])], {type: 'video/h264'})), /Annex B/);
@@ -56,5 +66,5 @@ try {
   await assert.rejects(prepareVideo(new Blob([raw, new Uint8Array([0,0,0,1,0x41,0xA0])], {type: 'video/h264'})), /重排序帧/);
   const wrongSize = run(['-f','lavfi','-i','color=c=red:s=320x640:r=30','-t','6','-c:v','libx264','-profile:v','baseline','-bf','0','-preset','ultrafast','-f','h264','pipe:1']);
   await assert.rejects(prepareVideo(new Blob([wrongSize], {type: 'video/h264'})), /720 × 1600/);
-  console.log(JSON.stringify({passed: true, nativeMuxMs: Math.round(muxMs), width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6, compressedSlicesUnchanged: true, decodedFramesUnchanged: true, checks: 13, browserFallbackNotExercised: true}));
+  console.log(JSON.stringify({passed: true, nativeMuxMs: Math.round(muxMs), width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6, compressedSlicesUnchanged: true, decodedFramesUnchanged: true, checks: 14, browserFallbackNotExercised: true}));
 } finally { await rm(folder, {recursive: true, force: true}); }

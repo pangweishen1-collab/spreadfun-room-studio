@@ -3,9 +3,11 @@
 import {CUBE_MOTION} from './cube-roll.mjs';
 const ZOOM_PEAK=CUBE_MOTION.zoomPeak;
 import {encodeRgbaPng} from './png-rgba.mjs';
-export const SIX_FACE_MOTION_VERSION='flat-handoff-v3';
+export const SIX_FACE_MOTION_VERSION='rounded-roll-v4';
 const ROLL_START=.025;
 const LAND_START=.55,LAND_READY=.591667,HANDOFF=.6;
+const CORNER_RADIUS=.19;
+const CORE_HALF_SIZE=.5-CORNER_RADIUS;
 const FACE = [
   {point:1,n:[0,0,1],u:[1,0,0],v:[0,1,0]},
   {point:6,n:[0,0,-1],u:[-1,0,0],v:[0,1,0]},
@@ -33,18 +35,27 @@ function rotation(t,point) {
 }
 function vertex(face,u,v) {
   const p=face.n.map((n,k) => n*.5+face.u[k]*(u-.5)+face.v[k]*(v-.5));
-  const c=p.map(v => clamp(v,-.405,.405)),d=p.map((v,i) => v-c[i]),len=Math.hypot(...d);
-  return c.map((v,i) => v+d[i]/len*.095);
+  const c=p.map(v => clamp(v,-CORE_HALF_SIZE,CORE_HALF_SIZE)),d=p.map((v,i) => v-c[i]),len=Math.hypot(...d);
+  return c.map((v,i) => v+d[i]/len*CORNER_RADIUS);
 }
-const grid=[0,.095,.5,.905,1],uvs=[],triangles=[];
-// Spine requires the 16 hull vertices first, in boundary order.
-const vertexOrder=[0,1,2,3,4,9,14,19,24,23,22,21,20,15,10,5,6,7,8,11,12,13,16,17,18];
-for (const i of vertexOrder) uvs.push(grid[i%5],grid[Math.floor(i/5)]);
-for (let y=0;y<4;y++) for (let x=0;x<4;x++) {
-  const a=y*5+x;
-  triangles.push(...[a,a+5,a+1,a+1,a+5,a+6].map(i => vertexOrder.indexOf(i)));
+// Sample each rounded band between the flat face and its shared edge, so a
+// spinning silhouette has a curved corner instead of a single bevel facet.
+const bevelSample=CORNER_RADIUS*(1-Math.tan(Math.PI/8));
+const grid=[0,bevelSample,CORNER_RADIUS,.5,1-CORNER_RADIUS,1-bevelSample,1];
+const side=grid.length,edge=side-1,hull=edge*4;
+const uvs=[],triangles=[],vertexOrder=[];
+// Spine requires hull vertices first, in boundary order.
+for(let i=0;i<edge;i++) vertexOrder.push(i);
+for(let i=0;i<edge;i++) vertexOrder.push(i*side+edge);
+for(let i=edge;i>0;i--) vertexOrder.push(edge*side+i);
+for(let i=edge;i>0;i--) vertexOrder.push(i*side);
+for(let y=1;y<edge;y++) for(let x=1;x<edge;x++) vertexOrder.push(y*side+x);
+for (const i of vertexOrder) uvs.push(grid[i%side],grid[Math.floor(i/side)]);
+for (let y=0;y<edge;y++) for (let x=0;x<edge;x++) {
+  const a=y*side+x;
+  triangles.push(...[a,a+side,a+1,a+1,a+side,a+side+1].map(i => vertexOrder.indexOf(i)));
 }
-const points=FACE.map(f => vertexOrder.map(i => vertex(f,grid[i%5],1-grid[Math.floor(i/5)])));
+const points=FACE.map(f => vertexOrder.map(i => vertex(f,grid[i%side],1-grid[Math.floor(i/side)])));
 const times=[...new Set([...Array.from({length:73},(_,i) => time(i/120)),.608333,.616667,.625,.633333])].sort((a,b) => a-b);
 const landingBlend = t => smooth((t-LAND_START)/(LAND_READY-LAND_START));
 const flatBlend = t => t<ROLL_START ? 1-smooth(t/ROLL_START) : landingBlend(t);
@@ -87,9 +98,9 @@ export function buildSpineJson(prepared) {
   for (const f of FACE) {
     const vertices=uvs.map((v,i) => round((i%2?.5-v:v-.5)*(i%2?faceHeight:faceWidth)));
     attachments['face_'+f.point]={['mesh_'+f.point]:{type:'mesh',path:'roll_'+f.point,width:faceWidth,height:faceHeight,
-      uvs:[...uvs],triangles:[...triangles],vertices,hull:16}};
+      uvs:[...uvs],triangles:[...triangles],vertices,hull}};
     attachments['face_'+f.point]['landed_'+f.point]={type:'mesh',path:'flat_'+f.point,width:faceWidth,height:faceHeight,
-      uvs:[...uvs],triangles:[...triangles],vertices:[...vertices],hull:16};
+      uvs:[...uvs],triangles:[...triangles],vertices:[...vertices],hull};
   }
   const animations={};
   for (let point=1;point<=6;point++) {
@@ -99,9 +110,10 @@ export function buildSpineJson(prepared) {
     data.slots.shadow={rgba:rgbaTimeline(t => hex(1,.15*smooth(t/.08)*(1-landingBlend(t))))};
     bones.shadow_size={scale:bones[bodyBone].scale};
     data.slots.result={attachment:[{name:'sz_'+point}],rgba:rgbaTimeline(t => hex(1,1-rollAlpha(t)))};
+    const rotations=new Map(times.map(t=>[t,rotation(t,point)]));
     let lastOrder='';
     for (const t of times) {
-      const m=rotation(t,point),order=[0,1,...FACE.map((f,i) => ({i:i+2,z:transform(m,f.n)[2]})).sort((a,b) => a.z-b.z).map(f => f.i),8];
+      const m=rotations.get(t),order=[0,1,...FACE.map((f,i) => ({i:i+2,z:transform(m,f.n)[2]})).sort((a,b) => a.z-b.z).map(f => f.i),8];
       if (order.join()!==lastOrder) {
         data.drawOrder.push({time:t,offsets:slots.flatMap((s,i) => {
           const offset=order.indexOf(i)-i;
@@ -113,23 +125,25 @@ export function buildSpineJson(prepared) {
     for (const [i,f] of FACE.entries()) {
       const slot='face_'+f.point,name='mesh_'+f.point,setup=attachments[slot][name].vertices;
       data.attachments.default[slot]={[name]:{deform:times.filter(t => t<=.6).map(t => ({time:t,
-        vertices:points[i].flatMap(p => project(p,rotation(t,point))).map((v,k) => round(v-setup[k]))}))}};
+        vertices:points[i].flatMap(p => project(p,rotations.get(t))).map((v,k) => round(v-setup[k]))}))}};
       if(f.point===point){
         // Deform the transparent face into and out of the roll on one slot.
         // The separate result slot appears only at the final handoff.
         const flatFrames=times.filter(t=>t<=ROLL_START || (t>=LAND_START && t<=HANDOFF));
         data.attachments.default[slot]['landed_'+f.point]={deform:flatFrames.map(t=>({time:t,
-          vertices:points[i].flatMap(p=>project(p,rotation(t,point))).map((v,k)=>round((v-setup[k])*(1-flatBlend(t))))}))};
+          vertices:points[i].flatMap(p=>project(p,rotations.get(t))).map((v,k)=>round((v-setup[k])*(1-flatBlend(t))))}))};
       }
       const flatName='landed_'+f.point;
       const attachment=f.point===point
         ? [{name:flatName},{time:ROLL_START,name},{time:LAND_START,name:flatName}]
         : [{name}];
       data.slots[slot]={attachment,rgba:rgbaTimeline(t => {
-        const n=transform(rotation(t,point),f.n),light=Math.max(0,(-.35*n[0]+.55*n[1]+n[2])/Math.hypot(.35,.55,1));
+        const n=transform(rotations.get(t),f.n),light=Math.max(0,(-.35*n[0]+.55*n[1]+n[2])/Math.hypot(.35,.55,1));
         const flat=flatBlend(t),shade=.78+.22*light;
+        // A side's bevel can still face the camera after its flat center turns away.
+        const visible=smooth((n[2]+.18)/.28);
         return hex(f.point===point?shade+(1-shade)*flat:shade,
-          rollAlpha(t)*smooth(n[2]/.12)*(f.point===point?1:1-flat));
+          rollAlpha(t)*visible*(f.point===point?1:1-flat));
       })};
     }
     data.events=[{time:0,name:'dice_roll'},...(point===6?[{time:.6,name:'sound_ui_dice6'}]:[])];
@@ -237,7 +251,7 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal,a
   const atlasText=lines.join('\n')+'\n',json=buildSpineJson(prepared);
   const encoded=await encodeRgbaPng(page.width,page.height,page.data,{signal}),textureBlob=encoded.blob;
   const metadata={name:String(name).trim().slice(0,120)||'自定义骰子',format:'Spine 4.2 JSON; MeshAttachment + DeformTimeline',
-    spine:'4.2.43',imageSequences:0,staticImages:14,faceMeshes:6,landingMeshes:6,faceMeshVertices:25,hull:16,
+    spine:'4.2.43',imageSequences:0,staticImages:14,faceMeshes:6,landingMeshes:6,faceMeshVertices:vertexOrder.length,hull,
     motionVersion:SIX_FACE_MOTION_VERSION,landing:{start:LAND_START,ready:LAND_READY,switch:HANDOFF,overlap:false},
     anchor:{slot:'anchor',bone:'root',attachment:'anchor',image:'images/anchor.png',width:30,height:30,scaleX:6,scaleY:6,opacity:0},
     crop:geo.crop,sourceSize:geo.sourceSize,cropOffset:[...prepared.cropOffset],logicalSize:[geo.faceWidth,geo.faceHeight],

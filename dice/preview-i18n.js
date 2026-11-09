@@ -34,6 +34,8 @@ const messages = {
   },
 };
 const errors = {
+  '视频压缩后仍超过 1.5 MB，请重新生成':'The video still exceeds 1.5 MB after compression. Generate it again.',
+  '视频超过 1.5 MB，请重新生成':'The video exceeds 1.5 MB. Generate it again.',
   '分离点数素材需要 sz_0.png 底图':'Separate numerals require a sz_0.png base image.',
   '紫色等级需要上传六张完整骰面':'Purple requires six complete dice faces.',
   '请填写 1～80 字的预览名称':'Enter a preview name with 1–80 characters.',

@@ -3,7 +3,7 @@
 import {mixReviewAudio} from './audio.mjs';
 const media = () => import('../vendor/mediabunny/mediabunny.mjs');
 export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps: 30, frameCount: 180, duration: 6,
-  profile: 'loop6-v4-audio-1mb', bitrate: 1_400_000, maxBytes: 1_000_000});
+  profile: 'loop6-v6-audio-1500kb', bitrate: 2_500_000, maxBytes: 1_500_000});
 const MAX_BYTES = 64 * 1024 * 1024;
 const fail = message => { throw new Error(message); };
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
@@ -194,7 +194,7 @@ function matches(info) {
     Math.abs(info.duration - 6) < .0001 && Math.abs(info.fps - 30) < .001 && info.codec === 'avc' && info.constantFrameRate;
 }
 
-async function transcodeFallback(blob, M, bitrate = VIDEO_SPEC.bitrate) {
+async function transcodeFallback(blob, M, bitrate = 1_900_000) {
   const source = await openVideo(blob, M);
   let output, iterator, canvas;
   try {
@@ -291,12 +291,12 @@ export async function prepareVideo(blob,options={}) {
   }else if(options.soundEnabled===false&&(await inspectVideo(video)).audio){
     result=await muxReviewAudio(video,null,M);
   }
-  for (const bitrate of [1_250_000, 1_050_000]) {
+  for (const bitrate of [1_780_000, 1_600_000]) {
     if (result.size <= VIDEO_SPEC.maxBytes) break;
     video = await transcodeFallback(source, M, bitrate); method = 'size_limited_transcode';
     result=mixed?await muxReviewAudio(video,mixed,M):video;
   }
-  if (result.size > VIDEO_SPEC.maxBytes) fail('视频压缩后仍超过 1 MB，请重新生成');
+  if (result.size > VIDEO_SPEC.maxBytes) fail('视频压缩后仍超过 1.5 MB，请重新生成');
   const info = await inspectVideo(result);
   if (!matches(info)) fail('视频规格校验未通过，请重新导出');
   if(soundEnabled&&(!info.audio||info.audio.codec!=='aac'||info.audio.numberOfChannels!==1||info.audio.sampleRate!==48000))fail('AAC音轨校验失败，请关闭音效后导出');

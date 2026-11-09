@@ -1,10 +1,10 @@
 import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
-import { VIDEO_SPEC } from './video-export.mjs';
+import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-hd2';
 import { DiceAudio } from './audio.mjs';
-import { clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs';
-import { GameRenderer } from '/dice/renderer.js';
-import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js';
+import { clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261109-dice-hd2';
+import { GameRenderer } from '/dice/renderer.js?v=20261109-dice-hd2';
+import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261109-dice-hd2';
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
