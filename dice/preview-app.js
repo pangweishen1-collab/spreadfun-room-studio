@@ -2,7 +2,7 @@ import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
 import { VIDEO_SPEC } from './video-export.mjs';
 import { DiceAudio } from './audio.mjs';
-import { localApi } from './local-preview.mjs';
+import { clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs';
 import { GameRenderer } from '/dice/renderer.js';
 import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js';
 
@@ -14,9 +14,10 @@ let activity = null, notice = null, currentError = null, toastTimer;
 let embedded = null, audioWarning='', audioSignature='';
 const audio = new DiceAudio();
 const requiredSlots = () => GREEN_SLOTS;
-let greenExtras = [];
+let pendingExtras = [];
+const normalizedName = file => file.name.normalize('NFKC').trim().toLowerCase();
 function greenSlot(file) {
- const name=file.name.normalize('NFKC').trim().toLowerCase(),stem=name.replace(/\.png$/i,'');
+ const name=normalizedName(file),stem=name.replace(/\.png$/i,'');
  const m=/^(?:sz[_ -]?|face[_ -]?)?([1-6])$/.exec(stem);
  return /\.png$/i.test(name) && m ? 'sz_'+m[1] : null;
 }
@@ -49,7 +50,7 @@ function fillSettings(value) {
 }
 function releasePending(resetTarget = true) {
   pending.forEach(file => { if(file.previewUrl) URL.revokeObjectURL(file.previewUrl); });
-  pending = new Map(); greenExtras = []; if (resetTarget) uploadGrade = null;
+  pending = new Map(); pendingExtras = []; if (resetTarget) uploadGrade = null;
 }
 const api = localApi;
 const post = (path, body) => api(path, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
@@ -211,8 +212,12 @@ async function importPending() {
   const values = {...settings(), grade:uploadGrade, previewGrade:uploadGrade, composition:'faces'};
   if (!values.name || values.name.length > 80) throw issue('nameRequired');
   activity = {key:'buildingPreview'}; render();
-  const next=await api('/api/preview/import', {method:'POST',body:{...values,files:[...[...pending.values()].map(f=>f.original),...greenExtras]}});
-  await loadSession(next); releasePending(); toast(grade === 'green' ? 'greenImportSuccess' : 'importSuccess');
+  const previous = session;
+  const next=await api('/api/preview/import', {method:'POST',body:{...values,files:[...[...pending.values()].map(f=>f.original),...pendingExtras]}});
+  try { await loadSession(next); }
+  catch (error) { forgetLocalPreview(next.id); throw error; }
+  if (previous) forgetLocalPreview(previous.id);
+  releasePending(); toast(grade === 'green' ? 'greenImportSuccess' : 'importSuccess');
 }
 async function stageFiles(files) {
   if (!files.length) throw issue('noFiles');
@@ -311,7 +316,7 @@ async function stageGreen(files) {
   // Canonical sz_N beats legacy 1.png/2.png included in old resource folders.
   const chosen=[];
   for(const [slot,list] of groups) {
-    const priority=f=>f.name.normalize('NFKC').trim().toLowerCase()===slot+'.png'?0:/^\d\.png$/i.test(f.name)?2:1;
+    const priority=f=>normalizedName(f)===slot+'.png'?0:/^\d\.png$/i.test(f.name)?2:1;
     const best=Math.min(...list.map(priority)),matches=list.filter(f=>priority(f)===best);
     if(matches.length!==1)throw issue('duplicateFiles',{files:matches.map(f=>f.name).join(', ')});
     chosen.push([slot,matches[0]]);
@@ -319,9 +324,10 @@ async function stageGreen(files) {
   if(!chosen.length)throw issue('greenIncomplete');
   if(chosen.length===6)releasePending(false);
   const selected=new Set(chosen.map(([,file])=>file));
-  const extras=usable.filter(f=>!selected.has(f) && (/^(?:icon|大骰子|sz_?0|anchor)\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/i.test(f.name.normalize('NFKC').trim())
-    ||uploadGrade==='purple'&&/^[12]\.png$/i.test(f.name.normalize('NFKC').trim())));
-  greenExtras.push(...extras);
+  const extras=usable.filter(f=>!selected.has(f) && (/^(?:icon|大骰子|sz_?0|anchor)\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/.test(normalizedName(f))
+    ||uploadGrade==='purple'&&/^[12]\.png$/.test(normalizedName(f))));
+  const newExtraNames = new Set(extras.map(normalizedName));
+  pendingExtras = [...pendingExtras.filter(file => !newExtraNames.has(normalizedName(file))), ...extras];
   for(const [slot,file]of chosen) {
     const old=pending.get(slot);if(old?.previewUrl)URL.revokeObjectURL(old.previewUrl);
     pending.set(slot,{slot,name:file.name,original:file,width:'—',height:'—'});
@@ -332,6 +338,7 @@ async function stageGreen(files) {
 function openDialog(id) { const dialog=$(id); if (!dialog.open) dialog.showModal(); }
 
 applyTranslations();
+clearLegacyPreviewHistory();
 try {
   renderer = new GameRenderer($('game-canvas'),syncRound);
   renderer.setLooping(true, 2);

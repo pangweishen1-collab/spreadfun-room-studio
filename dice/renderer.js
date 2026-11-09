@@ -271,14 +271,6 @@ export class GameRenderer {
     const ctx = this.ctx;
     ctx.clearRect(0, 0, 720, 1600);
     ctx.drawImage(this.background, 0, 0, 720, 1600);
-    // The supplied background has a rasterized old title. Replace its title area.
-    const titleFill = ctx.createLinearGradient(0, 418, 0, 515);
-    titleFill.addColorStop(0, purple ? '#b75bf6' : '#76c64e');
-    titleFill.addColorStop(1, purple ? '#bd74ed' : '#91d071');
-    ctx.fillStyle = titleFill;
-    ctx.beginPath();
-    ctx.roundRect(290, 420, 244, 96, 12);
-    ctx.fill();
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.lineJoin = 'round';

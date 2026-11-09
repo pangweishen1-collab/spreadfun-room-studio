@@ -1,4 +1,4 @@
-// Pure session-contract checks. Canvas/IndexedDB rendering remains browser QA.
+// Pure session-contract checks. Canvas rendering remains browser QA.
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import vm from 'node:vm';
@@ -397,5 +397,20 @@ assert.equal(referenceBuilds,1);
 referenceAdapter.dispose();
 checks.push('reference05_preview_download_reuse_identical_native_binary_and_texture_after_name_and_background_changes');
 
+const temporaryDependencies={...dependencies,storage:undefined};
+const currentPage=createLocalPreview(temporaryDependencies);
+const initialUpload=await currentPage.api('/api/preview/import',{method:'POST',body:payload});
+const repeatedUpload=await currentPage.api('/api/preview/import',{method:'POST',body:payload});
+currentPage.forget(initialUpload.id);
+assert.equal(urlBlobs.has(initialUpload.candidate.texture),false);
+assert.equal(urlBlobs.has(repeatedUpload.candidate.texture),true);
+await rejects(()=>currentPage.api(`/api/preview/${initialUpload.id}`),404);
+assert.equal((await currentPage.api(`/api/preview/${repeatedUpload.id}`)).id,repeatedUpload.id);
+const reloadedPage=createLocalPreview(temporaryDependencies);
+await rejects(()=>reloadedPage.api(`/api/preview/${repeatedUpload.id}`),404);
+currentPage.forget(repeatedUpload.id);
+assert.equal(urlBlobs.has(repeatedUpload.candidate.texture),false);
+checks.push('default_sessions_are_page_local_and_discarding_a_preview_releases_its_record_and_blob_urls');
+
 adapter.dispose();restored.dispose();assert.equal(urlBlobs.size,0);
-console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Pure session/PNG/ZIP/CAS logic with injected Canvas and storage. Real browser Canvas, IndexedDB, Spine and video module require browser QA.'},null,2));
+console.log(JSON.stringify({ok:true,count:checks.length,checks,limits:'Pure session/PNG/ZIP/CAS logic with injected Canvas. Real browser Canvas, Spine and video module require browser QA.'},null,2));

@@ -3,7 +3,8 @@
 import {CUBE_MOTION} from './cube-roll.mjs';
 const ZOOM_PEAK=CUBE_MOTION.zoomPeak;
 import {encodeRgbaPng} from './png-rgba.mjs';
-export const SIX_FACE_MOTION_VERSION='flat-handoff-v2';
+export const SIX_FACE_MOTION_VERSION='flat-handoff-v3';
+const ROLL_START=.025;
 const LAND_START=.55,LAND_READY=.591667,HANDOFF=.6;
 const FACE = [
   {point:1,n:[0,0,1],u:[1,0,0],v:[0,1,0]},
@@ -46,7 +47,8 @@ for (let y=0;y<4;y++) for (let x=0;x<4;x++) {
 const points=FACE.map(f => vertexOrder.map(i => vertex(f,grid[i%5],1-grid[Math.floor(i/5)])));
 const times=[...new Set([...Array.from({length:73},(_,i) => time(i/120)),.608333,.616667,.625,.633333])].sort((a,b) => a-b);
 const landingBlend = t => smooth((t-LAND_START)/(LAND_READY-LAND_START));
-const rollAlpha = t => t<HANDOFF?smooth(t/.08):0;
+const flatBlend = t => t<ROLL_START ? 1-smooth(t/ROLL_START) : landingBlend(t);
+const rollAlpha = t => t<HANDOFF ? 1 : 0;
 // Slot RGBA interpolates all channels together. Finish the visible pose first,
 // then step its alpha at handoff so two different silhouettes never crossfade.
 const rgbaTimeline = color => times.map((t,i)=>({time:t,color:color(t),
@@ -94,7 +96,7 @@ export function buildSpineJson(prepared) {
     const data={slots:{},bones:{},attachments:{default:{}},drawOrder:[]},bones=data.bones;
     bones[bodyBone]={scale:[{x:1,y:1},{time:.3,x:ZOOM_PEAK,y:ZOOM_PEAK},{time:LAND_READY,x:1,y:1},{time:HANDOFF,x:1,y:1}]};
     bones.dice_1={translate:times.filter(t => t<=.6).map(t => ({time:t,y:round(Math.sin(Math.min(t/.55,1)*Math.PI)**2*13*(1+(ZOOM_PEAK-1)*(1-Math.abs(2*clamp(t/.6)-1))))}))};
-    data.slots.shadow={rgba:rgbaTimeline(t => hex(1,.15*rollAlpha(t)*(1-landingBlend(t))))};
+    data.slots.shadow={rgba:rgbaTimeline(t => hex(1,.15*smooth(t/.08)*(1-landingBlend(t))))};
     bones.shadow_size={scale:bones[bodyBone].scale};
     data.slots.result={attachment:[{name:'sz_'+point}],rgba:rgbaTimeline(t => hex(1,1-rollAlpha(t)))};
     let lastOrder='';
@@ -113,16 +115,21 @@ export function buildSpineJson(prepared) {
       data.attachments.default[slot]={[name]:{deform:times.filter(t => t<=.6).map(t => ({time:t,
         vertices:points[i].flatMap(p => project(p,rotation(t,point))).map((v,k) => round(v-setup[k]))}))}};
       if(f.point===point){
-        // Reuse the original transparent landing texture, including ears/horns.
-        // This attachment has its own deform track; changing meshes resets deform.
-        data.attachments.default[slot]['landed_'+f.point]={deform:times.filter(t=>t>=LAND_START&&t<=HANDOFF).map(t=>({time:t,
-          vertices:points[i].flatMap(p=>project(p,rotation(t,point))).map((v,k)=>round((v-setup[k])*(1-landingBlend(t))))}))};
+        // Deform the transparent face into and out of the roll on one slot.
+        // The separate result slot appears only at the final handoff.
+        const flatFrames=times.filter(t=>t<=ROLL_START || (t>=LAND_START && t<=HANDOFF));
+        data.attachments.default[slot]['landed_'+f.point]={deform:flatFrames.map(t=>({time:t,
+          vertices:points[i].flatMap(p=>project(p,rotation(t,point))).map((v,k)=>round((v-setup[k])*(1-flatBlend(t))))}))};
       }
-      data.slots[slot]={attachment:[{name},...(f.point===point?[{time:LAND_START,name:'landed_'+f.point}]:[])],rgba:rgbaTimeline(t => {
+      const flatName='landed_'+f.point;
+      const attachment=f.point===point
+        ? [{name:flatName},{time:ROLL_START,name},{time:LAND_START,name:flatName}]
+        : [{name}];
+      data.slots[slot]={attachment,rgba:rgbaTimeline(t => {
         const n=transform(rotation(t,point),f.n),light=Math.max(0,(-.35*n[0]+.55*n[1]+n[2])/Math.hypot(.35,.55,1));
-        const settle=landingBlend(t),shade=.78+.22*light;
-        return hex(f.point===point?shade+(1-shade)*settle:shade,
-          rollAlpha(t)*smooth(n[2]/.12)*(f.point===point?1:1-settle));
+        const flat=flatBlend(t),shade=.78+.22*light;
+        return hex(f.point===point?shade+(1-shade)*flat:shade,
+          rollAlpha(t)*smooth(n[2]/.12)*(f.point===point?1:1-flat));
       })};
     }
     data.events=[{time:0,name:'dice_roll'},...(point===6?[{time:.6,name:'sound_ui_dice6'}]:[])];

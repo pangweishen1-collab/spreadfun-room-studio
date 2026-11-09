@@ -249,38 +249,23 @@ async function renderRuntime(files,composition,decode) {
   } finally {for(const image of images.values())image.close?.();}
 }
 
-export function createIndexedDBStorage(indexedDB=globalThis.indexedDB) {
-  let opening;
-  function database() {
-    if(!indexedDB) return Promise.reject(new PreviewError('此浏览器无法保存本地会话，请启用网站存储'));
-    if(!opening) opening=new Promise((resolve,reject)=>{
-      const request=indexedDB.open('fun-toolkit-dice-preview',1);
-      request.onupgradeneeded=()=>{if(!request.result.objectStoreNames.contains('sessions'))request.result.createObjectStore('sessions',{keyPath:'id'});};
-      request.onsuccess=()=>{request.result.onversionchange=()=>request.result.close();resolve(request.result);};
-      request.onerror=()=>reject(new PreviewError('本地会话存储不可用，请检查浏览器网站存储权限'));
-      request.onblocked=()=>reject(new PreviewError('本地会话存储正在更新，请关闭其他骰子页面后重试'));
-    });
-    return opening;
-  }
+function createSessionStorage() {
+  const records=new Map();
   return {
-    async get(id) {const db=await database();return new Promise((resolve,reject)=>{const r=db.transaction('sessions','readonly').objectStore('sessions').get(id);r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(new PreviewError('本地会话读取失败'));});},
+    async get(id) {return records.get(id);},
     async put(record,expected=null) {
-      const db=await database();
-      return new Promise((resolve,reject)=>{
-        const tx=db.transaction('sessions','readwrite'),store=tx.objectStore('sessions'),read=store.get(record.id);let failure;
-        read.onsuccess=()=>{
-          const before=read.result;
-          if(expected===null?Boolean(before):!before||before.revision!==expected.revision||before.candidateId!==expected.candidateId) {
-            failure=new PreviewError('预览已更新，请刷新后重试',409);tx.abort();return;
-          }
-          store.put(record);
-        };
-        tx.oncomplete=()=>resolve();
-        tx.onabort=()=>reject(failure||new PreviewError('本地存储空间不足或不可用，原会话已保留'));
-        tx.onerror=()=>{};
-      });
-    }
+      const before=records.get(record.id);
+      if(expected===null?Boolean(before):!before||before.revision!==expected.revision||before.candidateId!==expected.candidateId)
+        throw new PreviewError('预览已更新，请刷新后重试',409);
+      records.set(record.id,record);
+    },
+    delete(id) {records.delete(id);}
   };
+}
+
+export function clearLegacyPreviewHistory() {
+  // The old database held only transient dice previews. Storage access may be blocked in an iframe.
+  try {globalThis.indexedDB?.deleteDatabase('fun-toolkit-dice-preview');} catch {}
 }
 
 function validVideo(video,record) {
@@ -301,7 +286,7 @@ async function zipFactory() {
 }
 
 export function createLocalPreview(dependencies={}) {
-  const storage=dependencies.storage||createIndexedDBStorage();
+  const storage=dependencies.storage||createSessionStorage();
   const decode=dependencies.decodePNG||decodePNG;
   const render=dependencies.renderRuntime||((files,composition)=>renderRuntime(files,composition,decode));
   const renderSix=dependencies.renderSixFace||generateSixFaceRuntime;
@@ -573,9 +558,18 @@ export function createLocalPreview(dependencies={}) {
     }
     throw new PreviewError('预览接口不存在',404);
   }
-  return {api,dispose(){for(const value of urls.values())revoke(value);urls.clear();}};
+  function forget(id) {
+    storage.delete?.(id);
+    for(const [key,value] of urls) {
+      if(!key.startsWith(id+'/'))continue;
+      revoke(value);
+      urls.delete(key);
+    }
+  }
+  return {api,forget,dispose(){for(const value of urls.values())revoke(value);urls.clear();}};
 }
 
 let singleton;
 export function localApi(path,options={}) {singleton??=createLocalPreview();return singleton.api(path,options);}
+export function forgetLocalPreview(id) {singleton?.forget(id);}
 export const api=localApi;

@@ -93,6 +93,16 @@ function assertAtomicLanding(data){
   }
  }
 }
+function assertCleanStart(data){
+ for(let point=1;point<=6;point++)for(const time of [0,.008333,.016667,.025001,1/30,2/30,.08]){
+  const skeleton=new S.Skeleton(data);
+  data.findAnimation('spin_'+point).apply(skeleton,-1,time,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
+  const visibleFaces=skeleton.slots.filter(slot=>slot.data.name.startsWith('face_')&&slot.color.a>0);
+  assert.equal(skeleton.findSlot('result').color.a,0,'Starting the roll must not overlay the static result');
+  assert.ok(visibleFaces.length>0,'Starting the roll must not leave a blank frame');
+  if(time===0)assert.deepEqual(Array.from(visibleFaces,slot=>slot.getAttachment().path),['flat_'+point]);
+ }
+}
 function assertContinuousParity(left,right){
  for(let point=1;point<=6;point++){
   const skeletons=[left,right].map(data=>new S.Skeleton(data)),states=[left,right].map(data=>{const config=new S.AnimationStateData(data);config.defaultMix=0;return new S.AnimationState(config);});
@@ -108,9 +118,10 @@ function assertContinuousParity(left,right){
     for(const channel of ['r','g','b','a'])near(x.color[channel],y.color[channel],'Continuous slot color',1e-6);
     arrayNear(x.deform,y.deform,'Continuous deform');arrayNear(verticesOf(x),verticesOf(y),'Continuous world vertices');
    }
-   if(name.startsWith('standby_')||states[1].getCurrent(0).trackTime<.55){
-    for(let face=1;face<=6;face++)assert.equal(b.findSlot('face_'+face).getAttachment().name,'mesh_'+face,'Actions restore rolling attachments without setup reset');
-   }
+   const spinTime=states[1].getCurrent(0).trackTime;
+   const flatPoint=name.startsWith('spin_')&&(spinTime<.025||spinTime>=.55)?Number(name.split('_')[1]):0;
+   for(let face=1;face<=6;face++)assert.equal(b.findSlot('face_'+face).getAttachment().name,
+     (face===flatPoint?'landed_':'mesh_')+face,'Actions restore the appropriate attachments without setup reset');
    if(name.startsWith('standby_'))assert.equal(b.findSlot('result').getAttachment().path,'flat_'+Number(name.split('_')[1]));
   }
  }
@@ -135,6 +146,7 @@ for(const prepared of cases){
   const p=Number(animation.name.split('_')[1]),skeleton=new S.Skeleton(decoded);skeleton.setToSetupPose();other.apply(skeleton,-1,other.duration,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
   assert.equal(skeleton.findSlot('result').getAttachment().path,'flat_'+p);
  }
+ assertCleanStart(original);assertCleanStart(decoded);
  assertAtomicLanding(original);assertAtomicLanding(decoded);assertContinuousParity(original,decoded);
  results.push({sourceSize:prepared.sourceSize,bytes:bytes.length,animations:12,imagesPath:decoded.imagesPath,audioPath:decoded.audioPath});
 }

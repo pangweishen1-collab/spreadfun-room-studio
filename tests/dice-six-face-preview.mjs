@@ -79,7 +79,7 @@ assert.deepEqual(first.candidate.warnings,['fixture warning']);assert.equal(firs
 assert.equal(first.audio.dice_roll.default,true);assert.equal(first.anchor.hidden,true);
 assert.equal(stored.runtime.metadata.zoomPeak,1.3);assert.doesNotThrow(()=>structuredClone(stored));
 assert.equal(stored.runtime.metadata.staticImages,14);
-assert.equal(stored.runtime.metadata.motionVersion,'flat-handoff-v2');
+assert.equal(stored.runtime.metadata.motionVersion,'flat-handoff-v3');
 for(const file of first.files)assert.deepEqual(new Uint8Array(await urls.get(file.url).arrayBuffer()),new Uint8Array(await required.find(input=>input.name===file.name).arrayBuffer()));
 checks.push('six_native_files_preserved_geometry_is_serializable_missing_hero_is_explicit_and_public_audio_anchor_contract');
 
@@ -108,6 +108,7 @@ function assertLandedPlane(skeleton,point){
  for(let other=1;other<=6;other++)if(other!==point)assert.equal(skeleton.findSlot('face_'+other).color.a,0);
 }
 for(let point=1;point<=6;point++){
+ assertLandedPlane(pose(point,0),point);
  const before=pose(point,.549999).findSlot('face_'+point),at=pose(point,.550001).findSlot('face_'+point);
  assert.equal(before.getAttachment().name,'mesh_'+point);assert.equal(at.getAttachment().name,'landed_'+point);
  const left=worldVertices(before),right=worldVertices(at);assert.equal(left.length,right.length);
@@ -135,9 +136,10 @@ for(let point=1;point<=6;point++){
  for(const [name,time]of [['spin_'+point,.575],['standby_'+next,0],['spin_'+last,0],['spin_'+last,.3],['spin_'+last,.275]]){
   if(state.getCurrent(0)?.animation.name!==name)state.setAnimation(0,name,false);
   state.update(time);state.apply(skeleton);skeleton.updateWorldTransform(S.Physics.update);
-  if(name.startsWith('standby_')||state.getCurrent(0).trackTime<.55){
-   for(let face=1;face<=6;face++)assert.equal(skeleton.findSlot('face_'+face).getAttachment().name,'mesh_'+face,'Each action restores rolling attachments without a setup reset');
-  }else assert.equal(skeleton.findSlot('face_'+Number(name.split('_')[1])).getAttachment().name,'landed_'+Number(name.split('_')[1]));
+  const spinTime=state.getCurrent(0).trackTime;
+  const flatPoint=name.startsWith('spin_')&&(spinTime<.025||spinTime>=.55)?Number(name.split('_')[1]):0;
+  for(let face=1;face<=6;face++)assert.equal(skeleton.findSlot('face_'+face).getAttachment().name,
+    (face===flatPoint?'landed_':'mesh_')+face,'Each action restores the appropriate attachments without a setup reset');
   if(name.startsWith('standby_'))assert.equal(skeleton.findSlot('result').getAttachment().path,'flat_'+next);
  }
 }
@@ -315,7 +317,7 @@ legacyMotion.video={...structuredClone(previousVideo),revision:11,candidate:lega
 records.set(legacyMotion.id,structuredClone(legacyMotion));
 const motionRenders=renderCount,motionWrites=writes,migratedMotion=await adapter.api('/api/preview/'+legacyMotion.id),motionRecord=await storage.get(legacyMotion.id);
 assert.equal(migratedMotion.revision,12);assert.notEqual(migratedMotion.candidate.id,legacyMotion.candidateId);assert.equal(migratedMotion.video,null);
-assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'flat-handoff-v2');
+assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'flat-handoff-v3');
 for(let point=1;point<=6;point++)assert.ok(motionRecord.runtime.json.skins[0].attachments['face_'+point]['landed_'+point]);
 assert.deepEqual(motionRecord.files,legacyMotion.files);assert.deepEqual(motionRecord.audio,legacyMotion.audio);assert.deepEqual(motionRecord.anchor,legacyMotion.anchor);assert.deepEqual(motionRecord.video,legacyMotion.video);
 assert.deepEqual(new Uint8Array(await motionRecord.video.blob.arrayBuffer()),new Uint8Array(await legacyMotion.video.blob.arrayBuffer()));

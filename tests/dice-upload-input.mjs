@@ -385,7 +385,7 @@ const checks=[];
   // Execute the actual controller functions without booting its DOM/event shell.
   const source=await readFile(new URL('../dice/preview-app.js',import.meta.url),'utf8');
   const fields=Object.fromEntries(['dice-name','sound-enabled','preview-mode','preview-point'].map(id=>[id,{value:'',checked:true}]));
-  const calls=[],renderCalls=[],revoked=[],audioChanges=[],six=Array.from({length:6},(_,i)=>Object.freeze({name:`sz_${i+1}.png`,sha256:`original-${i+1}`}));
+  const calls=[],renderCalls=[],revoked=[],forgotten=[],audioChanges=[],six=Array.from({length:6},(_,i)=>Object.freeze({name:`sz_${i+1}.png`,sha256:`original-${i+1}`}));
   let app,serial=0,importFailure=null,settingsFailure=null,loadFailure=null,patchFailure=null,patchAccepted=true;
   const runtimeKind=grade=>grade==='purple'?'purple-gyro':'six-face';
   const fixtureSession=(grade='purple',composition='faces')=>({id:`old-${grade}-${composition}`,revision:1,name:'旧骰子',grade,previewGrade:grade,mode:'all',point:1,composition,resolvedComposition:composition==='faces'?'faces':'digits',soundEnabled:true,
@@ -393,6 +393,7 @@ const checks=[];
     candidate:{id:`old-candidate-${grade}-${composition}`,kind:runtimeKind(grade),template:grade,previewGrade:grade,runtimeIdentity:`original-runtime-${grade}`,json:{marker:`original-json-${grade}`},geometry:{marker:`original-geometry-${grade}`},atlas:`original-atlas-${grade}`,texture:`original-texture-${grade}`,audio:{dice_roll:'original-roll-audio'}}});
   const context={document:{getElementById:id=>{assert.ok(fields[id],`unexpected controller DOM access: ${id}`);return fields[id];}},
     URL:{createObjectURL:()=>`blob:controller-${++serial}`,revokeObjectURL:value=>revoked.push(value)},VIDEO_SPEC:{profile:'test'},t:key=>key,diceFilePath,
+    forgetLocalPreview:id=>forgotten.push(id),
     DiceAudio:class {ready=true;setEnabled(value){audioChanges.push(value);}async load(){}async unlock(){}stop(){}},
     localApi:async(path,options)=>{
       const body=typeof options.body==='string'?JSON.parse(options.body):options.body;calls.push({path,body});
@@ -417,8 +418,8 @@ const checks=[];
       reset(value=null){releasePending();session=value;grade=value?.grade||'green';previewGrade=value?.previewGrade||grade;currentError=null;notice=null;
         previewReady=hasCanvas=Boolean(value);loadingPreview=false;busy=false;audioSignature='';renderer.candidate=value?.candidate||null;
         if(value)fillSettings(value);else{$('dice-name').value='';$('sound-enabled').checked=true;}},
-      setPending(files,extras=[]){releasePending(false);greenExtras=extras;files.forEach(original=>pending.set(greenSlot(original),{slot:greenSlot(original),original,previewUrl:URL.createObjectURL(original)}));},
-      state(){return {session,grade,uploadGrade,previewGrade,pending,extras:greenExtras,previewReady,hasCanvas,loadingPreview,currentError,notice,rendererCandidate:renderer.candidate};}};
+      setPending(files,extras=[]){releasePending(false);pendingExtras=extras;files.forEach(original=>pending.set(greenSlot(original),{slot:greenSlot(original),original,previewUrl:URL.createObjectURL(original)}));},
+      state(){return {session,grade,uploadGrade,previewGrade,pending,extras:pendingExtras,previewReady,hasCanvas,loadingPreview,currentError,notice,rendererCandidate:renderer.candidate};}};
     renderer={data:{},candidate:null,async load(candidate){await loadCandidate(candidate);this.candidate=candidate;return true;},
       async patchPresentation(candidate){const accepted=await patchCandidate(candidate);if(accepted)this.candidate=candidate;return accepted;},configure(){},play(){},clear(){}};
   `,executed);app=executed.app;
@@ -452,13 +453,30 @@ const checks=[];
 
   for(const previous of [null,fixtureSession('green')]){
     app.reset(previous);app.selectUploadGrade('purple');fields['dice-name'].value='新紫色';app.setPending(six);const pending=app.state().pending;
+    const beforeFailures=forgotten.length;
     importFailure=Error('import rejected');await assert.rejects(()=>app.importPending(),error=>error===importFailure);
     assert.equal(app.state().session,previous);assert.equal(app.state().grade,'green');assert.equal(app.state().previewGrade,'green');assert.equal(app.state().pending,pending);assert.equal(app.state().pending.size,6);assert.equal(app.state().uploadGrade,'purple');importFailure=null;
     loadFailure=Error('renderer rejected');await assert.rejects(()=>app.importPending(),error=>error.key==='previewLoadFailed'&&error.cause===loadFailure);
     assert.equal(app.state().session,previous);assert.equal(app.state().grade,'green');assert.equal(app.state().previewGrade,'green');assert.equal(app.state().pending,pending);assert.equal(app.state().uploadGrade,'purple');assert.equal(app.state().rendererCandidate,previous?.candidate||null);assert.equal(app.state().hasCanvas,Boolean(previous));
+    assert.deepEqual(forgotten.slice(beforeFailures),[renderCalls.at(-1).candidate.geometry.marker]);
     assert.equal(renderCalls.at(-1).state.grade,'green','Even while the replacement renderer loads, the committed source remains the old grade');loadFailure=null;
   }
   checks.push('actual_controller_first_or_replacement_import_and_renderer_failures_preserve_committed_source_background_preview_and_pending_files');
+
+  app.reset(fixtureSession('purple'));
+  const previousId=app.state().session.id;
+  app.selectUploadGrade('purple');
+  const firstAnchor={name:'anchor.png'},replacementAnchor={name:'anchor.png'};
+  await app.stageFiles([...six.slice(0,2),firstAnchor]);
+  await app.stageFiles([...six.slice(2),replacementAnchor]);
+  assert.deepEqual(Array.from(calls.at(-1).body.files),[...six,replacementAnchor]);
+  assert.equal(forgotten.at(-1),previousId);
+  const importedId=app.state().session.id;
+  app.selectUploadGrade('purple');
+  await app.stageFiles([...six,replacementAnchor]);
+  assert.equal(forgotten.at(-1),importedId);
+  assert.equal(app.state().pending.size,0);
+  checks.push('partial_batches_keep_latest_optional_asset_and_successful_reuploads_release_the_previous_preview');
 
   for(const sourceGrade of ['green','purple']){
     const original=fixtureSession(sourceGrade,sourceGrade==='purple'?'auto':'faces');app.reset(original);
