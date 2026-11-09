@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.15.4 - 2026-11-09
+
+- Use up to 192 palette colors for purple atlas PNGs and up to 256 for green atlas PNGs when exporting dice ZIPs.
+
 ## 1.15.3 - 2026-11-09
 
 ### Dice atlas compression
