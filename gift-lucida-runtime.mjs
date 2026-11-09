@@ -1,10 +1,11 @@
+import {checksum, fetchVerifiedChunk} from './gift-lucida-download.mjs';
+
 const base = new URL('./vendor/ort-lucida/', import.meta.url);
 const GPU_WASM_SHA = '39f9f0894d478800487ed9f7dbe92618498db320cf55c8e3d89adff8dce658da';
 const GPU_WASM_BYTES = 26781914;
 let runtimePromise = null, providers = null;
 export let ort;
 
-const checksum = async data => Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), byte => byte.toString(16).padStart(2, '0')).join('');
 export function threadCount(scope = globalThis) {
   if (scope.crossOriginIsolated !== true || typeof scope.SharedArrayBuffer !== 'function') return 1;
   const count = Number(scope.navigator?.hardwareConcurrency);
@@ -19,17 +20,20 @@ async function gpuWasm() {
     || !Array.isArray(manifest.chunks) || manifest.chunks.length !== 2) throw new Error('WebGPU 运行时版本不匹配。');
   const binary = new Uint8Array(manifest.bytes);
   let offset = 0;
-  for (const chunk of manifest.chunks) {
-    if (!/^asyncify-wasm-[12]\.bin$/.test(chunk.file) || !Number.isInteger(chunk.bytes)
+  const chunks = manifest.chunks.map((chunk, index) => {
+    if (chunk.file !== `asyncify-wasm-${index + 1}.bin` || !Number.isInteger(chunk.bytes)
       || chunk.bytes < 1 || chunk.bytes > 20 * 1024 * 1024 || offset + chunk.bytes > binary.length
       || !/^[a-f0-9]{64}$/.test(chunk.sha256)) throw new Error('WebGPU 运行时分块无效。');
-    const result = await fetch(new URL(chunk.file, base));
-    if (!result.ok) throw new Error('WebGPU 运行时分块未能加载。');
-    const bytes = await result.arrayBuffer();
-    if (bytes.byteLength !== chunk.bytes || await checksum(bytes) !== chunk.sha256) throw new Error('WebGPU 运行时分块校验失败。');
-    binary.set(new Uint8Array(bytes), offset); offset += bytes.byteLength;
-  }
-  if (offset !== binary.length || await checksum(binary) !== manifest.sha256) throw new Error('WebGPU 运行时完整性校验失败。');
+    const start = offset;
+    offset += chunk.bytes;
+    return {chunk, start};
+  });
+  if (offset !== binary.length) throw new Error('WebGPU 运行时分块长度不匹配。');
+  await Promise.all(chunks.map(async ({chunk, start}) => {
+    const bytes = await fetchVerifiedChunk(base, chunk, {label: 'WebGPU 运行时'});
+    binary.set(new Uint8Array(bytes), start);
+  }));
+  if (await checksum(binary) !== manifest.sha256) throw new Error('WebGPU 运行时完整性校验失败。');
   return binary;
 }
 

@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const {pathToFileURL} = require('node:url');
 const {createHash} = require('node:crypto');
+const {gzipSync} = require('node:zlib');
 
 (async () => {
   const production = path.resolve(__dirname, '..');
@@ -11,7 +12,9 @@ const {createHash} = require('node:crypto');
   const originalFetch = globalThis.fetch, originalCaches = globalThis.caches;
   try {
     await fs.copyFile(path.join(production, 'gift-lucida-ai.mjs'), path.join(temporary, 'gift-lucida-ai.mjs'));
-    for (const file of ['gift-matte-resample.mjs']) await fs.copyFile(path.join(production, file), path.join(temporary, file));
+    for (const file of ['gift-matte-resample.mjs', 'gift-lucida-download.mjs']) {
+      await fs.copyFile(path.join(production, file), path.join(temporary, file));
+    }
     await fs.writeFile(path.join(temporary, 'package.json'), '{"type":"module"}');
     await fs.writeFile(path.join(temporary, 'gift-lucida-runtime.mjs'), `
       export const getExecutionProviders = async () => globalThis.__lucidaTest.gpu ? [{name:'webgpu'},'wasm'] : ['synthetic-test-provider'];
@@ -232,6 +235,26 @@ const {createHash} = require('node:crypto');
     await failingAI.remove(source);assert.deepEqual(state.model,Array.from(parallelPayload));
     assert.ok(!retryFetches.includes('parallel-0.bin')&&!retryFetches.includes('parallel-2.bin'),'retry reuses every previously verified block');
     assert.equal(retryFetches.length,5);await failingAI.release();
+
+    const {fetchVerifiedChunk} = await import(pathToFileURL(path.join(temporary, 'gift-lucida-download.mjs')));
+    const base = new URL('https://example.test/model/');
+    const chunk = {file: 'chunk.bin', bytes: payload.length, sha256: hash(payload), gzip: true};
+    for (const wrongDigest of [false, true]) {
+      const requests = [];
+      globalThis.fetch = async url => {
+        requests.push(url.pathname);
+        if (url.pathname.includes('/transfer/')) {
+          return new Response(gzipSync(wrongDigest ? Uint8Array.from(payload, byte => byte + 1) : payload));
+        }
+        return new Response(payload);
+      };
+      const bytes = await fetchVerifiedChunk(base, chunk, {label: 'test'});
+      assert.deepEqual(new Uint8Array(bytes), payload);
+      assert.deepEqual(requests, [
+        `/model/transfer/chunk.bin.${chunk.sha256.slice(0, 16)}.gz`,
+        ...(wrongDigest ? ['/model/chunk.bin'] : []),
+      ]);
+    }
 
     await checkInstalledAssets(fixture);
     console.log('gift-lucida: bounded three-block downloads, out-of-order assembly/byte progress, abort/partial-cache retry, manifest/chunk integrity, float ImageNet/sigmoid math, session retry/reuse/release, ordinary GPU getData without capture and tensor cleanup passed. Synthetic inference only.');

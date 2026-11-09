@@ -1,5 +1,6 @@
-import {ort, getExecutionProviders} from './gift-lucida-runtime.mjs';
+import {ort, getExecutionProviders} from './gift-lucida-runtime.mjs?v=20261109-transfer1';
 import {resizeMatteInput, resizeMatteAlpha} from './gift-matte-resample.mjs';
+import {checksum, fetchVerifiedChunk} from './gift-lucida-download.mjs';
 
 const SIDE = 1024;
 const REVISION = '6cbedc9722652dc9a3df91dd871f0c4f3334e922';
@@ -59,15 +60,15 @@ export function validateManifest(manifest) {
   return manifest;
 }
 
-async function checksum(data) {
-  return Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256', data)), byte => byte.toString(16).padStart(2, '0')).join('');
-}
-
 async function loadModel(progress) {
   progress('loading', 0);
   const response = await fetch(new URL('manifest.json', assetBase), {cache: 'no-cache'});
   if (!response.ok) throw new Error('Lucida 抠图模型清单未能加载，请检查网络后重试。');
   const manifest = validateManifest(await response.json());
+  const providers = getExecutionProviders();
+  // Model chunks have their own abort/retry lifecycle; observe a provider failure
+  // now and surface it when the verified model is ready for session creation.
+  providers.catch(() => {});
   let cache = null;
   try { cache = await globalThis.caches?.open('fun-toolkit-lucida-' + manifest.sha256.slice(0, 16)); } catch (ignored) {}
   const model = new Uint8Array(manifest.bytes);
@@ -88,10 +89,7 @@ async function loadModel(progress) {
       }
     } catch (ignored) {}
     if (!data) {
-      const result = await fetch(url, {signal: controller.signal});
-      if (!result.ok) throw new Error('Lucida 抠图模型未能下载，请检查网络后重试。');
-      data = await result.arrayBuffer();
-      if (data.byteLength !== chunk.bytes || await checksum(data) !== chunk.sha256) throw new Error('Lucida 抠图模型分块校验失败，请重试。');
+      data = await fetchVerifiedChunk(assetBase, chunk, {signal: controller.signal, label: 'Lucida 抠图模型'});
       if (cache) try { await cache.put(url, new Response(data, {headers: {'Content-Type': 'application/octet-stream'}})); } catch (ignored) {}
     }
     if (failure) return;
@@ -112,7 +110,7 @@ async function loadModel(progress) {
   if (failure) throw failure;
   if (completed !== model.length || await checksum(model) !== manifest.sha256) throw new Error('Lucida 抠图模型完整性校验失败，请重试。');
   progress('loading', .9);
-  const executionProviders = await getExecutionProviders();
+  const executionProviders = await providers;
   const gpu = executionProviders.some(provider => (typeof provider === 'string' ? provider : provider.name) === 'webgpu');
   const session = await ort.InferenceSession.create(model, {executionProviders, graphOptimizationLevel: 'all',
     enableGraphCapture: false, preferredOutputLocation: gpu ? 'gpu-buffer' : 'cpu'});
