@@ -5,18 +5,21 @@ import {settlingGain} from './presentation.mjs';
 import {Proxy3DRenderer} from './proxy-3d.mjs';
 import {encodeAtlasPng} from './atlas-png.mjs';
 
-export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-60fps-v3-png';
+export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-v7-compact-roll';
 const atlasPage = 'dice.png';
 const points = [1, 2, 3, 4, 5, 6];
 const fps = 60;
-const frontSwitch = .47;
+const lastRollFrame = 31;
+const resultAt = (lastRollFrame + 1) / fps;
 const soundNames = ['dice_roll', 'sound_ui_dice6'];
-const frameTimes = Object.freeze([...new Set([
-  ...Array.from({length: Math.ceil(MOTION.rollEnd * fps)}, (_, i) => i / fps),
-  .228, frontSwitch, .52, MOTION.shutterClearAt, MOTION.rollEnd,
-])].sort((a, b) => a - b));
-const frameIndex = time => frameTimes.indexOf(time);
-const frameName = (time, point) => (time < frontSwitch ? 'roll_' : 'to_' + point + '_') + frameIndex(time);
+// Sample the fast part at 60 fps and hold the slower poses for two ticks.
+const rollFrames = Array.from({length: lastRollFrame + 1}, (_, index) => ({
+  time: index / fps,
+  name: 'roll_' + index,
+})).filter(({time}, index) => index % 2 === 0 || (time >= .08 && time <= .45) || index === lastRollFrame);
+// These poses differ from the opening mostly by a small in-plane rotation.
+const reusedRollNames = new Set(['roll_2', 'roll_30', 'roll_31']);
+const rollTextures = rollFrames.filter(({name}) => !reusedRollNames.has(name));
 const canvasOf = (width, height) => Object.assign(document.createElement('canvas'), {width, height});
 const pause = () => new Promise(resolve => setTimeout(resolve, 0));
 
@@ -32,10 +35,8 @@ function canvasPixels(image, size = null) {
   }
 }
 
-function exposurePixels(renderer, time, point) {
-  const canvas = renderer.render(exposureSamples('E', time, {blur: true}), {
-    softShadows: true, ...(time >= frontSwitch ? {frontPoint: point} : {}),
-  });
+function exposurePixels(renderer, time) {
+  const canvas = renderer.render(exposureSamples('E', time, {blur: true}));
   const {width, height} = canvas;
   const {gl} = renderer;
   const bottomUp = new Uint8Array(width * height * 4);
@@ -137,9 +138,20 @@ function packRegions(regions) {
 function skeletonData(regions) {
   const animations = {};
   const attachments = Object.fromEntries(regions.map(({id, attachment}) => [id, attachment]));
+  const opening = attachments.roll_0;
+  for (const {name, time} of rollFrames) {
+    if (!reusedRollNames.has(name)) continue;
+    const [cos, sin] = motionAt('E', time).rotation;
+    attachments[name] = {
+      ...opening,
+      x: opening.x * cos - opening.y * sin,
+      y: opening.x * sin + opening.y * cos,
+      rotation: Math.atan2(sin, cos) * 180 / Math.PI,
+    };
+  }
   const keys = [...new Set([
-    ...Array.from({length: 73}, (_, i) => i / 120), ...frameTimes,
-    MOTION.zoomEnd, MOTION.settleEnd, MOTION.landAt,
+    ...Array.from({length: 73}, (_, i) => i / 120),
+    .228, .47, .52, MOTION.shutterClearAt, MOTION.rollEnd, MOTION.zoomEnd, MOTION.settleEnd, MOTION.landAt,
   ])].sort((a, b) => a - b).filter((time, i, times) => i === 0 || Math.fround(time) !== Math.fround(times[i - 1]));
   const scale = keys.map(time => {
     const value = motionAt('E', time).zoom * settlingGain(time);
@@ -152,10 +164,9 @@ function skeletonData(regions) {
   const settle = {x: settlingGain(MOTION.landAt), y: settlingGain(MOTION.landAt)};
   for (const point of points) {
     const result = 'sz_' + point;
-    const rolling = frameTimes.filter(time => time < MOTION.rollEnd).map(time => ({time, name: frameName(time, point)}));
     animations['spin_' + point] = {
       slots: {
-        body: {attachment: [...rolling, {time: MOTION.rollEnd, name: result}]},
+        body: {attachment: [...rollFrames, {time: resultAt, name: result}]},
         shadow: {attachment: [{time: 0, name: 'shadow'}, {time: MOTION.rollEnd, name: null}]},
       },
       bones: {body: {scale, translate}, shadow: {scale}},
@@ -221,30 +232,57 @@ function shadowRegion(baseSize, canvases) {
   return trimRegion('shadow',ctx.getImageData(0,0,196,36),baseSize*.49,baseSize*.09);
 }
 
-const jobs = frameTimes.filter(time=>time<MOTION.rollEnd)
-  .flatMap(time=>(time<frontSwitch?[0]:points).map(point=>({time,point})));
+const motionColors = Uint8Array.from({length:256}, (_, channel) => Math.round(channel / 15) * 15);
+// Leave room for the source-dependent savings of the lossless export pass.
+const atlasTargetBytes = 1.14 * 1024 * 1024;
 
-const motionColors = Uint8Array.from({length:256}, (_, channel) => Math.round(channel / 7) * 7);
+async function compactExposures(frames, factor, signal) {
+  const source = canvasOf(1, 1);
+  const target = canvasOf(1, 1);
+  const sourceCtx = source.getContext('2d');
+  const targetCtx = target.getContext('2d', {willReadFrequently:true});
+  try {
+    const result = [];
+    for (const [index, frame] of frames.entries()) {
+      checkAbort(signal);
+      // Motion blur hides fine detail in the fast middle of the roll.
+      const scale = factor * (frame.time >= .12 && frame.time <= .42 ? .52 : .65);
+      const {w, h, pixels} = frame;
+      source.width = w;
+      source.height = h;
+      const image = sourceCtx.createImageData(w, h);
+      image.data.set(pixels);
+      sourceCtx.putImageData(image, 0, 0);
+      target.width = Math.max(1, Math.round(w * scale));
+      target.height = Math.max(1, Math.round(h * scale));
+      targetCtx.imageSmoothingQuality = 'high';
+      targetCtx.drawImage(source, 0, 0, target.width, target.height);
+      const sample = targetCtx.getImageData(0, 0, target.width, target.height).data;
+      for (let offset = 0; offset < sample.length; offset += 4) {
+        const alpha = sample[offset + 3];
+        if (alpha === 0) continue;
+        sample[offset] = motionColors[sample[offset]];
+        sample[offset + 1] = motionColors[sample[offset + 1]];
+        sample[offset + 2] = motionColors[sample[offset + 2]];
+        if (alpha !== 255) sample[offset + 3] = Math.max(1, motionColors[alpha]);
+      }
+      // Keep the full-size world coordinates stored in the Spine attachment.
+      result.push({...frame, w:target.width, h:target.height, pixels:sample});
+      if (index % 8 === 0) await pause();
+    }
+    return result;
+  } finally {
+    source.width = source.height = target.width = target.height = 1;
+  }
+}
 
 async function captureExposures(renderer, baseSize, signal) {
   const size=baseSize*renderer.displayScale;
   const frames=[];
-  for (const [index,{time,point}] of jobs.entries()) {
+  for (const [index,{time,name}] of rollTextures.entries()) {
     checkAbort(signal);
-    const image=exposurePixels(renderer,time,point);
-    const frame=trimRegion(frameName(time,point),image,size,size);
-    // Round only the rolling regions to a smaller set of RGBA values.
-    // The channel error is at most 3/255 and the alpha endpoints stay exact.
-    const pixels=frame.pixels;
-    for (let offset=0;offset<pixels.length;offset+=4) {
-      const alpha=pixels[offset+3];
-      if (alpha===0) continue;
-      pixels[offset]=motionColors[pixels[offset]];
-      pixels[offset+1]=motionColors[pixels[offset+1]];
-      pixels[offset+2]=motionColors[pixels[offset+2]];
-      if (alpha!==255) pixels[offset+3]=Math.max(1,motionColors[alpha]);
-    }
-    frames.push(frame);
+    const image=exposurePixels(renderer,time);
+    frames.push({...trimRegion(name,image,size,size),time});
     if (index%4===0) await pause();
   }
   return frames;
@@ -291,23 +329,31 @@ export async function generatePurpleReferenceRuntime(files,{
       }
       warnings.push('已将 sz_0 与数字组合为骰面，原始 PNG 保持不变');
     }
-    images.front=zero||images[1];
+    const rollImage=zero||images[1];
     if (!zero) warnings.push('未提供可见的 sz_0，翻滚主体使用第 1 点完整图');
     const anchorPixels=canvasPixels(anchorImage,30);
     const anchor=trimRegion('anchor',anchorPixels,30,30);
     let selected;
     for (const size of [320,256,192,128]) {
       checkAbort(signal);
-      const renderer=new Proxy3DRenderer(images,{size});
+      const renderer=new Proxy3DRenderer(rollImage,{size});
       try {
         const baseSize=200*renderer.contentScale;
         const flat=points.map(point=>trimRegion('sz_'+point,canvasPixels(images[point]),baseSize,baseSize));
         const stills=[...flat,anchor,shadowRegion(baseSize,canvases)];
         const exposures=await captureExposures(renderer,baseSize,signal);
-        const regions=[...exposures,...stills];
-        const page=packRegions(regions);
-        if (page) {
-          selected={size,regions,page,rendererMetadata:renderer.metadata};
+        let factor=1;
+        for (let pass=0;pass<3;pass++) {
+          const regions=[...await compactExposures(exposures,factor,signal),...stills];
+          const page=packRegions(regions);
+          if (!page) break;
+          const texture=await encodeAtlasPng(page.width,page.height,page.rgba,{signal});
+          if (!selected||texture.size<selected.texture.size)
+            selected={size,regions,page,texture,rendererMetadata:renderer.metadata};
+          if (texture.size<=atlasTargetBytes) break;
+          factor*=Math.max(.78,Math.min(.92,Math.sqrt(atlasTargetBytes/texture.size)));
+        }
+        if (selected) {
           break;
         }
       } finally {
@@ -315,10 +361,9 @@ export async function generatePurpleReferenceRuntime(files,{
       }
     }
     if (!selected) throw Error('紫色骰子图集超过 2048×2048，请使用较小画布的素材');
-    const {size,regions,page,rendererMetadata}=selected;
+    const {size,regions,page,texture,rendererMetadata}=selected;
     if (size<320) warnings.push('素材轮廓较大，已将翻滚图集采样设为 '+size+' 像素');
     checkAbort(signal);
-    const texture=await encodeAtlasPng(page.width,page.height,page.rgba,{signal});
     const skel=new Blob([writeSpineBinary(skeletonData(regions))],{type:'application/octet-stream'});
     checkAbort(signal);
     return {
@@ -329,7 +374,7 @@ export async function generatePurpleReferenceRuntime(files,{
         name,grade:'purple',variant:'05',motionVersion:PURPLE_REFERENCE_MOTION_VERSION,
         resolvedComposition:resolved,referenceCamera:.86,cycle:MOTION.cycle,rollEnd:MOTION.rollEnd,
         settleEnd:MOTION.settleEnd,landAt:MOTION.landAt,zoomPeak:MOTION.zoomPeak,
-        captureSize:size,frameTimes,exposureFrames:jobs.length,staticImages:regions.length,
+        captureSize:size,frameTimes:rollFrames.map(({time})=>time),exposureFrames:rollTextures.length,staticImages:regions.length,
         atlas:{width:page.width,height:page.height},body:rendererMetadata,
         anchor:{slot:'anchor',bone:'root',attachment:'anchor',width:30,height:30,scaleX:6,scaleY:6,opacity:0},
       },

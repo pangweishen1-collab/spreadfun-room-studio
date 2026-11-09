@@ -48,7 +48,7 @@ export function buildSilhouetteGeometry(source,{steps=80,cutoff=24}={}){
   const v=(xx,yy)=>{const px=xx/steps*w,py=yy/steps*h;return {x:px,y:py,a:alpha(px,py)};};
   const a=v(x,y),b=v(x+1,y),c=v(x+1,y+1),d=v(x,y+1);add([a,b,c]);add([a,c,d]);
  }
- const meshes=[{key:'front',mask:true,ear:false,data:new Float32Array(front)},{key:6,mask:true,ear:false,data:new Float32Array(back)},{key:'front',mask:false,ear:false,data:new Float32Array(walls)}];
+ const meshes=[{mask:true,ear:false,data:new Float32Array(front)},{mask:true,ear:false,data:new Float32Array(back)},{mask:false,ear:false,data:new Float32Array(walls)}];
  if(!front.length||!walls.length)throw Error('异形轮廓无法生成封闭模型');
  let radius=0;for(const m of meshes)for(let i=0;i<m.data.length;i+=8)radius=Math.max(radius,Math.hypot(m.data[i],m.data[i+1],m.data[i+2]));
  // Conservative rotation-invariant sphere bound, including C's <=1.14 local
@@ -117,9 +117,8 @@ const ACCUM_FS=`precision mediump float;varying vec2 texUV;uniform sampler2D sou
 const FINAL_FS=`precision mediump float;varying vec2 texUV;uniform sampler2D source;void main(){vec4 c=texture2D(source,texUV);gl_FragColor=c.a>.00001?vec4(c.rgb/c.a,c.a):vec4(0.0);}`;
 
 export class Proxy3DRenderer{
- constructor(images,{size=320}={}){
-  for(const key of ['front',1,2,3,4,5,6])if(!images[key])throw Error('缺少 3D 骰子贴图 '+key);
-  const source=imagePixels(images.front);
+ constructor(rollImage,{size=320}={}){
+  const source=imagePixels(rollImage);
   let maxAlpha=0;
   for(let i=3;i<source.data.length;i+=4)maxAlpha=Math.max(maxAlpha,source.data[i]);
   if(!maxAlpha)throw Error('异形轮廓完全透明');
@@ -143,7 +142,7 @@ export class Proxy3DRenderer{
   this.displayScale=built.displayScale;this.contentScale=built.contentScale;this.metadata={...built.metadata,wallMaterial:wall.metadata};
   this.meshes=built.meshes.map(mesh=>{const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,mesh.data,gl.STATIC_DRAW);return {...mesh,buffer,count:mesh.data.length/8};});
   this.textures={};
-  for(const key of ['front',1,2,3,4,5,6])this.textures[key]=this.texture(buildFullTexturePixels(key==='front'?source:imagePixels(images[key])));
+  this.textures.body=this.texture(buildFullTexturePixels(source));
   this.textures.wall=this.texture(wall);
   this.quad=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
   this.sample=this.target(true);this.accum=this.target(false);gl.bindFramebuffer(gl.FRAMEBUFFER,null);
@@ -163,7 +162,7 @@ export class Proxy3DRenderer{
  }
  target(depth){const gl=this.gl,texture=gl.createTexture();gl.bindTexture(gl.TEXTURE_2D,texture);gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,this.size,this.size,0,gl.RGBA,gl.UNSIGNED_BYTE,null);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MIN_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);const framebuffer=gl.createFramebuffer();gl.bindFramebuffer(gl.FRAMEBUFFER,framebuffer);gl.framebufferTexture2D(gl.FRAMEBUFFER,gl.COLOR_ATTACHMENT0,gl.TEXTURE_2D,texture,0);let renderbuffer;if(depth){renderbuffer=gl.createRenderbuffer();gl.bindRenderbuffer(gl.RENDERBUFFER,renderbuffer);gl.renderbufferStorage(gl.RENDERBUFFER,gl.DEPTH_COMPONENT16,this.size,this.size);gl.framebufferRenderbuffer(gl.FRAMEBUFFER,gl.DEPTH_ATTACHMENT,gl.RENDERBUFFER,renderbuffer);}if(gl.checkFramebufferStatus(gl.FRAMEBUFFER)!==gl.FRAMEBUFFER_COMPLETE)throw Error('3D 曝光缓冲区不完整');return {texture,framebuffer,renderbuffer};}
  fullPass(p,texture){const gl=this.gl;gl.useProgram(p);gl.bindBuffer(gl.ARRAY_BUFFER,this.quad);for(const a of this.attributes)gl.disableVertexAttribArray(a.location);const loc=gl.getAttribLocation(p,'position');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,8,0);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,texture);gl.uniform1i(gl.getUniformLocation(p,'source'),0);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);}
- render(samples,{wireframe=false,frontPoint=0,softShadows=true}={}){
+ render(samples,{wireframe=false,softShadows=true}={}){
   if(this.disposed||this.lost)throw Error('3D 画布已关闭，请重新载入');
   if(!Array.isArray(samples)||!samples.length||samples.length>33)throw Error('3D 曝光采样无效');let weightSum=0;
   for(const s of samples){if(!s.rotation||s.rotation.length!==9||!s.rotation.every(Number.isFinite)||!Number.isFinite(s.weight??1)||(s.weight??1)<0)throw Error('3D 曝光姿态无效');weightSum+=s.weight??1;}
@@ -173,7 +172,7 @@ export class Proxy3DRenderer{
    gl.bindFramebuffer(gl.FRAMEBUFFER,this.sample.framebuffer);gl.disable(gl.BLEND);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);gl.depthFunc(gl.LESS);gl.enable(gl.CULL_FACE);gl.cullFace(gl.BACK);gl.clear(gl.COLOR_BUFFER_BIT|gl.DEPTH_BUFFER_BIT);gl.useProgram(this.modelProgram);
    gl.uniformMatrix3fv(this.uniforms.rotation,false,new Float32Array(sample.rotation));gl.uniformMatrix3fv(this.uniforms.previousRotation,false,new Float32Array(sample.previousRotation??sample.rotation));gl.uniform3fv(this.uniforms.stretch,new Float32Array(sample.stretch??[1,1,1]));gl.uniform1f(this.uniforms.smear,clamp(sample.smear??0));gl.uniform1f(this.uniforms.paddingScale,this.displayScale);gl.uniform1f(this.uniforms.wireframe,wireframe?1:0);gl.uniform1i(this.uniforms.faceImage,0);
    gl.uniform1f(this.uniforms.alphaCutoff,this.alphaCutoff);
-   for(const mesh of this.meshes){gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buffer);for(const a of this.attributes){gl.enableVertexAttribArray(a.location);gl.vertexAttribPointer(a.location,a.count,gl.FLOAT,false,32,a.offset);}const soft=Boolean(softShadows&&!mesh.mask);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,soft?this.textures.wall:(this.textures[mesh.key==='front'&&frontPoint?frontPoint:mesh.key]??this.textures.front));gl.uniform1f(this.uniforms.ear,mesh.ear?1:0);gl.uniform1f(this.uniforms.mask,mesh.mask?1:0);gl.uniform1f(this.uniforms.softWall,soft?1:0);gl.drawArrays(wireframe?gl.LINES:gl.TRIANGLES,0,mesh.count);}
+   for(const mesh of this.meshes){gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buffer);for(const a of this.attributes){gl.enableVertexAttribArray(a.location);gl.vertexAttribPointer(a.location,a.count,gl.FLOAT,false,32,a.offset);}const soft=Boolean(softShadows&&!mesh.mask);gl.activeTexture(gl.TEXTURE0);gl.bindTexture(gl.TEXTURE_2D,soft?this.textures.wall:this.textures.body);gl.uniform1f(this.uniforms.ear,mesh.ear?1:0);gl.uniform1f(this.uniforms.mask,mesh.mask?1:0);gl.uniform1f(this.uniforms.softWall,soft?1:0);gl.drawArrays(wireframe?gl.LINES:gl.TRIANGLES,0,mesh.count);}
    gl.bindFramebuffer(gl.FRAMEBUFFER,this.accum.framebuffer);gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.enable(gl.BLEND);gl.blendEquation(gl.FUNC_ADD);gl.blendFunc(gl.ONE,gl.ONE);gl.useProgram(this.accumProgram);gl.uniform1f(gl.getUniformLocation(this.accumProgram,'weight'),(sample.weight??1)/weightSum);this.fullPass(this.accumProgram,this.sample.texture);
   }
   gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.disable(gl.BLEND);gl.disable(gl.DEPTH_TEST);gl.disable(gl.CULL_FACE);gl.clear(gl.COLOR_BUFFER_BIT);this.fullPass(this.finalProgram,this.accum.texture);gl.flush();return this.canvas;

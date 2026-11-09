@@ -5,6 +5,7 @@ import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
 import {generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION} from './purple-reference/runtime.mjs';
+import {optimizeAtlasPng} from './atlas-png-optimizer.mjs';
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
 export const GREEN_SLOTS = Array.from({length:6},(_,i)=>`sz_${i+1}`);
 export const VIDEO_PROFILE = VIDEO_SPEC.profile;
@@ -547,7 +548,8 @@ export function createLocalPreview(dependencies={}) {
     }
     add(name+'.skel',skeleton instanceof Blob?skeleton:new Blob([skeleton],{type:'application/octet-stream'}));
     add(name+'.atlas',record.runtime.atlasText.replace(/^[^\r\n]+/,name+'.png'));
-    add(name+'.png',record.runtime.texture);
+    const texture=await optimizeAtlasPng(record.runtime.texture,record.grade==='green'?2:3);
+    add(name+'.png',texture);
     for(const sound of SOUND_NAMES)
       add('sound/'+sound+'.mp3',record.audio?.[sound]?.blob||await defaultAsset(DEFAULT_AUDIO[sound]));
     const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}}),latest=await read(id);

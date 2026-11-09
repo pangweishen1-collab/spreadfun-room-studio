@@ -156,7 +156,8 @@ function abortIf(signal) {
 }
 const align16 = n => Math.ceil(n/16)*16;
 function layout(width,height) {
-  for (const columns of [3,4]) {
+  // Adjacent flat/roll pairs let PNG compression reuse their shared color data.
+  for (const columns of [2,4]) {
     const regions=Array.from({length:12},(_,i) => ({name:`${i%2?'roll':'flat'}_${Math.floor(i/2)+1}`,
       x:i%columns*(width+4)+2,y:Math.floor(i/columns)*(height+4)+2,width,height}));
     const bottom=Math.ceil(12/columns)*(height+4)+2;
