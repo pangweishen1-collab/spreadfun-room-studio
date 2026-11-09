@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.15.10 - 2026-11-09
+
+### Dice preview
+
+- Automatically remove dark outer outlines from green dice in previews and video exports. Preserve the silhouette and interior artwork.
+- Keep visible rounded faces opaque while rolling to prevent gaps and dark seams.
+
 ## 1.15.9 - 2026-11-09
 
 ### Dice preview
