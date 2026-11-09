@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.15.3 - 2026-11-09
+
+### Dice atlas compression
+
+- Compress green and purple atlas PNGs locally during ZIP export using up to 256 palette colors. Keep atlas dimensions, placement, and Spine references intact. Use lossless compression if the indexed PNG is unavailable or larger.
+- Share rolling textures across all six purple results. Reuse the opening texture for similar poses and reduce texture resolution during the fast, blurred part of the roll.
+- Pack each green landing and rolling texture side by side to improve compression.
+
 ## 1.15.2 - 2026-11-06
 
 ### Dice upload
