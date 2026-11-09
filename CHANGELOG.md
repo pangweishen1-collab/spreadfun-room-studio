@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.15.7 - 2026-11-09
+
+### Dice preview
+
+- Show the unnumbered rolling image (`sz_0.png`) in the purple dice upload instructions.
+
 ## 1.15.6 - 2026-11-09
 
 ### Dice preview
