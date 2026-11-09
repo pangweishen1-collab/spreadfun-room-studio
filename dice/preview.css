@@ -266,6 +266,7 @@ html.embedded .page-shell { flex:none; }
 .upload-grade-card.green .upload-grade-icon { scale:.84; }
 .upload-grade-card h3 { display:flex; align-items:center; gap:8px; font-size:15px; }
 .upload-motion { color:var(--color-secondary); font-size:12px; line-height:20px; }
+.upload-assets-hint { min-block-size:2lh; }
 .preview-upload-actions { display:flex; flex-direction:column; width:100%; max-width:168px; gap:8px; }
 .preview-upload-actions .button { min-height:44px; padding-inline:8px; }
 .ft-ui #upload-zone.upload-replace-zone { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:0; border:0; background:transparent; }
@@ -280,6 +281,7 @@ html.embedded .page-shell { flex:none; }
  .upload-grade-card h3 { font-size:13px; gap:5px; }
  .preview-empty .upload-grade-icon { width:min(100%,72px); height:72px; }
  .preview-empty p { font-size:11px; line-height:18px; }
+ .upload-assets-hint { min-block-size:3lh; }
  .preview-upload-actions .button { font-size:12px; }
 }
 

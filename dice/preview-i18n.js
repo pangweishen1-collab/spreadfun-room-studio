@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'dice-studio-language';
 const messages = {
   zh: {
+    purpleUploadAssets:'拖入大骰子＋六张点数图＋无点数图（sz_0.png）',
     chooseUploadGrade:'请选择绿色或紫色上传区域', greenUpload:'绿色骰子上传', purpleUpload:'紫色骰子上传', greenMotion:'常规翻滚', purpleMotion:'倾轴陀螺', previewBackground:'预览背景', folderShort:'文件夹', folderDirectHint:'也可以把素材文件夹拖到这里，直接载入预览', finishPendingUpload:'请先完成或取消当前上传，再切换上传等级。',
     greenEmptyTitle:'拖入大骰子+六点数图', greenAssetStatus:'六张点数素材状态', greenUploadHint:'六张点数图 · 大图使用大骰子.png', greenPartialFiles:'已选择 {count}/6 张，请补齐：{missing}', greenIncomplete:'请上传 sz_1～sz_6 六张点数图。', greenImportSuccess:'六张点数图已载入，可以预览和导出。', soundEnabled:'投掷音效', missingHero:'请补传大骰子.png，用作左上角立体大图。', heroUpdated:'大骰子已更换，请重新生成视频。',
     title:'骰子预览', skip:'跳到预览工作台', home:'Fun Toolkit 首页', nav:'工具导航', language:'切换界面语言', author:'联系作者', help:'使用说明', close:'关闭',
@@ -16,6 +17,7 @@ const messages = {
     selectPng:'请选择 PNG 图片。', unknownFiles:'无法匹配文件名：{files}', duplicateFiles:'同一批次有重复素材：{files}', tooLarge:'{file}：单张 PNG 请小于 12 MB。', invalidPng:'{file}：文件内容不是有效 PNG。', invalidSize:'{file}：尺寸需为 {size}。', noFiles:'请先选择文件。', incompleteFiles:'请上传 sz_1～sz_6 六张点数图。', readFailed:'{file}：文件读取失败。', nameRequired:'请填写 1～80 字的预览名称。', requestFailed:'请求失败，请检查文件后重试。', networkFailed:'本地服务连接失败，请确认服务仍在运行后重试。', rendererFailed:'浏览器未能初始化预览，请使用支持 WebGL 的 Chrome。', previewLoadFailed:'预览加载失败，原有画面已保留。可点击“重试加载预览”。', restoreFailed:'上次预览无法恢复，请重新上传素材。', missing:'缺少：{files}', extra:'多余：{files}', duplicates:'重复：{files}', invalidDownload:'下载地址无效，请重试。', videoMismatch:'视频与当前预览不匹配，请重新生成。',
   },
   en: {
+    purpleUploadAssets:'3D dice + 6 faces + blank face (sz_0.png)',
     chooseUploadGrade:'Choose a green or purple upload area first.', greenUpload:'Green dice', purpleUpload:'Purple dice', greenMotion:'Cube roll', purpleMotion:'Tilted gyro', previewBackground:'Preview background', folderShort:'Folder', folderDirectHint:'Drop the assets folder here to import it directly', finishPendingUpload:'Finish or cancel the pending upload before choosing another grade.',
     greenEmptyTitle:'Drop the 3D dice + six face images', greenAssetStatus:'Six dice face assets', greenUploadHint:'Six faces · Use 大骰子.png for the hero', greenPartialFiles:'Selected {count}/6. Add: {missing}', greenIncomplete:'Upload all six faces: sz_1–sz_6.png.', greenImportSuccess:'Six faces loaded. Preview and export are ready.', soundEnabled:'Roll sound', missingHero:'Add 大骰子.png for the 3D hero image.', heroUpdated:'Hero replaced. Generate a new video.',
     title:'Dice Preview', skip:'Skip to preview workspace', home:'Fun Toolkit home', nav:'Tool navigation', language:'Switch interface language', author:'Contact author', help:'How to use', close:'Close',
