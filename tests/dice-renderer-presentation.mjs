@@ -30,7 +30,7 @@ globalThis.spine = {
   SkeletonBinary: class {
     readSkeletonData() { return {findAnimation() { return {duration: .64, apply() {}}; }}; }
   },
-  Skeleton: class { setToSetupPose() {} updateWorldTransform() {} },
+  Skeleton: class { drawOrder = []; setToSetupPose() {} updateWorldTransform() {} },
   MixBlend: {replace: 1}, MixDirection: {mixIn: 1}, Physics: {update: 1},
 };
 const canvas = {getContext() { return context; }};
@@ -151,9 +151,44 @@ for(const kind of ['six-face','purple-gyro']){
   retained.candidate.previewGrade=grade;
   for(const time of [0,.1,.3,.47,.535,.54,.6,1.9,2.3]){
    retained.draw(time);
-   assert.ok(retained.skeletons.every(s=>Math.abs(s.scaleX-.86*gain)<1e-10),'UI sizing is constant across time/background; the exported native animation is the only changing zoom curve');
+   assert.ok(retained.skeletons.every(s=>Math.abs(s.scaleX-.86*gain)<1e-10),'Previews that fit keep their nominal size');
   }
  }
 }
 retained.candidate={...retained.candidate,kind:'template'};retained.playing=true;retained.layer.listeners.webglcontextlost({preventDefault(){}});assert.equal(retained.playing,false,'Legacy template cannot silently claim a software fallback');
+
+// A wide rolling frame cannot overlap a neighboring grid cell. A narrower
+// result and a single-die preview retain their usual scale.
+let halfWidth = 120;
+const painted = [];
+for (const skeleton of retained.skeletons) {
+  const attachment = {region: {}, color: {a: 1}, computeWorldVertices(_slot, vertices) {
+    const width = halfWidth * skeleton.scaleX;
+    vertices[0] = vertices[2] = skeleton.x - width;
+    vertices[4] = vertices[6] = skeleton.x + width;
+    vertices[1] = vertices[3] = vertices[5] = vertices[7] = skeleton.y;
+  }};
+  skeleton.drawOrder = [{bone: {active: true}, color: {a: 1}, getAttachment: () => attachment}];
+}
+retained.software = {draw(_context, skeleton) {
+  const vertices = [];
+  const slot = skeleton.drawOrder[0];
+  slot.getAttachment().computeWorldVertices(slot, vertices);
+  painted.push({left: vertices[0], right: vertices[4], scale: skeleton.scaleX});
+}};
+retained.candidate.template = 'green';
+retained.mode = 'all';
+retained.draw(.275);
+assert.ok(painted[1].left - painted[0].right >= 7.999);
+assert.ok(painted[2].left - painted[1].right >= 7.999);
+assert.ok(painted.every(die => die.scale === painted[0].scale));
+halfWidth = 60;
+painted.length = 0;
+retained.draw(1);
+assert.ok(painted.every(die => die.scale === .9));
+halfWidth = 120;
+painted.length = 0;
+retained.mode = 'single';
+retained.draw(.275);
+assert.equal(painted[0].scale, 1.6);
 console.log(JSON.stringify({passed: true, checks: ['preload/cache', 'no pending blank frame', 'playback continuity', 'no runtime reload', 'identity/revision commit', 'centered title', 'subtitle removed', 'latest update wins', 'asset mismatch', 'recording guard', 'clear/full-load races', 'failure/retry', 'native green/purple context loss retains six-face Canvas fallback']}));

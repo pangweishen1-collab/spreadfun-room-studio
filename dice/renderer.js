@@ -15,8 +15,29 @@ const readAsset = (url, type, message) => fetch(url).then(response => {
   if (!response.ok) throw new Error(message);
   return response[type]();
 });
-// UI sizing stays constant: all animation and zoom come from the exported Spine data.
 const PURPLE_PRESENTATION_SCALE = 1.15;
+const GRID_X = [198, 363, 529];
+const GRID_Y = [1600 - 720, 1600 - 903];
+const GRID_GAP = 8;
+const CELL_HALF_WIDTH = (Math.min(GRID_X[1] - GRID_X[0], GRID_X[2] - GRID_X[1]) - GRID_GAP) / 2;
+const CELL_HALF_HEIGHT = (GRID_Y[0] - GRID_Y[1] - GRID_GAP) / 2;
+
+function gridCellFit(skeleton, centerX, centerY, vertices) {
+  let horizontal = 0, vertical = 0;
+  for (const slot of skeleton.drawOrder) {
+    const attachment = slot.getAttachment();
+    if (!slot.bone.active || !attachment?.region || slot.color.a * attachment.color.a === 0) continue;
+    const count = attachment.worldVerticesLength || 8;
+    if (attachment.worldVerticesLength) attachment.computeWorldVertices(slot, 0, count, vertices, 0, 2);
+    else attachment.computeWorldVertices(slot, vertices, 0, 2);
+    for (let i = 0; i < count; i += 2) {
+      horizontal = Math.max(horizontal, Math.abs(vertices[i] - centerX));
+      vertical = Math.max(vertical, Math.abs(vertices[i + 1] - centerY));
+    }
+  }
+  return Math.min(1, CELL_HALF_WIDTH / horizontal, CELL_HALF_HEIGHT / vertical);
+}
+
 const backgroundImages = new Map();
 const loadBackground = candidate => {
   const src = previewGrade(candidate) === 'purple' ? '/dice/assets/ui/bg_紫.webp' : '/dice/assets/ui/bg_绿.webp';
@@ -79,6 +100,7 @@ export class GameRenderer {
     this.last = performance.now();
     this.loadId = 0;
     this.presentationId = 0;
+    this.gridVertices = [];
     for (const previewGrade of ['green', 'purple']) void loadBackground({previewGrade}).catch(() => {});
     this.tick = this.tick.bind(this);
     requestAnimationFrame(this.tick);
@@ -295,15 +317,18 @@ export class GameRenderer {
     // before sampling so a boundary frame uses the same image in preview.
     const animationTime = reference ? Math.fround(time) : time;
     const presentationGain = this.candidate.template === 'purple' ? PURPLE_PRESENTATION_SCALE : 1;
-    if (gpu) this.scene.begin();
-    for (let index = 0; index < (all ? 6 : 1); index++) {
+    const count = all ? 6 : 1;
+    let gridFit = 1;
+    for (let index = 0; index < count; index++) {
       const skeleton = this.skeletons[index];
       const point = all ? index + 1 : selected;
+      const centerX = all ? GRID_X[index % 3] : 363;
+      const centerY = all ? GRID_Y[Math.floor(index / 3)] : 1600 - 810;
       skeleton.setToSetupPose();
       const animation = this.data.findAnimation('spin_' + point);
       animation.apply(skeleton, -1, Math.min(animationTime, animation.duration), false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
-      skeleton.x = all ? [198, 363, 529][index % 3] : 363;
-      skeleton.y = 1600 - (all ? (index < 3 ? 720 : 903) : 810);
+      skeleton.x = centerX;
+      skeleton.y = centerY;
       if (reference) {
         skeleton.scaleX = skeleton.scaleY = all ? .86 : 1.5;
       } else if (generatedCandidate(this.candidate)) {
@@ -315,6 +340,21 @@ export class GameRenderer {
         skeleton.y += cropOffset[1]*size/sourceSize;
       } else skeleton.scaleX = skeleton.scaleY = (all ? 0.9 : 1.6) * presentationGain;
       skeleton.updateWorldTransform(spine.Physics.update);
+      if (all) gridFit = Math.min(gridFit, gridCellFit(skeleton, centerX, centerY, this.gridVertices));
+    }
+
+    if (gpu) this.scene.begin();
+    for (let index = 0; index < count; index++) {
+      const skeleton = this.skeletons[index];
+      // Apply one fit to the whole grid, around each cell's visual center.
+      if (gridFit < 1) {
+        const centerX = GRID_X[index % 3], centerY = GRID_Y[Math.floor(index / 3)];
+        skeleton.x = centerX + (skeleton.x - centerX) * gridFit;
+        skeleton.y = centerY + (skeleton.y - centerY) * gridFit;
+        skeleton.scaleX *= gridFit;
+        skeleton.scaleY *= gridFit;
+        skeleton.updateWorldTransform(spine.Physics.pose);
+      }
       if (gpu) this.scene.drawSkeleton(skeleton, false);
       else this.software?.draw(ctx, skeleton, 1600);
     }
