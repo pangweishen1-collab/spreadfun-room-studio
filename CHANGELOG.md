@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.15.6 - 2026-11-09
+
+### Dice preview
+
+- Fit rolling dice within their cells in six-dice previews and video exports so neighboring dice stay separated.
+
 ## 1.15.5 - 2026-11-09
 
 ### Dice preview
