@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.15.9 - 2026-11-09
+
+### Dice preview
+
+- Export green and purple dice at 60 FPS, with 360 frames per six-second MP4 and a 1.5 MB limit.
+- Make the green dice grow more visibly during the roll and return to their resting size on landing.
+
 ## 1.15.8 - 2026-11-09
 
 ### Dice preview
