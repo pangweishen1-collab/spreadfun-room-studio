@@ -1,4 +1,4 @@
-import {readSvga,buildCustomizedSvga} from './avatar-custom-engine.mjs?v=20261104-lossless1';
+import {readSvga,buildCustomizedSvga,listSvgaImages,previewSvgaImages,svgaBitmapCount,svgaRuntimeBytes,SVGA_MAX_RUNTIME_BYTES} from './avatar-custom-engine.mjs?v=20261110-svga-layout';
 import {TEXT_STYLES,textStylePadding,drawStyledText} from './avatar-text-style.mjs';
 
 /* Image and text PNG sprites are embedded in the animation; the final player needs no fonts. */
@@ -9,13 +9,31 @@ const copy={
   zh:{imageTitle:'图片图层',imageUpload:'上传图片',imageReplace:'替换图片',imageRemove:'移除',imageCenter:'居中图片',imageWidth:'图片宽度',imageLoading:'正在读取图片…',imageDrag:'拖动图片调整位置，方向键微调，右下角缩放',imageResize:'调整图片大小，方向键缩放',imageNeedsSvga:'请先上传头像框 SVGA，再添加图片。',imageType:'请选择 PNG、JPG 或 WebP 图片。',imageSizeError:'请选择 20MB 以内的图片。',imageDimensions:'图片最长边需在 8192px 内，且不超过 3200 万像素。',imageLoadError:'无法读取此图片，请检查文件后重试。',imageWidthError:'请输入有效的图片宽度，保持原始比例。',stylePresets:'字体样式预设',stylePlain:'纯色',styleBrightGold:'亮金立体',styleChampagne:'香槟金',styleSilver:'银色金属',styleRoseGold:'玫瑰金',weightLabel:'字重',strokeLabel:'描边宽度',strokeColorLabel:'描边颜色',strokeError:'描边宽度需在 0–16px 之间。',textTooLarge:'文字过长或字号过大，请减少内容或字号。',fontLibrary:'字体库 ↗',imagesTab:'头像框图片',customTab:'定制头像框',preview:'效果预览',uploadTitle:'点击、拖入或粘贴 SVGA 文件',uploadHint:'保留原动效，添加文字或图片',upload:'上传 SVGA',replace:'替换文件',play:'播放',pause:'暂停',center:'水平居中',textSettings:'定制内容',textLabel:'文字内容',fontLabel:'英文字体',sizeLabel:'文字大小',colorLabel:'文字颜色',svgaLimit:'SVGA · 3MB 内',frameSpec:'首帧 WebP · 240 × 240',export:'导出 SVGA + WebP',exporting:'正在导出…',loading:'正在读取…',empty:'尚未选择文件',ready:'可编辑',fontLoading:'正在载入字体…',fileType:'请选择一个 .svga 文件。',fileSize:'请选择 50MB 以内的 SVGA。',loadError:'无法读取此 SVGA，请检查文件后重试。',exportError:'导出失败，请重试；上次的成品已保留。',fontError:'字体未能载入，请重新选择字体。',textEmpty:'请添加文字或图片。',sizeError:'文字大小需为 8–512 之间的整数。',sizeLimit:'无损压缩后 SVGA 仍超过 3MB，请减少素材或使用较小的源文件。',saved:'已无损打包 SVGA，并生成首帧 WebP。',optimized:'已无损压缩 SVGA，保留原尺寸和全部动画帧。',svgaDownload:'下载 SVGA',frameDownload:'下载首帧 WebP',zipDownload:'下载全部 ZIP',drag:'拖动文字调整位置，方向键微调',changed:'参数已修改，请重新导出。'},
   en:{imageTitle:'Image layer',imageUpload:'Upload image',imageReplace:'Replace image',imageRemove:'Remove',imageCenter:'Center image',imageWidth:'Image width',imageLoading:'Loading image…',imageDrag:'Drag image to move; arrows to nudge; corner to resize',imageResize:'Resize image; arrow keys adjust size',imageNeedsSvga:'Upload an SVGA first, then add your image.',imageType:'Choose a PNG, JPG or WebP image.',imageSizeError:'Choose an image under 20MB.',imageDimensions:'Use an image up to 8192px per side and 32 megapixels.',imageLoadError:'Could not read the image. Check it and retry.',imageWidthError:'Enter a valid image width; the original ratio is preserved.',stylePresets:'Text style presets',stylePlain:'Solid',styleBrightGold:'3D Gold',styleChampagne:'Champagne',styleSilver:'Silver',styleRoseGold:'Rose gold',weightLabel:'Weight',strokeLabel:'Outline width',strokeColorLabel:'Outline color',strokeError:'Outline width must be between 0 and 16px.',textTooLarge:'Text is too large. Shorten it or reduce its size.',fontLibrary:'Fonts ↗',imagesTab:'Frame images',customTab:'Custom frames',preview:'Preview',uploadTitle:'Click, drop or paste an SVGA file',uploadHint:'Keep the animation. Add text or an image.',upload:'Upload SVGA',replace:'Replace file',play:'Play',pause:'Pause',center:'Center horizontally',textSettings:'Custom content',textLabel:'Text',fontLabel:'English font',sizeLabel:'Text size',colorLabel:'Text color',svgaLimit:'SVGA · Under 3MB',frameSpec:'First-frame WebP · 240 × 240',export:'Export SVGA + WebP',exporting:'Exporting…',loading:'Loading…',empty:'No file selected',ready:'Ready to edit',fontLoading:'Loading font…',fileType:'Choose one .svga file.',fileSize:'Choose an SVGA under 50MB.',loadError:'Could not read this SVGA. Check the file and retry.',exportError:'Export failed. Retry; the last valid outputs have been kept.',fontError:'This font could not load. Please select it again.',textEmpty:'Add text or an image.',sizeError:'Text size must be a whole number from 8 to 512.',sizeLimit:'Lossless compression still exceeds 3MB. Reduce assets or use a smaller source file.',saved:'SVGA packaged losslessly and first-frame WebP generated.',optimized:'SVGA compressed losslessly; original dimensions and all frames preserved.',svgaDownload:'Download SVGA',frameDownload:'Download first-frame WebP',zipDownload:'Download all ZIP',drag:'Drag text to move; use arrow keys to adjust',changed:'Settings changed. Export again.'}
 };
-const state={mode:'images',style:'plain',source:null,file:null,video:null,loading:false,imageLoading:false,exporting:false,playing:false,position:{x:.5,y:.82},bitmap:null,image:null,result:null,notice:'',noticeKind:'error',renderId:0,frame:0};
-let player,exportPlayer,exportHost,drag,imageDrag,stageVisible=true;
+Object.assign(copy.zh,{
+  uploadHint:'提取图片素材，或定制文字和图片',assetsTitle:'SVGA 图片素材',assetAdd:'添加图片',assetDelete:'删除选中',assetsRestore:'恢复已删原图',
+  assetDownload:'下载',assetEdit:'定位',assetOriginal:'原始素材',assetAdded:'新增图层',assetWorking:'正在处理素材…',
+  assetEmpty:'当前没有图片素材。可以添加图片到头像框。',assetCount:'{total} 张图片 · 已选 {selected} 张',assetError:'素材修改失败，已保留之前的画面。',
+  assetLimit:'最多可添加 7 张图片。',moveAssets:'在上方画布拖动蓝框可移动选中素材，方向键可微调。',unplacedAssets:'选中素材没有可移动的画面图层。',
+  runtimeMemory:'运行内存估算',runtimeLimit:'解码后的图片和画布超过 3 MB，请移除素材或换用较小的图片再导出。',unknownRuntimeSize:'有图片无法计算运行内存，请更换源文件或移除该素材。',
+  runtimeHint:'按解码后的 RGBA 图片和一张原尺寸画布计算。实际播放器的总内存因平台而异。',overRuntime:'超出上限',unknownRuntime:'无法估算',
+});
+Object.assign(copy.en,{
+  uploadHint:'Extract images or customize the frame with text and images.',assetsTitle:'SVGA image assets',assetAdd:'Add image',assetDelete:'Delete selected',assetsRestore:'Restore original images',
+  assetDownload:'Download',assetEdit:'Edit',assetOriginal:'Original asset',assetAdded:'Added layer',assetWorking:'Processing assets…',
+  assetEmpty:'No image assets. Add an image to this avatar frame.',assetCount:'{total} images · {selected} selected',assetError:'Could not edit these assets. The previous preview has been kept.',
+  assetLimit:'You can add up to 7 images.',moveAssets:'Drag the blue outline in the preview to move selected assets. Use arrow keys to nudge.',unplacedAssets:'The selected assets have no movable layer in the animation.',
+  runtimeMemory:'Estimated runtime memory',runtimeLimit:'Decoded images and the canvas exceed 3 MB. Remove assets or use smaller images before exporting.',unknownRuntimeSize:'An image could not be measured. Replace the source file or remove that asset.',
+  runtimeHint:'Counts decoded RGBA images and one native-size canvas. Total player memory depends on the platform.',overRuntime:'Over limit',unknownRuntime:'Unavailable',
+});
+const state={mode:'images',style:'plain',source:null,file:null,video:null,loading:false,imageLoading:false,exporting:false,playing:false,position:{x:.5,y:.82},bitmap:null,image:null,result:null,notice:'',noticeKind:'error',renderId:0,frame:0,
+  images:[],sourceAssets:[],removedImages:new Set(),assetSelection:new Set(),assetOffsets:new Map(),assetBusy:false};
+const MAX_ADDED_IMAGES=7;
+let player,exportPlayer,exportHost,drag,imageDrag,assetDrag,assetPaint,stageVisible=true;
 const isZh=()=>document.documentElement.lang.startsWith('zh');
 const t=key=>copy[isZh()?'zh':'en'][key]||key;
 const selected=()=>state.mode==='custom';
 const active=()=>selected()&&!root.classList.contains('hidden');
-const busy=()=>state.loading||state.imageLoading||state.exporting;
+const busy=()=>state.loading||state.imageLoading||state.exporting||state.assetBusy;
 const weights=()=>['bebas','pacifico'].includes($('avatarCustomFont').value)?[400,700]:$('avatarCustomFont').value==='oswald'?[400,500,600,700]:[400,500,600,700,800];
 const weight=()=>Number($('avatarCustomWeight').value)||fonts[$('avatarCustomFont').value]?.[1]||600;
 const cssFont=(size=Number($('avatarCustomFontSize').value))=>`${weight()} ${size}px "${(fonts[$('avatarCustomFont').value]||fonts.inter)[0]}"`;
@@ -23,11 +41,31 @@ const mode=()=>window.FunWebP?.getMode?.()||'high';
 const cleanName=name=>name.replace(/\.svga$/i,'').replace(/[\\/:*?"<>|]/g,'-').slice(0,100)||'avatar';
 function notice(key='',kind='error'){state.notice=key;state.noticeKind=kind;syncNotice()}
 function syncNotice(){const n=$('avatarCustomNotice');n.hidden=!state.notice;n.dataset.state=state.noticeKind;n.textContent=state.notice?t(state.notice):''}
+function currentRuntimeBytes(){
+  if(!state.source||state.sourceAssets.length!==svgaBitmapCount(state.source))return null;
+  const original=state.sourceAssets.filter(asset=>!state.removedImages.has(asset.key));
+  const overlays=state.images.map(image=>image.canvas);
+  if(state.bitmap&&$('avatarCustomText').value.trim())overlays.push(state.bitmap.canvas);
+  return svgaRuntimeBytes(state.source.info,original.concat(overlays));
+}
+async function measureImage(bytes,type){
+  try{
+    const image=await createImageBitmap(new Blob([bytes],{type}));
+    const size={width:image.width,height:image.height};image.close();return size;
+  }catch{return null}
+}
 function sync(){
   const working=busy(),ready=!!state.source;
   $('avatarCustomFields').disabled=working||!ready;
   const hasText=!!$('avatarCustomText').value.trim();
-  $('avatarCustomExport').disabled=working||!ready||(!hasText&&!state.image)||(hasText&&(!validSize()||!validStroke()||!weights().includes(weight())))||!validImageWidth();
+  const runtimeBytes=currentRuntimeBytes(),overBudget=runtimeBytes!==null&&runtimeBytes>SVGA_MAX_RUNTIME_BYTES;
+  const budgetError=ready&&(runtimeBytes===null?'unknownRuntimeSize':overBudget?'runtimeLimit':'');
+  const memory=$('avatarCustomRuntimeMeta');
+  const label=t('runtimeMemory')+' · '+(runtimeBytes===null?t('unknownRuntime'):(runtimeBytes/1e6).toFixed(2)+' / 3 MB')+(overBudget?' · '+t('overRuntime'):'');
+  if(memory.textContent!==label)memory.textContent=label;
+  memory.title=t(budgetError||'runtimeHint');memory.dataset.over=String(!!budgetError);
+  $('avatarCustomExport').disabled=working||!ready||!!budgetError||(!hasText&&!state.images.length&&!state.removedImages.size&&!state.assetOffsets.size)||(hasText&&(!validSize()||!validStroke()||!weights().includes(weight())))||!validImageWidth();
+  $('avatarCustomExport').title=budgetError?t(budgetError):'';
   $('avatarCustomExport').setAttribute('aria-busy',String(state.exporting));
   $('avatarCustomExport').textContent=t(state.exporting?'exporting':'export');
   for(const id of ['avatarCustomUpload','avatarCustomReplace','avatarCustomPlay','avatarCustomCenter'])$(id).disabled=working||(['avatarCustomPlay','avatarCustomCenter'].includes(id)&&!ready);
@@ -37,7 +75,7 @@ function sync(){
   $('avatarCustomImageUpload').textContent=t(state.image?'imageReplace':'imageUpload');$('avatarCustomImageUpload').setAttribute('aria-busy',String(state.imageLoading));
   $('avatarCustomUpload').setAttribute('aria-busy',String(state.loading));
   $('avatarCustomStage').setAttribute('aria-busy',String(working));
-  $('avatarCustomStatus').textContent=t(state.loading?'loading':state.imageLoading?'imageLoading':state.exporting?'exporting':ready?'ready':'empty');
+  $('avatarCustomStatus').textContent=t(state.loading?'loading':state.imageLoading?'imageLoading':state.exporting?'exporting':state.assetBusy?'assetWorking':ready?'ready':'empty');
   $('avatarCustomPlayText').textContent=t(state.playing?'pause':'play');$('avatarCustomPlayIcon').textContent=state.playing?'Ⅱ':'▶';
   $('avatarCustomEmpty').hidden=ready;$('avatarCustomScene').hidden=!ready;
   $('avatarCustomSourcebar').hidden=$('avatarCustomToolbar').hidden=!ready;
@@ -46,7 +84,7 @@ function sync(){
   $('avatarCustomImageLayer').style.pointerEvents=working?'none':'';
   $('avatarCustomImageControls').hidden=!state.image;$('avatarCustomImageLayer').hidden=!state.image;
   if(state.image){$('avatarCustomImageName').textContent=state.image.name;$('avatarCustomImageName').title=state.image.name;$('avatarCustomImageThumb').src=state.image.url}
-  syncTabs();syncNotice();syncStyles();
+  syncTabs();syncNotice();syncStyles();syncAssetControls();
   document.dispatchEvent(new CustomEvent('webp:tool-state',{detail:{tool:'avatar',busy:working}}));
 }
 function syncStyles(){for(const button of root.querySelectorAll('button[data-text-style]'))button.setAttribute('aria-pressed',String(state.style===button.dataset.textStyle))}
@@ -69,7 +107,8 @@ function syncLanguage(){
   $('avatarCustomStrokeColorValue').setAttribute('aria-label',isZh()?'描边颜色 HEX':'Outline color HEX');
   $('avatarCustomStage').setAttribute('aria-label',t('uploadTitle'));$('avatarCustomTextLayer').setAttribute('aria-label',t('drag'));$('avatarCustomImageLayer').setAttribute('aria-label',t('imageDrag'));$('avatarCustomImageResize').setAttribute('aria-label',t('imageResize'));
   $('avatarCustomImageResize').title=t('imageResize');
-  if(state.result)renderDownloads();sync();
+  $('avatarCustomAssetDrag').setAttribute('aria-label',t('moveAssets'));
+  if(state.result)renderDownloads();renderAssets();sync();
 }
 function validSize(){const n=Number($('avatarCustomFontSize').value);return Number.isInteger(n)&&n>=8&&n<=512}
 function validStroke(){const n=Number($('avatarCustomStrokeWidth').value);return Number.isFinite(n)&&n>=0&&n<=16}
@@ -79,7 +118,15 @@ function parse(file){return new Promise((resolve,reject)=>{const timer=setTimeou
 function ensurePlayer(){
   if(player)return;
   player=new window.SVGA.Player($('avatarCustomPlayer'));player.clearsAfterStop=false;player.loops=0;player.setContentMode('AspectFit');
-  player.onFrame(frame=>{state.frame=frame;syncTime()});
+  const draw=player._renderer.drawSprite;
+  player._renderer.drawSprite=function(sprite,...args){
+    const offset=spriteValue(state.assetOffsets,sprite),frame=sprite.frames[this._owner._currentFrame];
+    if(!offset||!frame)return draw.call(this,sprite,...args);
+    const transform=frame.transform;
+    frame.transform={...transform,tx:transform.tx+offset.x,ty:transform.ty+offset.y};
+    try{return draw.call(this,sprite,...args)}finally{frame.transform=transform}
+  };
+  player.onFrame(frame=>{state.frame=frame;syncTime();if(state.assetSelection.size)placeAssetSelection()});
 }
 function syncTime(){if(!state.source)return;const info=state.source.info;$('avatarCustomTime').textContent=`${((state.frame||0)/info.fps).toFixed(2)} / ${(info.frames/info.fps).toFixed(2)} s`}
 function pause(){if(player&&state.video)player.pauseAnimation();state.playing=false;if($('avatarCustomPlayText')){$('avatarCustomPlayText').textContent=t('play');$('avatarCustomPlayIcon').textContent='▶'}}
@@ -96,13 +143,95 @@ function placeText(){
   n.style.left=(state.position.x-b.width/width/2)*100+'%';n.style.top=(state.position.y-b.height/height/2)*100+'%';
   root.dataset.customTextX=String(state.position.x);root.dataset.customTextY=String(state.position.y);
 }
-function placeImage(){
-  const image=state.image;if(!image||!state.source)return;
-  const {width,height}=state.source.info,layer=$('avatarCustomImageLayer');
+function positionImage(layer,image,{width,height}){
   layer.style.width=image.width/width*100+'%';layer.style.height=image.height/height*100+'%';
   layer.style.left=(image.position.x-image.width/width/2)*100+'%';layer.style.top=(image.position.y-image.height/height/2)*100+'%';
+}
+function placeImage(){
+  if(!state.source)return;
+  const info=state.source.info,image=state.image;
+  for(const added of state.images)positionImage(added.view,added,info);
+  placeAssetSelection();
+  if(!image)return;
+  positionImage($('avatarCustomImageLayer'),image,info);
   $('avatarCustomImageSize').textContent=`${Math.round(image.width)} × ${Number(image.height.toPrecision(4))} px`;
   root.dataset.customImageX=String(image.position.x);root.dataset.customImageY=String(image.position.y);root.dataset.customImageWidth=String(image.width);root.dataset.customImageHeight=String(image.height);
+}
+function spriteValue(assets,sprite){
+  const key=sprite.imageKey;
+  return assets.get(key.replace('.matte',''))||assets.get(key);
+}
+function pickedAssets(){
+  const images=new Map(),added=[];
+  for(const asset of state.assetSelection)if(asset.view)added.push(asset);else images.set(asset.key,asset);
+  const sprites=[];
+  for(const sprite of state.video?.sprites||[]){
+    const asset=spriteValue(images,sprite);
+    if(asset&&sprite.frames.length)sprites.push({sprite,asset});
+  }
+  return {added,sprites};
+}
+function seekSelectedAsset(asset){
+  pause();
+  if(asset.view)return;
+  const candidates=pickedAssets().sprites.filter(item=>item.asset===asset);
+  if(candidates.some(({sprite})=>sprite.frames[state.frame]?.alpha>=.05))return;
+  const frames=candidates.map(({sprite})=>sprite.frames.findIndex(frame=>frame.alpha>=.05)).filter(frame=>frame>=0);
+  if(frames.length){
+    state.frame=Math.min(...frames);
+    player.stepToFrame(state.frame,false);syncTime();
+  }
+}
+function placeAssetSelection(){
+  const layer=$('avatarCustomAssetDrag'),hint=$('avatarCustomAssetHint');
+  hint.hidden=!state.assetSelection.size;
+  if(!state.source||!state.assetSelection.size){layer.hidden=true;return}
+  const {added,sprites}=pickedAssets(),movable=added.length||sprites.length;
+  const help=t(movable?'moveAssets':'unplacedAssets');
+  if(hint.textContent!==help)hint.textContent=help;
+  layer.hidden=!movable||busy();
+  if(layer.hidden)return;
+  const {width,height}=state.source.info;
+  let left=Infinity,top=Infinity,right=-Infinity,bottom=-Infinity;
+  const include=(x,y)=>{left=Math.min(left,x);top=Math.min(top,y);right=Math.max(right,x);bottom=Math.max(bottom,y)};
+  for(const image of added){
+    const x=image.position.x*width,y=image.position.y*height;
+    include(x-image.width/2,y-image.height/2);include(x+image.width/2,y+image.height/2);
+  }
+  for(const {sprite,asset} of sprites){
+    const frame=sprite.frames[state.frame];
+    if(!frame||frame.alpha<.05)continue;
+    const {a,b,c,d,tx,ty}=frame.transform,offset=spriteValue(state.assetOffsets,sprite);
+    const w=asset.width||frame.layout.width,h=asset.height||frame.layout.height;
+    for(const x of [0,w])for(const y of [0,h])include(a*x+c*y+tx+(offset?.x||0),b*x+d*y+ty+(offset?.y||0));
+  }
+  if(!Number.isFinite(left)){left=width*.45;top=height*.45;right=width*.55;bottom=height*.55}
+  const x=Math.max(0,Math.min(95,left/width*100)),y=Math.max(0,Math.min(95,top/height*100));
+  layer.style.left=x+'%';layer.style.top=y+'%';
+  layer.style.width=Math.min(100-x,Math.max(5,right/width*100-x))+'%';
+  layer.style.height=Math.min(100-y,Math.max(5,bottom/height*100-y))+'%';
+}
+function movementSnapshot(){
+  const {added,sprites}=pickedAssets();
+  const keys=new Set(sprites.map(item=>item.asset.key));
+  return {
+    original:new Map([...keys].map(key=>[key,state.assetOffsets.get(key)||{x:0,y:0}])),
+    added:new Map(added.map(image=>[image,{...image.position}])),
+  };
+}
+function moveAssets(snapshot,dx,dy){
+  const {width,height}=state.source.info,clamp=value=>Math.max(-32768,Math.min(32768,value));
+  for(const [key,offset] of snapshot.original){
+    const x=clamp(offset.x+dx),y=clamp(offset.y+dy);
+    if(x||y)state.assetOffsets.set(key,{x,y});else state.assetOffsets.delete(key);
+  }
+  for(const [image,position] of snapshot.added)image.position={x:Math.max(0,Math.min(1,position.x+dx/width)),y:Math.max(0,Math.min(1,position.y+dy/height))};
+  placeImage();
+  if(state.result)notice('changed','success');
+  if(assetPaint===undefined)assetPaint=requestAnimationFrame(()=>{
+    assetPaint=undefined;
+    if(!state.playing&&!busy()&&state.video)player.stepToFrame(state.frame,false);
+  });
 }
 const imageAspect=(image=state.image)=>image.aspect||image.canvas.width/image.canvas.height;
 function validImageWidth(){if(!state.image)return true;const value=Number($('avatarCustomImageWidth').value);return Number.isInteger(value)&&value>=1&&value<=16384&&value/imageAspect()<=16384}
@@ -114,12 +243,28 @@ function resizeImage(value){
 }
 function removeImage(){
   if(busy()||!state.image)return;
-  URL.revokeObjectURL(state.image.url);state.image=null;imageDrag=null;$('avatarCustomImageThumb').removeAttribute('src');$('avatarCustomImageCanvas').width=$('avatarCustomImageCanvas').height=1;
-  $('avatarCustomImageWidth').setAttribute('aria-invalid','false');if(state.result)notice('changed','success');sync();
+  discardAddedImages(new Set([state.image]));
+  renderAssets();if(state.result)notice('changed','success');sync();
 }
-async function loadImageFiles(files){
+function selectImage(image){
+  state.image=image;imageDrag=null;
+  if(image)$('avatarCustomImageWidth').value=Math.round(image.width);
+  else $('avatarCustomImageThumb').removeAttribute('src');
+  $('avatarCustomImageWidth').setAttribute('aria-invalid','false');
+  placeImage();
+}
+function discardAddedImages(selected){
+  for(const image of state.images)if(selected.has(image)){
+    URL.revokeObjectURL(image.url);image.view.remove();state.assetSelection.delete(image);
+  }
+  state.images=state.images.filter(image=>!selected.has(image));
+  if(selected.has(state.image))selectImage(state.images.at(-1)||null);
+}
+async function loadImageFiles(files,add=false){
   if(busy())return;if(!state.source){notice('imageNeedsSvga');return}
   const file=Array.from(files||[])[0];if(!file)return;
+  const previous=add?null:state.image;
+  if(!previous&&state.images.length>=MAX_ADDED_IMAGES){notice('assetLimit');return}
   if(!/\.(png|jpe?g|webp)$/i.test(file.name||'')&&!/^image\/(png|jpeg|webp)$/i.test(file.type||'')){notice('imageType');return}
   if(file.size>20*1024*1024){notice('imageSizeError');return}
   const resume=state.playing;pause();state.imageLoading=true;notice();sync();let decoded,committed=false;
@@ -129,15 +274,99 @@ async function loadImageFiles(files){
     const info=state.source.info,scale=Math.min(1,4096/w,4096/h,Math.max(info.width,info.height)*2/Math.max(w,h),Math.sqrt(8000000/(w*h))),canvas=document.createElement('canvas');
     canvas.width=Math.max(1,Math.round(w*scale));canvas.height=Math.max(1,Math.round(h*scale));const ctx=canvas.getContext('2d');ctx.imageSmoothingEnabled=true;ctx.imageSmoothingQuality='high';ctx.drawImage(decoded,0,0,canvas.width,canvas.height);
     const blob=await toPng(canvas),bytes=new Uint8Array(await blob.arrayBuffer()),aspect=w/h;
-    const width=Math.max(1,Math.min(Math.floor(Math.min(16384,16384*aspect)),Math.round(state.image?.width||w*Math.min(1,info.width*.4/w,info.height*.4/h))));
-    const image={canvas,blob,bytes,url:URL.createObjectURL(blob),name:file.name||'image.png',aspect,width,height:width/aspect,position:state.image?{...state.image.position}:{x:.5,y:.5}};
-    const previous=state.image;state.image=image;$('avatarCustomImageWidth').value=width;$('avatarCustomImageWidth').setAttribute('aria-invalid','false');
-    const view=$('avatarCustomImageCanvas');view.width=canvas.width;view.height=canvas.height;view.getContext('2d').drawImage(canvas,0,0);placeImage();if(previous)URL.revokeObjectURL(previous.url);committed=true;
+    const width=Math.max(1,Math.min(Math.floor(Math.min(16384,16384*aspect)),Math.round(previous?.width||w*Math.min(1,info.width*.4/w,info.height*.4/h))));
+    const view=document.createElement('img');view.alt='';view.draggable=false;
+    const image={canvas,blob,bytes,view,url:URL.createObjectURL(blob),name:file.name||'image.png',aspect,width,height:width/aspect,position:previous?{...previous.position}:{x:.5,y:.5}};
+    view.src=image.url;
+    view.addEventListener('click',()=>{if(!busy()){selectImage(image);sync();$('avatarCustomImageLayer').focus({preventScroll:true})}});
+    if(previous){
+      state.images.splice(state.images.indexOf(previous),1,image);
+      if(state.assetSelection.delete(previous))state.assetSelection.add(image);
+      URL.revokeObjectURL(previous.url);
+    }else state.images.push(image);
+    $('avatarCustomAddedImages').replaceChildren(...state.images.map(added=>added.view));
+    selectImage(image);renderAssets();committed=true;
     if(state.result)notice('changed','success');
   }catch(error){notice(['imageDimensions'].includes(error.message)?error.message:'imageLoadError')}
   finally{decoded?.close?.();state.imageLoading=false;if(committed&&resume&&active()&&!document.hidden&&stageVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches){state.playing=true;player.stepToFrame(state.frame,true)}sync()}
 }
 function importFiles(files){const list=Array.from(files||[]),file=list[0];if(!file)return;if(/\.(png|jpe?g|webp)$/i.test(file.name||'')||/^image\/(png|jpeg|webp)$/i.test(file.type||''))return loadImageFiles(list);return loadFiles(list)}
+const visibleAssets=()=>state.sourceAssets.filter(asset=>!state.removedImages.has(asset.key)).concat(state.images);
+function assetName(asset){
+  const extension=asset.extension||'png';
+  const base=(asset.key??asset.name).replace(/[\\/:*?"<>|\x00-\x1f]/g,'-').replace(/\.(png|jpe?g|webp|gif|bmp)$/i,'').replace(/^\.+/,'').trim().slice(0,120);
+  return (base||'image')+'.'+extension;
+}
+function syncAssetControls(){
+  const working=busy(),total=state.sourceAssets.length-state.removedImages.size+state.images.length;
+  $('avatarCustomAssets').hidden=!state.source;
+  const count=$('avatarCustomAssetCount'),label=t('assetCount').replace('{total}',total).replace('{selected}',state.assetSelection.size);
+  if(count.textContent!==label)count.textContent=label;
+  $('avatarCustomAssetEmpty').hidden=total!==0;$('avatarCustomAssetList').hidden=total===0;
+  $('avatarCustomAssetAdd').disabled=$('avatarCustomAssetInput').disabled=working||state.images.length>=MAX_ADDED_IMAGES;
+  $('avatarCustomAssetDelete').disabled=working||!state.assetSelection.size;
+  $('avatarCustomAssetRecovery').hidden=!state.removedImages.size;
+  $('avatarCustomAssetsRestore').hidden=!state.removedImages.size;$('avatarCustomAssetsRestore').disabled=working;
+  for(const control of $('avatarCustomAssetList').querySelectorAll('button,input')){
+    control.disabled=working;
+    if(control.dataset.imageIndex!==undefined)control.setAttribute('aria-pressed',String(state.images[Number(control.dataset.imageIndex)]===state.image));
+  }
+  placeAssetSelection();
+}
+function renderAssets(){
+  const rows=visibleAssets().map(asset=>{
+    const row=document.createElement('li'),label=document.createElement('label'),check=document.createElement('input'),thumb=document.createElement('img'),description=document.createElement('span'),name=document.createElement('strong'),meta=document.createElement('small');
+    row.className='avatar-custom-asset-row';
+    label.className='avatar-custom-asset-select';check.type='checkbox';check.checked=state.assetSelection.has(asset);
+    check.addEventListener('change',()=>{if(check.checked){state.assetSelection.add(asset);seekSelectedAsset(asset)}else state.assetSelection.delete(asset);syncAssetControls()});
+    const filename=assetName(asset);
+    thumb.className='avatar-custom-asset-thumb checkerboard';thumb.src=asset.url;thumb.alt='';thumb.loading='lazy';thumb.decoding='async';
+    description.className='avatar-custom-asset-label';name.textContent=asset.name||filename;name.title=name.textContent;
+    const width=asset.canvas?.width??asset.width,height=asset.canvas?.height??asset.height;
+    meta.className='avatar-custom-asset-meta';meta.textContent=t(asset.view?'assetAdded':'assetOriginal')+(width&&height?' · '+width+' × '+height:'');
+    description.append(name,meta);label.append(check,thumb,description);row.append(label);
+    if(asset.view){
+      const edit=document.createElement('button');edit.type='button';edit.className='avatar-custom-secondary';edit.textContent=t('assetEdit');edit.dataset.imageIndex=state.images.indexOf(asset);
+      edit.setAttribute('aria-label',t('assetEdit')+' '+name.textContent);
+      edit.addEventListener('click',()=>{selectImage(asset);sync();$('avatarCustomImageLayer').focus()});row.append(edit);
+    }
+    const getFile=document.createElement('button');getFile.type='button';getFile.className='avatar-custom-secondary';getFile.textContent=t('assetDownload');
+    getFile.setAttribute('aria-label',t('assetDownload')+' '+name.textContent);
+    getFile.addEventListener('click',()=>download({name:filename,url:asset.url}));row.append(getFile);
+    return row;
+  });
+  $('avatarCustomAssetList').replaceChildren(...rows);syncAssetControls();
+}
+async function editAssets(restore=false){
+  if(busy()||!state.source||(restore?!state.removedImages.size:!state.assetSelection.size))return;
+  const selection=new Set(state.assetSelection),removed=restore?new Set():new Set(state.removedImages);
+  if(!restore)for(const asset of selection)if(!asset.view)removed.add(asset.key);
+  const reload=restore||removed.size!==state.removedImages.size,wasPlaying=state.playing,previous=state.video,frame=state.frame;
+  if(reload){pause();state.assetBusy=true;notice();sync()}
+  try{
+    if(reload){
+      const bytes=await previewSvgaImages(state.source,[...removed]),video=await parse(new File([bytes],state.file.name));
+      player.setVideoItem(video);await waitForRenderer(player);player.stepToFrame(frame,false);
+      state.video=video;state.removedImages=removed;
+      for(const key of removed)state.assetOffsets.delete(key);
+    }
+    if(!restore){discardAddedImages(selection);state.assetSelection.clear()}
+    renderAssets();notice(state.result?'changed':'','success');
+  }catch{
+    if(player&&previous){player.setVideoItem(previous);await waitForRenderer(player).catch(()=>{});player.stepToFrame(frame,false)}
+    notice('assetError');
+  }finally{
+    state.assetBusy=false;
+    if(reload&&wasPlaying&&active()&&!document.hidden&&stageVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches){
+      state.playing=true;player.stepToFrame(frame,true);
+    }
+    sync();
+    if(state.notice!=='assetError'){
+      const next=$('avatarCustomAssetsRestore').hidden?$('avatarCustomAssetAdd'):$('avatarCustomAssetsRestore');
+      next.focus({preventScroll:true});
+    }
+  }
+}
 async function rasterText(size=Number($('avatarCustomFontSize').value)){
   const raw=$('avatarCustomText').value.replace(/\r/g,''),color=$('avatarCustomColor').value,fontKey=$('avatarCustomFont').value,font=cssFont(size),fontWeight=weight(),strokeWidth=Number($('avatarCustomStrokeWidth').value),strokeColor=$('avatarCustomStrokeColor').value,styleKey=state.style;
   if(!raw.trim())return null;
@@ -176,11 +405,18 @@ async function loadFiles(files){
   pause();state.loading=true;++state.renderId;notice();sync();
   const previous=state.video,previousWidth=state.source?.info.width;let imported=false;
   try{
-    const bytes=new Uint8Array(await file.arrayBuffer()),source=await readSvga(bytes,{JSZip:window.JSZip}),video=await parse(file);
+    const bytes=new Uint8Array(await file.arrayBuffer()),source=await readSvga(bytes,{JSZip:window.JSZip});
+    const [video,assets]=await Promise.all([parse(file),listSvgaImages(source,measureImage)]);
     const size=state.source?Number($('avatarCustomFontSize').value):Math.max(8,Math.min(64,Math.round(source.info.width*.095))),bitmap=await rasterText(size);
     ensurePlayer();player.setVideoItem(video);await waitForRenderer(player);
     state.source=source;state.video=video;state.file=file;state.frame=0;$('avatarCustomFontSize').value=size;
-    if(state.image&&previousWidth){const width=Math.max(1,Math.min(Math.floor(Math.min(16384,16384*imageAspect())),Math.round(state.image.width*source.info.width/previousWidth)));state.image.width=width;state.image.height=width/imageAspect();$('avatarCustomImageWidth').value=width}
+    if(previousWidth)for(const image of state.images){
+      const aspect=imageAspect(image),width=Math.max(1,Math.min(Math.floor(Math.min(16384,16384*aspect)),Math.round(image.width*source.info.width/previousWidth)));
+      image.width=width;image.height=width/aspect;
+    }
+    for(const asset of state.sourceAssets)URL.revokeObjectURL(asset.url);
+    state.sourceAssets=assets.map(asset=>({...asset,url:URL.createObjectURL(new Blob([asset.bytes],{type:asset.type}))}));
+    state.removedImages.clear();state.assetSelection.clear();state.assetOffsets.clear();assetDrag=null;selectImage(state.image);renderAssets();
     releaseResult(state.result);state.result=null;$('avatarCustomResult').hidden=true;$('avatarCustomDownloads').replaceChildren();
     $('avatarCustomFileName').textContent=file.name;$('avatarCustomFileMeta').textContent=`${source.info.width} × ${source.info.height} · ${source.info.frames} ${isZh()?'帧':'frames'} · ${source.info.fps} FPS`;
     applyBitmap(bitmap);sync();layout();player.stepToFrame(0,false);syncTime();
@@ -204,14 +440,16 @@ function renderDownloads(){
   $('avatarCustomDownloads').replaceChildren();$('avatarCustomResult').hidden=true;
 }
 async function exportFiles(){
-  if(busy()||!state.source)return;const hasText=!!$('avatarCustomText').value.trim();if(!hasText&&!state.image){notice('textEmpty');return}if(hasText&&!validSize()){notice('sizeError');return}if(hasText&&!validStroke()){notice('strokeError');return}if(!validImageWidth()){notice('imageWidthError');return}
+  if(busy()||!state.source)return;const hasText=!!$('avatarCustomText').value.trim();if(!hasText&&!state.images.length&&!state.removedImages.size&&!state.assetOffsets.size){notice('textEmpty');return}if(hasText&&!validSize()){notice('sizeError');return}if(hasText&&!validStroke()){notice('strokeError');return}if(!validImageWidth()){notice('imageWidthError');return}
   pause();state.exporting=true;notice();sync();const started=performance.now(),compression=mode();
   try{
     const bitmap=await renderText();if(hasText&&!bitmap)throw Error('exportError');
-    const info=state.source.info,options={maxBytes:3000000,allowLossyOptimization:false},textLayer=bitmap?{image:new Uint8Array(await (await toPng(bitmap.canvas)).arrayBuffer()),x:state.position.x*info.width-bitmap.width/2,y:state.position.y*info.height-bitmap.height/2,width:bitmap.width,height:bitmap.height,key:'text'}:null;
-    if(state.image){const image=state.image;options.layers=[{image:image.bytes,x:image.position.x*info.width-image.width/2,y:image.position.y*info.height-image.height/2,width:image.width,height:image.height,key:'image'},...(textLayer?[textLayer]:[])]}
-    else Object.assign(options,{textImage:textLayer.image,x:textLayer.x,y:textLayer.y,width:textLayer.width,height:textLayer.height});
-    const result=await buildCustomizedSvga(state.source,options,{JSZip:window.JSZip});
+    const info=state.source.info,options={maxBytes:3000000,allowLossyOptimization:false,enforceRuntimeBudget:true},textLayer=bitmap?{image:new Uint8Array(await (await toPng(bitmap.canvas)).arrayBuffer()),x:state.position.x*info.width-bitmap.width/2,y:state.position.y*info.height-bitmap.height/2,width:bitmap.width,height:bitmap.height,key:'text'}:null;
+    options.removedImageKeys=[...state.removedImages];
+    options.imageOffsets=new Map([...state.assetOffsets].filter(([key])=>!state.removedImages.has(key)));
+    options.layers=state.images.map(image=>({image:image.bytes,x:image.position.x*info.width-image.width/2,y:image.position.y*info.height-image.height/2,width:image.width,height:image.height,key:'image'}));
+    if(textLayer)options.layers.push(textLayer);
+    const result=await buildCustomizedSvga(state.source,options,{JSZip:window.JSZip,measureImage});
     if(result.bytes.byteLength>3000000)throw Error('sizeLimit');
     const name=cleanName(state.file.name),svgaName=name+'-custom.svga',webpName=name+'-preview.webp',frame=await firstFrame(result.bytes,svgaName,compression);
     const svga=new Blob([result.bytes],{type:'application/octet-stream'}),zip=new window.JSZip();zip.file(svgaName,svga);zip.file(webpName,frame.blob);const archive=await zip.generateAsync({type:'blob',compression:'STORE'});if(mode()!==compression)throw Error('modeChanged');
@@ -220,7 +458,8 @@ async function exportFiles(){
     renderDownloads();window.Hub?.record('avatar','generated',2);download(files[2]);notice(result.optimized?'optimized':'saved','success');
     root.dataset.customExportBytes=String(svga.size);root.dataset.customExportMs=(performance.now()-started).toFixed(1);root.dataset.customTextKey=hasText?result.imageKey:'';root.dataset.customOverlayKeys=JSON.stringify(result.imageKeys||[result.imageKey]);
     root.dataset.customCompression='lossless';root.dataset.customCompressionStats=JSON.stringify(result.lossless||{});
-  }catch(error){notice(error.code==='sizeLimit'||error.message==='sizeLimit'?'sizeLimit':['fontError','strokeError','textTooLarge'].includes(error.message)?error.message:'exportError')}
+    root.dataset.customRuntimeBytes=String(result.runtimeBytes);
+  }catch(error){notice(['sizeLimit','runtimeLimit','unknownRuntimeSize'].includes(error.code)?error.code:['sizeLimit','fontError','strokeError','textTooLarge'].includes(error.message)?error.message:'exportError')}
   finally{state.exporting=false;sync()}
 }
 for(const [id,name] of [['avatarImagesTab','images'],['avatarCustomTab','custom']]){
@@ -237,11 +476,36 @@ $('avatarCustomStrokeColorValue').addEventListener('input',event=>{const hex=eve
 $('avatarCustomStrokeColorValue').addEventListener('blur',()=>{$('avatarCustomStrokeColorValue').value=$('avatarCustomStrokeColor').value.toUpperCase();$('avatarCustomStrokeColorValue').setAttribute('aria-invalid','false')});
 $('avatarCustomImageUpload').addEventListener('click',()=>{if(!busy()&&state.source)$('avatarCustomImageInput').click()});
 $('avatarCustomImageInput').addEventListener('change',event=>{loadImageFiles(event.target.files);event.target.value=''});
+$('avatarCustomAssetAdd').addEventListener('click',()=>$('avatarCustomAssetInput').click());
+$('avatarCustomAssetInput').addEventListener('change',event=>{loadImageFiles(event.target.files,true);event.target.value=''});
+$('avatarCustomAssetDelete').addEventListener('click',()=>editAssets());
+$('avatarCustomAssetsRestore').addEventListener('click',()=>editAssets(true));
 $('avatarCustomImageRemove').addEventListener('click',removeImage);
 $('avatarCustomImageCenter').addEventListener('click',()=>{if(busy()||!state.image)return;state.image.position={x:.5,y:.5};placeImage();if(state.result)notice('changed','success')});
 $('avatarCustomImageWidth').addEventListener('input',event=>resizeImage(event.target.value));
 $('avatarCustomImageWidth').addEventListener('blur',()=>{if(!state.image)return;$('avatarCustomImageWidth').value=Math.round(state.image.width);$('avatarCustomImageWidth').setAttribute('aria-invalid','false');if(state.notice==='imageWidthError')notice(state.result?'changed':'',state.result?'success':'error');sync()});
 const imageLayer=$('avatarCustomImageLayer'),imageResize=$('avatarCustomImageResize');
+const assetLayer=$('avatarCustomAssetDrag');
+assetLayer.addEventListener('pointerdown',event=>{
+  if(busy()||assetLayer.hidden||event.button!==0)return;
+  event.preventDefault();pause();
+  const rect=$('avatarCustomScene').getBoundingClientRect();
+  assetDrag={...movementSnapshot(),pointer:event.pointerId,x:event.clientX,y:event.clientY,rect};
+  assetLayer.setPointerCapture(event.pointerId);assetLayer.focus({preventScroll:true});
+});
+assetLayer.addEventListener('pointermove',event=>{
+  if(busy()||!assetDrag||event.pointerId!==assetDrag.pointer)return;
+  const {width,height}=state.source.info;
+  moveAssets(assetDrag,(event.clientX-assetDrag.x)*width/assetDrag.rect.width,(event.clientY-assetDrag.y)*height/assetDrag.rect.height);
+});
+for(const type of ['pointerup','pointercancel','lostpointercapture'])assetLayer.addEventListener(type,()=>{if(assetDrag){assetDrag=null;sync()}});
+assetLayer.addEventListener('keydown',event=>{
+  const direction={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[event.key];
+  if(busy()||assetLayer.hidden||!direction)return;
+  event.preventDefault();pause();
+  const step=event.shiftKey?10:1;
+  moveAssets(movementSnapshot(),direction[0]*step,direction[1]*step);sync();
+});
 function startImageDrag(event,kind){
   if(busy()||event.button!==0||!state.image)return;event.preventDefault();event.stopPropagation();
   const rect=$('avatarCustomScene').getBoundingClientRect(),image=state.image,info=state.source.info;

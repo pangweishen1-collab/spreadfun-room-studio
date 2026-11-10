@@ -70,10 +70,42 @@ const extraFields=Buffer.concat([msg(3,Buffer.concat([str(1,'sound'),msg(2,mp3)]
 const augmentedBody=Buffer.concat([sourceBody,extraFields]),augmented=zlib.deflateSync(augmentedBody);
 const textPng=png(80,40),placement={textImage:textPng,x:17,y:23,width:40,height:20};
 (async()=>{
-  const {readSvga,readSvgaInfo,buildCustomizedSvga,SvgaCustomizeError,SVGA_MAX_OUTPUT_BYTES}=await import('../avatar-custom-engine.mjs');
+  const {readSvga,readSvgaInfo,buildCustomizedSvga,listSvgaImages,previewSvgaImages,SvgaCustomizeError,SVGA_MAX_OUTPUT_BYTES}=await import('../avatar-custom-engine.mjs');
   assert.equal(SVGA_MAX_OUTPUT_BYTES,3000000);
   const before=createHash('sha256').update(augmented).digest('hex');
   const model=await readSvga(augmented);assert.deepEqual(model.info,{width:320,height:320,fps:30,frames:60,format:'protobuf',imageCount:2});assert.deepEqual(await readSvgaInfo(augmented),model.info);
+  const [asset]=await listSvgaImages(model);
+  assert.equal(asset.extension,'png');assert.equal(asset.width,320);
+  assert.deepEqual((await listSvgaImages(model)).map(item=>item.key),[asset.key],'audio bytes are not listed as images');
+  assert.deepEqual(Buffer.from(asset.bytes),last(scan(sourceRecords.find(r=>r.id===3).data),2).data,'extraction preserves the original asset bytes');
+  const maskKey='mask';
+  const maskedBody=Buffer.concat([msg(3,Buffer.concat([str(1,maskKey),msg(2,png(32,32))])),
+    msg(4,Buffer.concat([str(1,maskKey+'.matte'),...scan(sourceSprites[0].data).filter(r=>r.id===2).map(r=>r.raw)])),
+    ...scan(augmentedBody).map(r=>r.id===4?msg(4,Buffer.concat([r.data,str(3,maskKey+'.matte')])):r.raw)]);
+  const masked=await readSvga(zlib.deflateSync(maskedBody)),withoutMask=await previewSvgaImages(masked,[maskKey]),trimmedRecords=decode(withoutMask);
+  assert.deepEqual(trimmedRecords,scan(augmentedBody),'deleting the matte also removes its dependent references while retaining all other fields');
+  const deleted=await buildCustomizedSvga(masked,{layers:[],removedImageKeys:[maskKey,asset.key],allowLossyOptimization:false});
+  const empty=await readSvga(deleted.bytes);
+  assert.deepEqual(await listSvgaImages(empty),[]);assert.equal(empty.info.frames,60);assert.equal(empty.info.fps,30);
+  assert.deepEqual(decode(deleted.bytes).filter(r=>r.id===5||r.id>=90),scan(augmentedBody).filter(r=>r.id===5||r.id>=90));
+  await assert.rejects(()=>previewSvgaImages(masked,['sound']),error=>error.code==='invalidAsset');
+  assert.equal((await listSvgaImages(masked)).length,2,'previews and exports do not mutate original assets');
+  const moved=await buildCustomizedSvga(model,{imageOffsets:new Map([[asset.key,{x:17,y:-9}]]),enforceRuntimeBudget:true});
+  assert.equal(moved.runtimeBytes,320*320*4*2,'budget counts one canvas and one bitmap, excluding audio');
+  const originalFrames=scan(sourceSprites[0].data).filter(r=>r.id===2);
+  const movedFrames=scan(decode(moved.bytes).find(r=>r.id===4).data).filter(r=>r.id===2);
+  assert.equal(movedFrames.length,originalFrames.length);
+  for(let i=0;i<originalFrames.length;i++){
+    const before=scan(originalFrames[i].data),after=scan(movedFrames[i].data);
+    assert.deepEqual(after.filter(r=>r.id!==3),before.filter(r=>r.id!==3));
+    const matrix=scan(last(before,3).data),shifted=scan(last(after,3).data);
+    near(float(shifted,5),float(matrix,5)+17);near(float(shifted,6),float(matrix,6)-9);
+    assert.deepEqual(shifted.filter(r=>r.id<5),matrix.filter(r=>r.id<5));
+  }
+  const heavyImage=png(800,800);
+  assert.ok(heavyImage.length<3000000);
+  await assert.rejects(()=>buildCustomizedSvga(model,{layers:[{image:heavyImage,x:0,y:0,width:20,height:20}],enforceRuntimeBudget:true}),
+    e=>e.code==='runtimeLimit'&&e.runtimeBytes===3379200,'compressed size and logical placement do not bypass bitmap memory limits');
   const progress=[];const result=await buildCustomizedSvga(model,placement,{onProgress:x=>progress.push(x)});
   assert.ok(result.bytes.length<3000000);assert.equal(result.mime,'application/octet-stream');assert.equal(result.size,result.bytes.length);assert.equal(result.info.frames,60);assert.equal(progress.at(-1).progress,100);assert.ok(result.lossless.beforeBytes>=result.lossless.afterBytes);assert.equal(result.lossless.bytesSaved,result.lossless.beforeBytes-result.lossless.afterBytes);
   assert.equal(createHash('sha256').update(augmented).digest('hex'),before,'input bytes remain unchanged');
@@ -118,6 +150,19 @@ const textPng=png(80,40),placement={textImage:textPng,x:17,y:23,width:40,height:
   samePngPixels(await outZip.file('frame.png').async('uint8array'),await originalZip.file('frame.png').async('uint8array'));assert.deepEqual(Buffer.from(await outZip.file('sound.mp3').async('uint8array')),mp3);
   samePngPixels(await outZip.file(spec.images[legacy.imageKey]+'.png').async('uint8array'),textPng);
   const again=await buildCustomizedSvga(legacyModel,placement);assert.equal(Object.keys((await JSZip.loadAsync(again.bytes)).files).length,Object.keys(outZip.files).length,'cached legacy source is not mutated by packaging');
+  const [legacyAsset]=await listSvgaImages(legacyModel);
+  const legacyDeleted=await JSZip.loadAsync(await previewSvgaImages(legacyModel,[legacyAsset.key]));
+  assert.equal(legacyDeleted.file('frame.png'),null);
+  assert.deepEqual(Buffer.from(await legacyDeleted.file('sound.mp3').async('uint8array')),mp3);
+  const legacyDeletedSpec=JSON.parse(await legacyDeleted.file('movie.spec').async('string'));
+  assert.deepEqual(legacyDeletedSpec.images,{});assert.deepEqual(legacyDeletedSpec.sprites,[]);assert.deepEqual(legacyDeletedSpec.extra,sourceSpec.extra);
+  const legacyMoved=await buildCustomizedSvga(legacyModel,{imageOffsets:new Map([[legacyAsset.key,{x:17,y:-9}]]),enforceRuntimeBudget:true});
+  const movedZip=await JSZip.loadAsync(legacyMoved.bytes);
+  const legacyMovedSpec=JSON.parse(await movedZip.file('movie.spec').async('string'));
+  for(const [i,frame] of legacyMovedSpec.sprites[0].frames.entries()){
+    near(frame.transform.tx,sourceSpec.sprites[0].frames[i].transform.tx+17);
+    near(frame.transform.ty,sourceSpec.sprites[0].frames[i].transform.ty-9);
+  }
   // Duplicate image aliases in a legacy file must share optimization and compensated geometry.
   sourceSpec.images.alias='frame';sourceSpec.sprites.push({...sourceSpec.sprites[0],imageKey:'alias'});originalZip.file('movie.spec',JSON.stringify(sourceSpec));const aliasInput=await originalZip.generateAsync({type:'uint8array',compression:'DEFLATE'});
   const aliasOutput=await buildCustomizedSvga(aliasInput,{...placement,maxBytes:4000,optimizeImage:async()=>png(16,16)},{JSZip});const aliasZip=await JSZip.loadAsync(aliasOutput.bytes),aliasSpec=JSON.parse(await aliasZip.file('movie.spec').async('string'));

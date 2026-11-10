@@ -6,4 +6,6 @@ The original MIT license is retained in SVGA-LICENSE.
 
 This prevents valid SVGA files with an appended unmasked text layer from throwing in the pinned web renderer. It does not change the SVGA format or the exported source animation. Covered by the renderer regression in tests/avatar-custom.cjs and a masked-source export/re-import browser fixture.
 
+2026-11-10: mark the renderer prepared when it queues zero assets. This lets a file with all bitmaps removed still render its transparent or vector frames when the only embedded assets are audio and no audio loader is present.
+
 Upstream: https://github.com/svga/SVGAPlayer-Web/blob/master/src/Canvas/renderer.js

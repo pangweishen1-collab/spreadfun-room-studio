@@ -6,12 +6,12 @@ const vm = require('node:vm');
 
 const controller = fs.readFileSync(path.join(__dirname, '../avatar-custom.js'), 'utf8')
   .replace(/^import[^\n]+\n/gm, '')
-  + '\nwindow.test={state,chooseMode,chooseStyle,loadFiles,loadImageFiles,importFiles,removeImage,placeImage,resizeImage,renderText,exportFiles,sync,changed,firstFrame};';
+  + '\nwindow.test={state,chooseMode,chooseStyle,loadFiles,loadImageFiles,importFiles,removeImage,placeImage,resizeImage,renderText,exportFiles,sync,changed,firstFrame,editAssets};';
 let styleRenderer;
 const flush = () => new Promise(resolve => setImmediate(resolve));
 function deferred() { let resolve, reject; const promise = new Promise((a, b) => { resolve=a; reject=b; }); return {promise, resolve, reject}; }
 
-function checkVendoredMatteExit() {
+function checkVendoredRenderer() {
   const sdk=fs.readFileSync(path.join(__dirname,'../vendor/svga-2.3.2.min.js'),'utf8');
   const marker='{key:"drawFrame",value:',begin=sdk.indexOf(marker)+marker.length,end=sdk.indexOf('},{key:"drawSprite"',begin);
   assert.ok(begin>=marker.length&&end>begin,'read the actual pinned renderer method');
@@ -25,6 +25,12 @@ function checkVendoredMatteExit() {
     assert.deepEqual(draws,[['frame','source-over'],['round.matte','destination-in'],['custom-text','source-over']],'text after a masked group is drawn outside that group');assert.equal(context.depth,0);
     draws.length=0;renderer._owner._videoItem.sprites=[mask,image];drawFrame.call(renderer,0);assert.deepEqual(draws,[['frame','source-over'],['round.matte','destination-in']],'the last masked group still flushes its own mask');assert.equal(context.depth,0);
   }
+  const prepareMarker='{key:"prepare",value:',prepareStart=sdk.indexOf(prepareMarker)+prepareMarker.length,prepareEnd=sdk.indexOf('},{key:"clear"',prepareStart);
+  assert.ok(prepareStart>=prepareMarker.length&&prepareEnd>prepareStart);
+  const prepare=vm.runInNewContext('('+sdk.slice(prepareStart,prepareEnd)+')',{window:{}});
+  const audioOnly={_owner:{_videoItem:{images:{audio:'SUQz'}}}};
+  prepare.call(audioOnly);
+  assert.equal(audioOnly._prepared,true,'an audio-only source can display a frame when no audio decoder is present');
 }
 
 function harness() {
@@ -74,25 +80,25 @@ function harness() {
   get('avatarCustomPanel').hidden=true;get('avatarCustomText').value='VIP';get('avatarCustomFont').value='inter';get('avatarCustomFontSize').value='32';get('avatarCustomColor').value='#ffffff';
   get('avatarCustomWeight').value='600';get('avatarCustomWeight').options=['400','500','600','700','800'].map(value=>({value,disabled:false}));get('avatarCustomStrokeWidth').value='0';get('avatarCustomStrokeColor').value='#000000';get('avatarCustomStrokeColorValue').value='#000000';get('avatarCustomResult').hidden=true;
   class Player {
-    constructor(host) { this.host=host;this._renderer={_prepared:true};this.steps=[];this.pauses=0;this.canvas=new Element('canvas');host.append(this.canvas);players.push(this); }
+    constructor(host) { this.host=host;this._renderer={_prepared:true,_owner:this,drawSprite:sprite=>{this.lastTransform={...sprite.frames[this._currentFrame].transform}}};this.steps=[];this.pauses=0;this.canvas=new Element('canvas');host.append(this.canvas);players.push(this); }
     setContentMode() {} onFrame(fn) { this.onFrameCallback=fn; }
     setVideoItem(video) { if(video.failRenderer)throw Error('renderer');this.video=video; }
-    stepToFrame(frame,andPlay) { this.steps.push({frame,andPlay}); }
+    stepToFrame(frame,andPlay) { this.steps.push({frame,andPlay});this._currentFrame=frame;for(const sprite of this.video?.sprites||[])this._renderer.drawSprite(sprite); }
     pauseAnimation() { this.pauses++; }
   }
-  class Parser { load(file,success,failure) { parses.push(file);queueMicrotask(()=>{if(file.name.includes('parse-fail')||controls.outputParseFail&&file.name.endsWith('-custom.svga'))failure(Error('parse'));else success({name:file.name,videoSize:{width:320,height:320},frames:60,FPS:30,failRenderer:file.name.includes('renderer-fail')});}); } }
+  class Parser { load(file,success,failure) { parses.push(file);queueMicrotask(()=>{if(file.name.includes('parse-fail')||controls.outputParseFail&&file.name.endsWith('-custom.svga'))failure(Error('parse'));else success({name:file.name,videoSize:{width:320,height:320},frames:60,FPS:30,sprites:[{imageKey:'original',frames:Array.from({length:60},()=>({alpha:1,layout:{width:40,height:30},transform:{a:1,b:0,c:0,d:1,tx:80,ty:80}}))}],failRenderer:file.name.includes('renderer-fail')});}); } }
   class Zip { constructor(){this.entries=[];}file(name,blob){this.entries.push({name,blob});return this;}async generateAsync(){if(controls.zipFail)throw Error('zip');if(controls.zipHold)return controls.zipHold.promise;return new Blob(['archive'],{type:'application/zip'});} }
   const document={documentElement:{lang:'en'},body:new Element('body'),activeElement:null,hidden:false,getElementById:get,createElement:tag=>new Element(tag),addEventListener(type,fn){if(!listeners.has(type))listeners.set(type,[]);listeners.get(type).push(fn);},dispatchEvent(event){for(const fn of listeners.get(event.type)||[])fn(event);},fonts:{load(font,text){const request={font,text};fontRequests.push(request);if(controls.fontReject)return Promise.reject(Error('fontError'));if(controls.fontHold){Object.assign(request,deferred());return request.promise;}return Promise.resolve([{}]);}}};
   const paste=[];
   const window={SVGA:{Player,Parser},JSZip:Zip,Toolkit:{isAvatarBusy:()=>controls.oldBusy,pauseAvatar(){pauseCalls++;}},FunWebP:{getMode:()=>controls.profile},Hub:{record(tool,type,count=1){events.push({tool,type,count});}},UploadPaste:{register(value){paste.push(value);}},canvasToWebP:async(canvas,options)=>{webpCalls.push({canvas,options});if(controls.webpHold)return controls.webpHold.promise;return new Blob(['webp'],{type:'image/webp'});},addEventListener(type,fn){if(!windows.has(type))windows.set(type,[]);windows.get(type).push(fn);}};
-  const sandbox={...styleRenderer,document,window,console,Blob,File:TestFile,Uint8Array,Array,Number,String,Math,Date,Promise,Error,performance,setTimeout,clearTimeout,queueMicrotask,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},URL:{createObjectURL:()=>`blob:${++nextUrl}`,revokeObjectURL:url=>revoked.push(url)},ResizeObserver:class{observe(){}},IntersectionObserver:class{constructor(callback){intersections.push(callback)}observe(){}},MutationObserver:class{observe(){}},matchMedia:()=>({matches:controls.reducedMotion,addEventListener(){}}),createImageBitmap:async(input)=>{const result={input,width:controls.imageWidth,height:controls.imageHeight,closed:false,close(){this.closed=true}};imageDecodes.push(result);if(controls.imageDecodeHold)await controls.imageDecodeHold.promise;if(controls.imageDecodeFail)throw Error('decode');return result},readSvga:async(bytes)=>{if(controls.readHold)await controls.readHold.promise;if(controls.readFail||bytes[0]===255)throw Error('read');return {format:bytes[0]===2?'legacy':'proto',id:bytes[0],info:{width:320,height:320,fps:30,frames:60}};},buildCustomizedSvga:async(source,options)=>{buildCalls.push({source,options});if(controls.buildFail)throw Error('build');return {bytes:new Uint8Array(controls.oversize?3000001:512),imageKey:'custom-text',optimized:false};}};
+  const sandbox={...styleRenderer,document,window,console,Blob,File:TestFile,Uint8Array,Array,Number,String,Math,Date,Promise,Error,performance,setTimeout,clearTimeout,queueMicrotask,CustomEvent:class{constructor(type,options){this.type=type;this.detail=options.detail;}},requestAnimationFrame:callback=>{queueMicrotask(callback);return 1},SVGA_MAX_RUNTIME_BYTES:3000000,svgaBitmapCount:()=>1,svgaRuntimeBytes:(info,images)=>4*(info.width*info.height+images.reduce((sum,image)=>sum+image.width*image.height,0)),URL:{createObjectURL:()=>`blob:${++nextUrl}`,revokeObjectURL:url=>revoked.push(url)},ResizeObserver:class{observe(){}},IntersectionObserver:class{constructor(callback){intersections.push(callback)}observe(){}},MutationObserver:class{observe(){}},matchMedia:()=>({matches:controls.reducedMotion,addEventListener(){}}),createImageBitmap:async(input)=>{const result={input,width:controls.imageWidth,height:controls.imageHeight,closed:false,close(){this.closed=true}};imageDecodes.push(result);if(controls.imageDecodeHold)await controls.imageDecodeHold.promise;if(controls.imageDecodeFail)throw Error('decode');return result},readSvga:async(bytes)=>{if(controls.readHold)await controls.readHold.promise;if(controls.readFail||bytes[0]===255)throw Error('read');return {format:bytes[0]===2?'legacy':'proto',id:bytes[0],info:{width:320,height:320,fps:30,frames:60}};},listSvgaImages:async()=>[{key:'original',bytes:new Uint8Array([4,5,6]),extension:'png',type:'image/png',width:40,height:30}],previewSvgaImages:async()=>{if(controls.editFail)throw Error('asset');return new Uint8Array([3,4,5,6])},buildCustomizedSvga:async(source,options)=>{buildCalls.push({source,options});if(controls.buildFail)throw Error('build');return {bytes:new Uint8Array(controls.oversize?3000001:512),imageKey:'custom-text',optimized:false};}};
   vm.createContext(sandbox);vm.runInContext(controller,sandbox);
   return {api:window.test,get,document,window,controls,players,parses,buildCalls,events,downloads,revoked,fontRequests,webpCalls,pngEncodes,imageDecodes,paste,TestFile,imageFile:(name='badge.png',type='image/png')=>new TestFile([new Uint8Array([9,8,7,6])],name,{type}),intersect:visible=>intersections.forEach(fn=>fn([{isIntersecting:visible}])),pauseCalls:()=>pauseCalls,generated:()=>events.filter(x=>x.type==='generated').reduce((n,x)=>n+x.count,0),downloaded:()=>events.filter(x=>x.type==='download').reduce((n,x)=>n+x.count,0),file:(name='ring.svga',id=1)=>new TestFile([new Uint8Array([id,2,3,4])],name)};
 }
 
 (async()=>{
   styleRenderer=await import('../avatar-text-style.mjs');
-  checkVendoredMatteExit();
+  checkVendoredRenderer();
   const h=harness(),api=h.api;
   assert.equal(api.state.mode,'images');assert.equal(h.paste[0].isActive(),false,'custom paste target starts inactive');
   h.get('avatarImagesTab').emit('keydown',{key:'End'});assert.equal(api.state.mode,'custom');assert.equal(h.document.activeElement,h.get('avatarCustomTab'));assert.equal(h.get('avatarCustomTab').getAttribute('aria-selected'),'true');assert.equal(h.get('avatarImagesPanel').hidden,true);assert.equal(h.get('avatarCustomPanel').hidden,false);assert.equal(h.paste[0].isActive(),true);
@@ -244,5 +250,39 @@ function harness() {
   const thin=harness();thin.api.chooseMode('custom');await thin.api.loadFiles([thin.file('thin-base.svga')]);thin.controls.imageWidth=8192;thin.controls.imageHeight=1;await thin.api.loadImageFiles([thin.imageFile('wide-strip.png')]);
   assert.equal(thin.api.state.image.canvas.width,640);assert.equal(thin.api.state.image.canvas.height,1,'the normalized PNG rounds its tiny axis to a physical pixel');assert.equal(thin.api.state.image.width,128);assert.equal(thin.api.state.image.height,128/8192,'logical placement retains the original aspect ratio rather than using rounded PNG dimensions');
   thin.api.resizeImage(256);assert.equal(thin.api.state.image.height,256/8192,'manual resizing also uses the original image ratio');await thin.api.exportFiles();assert.equal(thin.buildCalls.at(-1).options.layers[0].width,256);assert.equal(thin.buildCalls.at(-1).options.layers[0].height,256/8192,'the SVGA sprite uses the original ratio after normalization and resizing');
-  console.log('avatar-custom: upload autoplay, text/metal styling, editable image import with drag/corner/keyboard sizing, original-aspect normalization, transactional rollback, image-only and ordered multi-layer export, paste/drop routing, URL cleanup, size/busy/async guards, atomic SVGA+WebP+ZIP and hidden output passed.');
+  const assets=harness(),assetApi=assets.api;
+  assetApi.chooseMode('custom');assets.get('avatarCustomText').value='';await assetApi.loadFiles([assets.file()]);
+  const originalAsset=assetApi.state.sourceAssets[0],beforeAssetVideo=assetApi.state.video;
+  assert.equal(assets.get('avatarCustomAssetList').children.length,1);
+  assert.equal(assets.get('avatarCustomExport').disabled,true,'an untouched animation does not gain sample text');
+  await assetApi.loadImageFiles([assets.imageFile('first.png')],true);
+  await assetApi.loadImageFiles([assets.imageFile('second.png')],true);
+  assert.equal(assets.get('avatarCustomAddedImages').children.length,2);
+  const [firstAdded,secondAdded]=assetApi.state.images;
+  const group=assets.get('avatarCustomAssetDrag');
+  assetApi.state.assetSelection.add(originalAsset);assetApi.state.assetSelection.add(secondAdded);assetApi.sync();
+  assert.equal(group.hidden,false);
+  group.emit('pointerdown',{button:0,pointerId:1,clientX:10,clientY:10});
+  group.emit('pointermove',{pointerId:1,clientX:55,clientY:32.5});group.emit('pointerup',{pointerId:1});
+  await flush();
+  assert.deepEqual({...assetApi.state.assetOffsets.get(originalAsset.key)},{x:40,y:20});
+  assert.equal(assets.players[0].lastTransform.tx,120);assert.equal(assets.players[0].lastTransform.ty,100);
+  assert.equal(assets.players[0].video.sprites[0].frames[0].transform.tx,80,'live rendering does not mutate animation data');
+  assert.equal(firstAdded.position.x,.5);assert.equal(secondAdded.position.x,.625);
+  await assetApi.exportFiles();
+  assert.deepEqual({...assets.buildCalls.at(-1).options.imageOffsets.get(originalAsset.key)},{x:40,y:20});
+  assert.equal(assets.buildCalls.at(-1).options.enforceRuntimeBudget,true);
+  assert.match(assets.get('avatarCustomRuntimeMeta').textContent,/1\.05 \/ 3 MB/);
+  assetApi.state.assetSelection.clear();
+  assetApi.state.assetSelection.add(originalAsset);assetApi.state.assetSelection.add(firstAdded);
+  assets.controls.editFail=true;await assetApi.editAssets();assets.controls.editFail=false;
+  assert.equal(assetApi.state.video,beforeAssetVideo);assert.equal(assetApi.state.images.length,2);assert.equal(assetApi.state.removedImages.size,0);
+  await assetApi.editAssets();
+  assert.deepEqual(Array.from(assetApi.state.removedImages),['original']);assert.equal(assetApi.state.images[0],secondAdded);
+  assert.equal(assets.get('avatarCustomAssetList').children.length,1);assert.ok(assets.revoked.includes(firstAdded.url));
+  await assetApi.exportFiles();assert.deepEqual(Array.from(assets.buildCalls.at(-1).options.removedImageKeys),['original']);assert.equal(assets.buildCalls.at(-1).options.layers.length,1);
+  assetApi.removeImage();assert.equal(assets.get('avatarCustomExport').disabled,false,'source-only deletion can export');
+  await assetApi.exportFiles();assert.equal(assets.buildCalls.at(-1).options.layers.length,0);
+  await assetApi.editAssets(true);assert.equal(assetApi.state.removedImages.size,0);assert.equal(assets.get('avatarCustomAssetList').children.length,1);
+  console.log('avatar-custom: existing editor, source asset list, deletion rollback and restore, and deletion-only export passed.');
 })().catch(error=>{console.error(error);process.exitCode=1;});

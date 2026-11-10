@@ -7,6 +7,7 @@ const MAX_INPUT_BYTES=50*1024*1024,MAX_DECODED_BYTES=150*1024*1024,MAX_FIELDS=10
 const encoder=new TextEncoder(),decoder=new TextDecoder('utf-8',{fatal:true});
 const parsedMarker=Symbol('parsedSvga');
 export const SVGA_MAX_OUTPUT_BYTES=3000000;
+export const SVGA_MAX_RUNTIME_BYTES=3000000;
 export class SvgaCustomizeError extends Error {
   constructor(code,message=code,details={}){super(message);this.name='SvgaCustomizeError';this.code=code;Object.assign(this,details)}
 }
@@ -121,10 +122,122 @@ export async function readSvga(input,{JSZip=globalThis.JSZip}={}){
     if(!key||!data||data.wire!==2)fail('invalidSvga','Invalid SVGA image entry.');images.push({key,bytes:data.data,index,entry});
   }
   const info=infoOf(f32(pr,1),f32(pr,2),integer(pr,3),integer(pr,4),'protobuf',images.length);
-  if(!root.some(r=>r.id===4))fail('invalidSvga','SVGA has no animation sprites.');
   return {[parsedMarker]:true,format:'protobuf',info,images,root,sourceBytes:bytes};
 }
 export const readSvgaInfo=async(input,options)=>(await readSvga(input,options)).info;
+const bitmapKey=key=>key.replace('.matte','');
+function audioKeys(model){
+  return model.format==='protobuf'
+    ? new Set(model.root.filter(r=>r.id===5&&r.wire===2).map(r=>text(records(r.data),1)))
+    : new Set((Array.isArray(model.spec.audios)?model.spec.audios:[]).map(audio=>audio?.audioKey));
+}
+function rasterFormat(bytes){
+  if(pngInfo(bytes))return ['png','image/png'];
+  if(bytes[0]===255&&bytes[1]===216&&bytes[2]===255)return ['jpg','image/jpeg'];
+  const header=String.fromCharCode(...bytes.subarray(0,12));
+  if(header.startsWith('RIFF')&&header.slice(8,12)==='WEBP')return ['webp','image/webp'];
+  if(header.startsWith('GIF87a')||header.startsWith('GIF89a'))return ['gif','image/gif'];
+  if(header.startsWith('BM'))return ['bmp','image/bmp'];
+  return null;
+}
+export async function listSvgaImages(model,measureImage){
+  const audio=audioKeys(model),assets=[],files=new Map();
+  for(const image of new Map(model.images.map(image=>[image.key,image])).values()){
+    if(audio.has(image.key))continue;
+    if(image.path&&!files.has(image.path))files.set(image.path,await assetBytes(model,image));
+    const bytes=image.bytes||files.get(image.path),format=rasterFormat(bytes);
+    if(format){
+      const size=pngInfo(bytes)||(measureImage?await measureImage(bytes,format[1]):null);
+      assets.push({key:image.key,bytes,extension:format[0],type:format[1],...size});
+    }
+  }
+  return assets;
+}
+// Budget the decoded RGBA bitmaps and one composition surface at native size.
+export function svgaRuntimeBytes(info,images){
+  let pixels=Math.ceil(info.width)*Math.ceil(info.height);
+  for(const {width,height} of images){
+    if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1)return null;
+    pixels+=width*height;
+  }
+  return pixels*4;
+}
+export function svgaBitmapCount(model){
+  const audio=audioKeys(model);
+  return new Set(model.images.filter(image=>!audio.has(image.key)).map(image=>image.key)).size;
+}
+function withoutImages(model,keys=[]){
+  if(!keys.length)return model;
+  const removed=new Set(keys),known=new Set(model.images.map(image=>image.key)),audio=audioKeys(model);
+  for(const key of removed)if(!known.has(key)||audio.has(key))fail('invalidAsset','Invalid SVGA image selection.');
+  const removesSprite=key=>removed.has(key)||removed.has(bitmapKey(key));
+  const info={...model.info,imageCount:model.images.filter(image=>!removed.has(image.key)).length};
+  if(model.format==='zip'){
+    const spec=cloneSpec(model.spec),images=model.images.filter(image=>!removed.has(image.key));
+    const paths=new Set(images.map(image=>image.path));
+    const removedPaths=model.images.filter(image=>removed.has(image.key)&&!paths.has(image.path)).map(image=>image.path);
+    for(const key of removed)delete spec.images[key];
+    const deletedSprites=new Set(spec.sprites.filter(sprite=>removesSprite(String(sprite.imageKey))).map(sprite=>sprite.imageKey));
+    spec.sprites=spec.sprites.filter(sprite=>!deletedSprites.has(sprite.imageKey));
+    for(const sprite of spec.sprites)if(deletedSprites.has(sprite.matteKey))delete sprite.matteKey;
+    return {...model,info,images,spec,removedPaths};
+  }
+  const root=[],images=[],imagesByIndex=new Map(model.images.map(image=>[image.index,image]));
+  const sprites=model.root.filter(r=>r.id===4&&r.wire===2).map(r=>[r,records(r.data)]);
+  const spriteRecords=new Map(sprites),deletedSprites=new Set(sprites.map(([,rs])=>text(rs,1)).filter(removesSprite));
+  for(const [index,r] of model.root.entries()){
+    const image=imagesByIndex.get(index),sprite=spriteRecords.get(r);
+    if(image){
+      if(removed.has(image.key))continue;
+      images.push({...image,index:root.length});
+    }
+    if(sprite&&deletedSprites.has(text(sprite,1)))continue;
+    if(sprite&&deletedSprites.has(text(sprite,3))){
+      const data=join(sprite.filter(field=>field.id!==3).map(field=>field.raw));
+      root.push({...r,data,raw:message(4,data)});
+    }else root.push(r);
+  }
+  return {...model,info,images,root};
+}
+export async function previewSvgaImages(source,removedImageKeys){
+  const model=withoutImages(source,removedImageKeys);
+  if(model===source)return model.sourceBytes;
+  const replacements=new Map();
+  return model.format==='zip'
+    ? zipBytes(model,[],replacements,1)
+    : transform(protobufBytes(model,[],replacements),'deflate');
+}
+function translateImageSprites(model,offsets){
+  if(!offsets?.size)return model;
+  const keys=new Set(model.images.map(image=>image.key));
+  for(const [key,{x,y}] of offsets){
+    if(!keys.has(key)||![x,y].every(Number.isFinite)||Math.abs(x)>32768||Math.abs(y)>32768)fail('invalidPlacement','Invalid SVGA bitmap movement.');
+  }
+  const movement=key=>offsets.get(bitmapKey(key))||offsets.get(key);
+  if(model.format==='zip'){
+    const spec=cloneSpec(model.spec);
+    for(const sprite of spec.sprites){
+      const offset=movement(String(sprite.imageKey));if(!offset)continue;
+      for(const frame of sprite.frames){
+        const matrix=frame.transform||{};
+        frame.transform={...matrix,tx:(Number(matrix.tx)||0)+offset.x,ty:(Number(matrix.ty)||0)+offset.y};
+      }
+    }
+    return {...model,spec};
+  }
+  const root=model.root.map(r=>{
+    if(r.id!==4||r.wire!==2)return r;
+    const sprite=records(r.data),offset=movement(text(sprite,1));if(!offset)return r;
+    const data=join(sprite.map(field=>{
+      if(field.id!==2||field.wire!==2)return field.raw;
+      const frame=records(field.data),matrixField=last(frame,3),matrix=matrixField?records(matrixField.data):[];
+      const moved=patch(matrix,new Map([[5,float(5,f32(matrix,5)+offset.x)],[6,float(6,f32(matrix,6)+offset.y)]]));
+      return message(2,patch(frame,new Map([[3,message(3,moved)]])));
+    }));
+    return {...r,data,raw:message(4,data)};
+  });
+  return {...model,root};
+}
 function imageKeysOf(model){const used=new Set(model.images.map(i=>i.key));if(model.format==='zip')for(const sprite of model.spec.sprites)used.add(sprite.imageKey);else for(const r of model.root)if(r.id===4&&r.wire===2)used.add(text(records(r.data),1));return used}
 function uniqueKey(used,kind){const base='fun_custom_'+kind;let key=base,number=2;while(used.has(key))key=base+'_'+number++;used.add(key);return key}
 function imagePlacement(options,legacy=false){
@@ -134,9 +247,10 @@ function imagePlacement(options,legacy=false){
   if(![x,y,width,height].every(Number.isFinite)||width<=0||height<=0||width>16384||height>16384||Math.abs(x)>32768||Math.abs(y)>32768)fail('invalidPlacement','Invalid overlay position or size.');
   return {bytes,png,x,y,width,height};
 }
-function layersOf(model,options){
-  const legacy=options.layers===undefined,inputs=legacy?[{...options,image:options.textImage,key:'text'}]:options.layers;
-  if(!Array.isArray(inputs)||inputs.length<1||inputs.length>8)fail('invalidLayers','Choose between one and eight image or text layers.');
+function layersOf(model,options,allowEmpty=false){
+  const legacy=options.layers===undefined&&(!allowEmpty||options.textImage!==undefined);
+  const inputs=legacy?[{...options,image:options.textImage,key:'text'}]:options.layers===undefined?[]:options.layers;
+  if(!Array.isArray(inputs)||(!inputs.length&&!allowEmpty)||inputs.length>8)fail('invalidLayers','Choose up to eight image or text layers.');
   const used=imageKeysOf(model);let total=0;
   return inputs.map(input=>{
     if(!input||typeof input!=='object'||(input.key!==undefined&&!['image','text'].includes(input.key)))fail('invalidLayers','Invalid image or text layer.');
@@ -180,9 +294,10 @@ function protobufBytes(model,layers,replacements){
   return join(parts);
 }
 function cloneSpec(spec){return JSON.parse(JSON.stringify(spec))}
-async function zipBytes(model,layers,replacements){
+async function zipBytes(model,layers,replacements,level=9){
   // JSZip instances own mutable file maps, so every build starts from the retained input bytes.
   const zip=await model.JSZip.loadAsync(model.sourceBytes),spec=cloneSpec(model.spec),reserved=new Set(Object.keys(zip.files));
+  for(const path of model.removedPaths||[])zip.remove(path);
   for(const image of model.images){const replacement=replacements.get(image.key);if(!replacement)continue;zip.file(image.path,replacement.bytes);if(replacement.sx===1&&replacement.sy===1)continue;
     for(const sprite of spec.sprites)if(String(sprite.imageKey).replace('.matte','')===image.key)for(const frame of sprite.frames){
       const matrix=frame.transform||{a:1,b:0,c:0,d:1,tx:0,ty:0},layout=frame.layout||{x:0,y:0,width:0,height:0};
@@ -195,7 +310,7 @@ async function zipBytes(model,layers,replacements){
     spec.images[key]=path.slice(0,-4);spec.sprites.push({imageKey:key,frames:Array.from({length:model.info.frames},()=>({alpha:1,layout:{x:0,y:0,width:png.width,height:png.height},transform:{a:width/png.width,b:0,c:0,d:height/png.height,tx:x,ty:y}}))});zip.file(path,bytes);
   }
   zip.file('movie.spec',JSON.stringify(spec));
-  return zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level:9}});
+  return zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level}});
 }
 async function assetBytes(model,image){return image.bytes||zipEntryBytes(model.zip.file(image.path))}
 async function optimizationAssets(model,layers){
@@ -215,6 +330,9 @@ async function packProtobuf(body){
 /**
  * Append static PNG layers in paint order. layers: [{image,x,y,width,height,key?}]
  * uses key 'image' (default) or 'text'. The old textImage/x/y/width/height API remains.
+ * removedImageKeys removes the selected bitmaps and their sprite references before
+ * adding layers. It can be used by itself for deletion-only edits.
+ * imageOffsets maps original bitmap keys to additive logical-pixel translations.
  * Coordinates are logical SVGA pixels, independent of PNG resolution.
  * Every PNG is first repacked without changing decoded RGBA, dimensions or placement.
  * The legacy optimizeImage({bytes,key,width,height,maxWidth,maxHeight,pass,canResize}) may
@@ -224,9 +342,17 @@ async function packProtobuf(body){
  * is safe. Original timeline/audio are retained, never frame-dropped to meet budget.
  */
 export async function buildCustomizedSvga(input,options={},runtime={}){
-  const model=await readSvga(input,runtime),layers=layersOf(model,options),replacements=new Map();
+  const source=await readSvga(input,runtime),model=translateImageSprites(withoutImages(source,options.removedImageKeys),options.imageOffsets);
+  const layers=layersOf(model,options,model!==source),replacements=new Map();
   const maxBytes=options.maxBytes??SVGA_MAX_OUTPUT_BYTES;
   if(!Number.isInteger(maxBytes)||maxBytes<1024||maxBytes>SVGA_MAX_OUTPUT_BYTES)fail('invalidSizeLimit','The SVGA size limit must be between 1 KB and 3 MB.');
+  let runtimeBytes;
+  if(options.enforceRuntimeBudget){
+    const assets=await listSvgaImages(model,runtime.measureImage);
+    runtimeBytes=assets.length===svgaBitmapCount(model)?svgaRuntimeBytes(model.info,[...assets,...layers.map(layer=>layer.png)]):null;
+    if(runtimeBytes===null)fail('unknownRuntimeSize','The decoded memory of an SVGA bitmap could not be measured.');
+    if(runtimeBytes>SVGA_MAX_RUNTIME_BYTES)fail('runtimeLimit','The decoded bitmap and canvas budget exceeds 3 MB.',{runtimeBytes,maxBytes:SVGA_MAX_RUNTIME_BYTES});
+  }
   const progress=value=>runtime.onProgress?.(value);
   progress({phase:'packaging',progress:10});
   const encode=async()=>model.format==='protobuf'?packProtobuf(protobufBytes(model,layers,replacements)):{bytes:await zipBytes(model,layers,replacements),packagingBytesSaved:0};
@@ -268,5 +394,5 @@ export async function buildCustomizedSvga(input,options={},runtime={}){
   const losslessAssets=assets.filter(asset=>replacements.get(asset.key)===losslessCandidates.get(asset.key)&&losslessCandidates.has(asset.key));
   const lossless={optimizedImages:losslessAssets.length,imageBytesSaved:losslessAssets.reduce((sum,asset)=>sum+asset.bytes.length-replacements.get(asset.key).bytes.length,0),packagingBytesSaved:baseline.packagingBytesSaved,bytesSaved:(baseline.nativeBytes??baseline.bytes.length)-losslessBytes,beforeBytes:baseline.nativeBytes??baseline.bytes.length,afterBytes:losslessBytes};
   lossless.savedBytes=lossless.bytesSaved;lossless.baselineBytes=lossless.beforeBytes;
-  return {bytes,mime:'application/octet-stream',info:{...model.info,imageCount:model.info.imageCount+layers.length},imageKey,imageKeys,optimized:replacements.size>0||lossless.bytesSaved>0,optimizedImages:replacements.size,optimizationPasses:passes,lossless,size:bytes.length};
+  return {bytes,mime:'application/octet-stream',info:{...model.info,imageCount:model.info.imageCount+layers.length},imageKey,imageKeys,optimized:replacements.size>0||lossless.bytesSaved>0,optimizedImages:replacements.size,optimizationPasses:passes,lossless,size:bytes.length,runtimeBytes};
 }
