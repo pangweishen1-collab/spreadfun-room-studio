@@ -53,7 +53,7 @@ body{min-width:320px}
 </style>
   <link rel="stylesheet" href="toolkit.css?v=20261103-dice1-20261103-metaltext1">
   <link rel="stylesheet" href="avatar-fonts.css?v=20261103-metaltext1">
-  <link rel="stylesheet" href="avatar-custom.css?v=20261110-svga-layout">
+  <link rel="stylesheet" href="avatar-custom.css?v=20261110-gradient1">
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
@@ -188,9 +188,16 @@ body{min-width:320px}
               <button type="button" class="avatar-text-preset" data-text-style="roseGold" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleRoseGold">玫瑰金</span></button>
               </div>
             </details>
+            <div class="avatar-custom-palette">
+              <div><label id="avatarCustomColorLabel" for="avatarCustomColor">文字颜色</label><div class="avatar-custom-color"><input id="avatarCustomColor" type="color" value="#ffffff"><input id="avatarCustomColorValue" type="text" value="#FFFFFF" maxlength="7" aria-label="文字颜色 HEX" spellcheck="false" autocomplete="off"></div></div>
+              <div id="avatarCustomHighlightField" hidden><label for="avatarCustomHighlight" data-custom-i18n="highlightLabel">高光色</label><div class="avatar-custom-color"><input id="avatarCustomHighlight" type="color" value="#ffffff"><input id="avatarCustomHighlightValue" type="text" maxlength="7" aria-label="高光色 HEX" spellcheck="false" autocomplete="off"></div></div>
+              <div id="avatarCustomShadowField" hidden><label for="avatarCustomShadow" data-custom-i18n="shadowLabel">暗部色</label><div class="avatar-custom-color"><input id="avatarCustomShadow" type="color" value="#000000"><input id="avatarCustomShadowValue" type="text" maxlength="7" aria-label="暗部色 HEX" spellcheck="false" autocomplete="off"></div></div>
+            </div>
             <div class="avatar-custom-fields-row"><div><label for="avatarCustomFontSize" data-custom-i18n="sizeLabel">文字大小</label><div class="dimension-input"><input id="avatarCustomFontSize" type="number" min="8" max="512" value="30" step="1" inputmode="numeric"><span>px</span></div></div><div><label for="avatarCustomWeight" data-custom-i18n="weightLabel">字重</label><select id="avatarCustomWeight"><option value="400">400</option><option value="500">500</option><option value="600" selected>600</option><option value="700">700</option><option value="800">800</option></select></div></div>
-            <div class="avatar-custom-fields-row"><div><label for="avatarCustomColor" data-custom-i18n="colorLabel">文字颜色</label><div class="avatar-custom-color"><input id="avatarCustomColor" type="color" value="#ffffff"><input id="avatarCustomColorValue" type="text" value="#FFFFFF" maxlength="7" aria-label="文字颜色 HEX" spellcheck="false" autocomplete="off"></div></div><div><label for="avatarCustomStrokeWidth" data-custom-i18n="strokeLabel">描边宽度</label><div class="dimension-input"><input id="avatarCustomStrokeWidth" type="number" min="0" max="16" value="0" step="0.1" inputmode="decimal"><span>px</span></div></div></div>
-            <label for="avatarCustomStrokeColor" data-custom-i18n="strokeColorLabel">描边颜色</label><div class="avatar-custom-color"><input id="avatarCustomStrokeColor" type="color" value="#000000"><input id="avatarCustomStrokeColorValue" type="text" value="#000000" maxlength="7" aria-label="描边颜色 HEX" spellcheck="false" autocomplete="off"></div>
+            <div class="avatar-custom-fields-row">
+              <div><label for="avatarCustomStrokeWidth" data-custom-i18n="strokeLabel">描边宽度</label><div class="dimension-input"><input id="avatarCustomStrokeWidth" type="number" min="0" max="16" value="0" step="0.1" inputmode="decimal"><span>px</span></div></div>
+              <div><label for="avatarCustomStrokeColor" data-custom-i18n="strokeColorLabel">描边颜色</label><div class="avatar-custom-color"><input id="avatarCustomStrokeColor" type="color" value="#000000"><input id="avatarCustomStrokeColorValue" type="text" value="#000000" maxlength="7" aria-label="描边颜色 HEX" spellcheck="false" autocomplete="off"></div></div>
+            </div>
           </fieldset>
           <div class="avatar-custom-output-spec"><span data-custom-i18n="svgaLimit">SVGA · 3MB 内</span><span data-custom-i18n="frameSpec">首帧 WebP · 240 × 240</span></div>
           <button type="button" id="avatarCustomExport" class="batch-download frame-download ft-motion-sheen" disabled aria-busy="false" data-custom-i18n="export">导出 SVGA + WebP</button>
@@ -937,5 +944,5 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="dice-embed.js?v=20261103-dice1"></script>
   <script src="toolkit.js?v=20261110-vap-review"></script>
   <script type="module" src="vap-review.js?v=20261110-review-background-library"></script>
-  <script type="module" src="avatar-custom.js?v=20261110-svga-layout"></script>
+  <script type="module" src="avatar-custom.js?v=20261110-gradient1"></script>
 </body></html>

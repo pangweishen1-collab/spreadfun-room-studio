@@ -185,11 +185,25 @@ function harness() {
   assert.equal(metalApi.state.style,'roseGold');assert.equal(metalApi.state.bitmap.styleKey,'roseGold');assert.equal(metal.get('avatarCustomColor').value,retainedColor,'source replacement keeps the user style');
   metal.controls.fontHold=true;metalApi.chooseStyle('brightGold');const lateGold=metal.fontRequests.at(-1);metalApi.chooseStyle('silver');const currentSilver=metal.fontRequests.at(-1);currentSilver.resolve([{}]);await flush();const silverBitmap=metalApi.state.bitmap;lateGold.resolve([{}]);await flush();metal.controls.fontHold=false;
   assert.equal(metalApi.state.bitmap,silverBitmap,'late completion of an old preset cannot overwrite the current effect');assert.equal(silverBitmap.styleKey,'silver');assert.equal(metal.get('avatarCustomTextLayer').dataset.textStyle,'silver');
-  const previewStops=JSON.stringify(silverBitmap.canvas.gradients.map(x=>x.stops));
+  const highlight=metal.get('avatarCustomHighlightValue'),shadow=metal.get('avatarCustomShadow');
+  assert.equal(metal.get('avatarCustomHighlightField').hidden,false);
+  const defaultHighlight=highlight.value;
+  highlight.value='FF86CF';highlight.emit('input');await flush();
+  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[1].stops[5],[.52,'rgb(255,134,207)']);
+  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[1].stops[4],silverBitmap.canvas.gradients[1].stops[4],'editing highlight keeps the dark band');
+  shadow.value='#32428d';shadow.emit('input');await flush();
+  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[1].stops[4],[.49,'rgb(50,66,141)']);
+  assert.equal(metal.get('avatarCustomShadowValue').value,'#32428D');
+  const previewStops=JSON.stringify(metalApi.state.bitmap.canvas.gradients.map(x=>x.stops));
   metal.controls.webpHold=deferred();const metalExport=metalApi.exportFiles();await flush();metalApi.chooseStyle('plain');assert.equal(metalApi.state.style,'silver','export locks the style snapshot');assert.equal(JSON.stringify(metal.pngEncodes.at(-1).gradients.map(x=>x.stops)),previewStops,'the embedded PNG uses the same reflective gradient as the preview');metal.controls.webpHold.resolve(new Blob(['webp'],{type:'image/webp'}));await metalExport;metal.controls.webpHold=null;
   assert.equal(metal.generated(),2);assert.equal(metal.get('avatarCustomResult').hidden,true,'metal export retains the simplified output flow');
+  metalApi.chooseStyle('silver');await flush();
+  assert.equal(highlight.value,defaultHighlight,'reapplying the preset resets its gradient');
+  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[1].stops,silverBitmap.canvas.gradients[1].stops);
   const metallicColor=metal.get('avatarCustomColor').value,metallicStroke=metal.get('avatarCustomStrokeWidth').value;
   metalApi.chooseStyle('plain');await flush();assert.equal(metalApi.state.bitmap.styleKey,'plain');assert.equal(metalApi.state.bitmap.canvas.gradients.length,0,'plain mode removes metallic reflections and depth');assert.equal(metal.get('avatarCustomColor').value,metallicColor);assert.equal(metal.get('avatarCustomStrokeWidth').value,metallicStroke,'plain mode keeps editable color and outline values');
+  assert.equal(metal.get('avatarCustomHighlightField').hidden,true);
+  assert.equal(metal.get('avatarCustomShadowField').hidden,true);
   metalApi.chooseStyle('unknown');await flush();assert.equal(metalApi.state.style,'plain','unknown preset keys do not change current state');
   for(const reason of ['documentHidden','routeHidden','inactiveTab','offscreen','reducedMotion']){
     const guarded=harness();guarded.api.chooseMode('custom');guarded.controls.readHold=deferred();const pending=guarded.api.loadFiles([guarded.file(reason+'.svga')]);

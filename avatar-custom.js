@@ -1,5 +1,5 @@
 import {readSvga,buildCustomizedSvga,listSvgaImages,previewSvgaImages,svgaBitmapCount,svgaRuntimeBytes,SVGA_MAX_RUNTIME_BYTES} from './avatar-custom-engine.mjs?v=20261110-svga-layout';
-import {TEXT_STYLES,textStylePadding,drawStyledText} from './avatar-text-style.mjs';
+import {TEXT_STYLES,defaultTextGradient,textStylePadding,drawStyledText} from './avatar-text-style.mjs?v=20261110-gradient1';
 
 /* Image and text PNG sprites are embedded in the animation; the final player needs no fonts. */
 const $=id=>document.getElementById(id);
@@ -10,6 +10,7 @@ const copy={
   en:{imageTitle:'Image layer',imageUpload:'Upload image',imageReplace:'Replace image',imageRemove:'Remove',imageCenter:'Center image',imageWidth:'Image width',imageLoading:'Loading image…',imageDrag:'Drag image to move; arrows to nudge; corner to resize',imageResize:'Resize image; arrow keys adjust size',imageNeedsSvga:'Upload an SVGA first, then add your image.',imageType:'Choose a PNG, JPG or WebP image.',imageSizeError:'Choose an image under 20MB.',imageDimensions:'Use an image up to 8192px per side and 32 megapixels.',imageLoadError:'Could not read the image. Check it and retry.',imageWidthError:'Enter a valid image width; the original ratio is preserved.',stylePresets:'Text style presets',stylePlain:'Solid',styleBrightGold:'3D Gold',styleChampagne:'Champagne',styleSilver:'Silver',styleRoseGold:'Rose gold',weightLabel:'Weight',strokeLabel:'Outline width',strokeColorLabel:'Outline color',strokeError:'Outline width must be between 0 and 16px.',textTooLarge:'Text is too large. Shorten it or reduce its size.',fontLibrary:'Fonts ↗',imagesTab:'Frame images',customTab:'Custom frames',preview:'Preview',uploadTitle:'Click, drop or paste an SVGA file',uploadHint:'Keep the animation. Add text or an image.',upload:'Upload SVGA',replace:'Replace file',play:'Play',pause:'Pause',center:'Center horizontally',textSettings:'Custom content',textLabel:'Text',fontLabel:'English font',sizeLabel:'Text size',colorLabel:'Text color',svgaLimit:'SVGA · Under 3MB',frameSpec:'First-frame WebP · 240 × 240',export:'Export SVGA + WebP',exporting:'Exporting…',loading:'Loading…',empty:'No file selected',ready:'Ready to edit',fontLoading:'Loading font…',fileType:'Choose one .svga file.',fileSize:'Choose an SVGA under 50MB.',loadError:'Could not read this SVGA. Check the file and retry.',exportError:'Export failed. Retry; the last valid outputs have been kept.',fontError:'This font could not load. Please select it again.',textEmpty:'Add text or an image.',sizeError:'Text size must be a whole number from 8 to 512.',sizeLimit:'Lossless compression still exceeds 3MB. Reduce assets or use a smaller source file.',saved:'SVGA packaged losslessly and first-frame WebP generated.',optimized:'SVGA compressed losslessly; original dimensions and all frames preserved.',svgaDownload:'Download SVGA',frameDownload:'Download first-frame WebP',zipDownload:'Download all ZIP',drag:'Drag text to move; use arrow keys to adjust',changed:'Settings changed. Export again.'}
 };
 Object.assign(copy.zh,{
+  gradientBaseLabel:'渐变基色',highlightLabel:'高光色',shadowLabel:'暗部色',
   uploadHint:'提取图片素材，或定制文字和图片',assetsTitle:'SVGA 图片素材',assetAdd:'添加图片',assetDelete:'删除选中',assetsRestore:'恢复已删原图',
   assetDownload:'下载',assetEdit:'定位',assetOriginal:'原始素材',assetAdded:'新增图层',assetWorking:'正在处理素材…',
   assetEmpty:'当前没有图片素材。可以添加图片到头像框。',assetCount:'{total} 张图片 · 已选 {selected} 张',assetError:'素材修改失败，已保留之前的画面。',
@@ -18,6 +19,7 @@ Object.assign(copy.zh,{
   runtimeHint:'按解码后的 RGBA 图片和一张原尺寸画布计算。实际播放器的总内存因平台而异。',overRuntime:'超出上限',unknownRuntime:'无法估算',
 });
 Object.assign(copy.en,{
+  gradientBaseLabel:'Base color',highlightLabel:'Highlight',shadowLabel:'Shadow',
   uploadHint:'Extract images or customize the frame with text and images.',assetsTitle:'SVGA image assets',assetAdd:'Add image',assetDelete:'Delete selected',assetsRestore:'Restore original images',
   assetDownload:'Download',assetEdit:'Edit',assetOriginal:'Original asset',assetAdded:'Added layer',assetWorking:'Processing assets…',
   assetEmpty:'No image assets. Add an image to this avatar frame.',assetCount:'{total} images · {selected} selected',assetError:'Could not edit these assets. The previous preview has been kept.',
@@ -26,7 +28,14 @@ Object.assign(copy.en,{
   runtimeHint:'Counts decoded RGBA images and one native-size canvas. Total player memory depends on the platform.',overRuntime:'Over limit',unknownRuntime:'Unavailable',
 });
 const state={mode:'images',style:'plain',source:null,file:null,video:null,loading:false,imageLoading:false,exporting:false,playing:false,position:{x:.5,y:.82},bitmap:null,image:null,result:null,notice:'',noticeKind:'error',renderId:0,frame:0,
-  images:[],sourceAssets:[],removedImages:new Set(),assetSelection:new Set(),assetOffsets:new Map(),assetBusy:false};
+  images:[],sourceAssets:[],removedImages:new Set(),assetSelection:new Set(),assetOffsets:new Map(),assetBusy:false,
+  highlightColor:null,shadowColor:null};
+const textColors=[
+  ['avatarCustomColor','colorLabel'],
+  ['avatarCustomHighlight','highlightLabel','highlightColor'],
+  ['avatarCustomShadow','shadowLabel','shadowColor'],
+  ['avatarCustomStrokeColor','strokeColorLabel'],
+];
 const MAX_ADDED_IMAGES=7;
 let player,exportPlayer,exportHost,drag,imageDrag,assetDrag,assetPaint,stageVisible=true;
 const isZh=()=>document.documentElement.lang.startsWith('zh');
@@ -87,10 +96,23 @@ function sync(){
   syncTabs();syncNotice();syncStyles();syncAssetControls();
   document.dispatchEvent(new CustomEvent('webp:tool-state',{detail:{tool:'avatar',busy:working}}));
 }
-function syncStyles(){for(const button of root.querySelectorAll('button[data-text-style]'))button.setAttribute('aria-pressed',String(state.style===button.dataset.textStyle))}
+function syncStyles(){
+  for(const button of root.querySelectorAll('button[data-text-style]'))button.setAttribute('aria-pressed',String(state.style===button.dataset.textStyle));
+  const plain=state.style==='plain', colorLabel=plain?'colorLabel':'gradientBaseLabel';
+  $('avatarCustomHighlightField').hidden=plain;
+  $('avatarCustomShadowField').hidden=plain;
+  $('avatarCustomColorLabel').textContent=t(colorLabel);
+  for(const [id,label] of textColors)$(id+'Value').setAttribute('aria-label',t(id==='avatarCustomColor'?colorLabel:label)+' HEX');
+}
+function syncHex(id){
+  const hex=$(id+'Value');
+  hex.value=$(id).value.toUpperCase();
+  hex.setAttribute('aria-invalid','false');
+}
 function chooseStyle(key){
   if(busy()||!state.source||!Object.hasOwn(TEXT_STYLES,key))return;
   state.style=key;const preset=TEXT_STYLES[key];
+  state.highlightColor=state.shadowColor=null;
   if(key!=='plain'){$('avatarCustomColor').value=preset.baseColor;$('avatarCustomStrokeColor').value=preset.outlineColor;$('avatarCustomStrokeWidth').value=preset.outlineWidth}
   syncStyles();changed();
 }
@@ -103,8 +125,6 @@ function chooseMode(next){
 function syncLanguage(){
   root.querySelectorAll('[data-custom-i18n]').forEach(node=>node.textContent=t(node.dataset.customI18n));
   root.querySelector('.avatar-subtabs').setAttribute('aria-label',isZh()?'头像框功能':'Avatar frame tools');
-  $('avatarCustomColorValue').setAttribute('aria-label',isZh()?'文字颜色 HEX':'Text color HEX');
-  $('avatarCustomStrokeColorValue').setAttribute('aria-label',isZh()?'描边颜色 HEX':'Outline color HEX');
   $('avatarCustomStage').setAttribute('aria-label',t('uploadTitle'));$('avatarCustomTextLayer').setAttribute('aria-label',t('drag'));$('avatarCustomImageLayer').setAttribute('aria-label',t('imageDrag'));$('avatarCustomImageResize').setAttribute('aria-label',t('imageResize'));
   $('avatarCustomImageResize').title=t('imageResize');
   $('avatarCustomAssetDrag').setAttribute('aria-label',t('moveAssets'));
@@ -369,6 +389,7 @@ async function editAssets(restore=false){
 }
 async function rasterText(size=Number($('avatarCustomFontSize').value)){
   const raw=$('avatarCustomText').value.replace(/\r/g,''),color=$('avatarCustomColor').value,fontKey=$('avatarCustomFont').value,font=cssFont(size),fontWeight=weight(),strokeWidth=Number($('avatarCustomStrokeWidth').value),strokeColor=$('avatarCustomStrokeColor').value,styleKey=state.style;
+  const {highlightColor,shadowColor}=state;
   if(!raw.trim())return null;
   if(!Number.isInteger(size)||size<8||size>512)throw Error('sizeError');
   if(!validStroke())throw Error('strokeError');
@@ -379,7 +400,7 @@ async function rasterText(size=Number($('avatarCustomFontSize').value)){
   const ratio=Math.min(2,4096/width,4096/height,Math.sqrt(12000000/(width*height))),canvas=document.createElement('canvas');
   canvas.width=Math.max(1,Math.ceil(width*ratio));canvas.height=Math.max(1,Math.ceil(height*ratio));
   const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);
-  drawStyledText(ctx,{lines,size,width,padding,font,color,strokeWidth,strokeColor,styleKey});return {canvas,width,height,fontKey,color,text:raw,fontWeight,strokeWidth,strokeColor,styleKey};
+  drawStyledText(ctx,{lines,size,width,padding,font,color,strokeWidth,strokeColor,styleKey,highlightColor,shadowColor});return {canvas,width,height,fontKey,color,text:raw,fontWeight,strokeWidth,strokeColor,styleKey};
 }
 function applyBitmap(bitmap){
   state.bitmap=bitmap;const layer=$('avatarCustomTextLayer');layer.hidden=!bitmap;
@@ -392,8 +413,10 @@ async function renderText(){
 }
 function changed(){
   ++state.renderId;
-  $('avatarCustomColorValue').value=$('avatarCustomColor').value.toUpperCase();$('avatarCustomColorValue').setAttribute('aria-invalid','false');
-  $('avatarCustomStrokeColorValue').value=$('avatarCustomStrokeColor').value.toUpperCase();$('avatarCustomStrokeColorValue').setAttribute('aria-invalid','false');
+  const defaults=defaultTextGradient($('avatarCustomColor').value);
+  $('avatarCustomHighlight').value=state.highlightColor??defaults.highlight;
+  $('avatarCustomShadow').value=state.shadowColor??defaults.shadow;
+  for(const [id] of textColors)syncHex(id);
   if(state.result)notice('changed','success');else notice();
   if($('avatarCustomText').value.trim()&&!validSize()){notice('sizeError');sync();return}
   if($('avatarCustomText').value.trim()&&!validStroke()){notice('strokeError');sync();return}
@@ -466,14 +489,25 @@ for(const [id,name] of [['avatarImagesTab','images'],['avatarCustomTab','custom'
   $(id).addEventListener('click',()=>chooseMode(name));
   $(id).addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'images':event.key==='End'?'custom':state.mode==='images'?'custom':'images';chooseMode(next);$(next==='images'?'avatarImagesTab':'avatarCustomTab').focus()});
 }
-for(const id of ['avatarCustomText','avatarCustomFontSize','avatarCustomColor','avatarCustomStrokeWidth','avatarCustomStrokeColor'])$(id).addEventListener('input',changed);
+for(const id of ['avatarCustomText','avatarCustomFontSize','avatarCustomStrokeWidth'])$(id).addEventListener('input',changed);
 for(const button of root.querySelectorAll('button[data-text-style]'))button.addEventListener('click',()=>chooseStyle(button.dataset.textStyle));
 $('avatarCustomWeight').addEventListener('change',changed);
 $('avatarCustomFont').addEventListener('change',()=>{syncWeights();changed()});
-$('avatarCustomColorValue').addEventListener('input',event=>{const hex=event.target.value.trim();if(!/^#?[a-f0-9]{6}$/i.test(hex)){event.target.setAttribute('aria-invalid','true');return}$('avatarCustomColor').value='#'+hex.replace(/^#/,'');changed()});
-$('avatarCustomColorValue').addEventListener('blur',()=>{$('avatarCustomColorValue').value=$('avatarCustomColor').value.toUpperCase();$('avatarCustomColorValue').setAttribute('aria-invalid','false')});
-$('avatarCustomStrokeColorValue').addEventListener('input',event=>{const hex=event.target.value.trim();if(!/^#?[a-f0-9]{6}$/i.test(hex)){event.target.setAttribute('aria-invalid','true');return}$('avatarCustomStrokeColor').value='#'+hex.replace(/^#/,'');changed()});
-$('avatarCustomStrokeColorValue').addEventListener('blur',()=>{$('avatarCustomStrokeColorValue').value=$('avatarCustomStrokeColor').value.toUpperCase();$('avatarCustomStrokeColorValue').setAttribute('aria-invalid','false')});
+for(const [id,,override] of textColors){
+  const color=$(id),hex=$(id+'Value');
+  const update=()=>{
+    if(override)state[override]=color.value;
+    changed();
+  };
+  color.addEventListener('input',update);
+  hex.addEventListener('input',()=>{
+    const value=hex.value.trim();
+    if(!/^#?[a-f0-9]{6}$/i.test(value)){hex.setAttribute('aria-invalid','true');return}
+    color.value='#'+value.replace(/^#/,'');
+    update();
+  });
+  hex.addEventListener('blur',()=>syncHex(id));
+}
 $('avatarCustomImageUpload').addEventListener('click',()=>{if(!busy()&&state.source)$('avatarCustomImageInput').click()});
 $('avatarCustomImageInput').addEventListener('change',event=>{loadImageFiles(event.target.files);event.target.value=''});
 $('avatarCustomAssetAdd').addEventListener('click',()=>$('avatarCustomAssetInput').click());
