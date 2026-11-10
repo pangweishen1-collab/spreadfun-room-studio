@@ -6,7 +6,7 @@ const copy = {
     convertTab:'VAP 工具',reviewTab:'预览功能',title:'房间礼物过稿',
     settings:'过稿设置',background:'房间背景',ludo:'Hapi Ludo 房间',dark:'深色对比',custom:'自定义背景',uploadBackground:'选择本机背景…',uploadCloudBackground:'添加云端背景…',
     uploadVideo:'上传{gift} MP4',count:'视频数量',play:'同步播放',pause:'暂停',timeline:'播放时间',slots:'视频调整',
-    large:'大礼物',medium:'中礼物',small:'小礼物',gift:'礼物',replace:'替换',add:'上传',remove:'移除',
+    large:'大礼物',medium:'中礼物',small:'小礼物',gift:'礼物',vehicle:'座驾',replace:'替换',add:'上传',remove:'移除',
     scale:'画面大小',offsetY:'上下位置',editHint:'拖动视频调整位置，拖蓝线上的百分比手柄调整遮罩。',key:'视频底色',auto:'自动识别',opaque:'保留画面',black:'黑底去背景',white:'白底去背景',chroma:'色幕去背景',native:'原生 VAP 透明',
     mask:'上下渐变遮罩',enabled:'启用渐变',topStart:'上方透明边界',topEnd:'上方渐变结束',bottomStart:'下方渐变开始',bottomEnd:'下方透明边界',
     templates:'过稿模板',templateName:'模板名称',namePlaceholder:'输入模板名称',sharedHint:'模板及所选背景对全站访客可见。',
@@ -29,7 +29,7 @@ const copy = {
     convertTab:'VAP tool',reviewTab:'Review preview',title:'Room gift review',
     settings:'Review settings',background:'Room background',ludo:'Hapi Ludo room',dark:'Dark comparison',custom:'Custom background',uploadBackground:'Choose local background…',uploadCloudBackground:'Add cloud background…',
     uploadVideo:'Upload {gift} MP4',count:'Video count',play:'Play together',pause:'Pause',timeline:'Playback time',slots:'Video adjustments',
-    large:'Large gift',medium:'Medium gift',small:'Small gift',gift:'Gift',replace:'Replace',add:'Upload',remove:'Remove',
+    large:'Large gift',medium:'Medium gift',small:'Small gift',gift:'Gift',vehicle:'Vehicle',replace:'Replace',add:'Upload',remove:'Remove',
     scale:'Gift size',offsetY:'Vertical position',editHint:'Drag the video to move it. Drag the percentage handles to adjust the mask.',key:'Video background',auto:'Auto detect',opaque:'Keep picture',black:'Remove black',white:'Remove white',chroma:'Remove color screen',native:'Native VAP alpha',
     mask:'Vertical feather mask',enabled:'Enable feathering',topStart:'Top transparent edge',topEnd:'Top fade end',bottomStart:'Bottom fade start',bottomEnd:'Bottom transparent edge',
     templates:'Review templates',templateName:'Template name',namePlaceholder:'Name this template',sharedHint:'The template and selected background are visible to all site visitors.',
@@ -51,7 +51,10 @@ const copy = {
 };
 const t = key => copy[document.documentElement.lang.startsWith('zh') ? 'zh' : 'en'][key];
 const maskKeys = ['topStart', 'topEnd', 'bottomStart', 'bottomEnd'];
-const label = index => index < 3 ? t(['large', 'medium', 'small'][index]) : t('gift') + ' ' + (index + 1);
+function label(index, count = state.count) {
+  if (count === 2) return t('vehicle') + '-' + (index + 1);
+  return index < 3 ? t(['large', 'medium', 'small'][index]) : t('gift') + ' ' + (index + 1);
+}
 const state = {
   active: false, tab: 'convert', engine: null, count: 3, slots: [],
   background: 'ludo', backgroundImage: null, backgroundFile: null, backgroundId: null, localBackgroundFile: null, cloudBackgrounds: [],
@@ -230,7 +233,7 @@ function guideMarkup(visual = false) {
   return maskKeys.map(key => '<div class="vap-review-guide-line" hidden><button type="button" class="vap-review-guide" data-adjust="' +
     key + '"' + (visual ? ' role="slider" aria-orientation="vertical"' : '') + '><span></span></button></div>').join('');
 }
-function syncMaskGuides(guides, slot, index, visible, visual = false) {
+function syncMaskGuides(guides, slot, slotLabel, visible, visual = false) {
   for (const line of guides) {
     line.hidden = !visible;
     if (line.hidden) continue;
@@ -240,7 +243,7 @@ function syncMaskGuides(guides, slot, index, visible, visual = false) {
     line.dataset.edge = position < .04 ? 'top' : position > .96 ? 'bottom' : '';
     const name = t(key);
     guide.title = name + ' ' + percent;
-    guide.setAttribute('aria-label', label(index) + ' · ' + name + (visual ? '' : ' ' + percent));
+    guide.setAttribute('aria-label', slotLabel + ' · ' + name + (visual ? '' : ' ' + percent));
     if (visual) {
       const [min, max] = maskBounds(slot.settings.mask, key);
       guide.setAttribute('aria-valuemin', min);
@@ -297,7 +300,7 @@ function syncEditors() {
     const rect = state.engine.giftRect(room, clip.width, clip.height, settings.scale, settings.offsetY);
     placeEditor(move, {...rect, x: rect.x - room.x, y: rect.y - room.y}, room.w, room.h);
     move.setAttribute('aria-label', label(index) + ' · ' + t('offsetY') + ' ' + settings.offsetY + '%');
-    syncMaskGuides(guides, slot, index, selectedSlot === slot && settings.mask.enabled && !state.running);
+    syncMaskGuides(guides, slot, label(index), selectedSlot === slot && settings.mask.enabled && !state.running);
   });
 }
 function finishEditorDrag(event) {
@@ -606,7 +609,7 @@ function templateExample() {
 }
 function drawTemplateMask(slot) {
   if (!slot.renderer) return;
-  const {previewBackground, example} = templateDraft;
+  const {previewBackground, example, count} = templateDraft;
   const source = slot.clip?.video.readyState >= 2 ? slot.clip.video : example;
   const sample = source === example;
   const clip = sample ? {width:example.width, height:example.height, meta:{}} : slot.clip;
@@ -615,7 +618,7 @@ function drawTemplateMask(slot) {
     background:previewBackground, clips:[clip], sources:[source], settings:[sample ? {...slot.settings, key:'opaque'} : slot.settings], labels:[''],
     frameTimes:[sample ? 0 : source.seeking ? undefined : source.currentTime],
   });
-  syncMaskGuides(slot.card.querySelector('.vap-review-template-guides').children, slot, slot.index, slot.settings.mask.enabled, true);
+  syncMaskGuides(slot.card.querySelector('.vap-review-template-guides').children, slot, label(slot.index, count), slot.settings.mask.enabled, true);
 }
 function renderTemplateEditor() {
   const draft = templateDraft, slot = currentTemplateSlot(), card = $('TemplateControls');
@@ -624,7 +627,7 @@ function renderTemplateEditor() {
     preview.classList.toggle('is-selected', selected);
     preview.firstElementChild.setAttribute('aria-pressed', String(selected));
   }
-  $('TemplateAdjustTitle').textContent = label(slot.index) + ' · ' + t('giftSettings');
+  $('TemplateAdjustTitle').textContent = label(slot.index, draft.count) + ' · ' + t('giftSettings');
   card.innerHTML = slotSettingsMarkup(true);
   bindSlotSettings(slot, card, () => {syncSlotSettings(slot, card);drawTemplateMask(slot);});
   syncSlotSettings(slot, card);
@@ -650,7 +653,7 @@ function renderTemplateSlots() {
     card.className = 'vap-review-template-tile';
     card.dataset.templateSlot = slot.index;
     card.innerHTML = '<button type="button" class="vap-review-template-label" aria-controls="vapReviewTemplateEditor"><span>' +
-      label(slot.index) + '</span><span data-example hidden>' + t('maskExample') + '</span></button>' +
+      label(slot.index, count) + '</span><span data-example hidden>' + t('maskExample') + '</span></button>' +
       '<div class="vap-review-template-preview"><canvas aria-hidden="true"></canvas>' +
       '<div class="vap-review-template-guides">' + guideMarkup(true) + '</div></div>';
     card.firstElementChild.addEventListener('click', () => selectTemplateSlot(slot.index));
@@ -840,7 +843,7 @@ async function initialize() {
   if (!initTask) initTask = (async () => {
     state.busy = 'init';sync();
     try {
-      state.engine = await import('./vap-review-engine.mjs?v=20261110-review-preview-perf');
+      state.engine = await import('./vap-review-engine.mjs?v=20261110-review-hd-compact');
       state.slots = Array.from({length: state.engine.MAX_REVIEW_SLOTS}, () => ({settings: state.engine.defaultReviewSlot(), clip: null}));
       state.backgroundImage = await readBackground('ludo');
       renderSlots();updateLayout();

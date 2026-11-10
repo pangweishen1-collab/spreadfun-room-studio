@@ -35,11 +35,6 @@ export function applyVerticalMask(data,width,height,value){
   return out;
 }
 function setting(value,fallback){return Number.isFinite(value)?clamp(value):fallback;}
-function physicalAlpha(r,g,b,background,noise=0){
-  let minimum=0;const rgb=[r,g,b];
-  for(let c=0;c<3;c++){const bg=background[c],v=rgb[c];if(bg>0)minimum=Math.max(minimum,1-(v+noise)/bg);if(bg<255)minimum=Math.max(minimum,(v-noise-bg)/(255-bg));}
-  return clamp(minimum);
-}
 function recover(out,offset,r,g,b,alpha,background,originalAlpha){
   if(alpha<=0){out[offset]=out[offset+1]=out[offset+2]=out[offset+3]=0;return;}
   const rgb=[r,g,b];for(let c=0;c<3;c++)out[offset+c]=alpha>=.999?rgb[c]:byte((rgb[c]-(1-alpha)*background[c])/alpha);
@@ -172,6 +167,49 @@ export function detectScreenColor(data,width,height,requested='auto'){
   return requested==='auto'?null:{color:requested,background:namedScreens[requested].slice(),confidence:0};
 }
 
+function keyLumaPixels(data, black, tolerance, softness, workspace) {
+  const low = tolerance * .025, high = Math.max(low + .005, .25 + softness * .5);
+  const background = black ? 0 : 255;
+  const coverage = peak => {
+    const difference = black ? peak / 255 : 1 - peak / 255;
+    const softened = smooth(low, high, difference);
+    return softened > 0 ? Math.max(softened, difference) : 0;
+  };
+  const out = new Uint8ClampedArray(data.length);
+  const peakChannel = black ? Math.max : Math.min;
+  if (!workspace) {
+    const plate = [background, background, background];
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      recover(out, i, r, g, b, coverage(peakChannel(r, g, b)), plate, data[i + 3]);
+    }
+    return out;
+  }
+  let table = workspace.lumaTable;
+  if (table?.black !== black || table.low !== low || table.high !== high) {
+    const alphas = Float64Array.from({length: 256}, (_, peak) => coverage(peak));
+    const colors = new Uint8Array(256 * 256);
+    // For a pure black or white plate, alpha and recovered channels depend
+    // only on the extremal channel byte and the byte being recovered.
+    for (let peak = 0; peak < alphas.length; peak++) {
+      const alpha = alphas[peak];
+      if (!alpha) continue;
+      const removed = (1 - alpha) * background;
+      for (let value = 0; value < 256; value++)
+        colors[peak * 256 + value] = alpha >= .999 ? value : byte((value - removed) / alpha);
+    }
+    table = workspace.lumaTable = {black, low, high, alphas, colors};
+  }
+  const {alphas, colors} = table;
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const peak = peakChannel(r, g, b), row = peak * 256;
+    out[i] = colors[row + r]; out[i + 1] = colors[row + g]; out[i + 2] = colors[row + b];
+    out[i + 3] = byte(alphas[peak] * data[i + 3]);
+  }
+  return out;
+}
+
 /** Straight RGB + alpha, shared by live preview and the exported packed frame. */
 export function keyPixels(data,width,height,{matteMethod='black_luma',keyTolerance=.25,edgeSoftness=.08,spill=.7,background,screenColor='auto',lightRecovery=false,adaptiveChroma=false}={},workspace){
   pixels(data,width,height);if(!['black_luma','white_luma','chroma_key','opaque'].includes(matteMethod))throw new Error('此抠像方式需要独立的本地模型或遮罩。');
@@ -181,18 +219,8 @@ export function keyPixels(data,width,height,{matteMethod='black_luma',keyToleran
   if(matteMethod==='opaque')return data.slice();
   const screen=matteMethod==='chroma_key'?(screenOption(screenColor,background)||detectScreenColor(data,width,height,screenColor)):null;
   if(matteMethod==='chroma_key'&&!screen)return data.slice();
-  const bg=screen?.background||(matteMethod==='white_luma'?[255,255,255]:[0,0,0]);
   if(screen)return chromaPixels(data,width,height,screen,tolerance,softness,despill,workspace,lightRecovery,adaptiveChroma);
-  const out=new Uint8ClampedArray(data.length);
-  for(let o=0;o<data.length;o+=4){
-    const r=data[o],g=data[o+1],b=data[o+2];let alpha;
-    {const difference=matteMethod==='black_luma'?Math.max(r,g,b)/255:1-Math.min(r,g,b)/255;
-      const low=tolerance*.025;alpha=smooth(low,Math.max(low+.005,.25+softness*.5),difference);
-      if(alpha>0)alpha=Math.max(alpha,physicalAlpha(r,g,b,bg));
-    }
-    recover(out,o,r,g,b,alpha,bg,data[o+3]);
-  }
-  return out;
+  return keyLumaPixels(data,matteMethod==='black_luma',tolerance,softness,workspace);
 }
 
 /** Grayscale masks use luminance; masks with transparency use their alpha channel. */

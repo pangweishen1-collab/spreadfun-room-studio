@@ -1,11 +1,13 @@
 import {avcCodec, inspectVideo} from './vap-engine.mjs?v=20261110-review-preview-perf';
-import {applyVerticalMask, keyPixels, normalizeVerticalMask} from './vap-matte.mjs';
+import {applyVerticalMask, keyPixels, normalizeVerticalMask} from './vap-matte.mjs?v=20261110-luma-cache';
 import {readSourceVapConfig} from './vap-protocol.mjs';
-import {createVapUnpacker} from './vap-resources.mjs';
+import {createVapUnpacker} from './vap-resources.mjs?v=20261110-unpack-cache';
 
 export const REVIEW_FPS = 30;
 export const MAX_REVIEW_SLOTS = 6;
 export const REVIEW_POSITION_LIMIT = 50;
+const REVIEW_HD_TILE_WIDTH = 576;
+const REVIEW_STANDARD_TILE_WIDTH = 512;
 export const REVIEW_BACKGROUNDS = Object.freeze({
   ludo: 'assets/vap-review-room.webp',
   dark: null,
@@ -105,14 +107,15 @@ function matteOptions(clip, key) {
   };
 }
 
-function paintGift(gift, source, clip, settings, rect, room, pixelScale, frameTime) {
+function paintGift(gift, source, clip, settings, rect, room, pixelScale, frameTime, fixedMask) {
   const w = Math.max(1, Math.round(rect.w * pixelScale)), h = Math.max(1, Math.round(rect.h * pixelScale));
   const options = clip.config ? null : matteOptions(clip, settings.key);
   const readback = options !== null && options.matteMethod !== 'opaque';
-  if (!gift.surface || gift.surface.canvas.width !== w || gift.surface.canvas.height !== h || gift.config !== clip.config) {
+  if (!gift.surface || gift.surface.canvas.width !== w || gift.surface.canvas.height !== h || gift.config !== clip.config || gift.readback !== readback) {
     gift.unpacker?.dispose();
     if (gift.surface) gift.surface.canvas.width = gift.surface.canvas.height = 1;
-    gift.surface = surface(w, h, true);
+    gift.surface = surface(w, h, readback);
+    gift.readback = readback;
     gift.config = clip.config;
     gift.unpacker = clip.config ? createVapUnpacker({width: w, height: h, sourceVapConfig: clip.config}) : null;
     gift.workspace = {};
@@ -120,7 +123,8 @@ function paintGift(gift, source, clip, settings, rect, room, pixelScale, frameTi
   }
   const {canvas, ctx} = gift.surface;
   const cacheFrame = frameTime !== undefined;
-  if (!cacheFrame || frameTime !== gift.frameTime || source !== gift.source || settings.key !== gift.key) {
+  const repaint = !cacheFrame || frameTime !== gift.frameTime || source !== gift.source || settings.key !== gift.key;
+  if (repaint) {
     if (gift.unpacker) {
       ctx.putImageData(gift.unpacker.process(source), 0, 0);
     } else {
@@ -137,7 +141,7 @@ function paintGift(gift, source, clip, settings, rect, room, pixelScale, frameTi
     gift.key = settings.key;
     gift.compositeKey = null;
   }
-  if (!settings.mask.enabled) return canvas;
+  if (!settings.mask.enabled || (fixedMask && !repaint)) return canvas;
   const maskKey = room.h + ':' + JSON.stringify(settings.mask);
   if (maskKey !== gift.maskKey) {
     gift.mask ||= surface(1, room.h);
@@ -148,7 +152,7 @@ function paintGift(gift, source, clip, settings, rect, room, pixelScale, frameTi
     gift.maskKey = maskKey;
   }
   let composite = gift.surface;
-  if (cacheFrame) {
+  if (cacheFrame && !fixedMask) {
     // Keep the paused, keyed source intact while the editor moves the room mask over it.
     const compositeKey = maskKey + ':' + rect.y + ':' + rect.h;
     if (compositeKey === gift.compositeKey) return gift.composite.canvas;
@@ -175,12 +179,42 @@ function disposeGift(gift) {
   for (const item of [gift.surface, gift.mask, gift.composite]) if (item) item.canvas.width = item.canvas.height = 1;
 }
 
-export function createReviewRenderer(canvas, layout) {
+function paintRoom(ctx, room, background) {
+  if (background) {
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(room.x, room.y, room.w, room.h);
+    ctx.clip();
+    cover(ctx, background, room);
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#17243a';
+    ctx.fillRect(room.x, room.y, room.w, room.h);
+  }
+}
+
+function paintBackdrop(ctx, layout, rooms, background, clips, labels, showEmptyRooms) {
+  ctx.fillStyle = '#111b2b'; ctx.fillRect(0, 0, layout.width, layout.height);
+  for (const [index, tile] of layout.tiles.entries()) {
+    const {x, y, w, label} = tile;
+    ctx.fillStyle = '#233247'; ctx.fillRect(x, y, w, label);
+    ctx.font = '600 ' + Math.round(label * .43) + 'px system-ui, sans-serif';
+    ctx.textBaseline = 'middle'; ctx.fillStyle = '#f1f6ff';
+    ctx.fillText(labels[index], x + label * .38, y + label / 2, w - label * .76);
+    if (clips[index] || showEmptyRooms) paintRoom(ctx, rooms[index], background);
+  }
+}
+
+export function createReviewRenderer(canvas, layout, {exportBackdrop} = {}) {
   canvas.width = layout.width; canvas.height = layout.height;
   const ctx = canvas.getContext('2d', {alpha: false});
   const gifts = layout.tiles.map(() => ({}));
+  const rooms = layout.tiles.map(tile => ({...tile, y: tile.y + tile.label}));
   if (!ctx) throw new Error('Canvas 2D unavailable');
   ctx.imageSmoothingQuality = 'high';
+  // The room artwork and labels are fixed throughout an export.
+  const backdrop = exportBackdrop && surface(layout.width, layout.height);
+  if (backdrop) paintBackdrop(backdrop.ctx, layout, rooms, exportBackdrop.background, [], exportBackdrop.labels, true);
   return {
     draw({background, clips, settings, sources, labels, showEmptyRooms = true, pixelScale = 1, frameTimes = []}) {
       const width = Math.max(1, Math.round(layout.width * pixelScale));
@@ -191,35 +225,28 @@ export function createReviewRenderer(canvas, layout) {
         ctx.setTransform(width / layout.width, 0, 0, height / layout.height, 0, 0);
         ctx.imageSmoothingQuality = 'high';
       }
-      ctx.fillStyle = '#111b2b'; ctx.fillRect(0, 0, layout.width, layout.height);
-      for (const [index, tile] of layout.tiles.entries()) {
-        const {x, y, w, h, label} = tile;
-        ctx.fillStyle = '#233247'; ctx.fillRect(x, y, w, label);
-        ctx.font = '600 ' + Math.round(label * .43) + 'px system-ui, sans-serif';
-        ctx.textBaseline = 'middle'; ctx.fillStyle = '#f1f6ff';
-        ctx.fillText(labels[index], x + label * .38, y + label / 2, w - label * .76);
+      if (backdrop) ctx.drawImage(backdrop.canvas, 0, 0);
+      else paintBackdrop(ctx, layout, rooms, background, clips, labels, showEmptyRooms);
+      for (const [index, room] of rooms.entries()) {
         const clip = clips[index];
         if (!clip && gifts[index].surface) {
           disposeGift(gifts[index]);
           gifts[index] = {};
         }
-        if (!clip && !showEmptyRooms) continue;
-        const room = {...tile, y: y + label};
-        ctx.save();
-        ctx.beginPath(); ctx.rect(room.x, room.y, w, h); ctx.clip();
-        if (background) cover(ctx, background, room);
-        else {ctx.fillStyle = '#17243a'; ctx.fillRect(room.x, room.y, w, h);}
         if (sources[index] && clip) {
+          ctx.save();
+          ctx.beginPath(); ctx.rect(room.x, room.y, room.w, room.h); ctx.clip();
           const {scale, offsetY} = settings[index];
           const rect = giftRect(room, clip.width, clip.height, scale, offsetY);
-          const frame = paintGift(gifts[index], sources[index], clip, settings[index], rect, room, pixelScale, frameTimes[index]);
+          const frame = paintGift(gifts[index], sources[index], clip, settings[index], rect, room, pixelScale, frameTimes[index], !!backdrop);
           ctx.drawImage(frame, rect.x, rect.y, rect.w, rect.h);
+          ctx.restore();
         }
-        ctx.restore();
       }
     },
     dispose() {
       for (const gift of gifts) disposeGift(gift);
+      if (backdrop) backdrop.canvas.width = backdrop.canvas.height = 1;
       canvas.width = canvas.height = 1;
     },
   };
@@ -229,26 +256,36 @@ const checkAbort = signal => {
   if (signal?.aborted) throw new DOMException('Cancelled', 'AbortError');
 };
 
+async function chooseReviewEncoding(M, count, signal) {
+  const widths = count <= 3
+    ? [REVIEW_HD_TILE_WIDTH, REVIEW_STANDARD_TILE_WIDTH, 432]
+    : [REVIEW_STANDARD_TILE_WIDTH, 432];
+  const bitsPerPixelPerFrame = count === 2 ? .10 : .17;
+  for (const tileWidth of widths) {
+    const layout = reviewLayout(count, tileWidth);
+    const bitrate = clamp(Math.round(layout.width * layout.height * REVIEW_FPS * bitsPerPixelPerFrame), 2000000, 16000000);
+    const quality = new M.Quality({bitrate, bitrateMode: 'variable'});
+    for (const profile of ['high', 'main', 'baseline']) {
+      checkAbort(signal);
+      const codec = avcCodec(layout.width, layout.height, REVIEW_FPS, bitrate, profile);
+      if (await M.canEncodeVideo('avc', {width: layout.width, height: layout.height, frameRate: REVIEW_FPS, fullCodecString: codec, quality})) {
+        return {layout, codec, quality};
+      }
+    }
+  }
+  throw Object.assign(new Error('H.264 encoder unavailable'), {code: 'encoder'});
+}
+
 export async function exportReviewMp4({background, clips, settings, labels}, {signal, onProgress = () => {}} = {}) {
   const M = await import('./vendor/mediabunny/mediabunny.mjs');
-  const layout = reviewLayout(settings.length);
   const duration = Math.max(0, ...clips.map(clip => clip?.duration || 0));
   const frameCount = Math.ceil(duration * REVIEW_FPS);
   if (!frameCount) throw new Error('No review clips');
   const readers = clips.map(() => null);
   const target = new M.BufferTarget();
-  let output, renderer;
+  let output, renderer, pendingFrame;
   try {
-    const bitrate = clamp(Math.round(layout.width * layout.height * REVIEW_FPS * .15), 1800000, 12000000);
-    const quality = new M.Quality({bitrate, bitrateMode: 'variable'});
-    let codec;
-    for (const profile of ['high', 'main', 'baseline']) {
-      const candidate = avcCodec(layout.width, layout.height, REVIEW_FPS, bitrate, profile);
-      if (await M.canEncodeVideo('avc', {width: layout.width, height: layout.height, frameRate: REVIEW_FPS, fullCodecString: candidate, quality})) {
-        codec = candidate; break;
-      }
-    }
-    if (!codec) throw Object.assign(new Error('H.264 encoder unavailable'), {code: 'encoder'});
+    const {layout, codec, quality} = await chooseReviewEncoding(M, settings.length, signal);
     checkAbort(signal);
     const opened = await Promise.allSettled(clips.map(async (clip, index) => {
       if (!clip) return;
@@ -267,21 +304,32 @@ export async function exportReviewMp4({background, clips, settings, labels}, {si
     const failed = opened.find(result => result.status === 'rejected');
     if (failed) throw failed.reason;
     const {canvas} = surface(layout.width, layout.height);
-    renderer = createReviewRenderer(canvas, layout);
+    renderer = createReviewRenderer(canvas, layout, {exportBackdrop: {background, labels}});
     output = new M.Output({format: new M.Mp4OutputFormat({fastStart: 'in-memory'}), target});
     const source = new M.CanvasSource(canvas, {codec: 'avc', fullCodecString: codec, quality, latencyMode: 'quality', keyFrameInterval: 2});
     output.addVideoTrack(source, {frameRate: REVIEW_FPS});
     await output.start();
+    const readFrame = i => Promise.allSettled(readers.map(async reader => {
+      if (!reader || i >= reader.count) return null;
+      const next = await reader.iterator.next();
+      // The sink cycles its canvases even when two requested times select
+      // the same decoded frame. Keep the prepared frame until its timestamp changes.
+      if (next.value && (!Number.isFinite(next.value.timestamp) || next.value.timestamp !== reader.last?.timestamp))
+        reader.last = next.value;
+      if (!reader.last) throw new Error('The video has no decodable frame');
+      return reader.last;
+    }));
+    pendingFrame = readFrame(0);
     for (let i = 0; i < frameCount; i++) {
       checkAbort(signal);
-      const sources = await Promise.all(readers.map(async reader => {
-        if (!reader || i >= reader.count) return null;
-        const next = await reader.iterator.next();
-        if (next.value) reader.last = next.value.canvas;
-        if (!reader.last) throw new Error('The video has no decodable frame');
-        return reader.last;
-      }));
-      renderer.draw({background, clips, settings, sources, labels});
+      const frames = await pendingFrame;
+      checkAbort(signal);
+      const failed = frames.find(result => result.status === 'rejected');
+      if (failed) throw failed.reason;
+      const decoded = frames.map(result => result.value);
+      renderer.draw({clips, settings, sources: decoded.map(frame => frame?.canvas), frameTimes: decoded.map(frame => frame?.timestamp)});
+      // Only prefetch after composition has finished reading the current source canvases.
+      pendingFrame = i + 1 < frameCount ? readFrame(i + 1) : null;
       await source.add(i / REVIEW_FPS, 1 / REVIEW_FPS, {keyFrame: i % (REVIEW_FPS * 2) === 0});
       onProgress((i + 1) / frameCount);
       if (i % 12 === 11) await new Promise(resolve => setTimeout(resolve, 0));
@@ -294,6 +342,7 @@ export async function exportReviewMp4({background, clips, settings, labels}, {si
     await output?.cancel().catch(() => {});
     throw error;
   } finally {
+    await pendingFrame;
     await Promise.allSettled(readers.map(async reader => {
       if (!reader) return;
       try {await reader.iterator?.return?.();} finally {reader.input.dispose();}

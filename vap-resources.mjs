@@ -169,6 +169,17 @@ async function image(file){
 function fitted(ctx,img,w,h,fit){const iw=img.width||img.naturalWidth,ih=img.height||img.naturalHeight,scale=Math[fit==='cover'?'max':'min'](w/iw,h/ih);ctx.drawImage(img,(w-iw*scale)/2,(h-ih*scale)/2,iw*scale,ih*scale);}
 function toBlob(canvas){return typeof canvas.convertToBlob==='function'?canvas.convertToBlob({type:'image/png'}):new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(new Error('Resource export failed')),'image/png'));}
 
+let unpremultiplyTable;
+function unpremultiplyBytes() {
+  if (!unpremultiplyTable) {
+    unpremultiplyTable = new Uint8Array(256 * 256);
+    for (let alpha = 1; alpha < 256; alpha++)
+      for (let value = 0; value < 256; value++)
+        unpremultiplyTable[alpha * 256 + value] = Math.min(255, Math.round(value * 255 / alpha));
+  }
+  return unpremultiplyTable;
+}
+
 /** Return a straight-alpha visible image from a packed native VAP source. */
 export function createVapUnpacker({width,height,sourceVapConfig,verticalMask,videoOffsetY=0}={}){
   if(!finite(videoOffsetY)||Math.abs(videoOffsetY)>1)throw new TypeError('Invalid video offset');
@@ -177,15 +188,25 @@ export function createVapUnpacker({width,height,sourceVapConfig,verticalMask,vid
   // Native Tencent exporter composites RGB over black. Explicit straight exports
   // carry our marker and must not be unpremultiplied a second time.
   const premultiplied=sourceVapConfig.funToolkit?.rgbAlphaMode!=='straight';
+  const rgbBytes = premultiplied ? unpremultiplyBytes() : null;
   return {
     process(source){
       rgb.ctx.clearRect(0,0,width,height);alpha.ctx.clearRect(0,0,width,height);
       rgb.ctx.drawImage(source,...i.rgbFrame,...content);alpha.ctx.drawImage(source,...i.aFrame,...content);
       const out=rgb.ctx.getImageData(0,0,width,height),a=alpha.ctx.getImageData(0,0,width,height).data;
-      for(let y=0;y<height;y++)for(let x=0;x<width;x++){
-        const p=(y*width+x)*4,original=a[p];
-        if(premultiplied)for(let c=0;c<3;c++)out.data[p+c]=original?Math.min(255,Math.round(out.data[p+c]*255/original)):0;
-        out.data[p+3]=Math.round(original*fade(y,height,verticalMask));
+      const data = out.data;
+      for (let y = 0; y < height; y++) {
+        const weight = fade(y, height, verticalMask);
+        for (let p = y * width * 4, end = p + width * 4; p < end; p += 4) {
+          const original = a[p];
+          if (rgbBytes) {
+            const row = original * 256;
+            data[p] = rgbBytes[row + data[p]];
+            data[p + 1] = rgbBytes[row + data[p + 1]];
+            data[p + 2] = rgbBytes[row + data[p + 2]];
+          }
+          data[p + 3] = weight === 1 ? original : Math.round(original * weight);
+        }
       }
       return out;
     },
