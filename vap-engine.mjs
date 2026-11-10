@@ -13,6 +13,17 @@ export class VapError extends Error {
 }
 let mediaPromise;
 const media = () => mediaPromise ||= import('./vendor/mediabunny/mediabunny.mjs').catch(error=>{mediaPromise=null;throw new VapError('unsupported','视频处理组件未能加载，请重试。',error)});
+async function ensureAacEncoding(M, config){
+  if(await M.canEncodeAudio('aac',config))return;
+  try{
+    const {registerAacEncoder}=await import('./vendor/mediabunny-aac/mediabunny-aac-encoder.mjs');
+    registerAacEncoder();
+    if(await M.canEncodeAudio('aac',config))return;
+  }catch(error){
+    throw Object.assign(new VapError('audio','备用 AAC 编码器加载失败；原 AAC 音轨可尝试用 100% 音量直接保留。',error),{audioStage:'encode'});
+  }
+  throw Object.assign(new VapError('audio','当前无法重新编码这条音轨；原 AAC 音轨可尝试用 100% 音量直接保留。'),{audioStage:'encode'});
+}
 const clock = () => performance.now();
 const cancelled = signal => {if(signal?.aborted)throw new VapError('cancelled','转换已取消。')};
 const finite = value => typeof value==='number'&&Number.isFinite(value);
@@ -181,19 +192,23 @@ function prepareNativeOpaque(o,info,matteModule,images){
   white.canvas.width=white.canvas.height=1;
   return {enabled:true,reason:null,alpha:alpha.canvas,rgbMask:needsRGBMask?coverage.canvas:null,rect:[x,y,w,h]};
 }
-async function open(file){
+async function open(file,{videoTrackOnly=false}={}){
   fileCheck(file);const M=await media();
   const input=new M.Input({source:new M.BlobSource(file),formats:[M.MP4]});
   try{
     if(!await input.canRead())throw new VapError('file','无法识别此 MP4，请检查文件是否完整。');
-    const video=await input.getPrimaryVideoTrack(),audio=await input.getPrimaryAudioTrack();
+    const video=await input.getPrimaryVideoTrack(),audio=videoTrackOnly?null:await input.getPrimaryAudioTrack();
     if(!video)throw new VapError('file','文件中没有可读取的视频轨道。');
-    const [width,height,duration,metrics,codec,canDecode,hdr]=await Promise.all([video.getDisplayWidth(),video.getDisplayHeight(),input.computeDuration(),video.computeFrameRateMetrics(),video.getCodec(),video.canDecode(),video.hasHighDynamicRange()]);
+    const timing=videoTrackOnly
+      ? Promise.all([video.getFirstTimestamp(),video.computeDuration()]).then(([start,end])=>({duration:end-start,videoStart:start,videoDuration:end-start}))
+      : Promise.resolve(input.computeDuration()).then(duration=>({duration}));
+    const [width,height,times,metrics,codec,canDecode,hdr]=await Promise.all([video.getDisplayWidth(),video.getDisplayHeight(),timing,videoTrackOnly?null:video.computeFrameRateMetrics(),video.getCodec(),video.canDecode(),video.hasHighDynamicRange()]);
+    const {duration}=times;
     if(!canDecode)throw new VapError('decode','浏览器无法解码此视频，请先转为 H.264 MP4。');
     if(!finite(duration)||duration<=0||duration>120||!finite(width)||!finite(height)||Math.max(width,height)>4096)throw new VapError('limits','请使用 120 秒以内、最长边不超过 4096px 的视频。');
     if(hdr)throw new VapError('unsupported','此版本仅支持 SDR 视频，请先将 HDR 视频转换为 SDR。');
     let nativeOpaqueSource=false;
-    if(codec==='avc')try{
+    if(!videoTrackOnly&&codec==='avc')try{
       const [codedWidth,codedHeight,sar,rotation,flip]=await Promise.all([video.getCodedWidth(),video.getCodedHeight(),video.getPixelAspectRatio(),video.getRotation(),video.getFlip()]);
       // These metadata constraints keep CanvasSink's fixed output from adding
       // transparent contain padding of its own. Unknown/transformed sources use
@@ -202,17 +217,19 @@ async function open(file){
     }catch(ignored){}
     const audioCodec=audio?await audio.getCodec():null;
     const audioStats=audio?await audio.computePacketStats(100):null;
-    const info={width:Math.round(width),height:Math.round(height),duration,fps:metrics.bestGuessFrameRate||24,hasAudio:!!audio,audioCodec,audioBitrate:audioStats?.averageBitrate||0,codec,nativeOpaqueSource};
+    const info={width:Math.round(width),height:Math.round(height),...times,fps:metrics?.bestGuessFrameRate||24,hasAudio:!!audio,audioCodec,audioBitrate:audioStats?.averageBitrate||0,codec,nativeOpaqueSource};
     return {M,input,video,audio,info};
   }catch(error){input.dispose();if(error instanceof VapError)throw error;throw new VapError('file','视频读取失败，请使用完整的 MP4 文件。',error)}
 }
 
-async function detectSampledSource({M,video,info},{allowCustomScreen}){
+async function detectSampledSource({M,video,info},{allowCustomScreen,videoTrackOnly}){
   let surface;
   try{
     const scale=Math.min(1,128/Math.max(info.width,info.height));
     const width=Math.max(1,Math.round(info.width*scale)),height=Math.max(1,Math.round(info.height*scale));
-    surface=canvas(width,height);const sink=new M.CanvasSink(video,{poolSize:1}),frames=[];
+    surface=canvas(width,height);
+    const sizing=videoTrackOnly?{width,height,fit:'fill'}:{};
+    const sink=new M.CanvasSink(video,{poolSize:1,...sizing}),frames=[];
     for(const fraction of [.12,.5,.85]){
       const frame=await sink.getCanvas((info.videoStart??0)+(info.videoDuration??info.duration)*fraction);if(!frame)continue;
       surface.ctx.clearRect(0,0,width,height);surface.ctx.drawImage(frame.canvas,0,0,width,height);
@@ -224,14 +241,11 @@ async function detectSampledSource({M,video,info},{allowCustomScreen}){
 }
 
 export async function inspectVideo(file,{detectSource=false,sourceVapConfig,videoTrackOnly=false,allowCustomScreen=false}={}){
-  const opened=await open(file);
+  const opened=await open(file,{videoTrackOnly});
   try{
     const info={...opened.info};
-    if(videoTrackOnly){
-      const [start,end]=await Promise.all([opened.video.getFirstTimestamp(),opened.video.computeDuration()]);
-      info.videoStart=start;info.videoDuration=end-start;
-    }else if(sourceVapConfig)info.videoDuration=await opened.video.computeDuration();
-    return detectSource?{...info,sourceDetection:await detectSampledSource({...opened,info},{allowCustomScreen})}:info;
+    if(!videoTrackOnly&&sourceVapConfig)info.videoDuration=await opened.video.computeDuration();
+    return detectSource?{...info,sourceDetection:await detectSampledSource({...opened,info},{allowCustomScreen,videoTrackOnly})}:info;
   }
   finally{opened.input.dispose()}
 }
@@ -428,7 +442,9 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
       if(info.audioCodec==='aac'&&o.audioGain===1){audioMode='copied';audioSource=new M.EncodedAudioPacketSource('aac');}
       else{
         const channels=await audio.getNumberOfChannels(),sampleRate=await audio.getSampleRate(),bitrate=o.audioGain===1?80000:128000;
-        if(!await audio.canDecode()||!await M.canEncodeAudio('aac',{numberOfChannels:channels,sampleRate,quality:new M.Quality({bitrate})}))throw new VapError('audio',o.audioGain===1?'浏览器无法将此音轨转换为 AAC；请先转换音轨，或手动取消保留音频。':'当前浏览器无法编码调整后的音量；请将音量恢复为 100%，或取消保留音频。');
+        if(!await audio.canDecode())throw Object.assign(new VapError('audio','当前浏览器无法解码这条音轨。'),{audioStage:'decode'});
+        await ensureAacEncoding(M,{numberOfChannels:channels,sampleRate,quality:new M.Quality({bitrate})});
+        cancelled(signal);
         audioMode='transcoded';audioSource=new M.AudioSampleSource({codec:'aac',quality:new M.Quality({bitrate})});
       }
       output.addAudioTrack(audioSource);

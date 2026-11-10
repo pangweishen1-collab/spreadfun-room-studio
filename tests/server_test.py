@@ -3,6 +3,7 @@
 
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from base64 import b64encode
 import http.client
 import importlib.util
 import json
@@ -62,6 +63,34 @@ class ServerTests(unittest.TestCase):
 
     def tearDown(self):
         self.temporary.cleanup()
+
+    def test_review_backgrounds_are_reused_by_templates(self):
+        backgrounds = "/api/vap-review-backgrounds"
+        templates = "/api/vap-review-templates"
+        image = "data:image/webp;base64," + b64encode((ROOT / "assets/vap-review-room.webp").read_bytes()).decode()
+        slot = {"key": "auto", "offsetY": 0, "scale": 100,
+                "mask": {"enabled": True, "topStart": 0, "topEnd": .12, "bottomStart": .88, "bottomEnd": 1}}
+        upload = {"name": "Review room", "backgroundImage": image}
+        template = {"name": "Gift review", "background": "custom", "backgroundImage": None, "slots": [slot]}
+        with running(self.database) as server:
+            self.assertEqual(request(server, "POST", backgrounds, upload, {"Origin": "https://external.invalid"})[0], 403)
+            self.assertEqual(request(server, "POST", backgrounds, dict(upload, backgroundImage="invalid"))[0], 400)
+            code, _, room = request(server, "POST", backgrounds, upload)
+            self.assertEqual(code, 201)
+            self.assertEqual(request(server, "POST", backgrounds, dict(upload, name="review room"))[0], 409)
+            self.assertEqual(request(server, "GET", backgrounds)[2], {"backgrounds": [room]})
+            self.assertEqual(request(server, "POST", templates, dict(template, backgroundId=str(uuid.uuid4())))[0::2],
+                             (409, {"error": "background_missing"}))
+            self.assertEqual(request(server, "POST", templates, dict(template, backgroundId=room["id"], backgroundImage=image))[0], 400)
+            code, _, saved = request(server, "POST", templates, dict(template, backgroundId=room["id"]))
+            self.assertEqual(code, 201)
+            code, _, legacy = request(server, "POST", templates, dict(template, name="Inline background", backgroundImage=image))
+            self.assertEqual(code, 201)
+        with running(self.database) as server:
+            self.assertEqual(request(server, "GET", templates + "/" + saved["id"])[2],
+                             {**saved, **template, "backgroundId": room["id"]})
+            self.assertEqual(request(server, "GET", backgrounds + "/" + room["id"])[2], {**room, **upload})
+            self.assertEqual(request(server, "GET", templates + "/" + legacy["id"])[2]["backgroundImage"], image)
 
     def test_independent_clients_share_counters_and_restart_persists(self):
         with running(self.database) as server:

@@ -1,7 +1,12 @@
-// First-party anonymous usage counts and private tool suggestions. No source assets are accepted.
+// First-party counters, private suggestions and shared review templates.
 const TOOLS = ['room', 'avatar', 'banner', 'gift', 'resources', 'vap'];
 const EVENT_TYPES = ['generated', 'download'];
 const MAX_BODY = 16 * 1024;
+const MAX_REVIEW_BODY = 704 * 1024;
+const MAX_REVIEW_ENTRIES = 100;
+const TEMPLATES_PATH = '/api/vap-review-templates';
+const BACKGROUNDS_PATH = '/api/vap-review-backgrounds';
+const WEBP_DATA = 'data:image/webp;base64,';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 class ApiError extends Error {
@@ -44,14 +49,14 @@ function checkOrigin(request) {
   }
 }
 
-async function readJson(request) {
+async function readJson(request, maxBody = MAX_BODY) {
   checkOrigin(request);
   if (request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase() !== 'application/json') {
     throw new ApiError(415, 'json_required');
   }
   const length = request.headers.get('Content-Length');
   if (length !== null && !/^\d+$/.test(length)) throw new ApiError(400, 'invalid_json');
-  if (length !== null && Number(length) > MAX_BODY) throw new ApiError(413, 'body_too_large');
+  if (length !== null && Number(length) > maxBody) throw new ApiError(413, 'body_too_large');
 
   // Streaming and chunked requests get the same actual-byte limit; headers are not trusted.
   const reader = request.body?.getReader();
@@ -63,7 +68,7 @@ async function readJson(request) {
         const { value, done } = await reader.read();
         if (done) break;
         size += value.byteLength;
-        if (size > MAX_BODY) {
+        if (size > maxBody) {
           await reader.cancel();
           throw new ApiError(413, 'body_too_large');
         }
@@ -170,6 +175,105 @@ async function saveRequest(db, payload) {
   return json(201, receipt);
 }
 
+function hasFields(value, fields) {
+  return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join(',') === fields;
+}
+
+function reviewName(value, invalid) {
+  if (typeof value !== 'string') invalid();
+  const name = value.trim().normalize('NFC');
+  if (!name || [...name].length > 40 || /[\u0000-\u001f\u007f\uD800-\uDFFF]/u.test(name)) invalid();
+  return name;
+}
+
+function validateBackgroundImage(image, invalid) {
+  if (typeof image !== 'string' || !image.startsWith(WEBP_DATA)) invalid();
+  const encoded = image.slice(WEBP_DATA.length);
+  if (encoded.length < 28 || encoded.length % 4 || !/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) invalid();
+  const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0;
+  const size = encoded.length / 4 * 3 - padding;
+  if (size < 20 || size > 512 * 1024) invalid();
+  const header = atob(encoded.slice(0, 28));
+  const riffSize = header.charCodeAt(4) + header.charCodeAt(5) * 256 + header.charCodeAt(6) * 65536 + header.charCodeAt(7) * 16777216;
+  if (header.slice(0, 4) !== 'RIFF' || header.slice(8, 12) !== 'WEBP' || riffSize !== size - 8
+      || !['VP8 ', 'VP8L', 'VP8X'].includes(header.slice(12, 16))) invalid();
+}
+
+function validateBackground(payload) {
+  const invalid = () => { throw new ApiError(400, 'invalid_background'); };
+  if (!hasFields(payload, 'backgroundImage,name')) invalid();
+  const name = reviewName(payload.name, invalid);
+  validateBackgroundImage(payload.backgroundImage, invalid);
+  return { name, backgroundImage: payload.backgroundImage };
+}
+
+function validateTemplate(payload) {
+  const invalid = () => { throw new ApiError(400, 'invalid_template'); };
+  const hasReference = Object.hasOwn(payload, 'backgroundId');
+  if (!hasFields(payload, hasReference ? 'background,backgroundId,backgroundImage,name,slots' : 'background,backgroundImage,name,slots')) invalid();
+  const name = reviewName(payload.name, invalid);
+  const { background, backgroundId, backgroundImage, slots } = payload;
+  if (!['ludo', 'dark', 'custom'].includes(background) || !Array.isArray(slots) || slots.length < 1 || slots.length > 6) invalid();
+  for (const slot of slots) {
+    if (!hasFields(slot, 'key,mask,offsetY,scale') || !Number.isInteger(slot.scale) || slot.scale < 25 || slot.scale > 110
+        || !Number.isFinite(slot.offsetY) || Math.abs(slot.offsetY) > 50
+        || !['auto', 'opaque', 'black_luma', 'white_luma', 'chroma_key'].includes(slot.key)
+        || !hasFields(slot.mask, 'bottomEnd,bottomStart,enabled,topEnd,topStart')) invalid();
+    const { enabled, topStart, topEnd, bottomStart, bottomEnd } = slot.mask;
+    if (typeof enabled !== 'boolean' || ![topStart, topEnd, bottomStart, bottomEnd].every(Number.isFinite)
+        || !(0 <= topStart && topStart < topEnd && topEnd <= bottomStart && bottomStart < bottomEnd && bottomEnd <= 1)) invalid();
+  }
+  const settings = { background, slots };
+  if (hasReference) {
+    if (background !== 'custom' || typeof backgroundId !== 'string' || !UUID.test(backgroundId) || backgroundImage !== null) invalid();
+    settings.backgroundId = backgroundId.toLowerCase();
+  } else if (background === 'custom') {
+    validateBackgroundImage(backgroundImage, invalid);
+  } else if (backgroundImage !== null) invalid();
+  return { name, settings, backgroundImage };
+}
+
+async function reviewLibrary(request, db, path, collection) {
+  const templates = collection === TEMPLATES_PATH;
+  const key = templates ? 'template' : 'background';
+  const table = templates ? 'vap_review_templates' : 'vap_review_backgrounds';
+  const head = request.method === 'HEAD';
+  if (path === collection && ['GET', 'HEAD'].includes(request.method)) {
+    const { results } = await db.prepare(`SELECT id, name, created_at AS createdAt FROM ${table} ORDER BY created_at DESC, id LIMIT ?`)
+      .bind(MAX_REVIEW_ENTRIES).all();
+    return json(200, { [key + 's']: results }, head);
+  }
+  if (path !== collection && ['GET', 'HEAD'].includes(request.method)) {
+    const id = path.slice(collection.length + 1);
+    if (!UUID.test(id)) throw new ApiError(404, 'not_found');
+    const row = await db.prepare(`SELECT id, name, created_at AS createdAt, background_image AS backgroundImage${templates ? ', settings' : ''} FROM ${table} WHERE id = ?`)
+      .bind(id.toLowerCase()).first();
+    if (!row) throw new ApiError(404, 'not_found');
+    const { settings, ...entry } = row;
+    return json(200, settings ? { ...entry, ...JSON.parse(settings) } : entry, head);
+  }
+  if (path !== collection || request.method !== 'POST') throw new ApiError(405, 'method_not_allowed');
+  const payload = await readJson(request, MAX_REVIEW_BODY);
+  const { name, settings, backgroundImage } = templates ? validateTemplate(payload) : validateBackground(payload);
+  if (settings?.backgroundId && !await db.prepare('SELECT 1 FROM vap_review_backgrounds WHERE id = ?').bind(settings.backgroundId).first()) {
+    throw new ApiError(409, 'background_missing');
+  }
+  const id = crypto.randomUUID(), nameKey = name.toLowerCase(), createdAt = new Date().toISOString();
+  // Keep both the shared capacity and the short-window write limit atomic.
+  const inserted = await db.prepare(`
+    INSERT INTO ${table} (id, name, name_key, background_image, created_at${templates ? ', settings' : ''})
+    SELECT ?, ?, ?, ?, ?${templates ? ', ?' : ''}
+    WHERE (SELECT count(*) FROM ${table}) < ?
+      AND (SELECT count(*) FROM ${table} WHERE created_at >= ?) < 6
+    ON CONFLICT DO NOTHING RETURNING id
+  `).bind(id, name, nameKey, backgroundImage, createdAt, ...(templates ? [JSON.stringify(settings)] : []),
+    MAX_REVIEW_ENTRIES, new Date(Date.now() - 60000).toISOString()).first();
+  if (inserted) return json(201, { id, name, createdAt });
+  if (await db.prepare(`SELECT 1 FROM ${table} WHERE name_key = ?`).bind(nameKey).first()) throw new ApiError(409, key + '_exists');
+  if ((await db.prepare(`SELECT count(*) AS count FROM ${table}`).first()).count >= MAX_REVIEW_ENTRIES) throw new ApiError(409, key + '_limit');
+  throw new ApiError(429, 'rate_limited');
+}
+
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
@@ -182,6 +286,10 @@ export default {
     try {
       if (path === '/api/stats' && ['GET', 'HEAD'].includes(request.method)) {
         return json(200, await stats(env.DB.withSession('first-primary')), head);
+      }
+      const collection = [TEMPLATES_PATH, BACKGROUNDS_PATH].find(value => path === value || path.startsWith(value + '/'));
+      if (collection) {
+        return await reviewLibrary(request, env.DB.withSession('first-primary'), path, collection);
       }
       if (!['GET', 'HEAD', 'POST'].includes(request.method)) {
         throw new ApiError(405, 'method_not_allowed');

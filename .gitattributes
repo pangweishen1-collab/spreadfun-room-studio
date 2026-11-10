@@ -1,2 +1,3 @@
 *.pdf binary
 *.bin binary
+vendor/mediabunny-aac/mediabunny-aac-encoder.mjs binary

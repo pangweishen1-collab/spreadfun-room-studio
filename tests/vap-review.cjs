@@ -44,10 +44,11 @@ const assert = require('node:assert/strict');
   assert.throws(() => normalizeReviewTemplate({background:'ludo', slots}), /遮罩/);
   const layout = reviewLayout(3), painted = [];
   const context = {
-    fillRect() {}, fillText() {}, save() {}, restore() {}, beginPath() {}, rect() {}, clip() {},
+    fillRect() {}, fillText() {}, save() {}, restore() {}, beginPath() {}, rect() {}, clip() {}, setTransform() {},
     drawImage(image, x) {painted.push(x);},
   };
-  const renderer = createReviewRenderer({getContext: () => context}, layout);
+  const canvas = {getContext: () => context};
+  const renderer = createReviewRenderer(canvas, layout);
   const preview = {background:{width:720,height:1560}, clips:[null, {}, null], settings:slots, sources:[], labels:['L', 'M', 'S']};
   renderer.draw({...preview, showEmptyRooms:false});
   assert.deepEqual(painted, [layout.tiles[1].x], 'only the uploaded middle slot shows a room in preview');
@@ -55,7 +56,8 @@ const assert = require('node:assert/strict');
   renderer.draw(preview);
   assert.deepEqual(painted, layout.tiles.map(tile => tile.x), 'the exported comparison still draws all rooms');
 
-  const maskDraws = [], maskPixels = [];
+  const maskDraws = [], maskPixels = [], sourceDraws = [];
+  const source = {};
   globalThis.ImageData = class {
     constructor(data) { this.data = data; }
   };
@@ -65,6 +67,7 @@ const assert = require('node:assert/strict');
         clearRect() {}, save() {}, restore() { this.globalCompositeOperation = 'source-over'; },
         putImageData(image) { maskPixels.push(image.data); },
         drawImage(image, x, y, width, height) {
+          if (image === source) sourceDraws.push(image);
           if (this.globalCompositeOperation === 'destination-in') maskDraws.push({image, y, height});
         },
       };
@@ -72,7 +75,7 @@ const assert = require('node:assert/strict');
   };
   const gift = {...defaultReviewSlot(), scale:48, key:'opaque'};
   const clip = {width:720, height:1560, meta:{}};
-  const frame = {clips:[clip], settings:[gift], sources:[{}], labels:preview.labels};
+  const frame = {clips:[clip], settings:[gift], sources:[source], labels:preview.labels};
   const fixedRoom = {...room, y:room.y + room.label};
   for (const [offsetY, scale] of [[0,48], [24,48], [-19,80]]) {
     Object.assign(gift, {offsetY, scale});
@@ -84,5 +87,16 @@ const assert = require('node:assert/strict');
   }
   assert.equal(maskPixels.length, 1, 'moving or resizing a gift reuses the room mask');
   assert.ok(maskDraws.every(draw => draw.image === maskDraws[0].image));
-  console.log('vap-review: room-anchored mask, preview visibility, 30 FPS, 100% defaults and template compatibility passed.');
+  const before = sourceDraws.length;
+  renderer.draw({...frame, frameTimes:[0]});
+  gift.offsetY = 5;
+  renderer.draw({...frame, frameTimes:[0]});
+  assert.equal(sourceDraws.length, before + 1, 'moving a paused video reuses its prepared frame');
+  renderer.draw({...frame, frameTimes:[.5]});
+  assert.equal(sourceDraws.length, before + 2, 'seeking refreshes the prepared frame');
+  renderer.draw({...frame, pixelScale:.5});
+  assert.equal(canvas.width, layout.width / 2, 'playback reduces the canvas backing resolution');
+  renderer.draw(frame);
+  assert.equal(canvas.width, layout.width, 'full-size rendering remains the default');
+  console.log('vap-review: cached paused frames, scaled preview, room-anchored mask, 30 FPS and template compatibility passed.');
 })().catch(error => {console.error(error); process.exitCode = 1;});

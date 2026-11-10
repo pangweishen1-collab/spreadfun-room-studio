@@ -1,0 +1,4 @@
+Mediabunny AAC encoder 1.62.1, MPL-2.0. The local ES module differs from the official npm bundle only in the two imports of its peer dependency (resolved to the adjacent Mediabunny browser bundle).
+Source and WASM build instructions: https://github.com/Vanilagy/mediabunny/tree/v1.62.1/packages/aac-encoder
+Package: https://registry.npmjs.org/@mediabunny/aac-encoder/-/aac-encoder-1.62.1.tgz
+The AAC encoder contains FFmpeg's libavcodec and libavutil, under the GNU Lesser General Public License v2.1 or later. FFmpeg source: https://github.com/FFmpeg/FFmpeg

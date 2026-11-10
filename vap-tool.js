@@ -44,6 +44,16 @@
   Object.assign(copy.en,{uploadTitle:'Click, drop or paste MP4 / image frames',uploadHint:'MP4 / PNG / WebP / JPG / ZIP · Up to 200 MB · On-device',upload:'Upload files',replace:'Replace files',reading:'Detecting and reading files…',errorFile:'Choose one MP4, same-size image frames, or one frame ZIP. Do not mix input types.'});
   Object.assign(copy.zh,{refining:'正在提升画质…',codecHint:'优先使用高清 H.264 编码，不支持时自动回退兼容配置；原音量 AAC 直接保留，调整音量时在本机重新编码声音。'});
   Object.assign(copy.en,{refining:'Refining video quality…',codecHint:'Uses efficient H.264 encoding with a compatibility fallback. AAC at source volume is copied; volume adjustments re-encode audio on-device.'});
+  Object.assign(copy.zh,{
+    errorAudioOriginal:'无法重新编码这条 AAC 音轨。可将视频音量切到「原声 100%」，直接保留原音轨后重试。',
+    errorAudioDecode:'浏览器无法解码这条音轨。请将音轨转为 AAC 后重新上传，或关闭「保留原片声音」导出。',
+    errorAudioEncode:'无法将这条音轨编码为 AAC。请重试，或用 AAC 音轨的视频重新上传。',
+  });
+  Object.assign(copy.en,{
+    errorAudioOriginal:'This AAC track could not be re-encoded. Choose Original 100% to keep the existing audio track and try again.',
+    errorAudioDecode:'This browser could not decode the audio track. Upload a version with AAC audio, or turn off Keep source audio.',
+    errorAudioEncode:'This audio track could not be encoded as AAC. Try again, or upload a version with AAC audio.',
+  });
   const maskDefaults={enabled:true,topStart:0,topEnd:.15,bottomStart:.85,bottomEnd:1};
   Object.assign(copy.zh,{pickColor:'吸管取色',cancelPickColor:'取消取色',pickColorHint:'点击视频中的幕布取色，Esc 取消',pickColorGroup:'幕布取色',resetColor:'自动识别',screenCustom:'吸管取色',pickColorFailed:'当前帧无法取色，请换一帧后重试。'});
   Object.assign(copy.en,{pickColor:'Pick screen color',cancelPickColor:'Cancel picker',pickColorHint:'Click the screen in the video. Esc cancels.',pickColorGroup:'Screen color picker',resetColor:'Auto-detect',screenCustom:'Picked color',pickColorFailed:'Could not sample this frame. Try another frame.'});
@@ -98,13 +108,17 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[],autoplaySource=null;
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261102-release174').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261110-audio-fallback').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
   function budgetCap(){return engineApi?.outputBudget(maxOutputBytes,state.meta||{},state.sourceVapConfig)??maxOutputBytes}
   function applyBudget(){
     const cap=budgetCap();$('Target').max=String(cap/1e6);
     $('Target').value=String(Math.min(requestedTargetBytes??cap,cap)/1e6);
   }
   function errorKey(error,fallback='errorConvert'){
+    if(error?.code==='audio'&&error.audioStage){
+      if(state.meta?.audioCodec==='aac')return 'errorAudioOriginal';
+      return error.audioStage==='decode'?'errorAudioDecode':'errorAudioEncode';
+    }
     const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',budget:'errorBudget',cancelled:'cancelled'};
     return codes[error?.code]||fallback;
   }

@@ -33,6 +33,10 @@ The production Pages site, test Pages site and legacy Worker share the existing 
 
 The six-tool statistics update requires `migrations/0002_whole_site_statistics.sql` before publishing its API and frontend. It extends the allowed tools to room backgrounds, avatar frames, banners, gift images, resources and VAP. The migration copies existing events and counters exactly, preserves metadata, suggestions and rate-limit rows, and restores the atomic counter trigger; it does not reset totals or infer unrecorded historical usage. Apply migrations locally first. Production migration and deployment remain explicit release actions; after authorization, run `wrangler d1 migrations apply fun-toolkit-production --remote` before deploying the new code.
 
+Shared VAP review templates require `migrations/0003_vap_review_templates.sql` before publishing. The migration adds a separate table for public template names, preview settings, and optional WebP room backgrounds. Video files stay in the browser.
+
+The reusable room background library requires `migrations/0004_vap_review_backgrounds.sql`. It adds a separate table for public background names and WebP images. New templates can reference that library, and templates with an embedded background remain readable.
+
 Suggestions have no public list API. The owner can read them through their authenticated Cloudflare dashboard or CLI:
 
 ```sh

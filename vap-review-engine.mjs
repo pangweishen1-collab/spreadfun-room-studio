@@ -1,4 +1,4 @@
-import {avcCodec, inspectVideo} from './vap-engine.mjs?v=20261110-custom-plate';
+import {avcCodec, inspectVideo} from './vap-engine.mjs?v=20261110-review-preview-perf';
 import {applyVerticalMask, keyPixels, normalizeVerticalMask} from './vap-matte.mjs';
 import {readSourceVapConfig} from './vap-protocol.mjs';
 import {createVapUnpacker} from './vap-resources.mjs';
@@ -105,8 +105,10 @@ function matteOptions(clip, key) {
   };
 }
 
-function paintGift(gift, source, clip, settings, rect, room) {
-  const {w, h} = rect;
+function paintGift(gift, source, clip, settings, rect, room, pixelScale, frameTime) {
+  const w = Math.max(1, Math.round(rect.w * pixelScale)), h = Math.max(1, Math.round(rect.h * pixelScale));
+  const options = clip.config ? null : matteOptions(clip, settings.key);
+  const readback = options !== null && options.matteMethod !== 'opaque';
   if (!gift.surface || gift.surface.canvas.width !== w || gift.surface.canvas.height !== h || gift.config !== clip.config) {
     gift.unpacker?.dispose();
     if (gift.surface) gift.surface.canvas.width = gift.surface.canvas.height = 1;
@@ -114,37 +116,63 @@ function paintGift(gift, source, clip, settings, rect, room) {
     gift.config = clip.config;
     gift.unpacker = clip.config ? createVapUnpacker({width: w, height: h, sourceVapConfig: clip.config}) : null;
     gift.workspace = {};
+    gift.frameTime = undefined;
   }
   const {canvas, ctx} = gift.surface;
-  if (gift.unpacker) {
-    ctx.putImageData(gift.unpacker.process(source), 0, 0);
-  } else {
-    ctx.clearRect(0, 0, w, h);
-    ctx.drawImage(source, 0, 0, w, h);
-    const options = matteOptions(clip, settings.key);
-    if (options.matteMethod !== 'opaque') {
-      const frame = ctx.getImageData(0, 0, w, h);
-      frame.data.set(keyPixels(frame.data, w, h, options, gift.workspace));
-      ctx.putImageData(frame, 0, 0);
+  const cacheFrame = frameTime !== undefined;
+  if (!cacheFrame || frameTime !== gift.frameTime || source !== gift.source || settings.key !== gift.key) {
+    if (gift.unpacker) {
+      ctx.putImageData(gift.unpacker.process(source), 0, 0);
+    } else {
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(source, 0, 0, w, h);
+      if (readback) {
+        const frame = ctx.getImageData(0, 0, w, h);
+        frame.data.set(keyPixels(frame.data, w, h, options, gift.workspace));
+        ctx.putImageData(frame, 0, 0);
+      }
     }
+    gift.frameTime = frameTime;
+    gift.source = cacheFrame ? source : null;
+    gift.key = settings.key;
+    gift.compositeKey = null;
   }
-  if (settings.mask.enabled) {
-    const maskKey = room.h + ':' + JSON.stringify(settings.mask);
-    if (maskKey !== gift.maskKey) {
-      gift.mask ||= surface(1, room.h);
-      gift.mask.canvas.height = room.h;
-      const alpha = new Uint8ClampedArray(4 * room.h);
-      for (let y = 0; y < room.h; y++) alpha[y * 4 + 3] = 255;
-      gift.mask.ctx.putImageData(new ImageData(applyVerticalMask(alpha, 1, room.h, settings.mask), 1, room.h), 0, 0);
-      gift.maskKey = maskKey;
+  if (!settings.mask.enabled) return canvas;
+  const maskKey = room.h + ':' + JSON.stringify(settings.mask);
+  if (maskKey !== gift.maskKey) {
+    gift.mask ||= surface(1, room.h);
+    gift.mask.canvas.height = room.h;
+    const alpha = new Uint8ClampedArray(4 * room.h);
+    for (let y = 0; y < room.h; y++) alpha[y * 4 + 3] = 255;
+    gift.mask.ctx.putImageData(new ImageData(applyVerticalMask(alpha, 1, room.h, settings.mask), 1, room.h), 0, 0);
+    gift.maskKey = maskKey;
+  }
+  let composite = gift.surface;
+  if (cacheFrame) {
+    // Keep the paused, keyed source intact while the editor moves the room mask over it.
+    const compositeKey = maskKey + ':' + rect.y + ':' + rect.h;
+    if (compositeKey === gift.compositeKey) return gift.composite.canvas;
+    if (!gift.composite || gift.composite.canvas.width !== w || gift.composite.canvas.height !== h) {
+      if (gift.composite) gift.composite.canvas.width = gift.composite.canvas.height = 1;
+      gift.composite = surface(w, h);
     }
-    ctx.save();
-    ctx.globalCompositeOperation = 'destination-in';
-    // Translate the room-space mask into this video's local surface.
-    ctx.drawImage(gift.mask.canvas, 0, room.y - rect.y, w, room.h);
-    ctx.restore();
+    composite = gift.composite;
+    composite.ctx.clearRect(0, 0, w, h);
+    composite.ctx.drawImage(canvas, 0, 0);
+    gift.compositeKey = compositeKey;
   }
-  return canvas;
+  composite.ctx.save();
+  composite.ctx.globalCompositeOperation = 'destination-in';
+  // Translate the room-space mask into the local preview or export surface.
+  const heightRatio = h / rect.h;
+  composite.ctx.drawImage(gift.mask.canvas, 0, (room.y - rect.y) * heightRatio, w, room.h * heightRatio);
+  composite.ctx.restore();
+  return composite.canvas;
+}
+
+function disposeGift(gift) {
+  gift.unpacker?.dispose();
+  for (const item of [gift.surface, gift.mask, gift.composite]) if (item) item.canvas.width = item.canvas.height = 1;
 }
 
 export function createReviewRenderer(canvas, layout) {
@@ -154,7 +182,15 @@ export function createReviewRenderer(canvas, layout) {
   if (!ctx) throw new Error('Canvas 2D unavailable');
   ctx.imageSmoothingQuality = 'high';
   return {
-    draw({background, clips, settings, sources, labels, showEmptyRooms = true}) {
+    draw({background, clips, settings, sources, labels, showEmptyRooms = true, pixelScale = 1, frameTimes = []}) {
+      const width = Math.max(1, Math.round(layout.width * pixelScale));
+      const height = Math.max(1, Math.round(layout.height * pixelScale));
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+        ctx.setTransform(width / layout.width, 0, 0, height / layout.height, 0, 0);
+        ctx.imageSmoothingQuality = 'high';
+      }
       ctx.fillStyle = '#111b2b'; ctx.fillRect(0, 0, layout.width, layout.height);
       for (const [index, tile] of layout.tiles.entries()) {
         const {x, y, w, h, label} = tile;
@@ -162,26 +198,28 @@ export function createReviewRenderer(canvas, layout) {
         ctx.font = '600 ' + Math.round(label * .43) + 'px system-ui, sans-serif';
         ctx.textBaseline = 'middle'; ctx.fillStyle = '#f1f6ff';
         ctx.fillText(labels[index], x + label * .38, y + label / 2, w - label * .76);
-        if (!clips[index] && !showEmptyRooms) continue;
+        const clip = clips[index];
+        if (!clip && gifts[index].surface) {
+          disposeGift(gifts[index]);
+          gifts[index] = {};
+        }
+        if (!clip && !showEmptyRooms) continue;
         const room = {...tile, y: y + label};
         ctx.save();
         ctx.beginPath(); ctx.rect(room.x, room.y, w, h); ctx.clip();
         if (background) cover(ctx, background, room);
         else {ctx.fillStyle = '#17243a'; ctx.fillRect(room.x, room.y, w, h);}
-        if (sources[index] && clips[index]) {
+        if (sources[index] && clip) {
           const {scale, offsetY} = settings[index];
-          const rect = giftRect(room, clips[index].width, clips[index].height, scale, offsetY);
-          const frame = paintGift(gifts[index], sources[index], clips[index], settings[index], rect, room);
-          ctx.drawImage(frame, rect.x, rect.y);
+          const rect = giftRect(room, clip.width, clip.height, scale, offsetY);
+          const frame = paintGift(gifts[index], sources[index], clip, settings[index], rect, room, pixelScale, frameTimes[index]);
+          ctx.drawImage(frame, rect.x, rect.y, rect.w, rect.h);
         }
         ctx.restore();
       }
     },
     dispose() {
-      for (const gift of gifts) {
-        gift.unpacker?.dispose();
-        for (const item of [gift.surface, gift.mask]) if (item) item.canvas.width = item.canvas.height = 1;
-      }
+      for (const gift of gifts) disposeGift(gift);
       canvas.width = canvas.height = 1;
     },
   };
