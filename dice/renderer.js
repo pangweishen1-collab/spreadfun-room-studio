@@ -1,6 +1,7 @@
 import { VIDEO_AVC_CODECS, VIDEO_ROUND_SECONDS, VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { CanvasSpineRenderer } from './six-face/canvas-spine.mjs';
 import { removeOuterStroke } from './six-face/outer-stroke.mjs';
+import { PLAN02_FIRST_NUMBERED_FRAME } from './purple-reference/presentation.mjs';
 
 const loadImage = src => new Promise((resolve, reject) => {
   const image = new Image();
@@ -35,14 +36,18 @@ const PURPLE_REFERENCE_PRESENTATION_SCALE = 1.2;
 const REFERENCE_GRID_SCALE = .86 * PURPLE_REFERENCE_PRESENTATION_SCALE;
 const GRID_X = [198, 363, 529];
 const GRID_Y = [1600 - 720, 1600 - 903];
+const PLAN02_GRID_X = [181, 360, 539];
+const PLAN02_TRAY_LEFT = 95;
+const PLAN02_TRAY_RIGHT = 625;
+const PLAN02_SHARED_UNTIL = Math.fround(PLAN02_FIRST_NUMBERED_FRAME / 60);
 const GRID_GAP = 8;
 const CELL_HALF_WIDTH = (Math.min(GRID_X[1] - GRID_X[0], GRID_X[2] - GRID_X[1]) - GRID_GAP) / 2;
 const CELL_HALF_HEIGHT = (GRID_Y[0] - GRID_Y[1] - GRID_GAP) / 2;
 const GRID_FIT_SAMPLE_RATE = 120;
 const GRID_FIT_MAX_STEP = .028;
 
-function gridCellFit(skeleton, centerX, centerY, vertices, sizeScale) {
-  let horizontal = 0, vertical = 0;
+function gridBounds(skeleton, centerX, centerY, vertices) {
+  let left = 0, right = 0, bottom = 0, top = 0;
   for (const slot of skeleton.drawOrder) {
     const attachment = slot.getAttachment();
     if (!slot.bone.active || !attachment?.region || slot.color.a * attachment.color.a === 0) continue;
@@ -50,12 +55,25 @@ function gridCellFit(skeleton, centerX, centerY, vertices, sizeScale) {
     if (attachment.worldVerticesLength) attachment.computeWorldVertices(slot, 0, count, vertices, 0, 2);
     else attachment.computeWorldVertices(slot, vertices, 0, 2);
     for (let i = 0; i < count; i += 2) {
-      horizontal = Math.max(horizontal, Math.abs(vertices[i] - centerX));
-      vertical = Math.max(vertical, Math.abs(vertices[i + 1] - centerY));
+      left = Math.min(left, vertices[i] - centerX);
+      right = Math.max(right, vertices[i] - centerX);
+      bottom = Math.min(bottom, vertices[i + 1] - centerY);
+      top = Math.max(top, vertices[i + 1] - centerY);
     }
   }
-  // Fit in the same proportion as the die so the cap cannot undo its size change.
-  return Math.min(1, CELL_HALF_WIDTH * sizeScale / horizontal, CELL_HALF_HEIGHT * sizeScale / vertical);
+  return {left, right, bottom, top};
+}
+
+function gridCellFit({left, right, bottom, top}, sizeScale, sharedPose) {
+  if (sharedPose) {
+    // All six dice toss in sync. Their common offset cannot close the gap.
+    const width = PLAN02_GRID_X[1] - PLAN02_GRID_X[0] - GRID_GAP;
+    const height = GRID_Y[0] - GRID_Y[1] - GRID_GAP;
+    return Math.min(1, width / (right - left), height / (top - bottom));
+  }
+  return Math.min(1,
+    CELL_HALF_WIDTH * sizeScale / Math.max(-left, right),
+    CELL_HALF_HEIGHT * sizeScale / Math.max(-bottom, top));
 }
 
 function plan02GridLimits(data, sizeScale) {
@@ -73,7 +91,8 @@ function plan02GridLimits(data, sizeScale) {
       skeleton.scaleX = skeleton.scaleY = REFERENCE_GRID_SCALE;
       animation.apply(skeleton, -1, time, false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
       skeleton.updateWorldTransform(spine.Physics.update);
-      limits[frame]=Math.min(limits[frame],gridCellFit(skeleton,0,0,vertices,sizeScale));
+      const bounds = gridBounds(skeleton, 0, 0, vertices);
+      limits[frame] = Math.min(limits[frame], gridCellFit(bounds, sizeScale, time < PLAN02_SHARED_UNTIL));
     }
   }
   for(let i=1;i<=frames;i++)limits[i]=Math.min(limits[i],limits[i-1]+GRID_FIT_MAX_STEP);
@@ -374,14 +393,18 @@ export class GameRenderer {
     // Spine attachment keys are Float32 in the package. Match their precision
     // before sampling so a boundary frame uses the same image in preview.
     const animationTime = reference ? Math.fround(time) : time;
+    const plan02 = all && reference && this.candidate.purpleVariant === '02';
+    const gridX = plan02 ? PLAN02_GRID_X : GRID_X;
+    const sharedPose = plan02 && animationTime < PLAN02_SHARED_UNTIL;
     const presentationGain = this.candidate.template === 'purple' ? PURPLE_PRESENTATION_SCALE : 1;
     const count = all ? 6 : 1;
     const sizeScale = this.sizeScale ?? 1;
     let gridFit = all ? gridLimitAt(this.gridLimits,animationTime) : 1;
+    let sharedBounds;
     for (let index = 0; index < count; index++) {
       const skeleton = this.skeletons[index];
       const point = all ? index + 1 : selected;
-      const centerX = all ? GRID_X[index % 3] : 363;
+      const centerX = all ? gridX[index % 3] : 363;
       const centerY = all ? GRID_Y[Math.floor(index / 3)] : 1600 - 810;
       skeleton.setToSetupPose();
       const animation = this.data.findAnimation('spin_' + point);
@@ -400,16 +423,26 @@ export class GameRenderer {
       } else skeleton.scaleX = skeleton.scaleY = (all ? 0.9 : 1.6) * presentationGain;
       skeleton.updateWorldTransform(spine.Physics.update);
       // The live bound also covers unsampled attachment switches between keys.
-      if (all) gridFit = Math.min(gridFit, gridCellFit(skeleton, centerX, centerY, this.gridVertices, sizeScale));
+      if (all) {
+        const bounds = gridBounds(skeleton, centerX, centerY, this.gridVertices);
+        gridFit = Math.min(gridFit, gridCellFit(bounds, sizeScale, sharedPose));
+        if (sharedPose && index === 0) sharedBounds = bounds;
+      }
     }
 
+    let gridShiftX = 0;
+    if (sharedBounds) {
+      const left = gridX[0] + sharedBounds.left * gridFit;
+      const right = gridX[2] + sharedBounds.right * gridFit;
+      gridShiftX = Math.max(PLAN02_TRAY_LEFT - left, Math.min(0, PLAN02_TRAY_RIGHT - right));
+    }
     if (gpu) this.scene.begin();
     for (let index = 0; index < count; index++) {
       const skeleton = this.skeletons[index];
       // Apply one fit to the whole grid, around each cell's visual center.
-      if (gridFit < 1) {
-        const centerX = GRID_X[index % 3], centerY = GRID_Y[Math.floor(index / 3)];
-        skeleton.x = centerX + (skeleton.x - centerX) * gridFit;
+      if (gridFit < 1 || gridShiftX) {
+        const centerX = gridX[index % 3], centerY = GRID_Y[Math.floor(index / 3)];
+        skeleton.x = centerX + (skeleton.x - centerX) * gridFit + gridShiftX;
         skeleton.y = centerY + (skeleton.y - centerY) * gridFit;
         skeleton.scaleX *= gridFit;
         skeleton.scaleY *= gridFit;

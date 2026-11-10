@@ -2,9 +2,9 @@ import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
 import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { DiceAudio } from './audio.mjs';
-import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261110-dice-scale95';
-import { GameRenderer } from '/dice/renderer.js?v=20261110-dice-scale95';
-import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261110-purple-default02';
+import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261110-dice-balanced-size';
+import { GameRenderer } from '/dice/renderer.js?v=20261110-dice-balanced-size';
+import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261110-dice-balanced-size';
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
@@ -38,6 +38,10 @@ function settingsDirty() {
   if (!session) return false;
   const values = settings();
   return Object.keys(values).some(key => values[key] !== session[key]);
+}
+function hasRuntimeBundle() {
+  return session?.grade === 'purple' && session?.candidate?.kind === 'purple-reference'
+    && session.candidate.purpleVariant === '02';
 }
 function currentVideo(video = session?.video) {
   const {profile, maxBytes, duration, fps, frameCount, width, height} = VIDEO_SPEC;
@@ -114,7 +118,7 @@ function render() {
   document.querySelector('.preview-card').dataset.hasCanvas = String(hasCanvas);
   $('preview-empty').setAttribute('aria-busy', String(locked));
   $('preview-empty').setAttribute('aria-disabled', String(locked));
-  ['choose-files','choose-folder','choose-purple-files','choose-purple-folder','choose-preview-files','choose-preview-folder','choose-preview-purple-files','choose-preview-purple-folder','res-file-input','res-folder-input'].forEach(id => { $(id).disabled = locked; });
+  ['choose-files','choose-purple-files','choose-preview-files','choose-preview-purple-files','res-file-input','res-folder-input'].forEach(id => { $(id).disabled = locked; });
   $('upload-zone').hidden = !hasCanvas;
   $('background-field').hidden = !session;
   $('purple-variant-field').hidden = session?.grade !== 'purple';
@@ -145,6 +149,9 @@ function render() {
   $('export-video').disabled = locked || !usable || (!clip && (!ready || !session?.videoAvailable));
   $('export-video').querySelector('span').textContent = t(clip ? 'downloadExistingVideo' : 'exportVideo');
   $('download-bundle').disabled = locked || !usable;
+  const runtimeBundle = $('download-runtime-bundle');
+  runtimeBundle.hidden = !hasRuntimeBundle();
+  runtimeBundle.disabled = runtimeBundle.hidden || locked || !usable;
   $('reload-preview').hidden = !session || (previewReady && currentError?.status !== 409);
   $('reload-preview').disabled = locked;
   $('activity-status').hidden = !activity;
@@ -266,6 +273,13 @@ function settingsChanged() {
   currentError = null; render();
   if (session && !pending.size && settingsDirty()) return run(null, saveSettings);
 }
+async function downloadBundle(runtimeOnly = false) {
+  if (!session || pending.size || settingsDirty() || (runtimeOnly && !hasRuntimeBundle())) return;
+  const suffix = runtimeOnly ? '/runtime' : '';
+  const result = await api(`/api/preview/${session.id}/bundle${suffix}`);
+  download(result.url, '.zip', result.name);
+  toast('downloadStarted');
+}
 async function exportVideo() {
   if (!session || settingsDirty() || pending.size) return;
   const clip = currentVideo();
@@ -288,7 +302,7 @@ async function exportVideo() {
 function bindUploads() {
   bindDiceUploads({primaryZone:$('preview-empty'), replacementZone:$('upload-zone'),
     primaryButtons:[$('choose-preview-files'),$('choose-preview-purple-files')], replacementButtons:[$('choose-files'),$('choose-purple-files')], input:$('res-file-input'),
-    folderInput:$('res-folder-input'), primaryFolderButtons:[$('choose-preview-folder'),$('choose-preview-purple-folder')], replacementFolderButtons:[$('choose-folder'),$('choose-purple-folder')],
+    folderInput:$('res-folder-input'),
     onTarget:(event) => selectUploadGrade(event?.target?.closest?.('[data-upload-grade]')?.dataset.uploadGrade || document.activeElement?.closest?.('[data-upload-grade]')?.dataset.uploadGrade || uploadGrade || session?.grade),
     onDirectory:provider => run('readingFiles',async()=>{
       const files=await provider();
@@ -381,7 +395,8 @@ $('clear-pending').addEventListener('click', () => { if (busy) return; releasePe
 $('reload-preview').addEventListener('click', () => run('loadingPreview', async () => { if (session) await loadSession(await api('/api/preview/' + session.id)); }));
 $('game-canvas').addEventListener('click', () => { if (!busy && previewReady && !pending.size && !settingsDirty()) { void audio.unlock().catch(()=>{}); renderer.play(); } });
 $('export-video').addEventListener('click', () => run('recording', exportVideo));
-$('download-bundle').addEventListener('click', () => run('bundling', async () => { if (!session || pending.size || settingsDirty()) return; const result=await api(`/api/preview/${session.id}/bundle`); download(result.url,'.zip',result.name); toast('downloadStarted'); }));
+$('download-bundle').addEventListener('click', () => run('bundling', downloadBundle));
+$('download-runtime-bundle').addEventListener('click', () => run('bundling', () => downloadBundle(true)));
 document.addEventListener('visibilitychange',()=>{if(document.hidden)audio.stop();});
 window.addEventListener('beforeunload', () => { audio.dispose(); releasePending(); renderer?.pause(); });
 embedded = connectEmbedded(renderer, {onFiles:importFiles, isBusy:() => busy});

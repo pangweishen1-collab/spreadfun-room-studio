@@ -419,6 +419,20 @@ const changedZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(changed
 const changedBinary=await changedZip.file(`${changedPackage.name}/${changedPackage.name}.skel`).async('uint8array');
 assert.deepEqual(changedBinary,new Uint8Array(await urlBlobs.get(changedReference.candidate.skel).arrayBuffer()));
 assert.notDeepEqual(changedBinary,new Uint8Array(await referenceBinary.arrayBuffer()));
+const runtimePackage=await referenceAdapter.api(path+'/bundle/runtime');
+assert.equal(runtimePackage.name,changedPackage.name+'-runtime');
+assert.notEqual(runtimePackage.url,changedPackage.url);
+const runtimeZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(runtimePackage.url).arrayBuffer()),{checkCRC32:true});
+const root=changedPackage.name+'/';
+const runtimePaths=[changedPackage.name+'.skel',changedPackage.name+'.atlas',changedPackage.name+'.png',
+  'res/icon.png','sound/dice_roll.mp3','sound/sound_ui_dice6.mp3'].map(name=>root+name).sort();
+assert.deepEqual(Object.keys(runtimeZip.files).filter(name=>!runtimeZip.files[name].dir).sort(),runtimePaths);
+for (const name of runtimePaths) {
+  assert.deepEqual(await runtimeZip.file(name).async('uint8array'),await changedZip.file(name).async('uint8array'));
+}
+assert.ok(changedZip.file(root+'res/sz_1.png'));
+checks.push('purple02_runtime_zip_keeps_same_spine_and_audio_and_original_hero_without_duplicate_faces');
+
 const withBackground=await referenceAdapter.api(path+'/settings',{method:'POST',body:{expectedRevision:3,previewGrade:'purple'}});
 assert.equal(referenceBuilds,2);
 assert.equal(withBackground.purpleVariant,'02');
@@ -434,6 +448,7 @@ assert.equal((await referenceStorage.get(outdated.id)).runtime.metadata.motionVe
 const returnedReference=await referenceAdapter.api(path+'/settings',{method:'POST',body:{expectedRevision:5,purpleVariant:'05'}});
 assert.equal(returnedReference.purpleVariant,'05');
 assert.equal(referenceBuilds,4);
+await rejects(()=>referenceAdapter.api(path+'/bundle/runtime'));
 referenceAdapter.dispose();
 checks.push('purple_variant_switch_rebuilds_the_baked_assets_and_exports_reject_stale_videos_while_background_changes_reuse_the_bake');
 

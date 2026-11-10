@@ -45,6 +45,7 @@
 .button.text { background: var(--color-transparent); border-color: var(--color-transparent); color: var(--color-secondary); }
 .button:disabled, .button[aria-disabled='true'] { cursor: not-allowed; color: var(--ft-color-disabled-text); border-color: var(--ft-color-disabled-border); background: var(--ft-color-disabled-surface); box-shadow: none; }
 .asset-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 8px; margin-top: 20px; }
+.ft-ui .asset-disclosure { border-top: 0; }
 .asset-disclosure .asset-grid { margin-top: 12px; }
 .asset-slot { display: flex; flex-direction: column; align-items: stretch; gap: 4px; min-width: 0; padding: 6px; border: 1px solid var(--color-rule); border-radius: var(--ft-radius-inner); background: var(--color-surface); color: var(--color-ink); text-align: left; }
 .asset-slot.missing { border-style: dashed; color: var(--color-muted); }
@@ -234,7 +235,7 @@ html.embedded .page-shell { flex:none; }
   border-radius: var(--ft-radius-inner); text-align: left;
 }
 #upload-zone .upload-actions { display: flex; width: auto; justify-content: flex-start; }
-#upload-zone .upload-actions .button { width: auto; padding-inline: 10px; font-size: 12px; }
+#upload-zone .upload-actions .button { width: 100%; padding-inline: 10px; font-size: 12px; }
 @media (max-width: 900px) {
   .ft-ui .preview-card[data-has-canvas='false'] .preview-stage { height: 480px; }
 }
@@ -267,13 +268,13 @@ html.embedded .page-shell { flex:none; }
 .upload-grade-card h3 { display:flex; align-items:center; gap:8px; font-size:15px; }
 .upload-motion { color:var(--color-secondary); font-size:12px; line-height:20px; }
 .upload-assets-hint { min-block-size:2lh; }
-.preview-upload-actions { display:flex; flex-direction:column; width:100%; max-width:168px; gap:8px; }
-.preview-upload-actions .button { min-height:44px; padding-inline:8px; }
+.preview-upload-actions { width:100%; max-width:168px; }
+.preview-upload-actions .button { width:100%; min-height:44px; padding-inline:8px; }
 .ft-ui #upload-zone.upload-replace-zone { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:0; border:0; background:transparent; }
 .replacement-grade-card { min-width:0; padding:12px 8px; border:1px solid var(--color-rule); border-radius:var(--ft-radius-input); }
 .replacement-grade-label { display:flex; align-items:center; justify-content:center; gap:6px; color:var(--color-secondary); font-size:12px; }
-.replacement-grade-card .upload-actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
-.replacement-grade-card .button { flex:1 1 48px; min-height:44px; padding:8px; font-size:12px; }
+.replacement-grade-card .upload-actions { margin-top:8px; }
+.replacement-grade-card .button { min-height:44px; padding:8px; font-size:12px; }
 .grade-field { margin:20px 0 0; }
 @media (max-width:540px) {
  .ft-ui .preview-empty { padding:8px; gap:8px; }

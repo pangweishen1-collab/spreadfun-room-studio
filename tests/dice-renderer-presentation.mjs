@@ -159,13 +159,14 @@ retained.candidate={...retained.candidate,kind:'template'};retained.playing=true
 
 // A wide rolling frame cannot overlap a neighboring grid cell. A narrower
 // result and a single-die preview retain their usual scale.
-let halfWidth = 120;
+let halfWidth = 120, sharedOffset = 0;
 const painted = [];
 for (const skeleton of retained.skeletons) {
   const attachment = {region: {}, color: {a: 1}, computeWorldVertices(_slot, vertices) {
     const width = halfWidth * skeleton.scaleX;
-    vertices[0] = vertices[2] = skeleton.x - width;
-    vertices[4] = vertices[6] = skeleton.x + width;
+    const center = skeleton.x + sharedOffset * skeleton.scaleX;
+    vertices[0] = vertices[2] = center - width;
+    vertices[4] = vertices[6] = center + width;
     vertices[1] = vertices[3] = vertices[5] = vertices[7] = skeleton.y;
   }};
   skeleton.drawOrder = [{bone: {active: true}, color: {a: 1}, getAttachment: () => attachment}];
@@ -207,4 +208,19 @@ retained.mode = 'single';
 painted.length = 0;
 retained.draw(.275);
 assert.ok(Math.abs(painted[0].scale - 1.8) < 1e-10);
-console.log(JSON.stringify({passed: true, checks: ['preload/cache', 'no pending blank frame', 'playback continuity', 'no runtime reload', 'identity/revision commit', 'centered title', 'subtitle removed', 'latest update wins', 'asset mismatch', 'recording guard', 'clear/full-load races', 'failure/retry', 'native green/purple context loss retains six-face Canvas fallback', 'larger purple presentation stays within its grid cells']}));
+// 02 B rolls all six identical poses in sync. A shared offset must not
+// shrink their visible width, and the outer faces still fit the tray.
+retained.candidate.purpleVariant = '02';
+retained.mode = 'all';
+painted.length = 0;
+retained.draw(.3);
+const centeredWidth = painted[0].right - painted[0].left;
+sharedOffset = 20;
+painted.length = 0;
+retained.draw(.3);
+assert.ok(centeredWidth > 157, 'The roll uses the available tray width');
+assert.ok(Math.abs(painted[0].right - painted[0].left - centeredWidth) < 1e-9);
+assert.ok(painted[0].left >= 95 - 1e-9 && painted[2].right <= 625 + 1e-9);
+assert.ok(painted[1].left - painted[0].right >= 7.999);
+assert.ok(painted[2].left - painted[1].right >= 7.999);
+console.log(JSON.stringify({passed: true, checks: ['preload/cache', 'no pending blank frame', 'playback continuity', 'no runtime reload', 'identity/revision commit', 'centered title', 'subtitle removed', 'latest update wins', 'asset mismatch', 'recording guard', 'clear/full-load races', 'failure/retry', 'native green/purple context loss retains six-face Canvas fallback', 'larger purple presentation stays within its grid cells', '02 B keeps shared translation from shrinking its dice']}));

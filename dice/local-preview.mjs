@@ -4,7 +4,7 @@ import {generateSixFaceRuntime} from './six-face/runtime.mjs';
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
-import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261110-dice-scale95';
+import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261110-dice-balanced-size';
 import {optimizeAtlasPng} from './atlas-png-optimizer.mjs';
 export {DEFAULT_PURPLE_VARIANT};
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
@@ -531,13 +531,18 @@ export function createLocalPreview(dependencies={}) {
     await storage.put({...record,video:stored},{revision,candidateId:record.candidateId});
     return publicSession({...record,video:stored}).video;
   }
-  async function bundle(id) {
-    const record=await read(id),zip=await (dependencies.zipFactory||zipFactory)();
+  async function bundle(id, runtimeOnly = false) {
+    const record = await read(id);
+    if (runtimeOnly && (record.grade !== 'purple' || settingValue(record,'purpleVariant') !== '02' || !referenceRuntime(record.runtime))) {
+      throw new PreviewError('精简包仅适用于紫色 02 双轴抛转');
+    }
+    const zip=await (dependencies.zipFactory||zipFactory)();
     const name=resourceName(record.name,record.grade);
     const add=(path,content)=>zip.file(name+'/'+path,content);
-    // Only game runtime files, canonical source PNGs and the two audio files.
-    for(const file of record.files)if(file.slot!=='anchor')
-      add('res/'+(file.slot==='大骰子'?'icon':file.slot)+'.png',file.blob);
+    for (const file of record.files) {
+      if (file.slot === '大骰子') add('res/icon.png',file.blob);
+      else if (!runtimeOnly && file.slot !== 'anchor') add('res/'+file.slot+'.png',file.blob);
+    }
     let skeleton;
     if(referenceRuntime(record.runtime)){
       skeleton=record.runtime.skel;
@@ -563,13 +568,17 @@ export function createLocalPreview(dependencies={}) {
     const blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}}),latest=await read(id);
     if(latest.revision!==record.revision||latest.candidateId!==record.candidateId)
       throw new PreviewError('打包期间预览已更新，请重新打包',409);
-    return {name,url:url(id+'/bundle/compact-v1/'+record.revision,blob)};
+    const format = runtimeOnly ? 'runtime-v1' : 'compact-v1';
+    return {name:runtimeOnly ? name+'-runtime' : name,url:url(id+'/bundle/'+format+'/'+record.revision,blob)};
   }
   async function api(path,options={}) {
     const method=(options.method||'GET').toUpperCase();
     let match;
     if(method==='POST'&&(match=/^\/api\/preview\/([a-f0-9]{32})\/video$/.exec(path)))return video(match[1],options);
-    if(method==='GET'&&(match=/^\/api\/preview\/([a-f0-9]{32})(\/bundle)?$/.exec(path)))return match[2]?bundle(match[1]):publicSession(await read(match[1]));
+    if (method === 'GET' && (match = /^\/api\/preview\/([a-f0-9]{32})(\/bundle(?:\/runtime)?)?$/.exec(path))) {
+      if (match[2]) return bundle(match[1], match[2] === '/bundle/runtime');
+      return publicSession(await read(match[1]));
+    }
     if(method==='POST') {
       let payload;try{payload=typeof options.body==='string'?JSON.parse(options.body):options.body;}catch{throw new PreviewError('请求内容需要是对象');}
       if(path==='/api/preview/import')return importSession(payload,options);

@@ -2,12 +2,12 @@ import {DICE_SIZE_SCALE} from '../presentation-scale.mjs';
 import {decodeFaceFiles} from '../six-face/import-faces.mjs';
 import {writeSpineBinary} from '../six-face/spine-binary.mjs';
 import {motionAt, exposureSamples, MOTION} from './motion.mjs';
-import {settlingGain} from './presentation.mjs';
+import {PLAN02_FIRST_NUMBERED_FRAME, PLAN02_FRONT_AT, settlingGain} from './presentation.mjs';
 import {Proxy3DRenderer} from './proxy-3d.mjs';
 import {encodeAtlasPng} from './atlas-png.mjs';
 
 export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-v9-settle-face';
-export const PURPLE_PLAN_02_MOTION_VERSION='purple02-reference-v10-compact-aligned';
+export const PURPLE_PLAN_02_MOTION_VERSION='purple02-reference-v12-balanced-size';
 export const DEFAULT_PURPLE_VARIANT='02';
 const motions = new Map([['01', 'A'], ['02', 'B'], ['05', 'E']]);
 const atlasPage = 'dice.png';
@@ -21,8 +21,8 @@ const frontAt = (lastRollFrame + 1) / fps;
 // Preserve the review page's two unsnapped times in Spine. The numbered
 // frames between them use the result image instead of another material pass.
 const plan02 = Object.freeze({
-  pointAt:.47, flatAt:MOTION.rollEnd,
-  firstPointFrame:Math.ceil(.47 * fps), handoffFrame:Math.ceil(MOTION.rollEnd * fps),
+  pointAt:PLAN02_FRONT_AT, flatAt:MOTION.rollEnd,
+  firstPointFrame:PLAN02_FIRST_NUMBERED_FRAME, handoffFrame:Math.ceil(MOTION.rollEnd * fps),
   narrowShutterAt:.4, singleExposureAt:.45,
   zoomPeakAt:MOTION.zoomPeakAt, settledScale:settlingGain(MOTION.landAt),
 });
@@ -245,6 +245,12 @@ function skeletonData(regions, motion, usePlan02, panda, landing) {
     const value = motionAt(motion, time).zoom * settlingGain(time);
     return {time, x: value, y: value};
   });
+  const bodyScale = usePlan02 ? scale.map(key => {
+    // Match the opening to the landed die, then ease into the authored zoom.
+    const progress = Math.max(0, 1 - key.time / .18);
+    const gain = 1 + .15 * progress * progress * (3 - 2 * progress);
+    return {...key, x: key.x * gain, y: key.y * gain};
+  }) : scale;
   const translate = keys.map(time => {
     const [x, y] = motionAt(motion, time).offset;
     return {time, x, y: -y};
@@ -264,7 +270,7 @@ function skeletonData(regions, motion, usePlan02, panda, landing) {
         body: usePlan02?{attachment:[{time:0,name:null},{time:plan02.flatAt,name:result}]}:{attachment:[{time:0,name:result}],rgba:resultFade},
         shadow: {attachment: [{time: 0, name: 'shadow'}, {time: MOTION.rollEnd, name: null}]},
       },
-      bones: {body: {scale, translate}, shadow: {scale}},
+      bones: {body: {scale: bodyScale, translate}, shadow: {scale}},
       events: [{time: 0, name: 'dice_roll'}, ...(point === 6 ? [{time: MOTION.landAt, name: 'sound_ui_dice6'}] : [])],
     };
     animations['standby_' + point] = {
@@ -348,7 +354,9 @@ async function compactExposures(frames, factor, signal, plan02Motion) {
       checkAbort(signal);
       // Motion blur hides fine detail in the fast middle of the roll.
       const fast=frame.time>=.12&&frame.time<=.42;
-      const scale=factor*(fast?(plan02Motion ? .46 : .52):.65);
+      const clearPose = frame.time <= .05 || frame.time >= plan02.singleExposureAt;
+      const resolution = plan02Motion && !clearPose ? (fast ? .37 : .52) : (fast ? .52 : .65);
+      const scale = factor * resolution;
       const {w, h, pixels} = frame;
       source.width = w;
       source.height = h;
