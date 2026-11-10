@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.18.3 - 2026-11-10
+
+### VAP converter and room review
+
+- Export VAP videos at a constant 24 FPS, with a full duration for every video frame.
+- Apply a one-second fade at the start and end of each review clip in both preview and exported MP4s. Fit the fades to shorter clips and reuse fades already declared by VAP sources.
+
 ## 1.18.2 - 2026-11-10
 
 ### VAP room gift review
