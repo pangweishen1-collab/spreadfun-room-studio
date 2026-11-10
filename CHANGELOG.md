@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.17.0 - 2026-11-10
+
+### VAP room gift review
+
+- Review up to six gift videos side by side over the default Hapi Ludo room or a custom background. Each slot accepts its own MP4, and local templates retain the layout and settings.
+- Move each video vertically under a room-anchored feather mask. The percentage handles adjust the mask independently, and the preview and export use the same coordinates.
+- Export one silent 30 FPS H.264 MP4. The longest clip sets the duration, and shorter slots return to the room background as they end.
+
 ## 1.16.0 - 2026-11-10
 
 ### Custom avatar frames
