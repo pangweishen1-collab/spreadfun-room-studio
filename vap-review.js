@@ -350,11 +350,13 @@ function draw() {
   const sources = clips.map(clip => clip && clip.video.readyState >= 2 && state.time < clip.duration ? clip.video : null);
   const pixelScale = state.running ? Math.min(1, (previewWidth || previewLayout.width) / previewLayout.width,
     playbackTileWidth / previewLayout.tiles[0].w) : 1;
+  const fps = state.engine.REVIEW_FPS;
   try {
     state.renderer.draw({
       background: state.backgroundImage, clips,
       settings: slots.map(slot => slot.settings), labels: slots.map((_, index) => label(index)),
       sources, showEmptyRooms: false, pixelScale,
+      timelineTime: Math.floor(state.time * fps + 1e-7) / fps,
       frameTimes: state.running ? undefined : sources.map(video => video && !video.seeking ? video.currentTime : undefined),
     });
   } catch (error) {
@@ -392,7 +394,7 @@ function tick(now) {
       video.play().catch(() => {pause();report('previewError','error');}).finally(() => {clip.starting = false;});
     }
   }
-  const frame = Math.floor(state.time * state.engine.REVIEW_FPS);
+  const frame = Math.floor(state.time * state.engine.REVIEW_FPS + 1e-7);
   if (frame !== lastFrame) {lastFrame = frame;syncPlayback();draw();}
   if (state.running) animation = requestAnimationFrame(tick);
 }
@@ -843,7 +845,7 @@ async function initialize() {
   if (!initTask) initTask = (async () => {
     state.busy = 'init';sync();
     try {
-      state.engine = await import('./vap-review-engine.mjs?v=20261110-review-hd-compact');
+      state.engine = await import('./vap-review-engine.mjs?v=20261110-review-gift-fade2');
       state.slots = Array.from({length: state.engine.MAX_REVIEW_SLOTS}, () => ({settings: state.engine.defaultReviewSlot(), clip: null}));
       state.backgroundImage = await readBackground('ludo');
       renderSlots();updateLayout();

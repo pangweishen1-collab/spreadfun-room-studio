@@ -286,7 +286,7 @@ async function encodingProbe(M,plan,fps,signal){
   surface.ctx.fillStyle='#000';surface.ctx.fillRect(0,0,surface.canvas.width,surface.canvas.height);
   const target=new M.BufferTarget(),output=new M.Output({format:new M.Mp4OutputFormat({fastStart:'in-memory'}),target});
   const source=new M.CanvasSource(surface.canvas,{codec:'avc',...videoEncodingSettings(M,plan)});
-  output.addVideoTrack(source);let input;
+  output.addVideoTrack(source,{frameRate:fps});let input;
   try{
     await output.start();for(let i=0;i<3;i++){cancelled(signal);await source.add(i/fps,1/fps,{keyFrame:i===0})}source.close();await output.finalize();
     input=new M.Input({source:new M.BufferSource(target.buffer),formats:[M.MP4]});
@@ -437,7 +437,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
     }
     const target=new M.BufferTarget();output=new M.Output({format:new M.Mp4OutputFormat({fastStart:'in-memory'}),target});
     videoSource=new M.CanvasSource(packed.canvas,{codec:'avc',...videoEncodingSettings(M,plan),keyFrameInterval:2,onEncoderConfig:config=>{actualCodec=config.codec}});
-    output.addVideoTrack(videoSource);
+    output.addVideoTrack(videoSource,{frameRate:o.fps});
     if(audio&&o.keepAudio&&o.audioGain>0){
       if(info.audioCodec==='aac'&&o.audioGain===1){audioMode='copied';audioSource=new M.EncodedAudioPacketSource('aac');}
       else{
@@ -553,7 +553,8 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
           times.packMs+=clock()-t;
           if(qualitySampler){const sampledAt=clock();try{qualitySampler.capture(packed.canvas,frame);}catch(ignored){qualitySampler.dispose();qualitySampler=null;}times.qualitySampleMs+=clock()-sampledAt;}
           if(wantsPreview){t=clock();const faded=applyGiftFade(matte,opacity);await onPreview(resourceRenderer&&o.resourceMode==='dynamic'?resourceRenderer.apply(faded,frame/o.fps,{sourceCanvas:decoded.value.canvas,resourceOpacity:opacity,includeStatic:true,includeDefaults:false}):faded);times.previewMs=(times.previewMs??0)+clock()-t;}
-          t=clock();await videoSource.add(frame/o.fps,Math.min(1/o.fps,duration-frame/o.fps),{keyFrame:frame%(o.fps*2)===0});times.encodeMs+=clock()-t;
+          // Keep the final sample one full frame so the MP4 has a constant cadence.
+          t=clock();await videoSource.add(frame/o.fps,1/o.fps,{keyFrame:frame%(o.fps*2)===0});times.encodeMs+=clock()-t;
           progress({phase:'encoding',progress:.05+.90*((pass-1+(frame+1)/frameCount)/totalPasses),frame:frame+1,totalFrames:frameCount,pass});
         }
       }catch(error){failed ||= error;void output.cancel().catch(()=>{});throw error}

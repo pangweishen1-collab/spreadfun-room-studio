@@ -42,10 +42,13 @@ const assert = require('node:assert/strict');
   assert.throws(() => normalizeReviewTemplate({background:'custom', slots}), /review background/);
   slots[0].mask.topEnd = .95;
   assert.throws(() => normalizeReviewTemplate({background:'ludo', slots}), /遮罩/);
-  const layout = reviewLayout(3), painted = [];
+  const layout = reviewLayout(3), painted = [], paintAlphas = [], savedAlphas = [];
   const context = {
-    fillRect() {}, fillText() {}, save() {}, restore() {}, beginPath() {}, rect() {}, clip() {}, setTransform() {},
-    drawImage(image, x) {painted.push(x);},
+    globalAlpha: 1,
+    fillRect() {}, fillText() {}, beginPath() {}, rect() {}, clip() {}, setTransform() {},
+    save() {savedAlphas.push(this.globalAlpha);},
+    restore() {this.globalAlpha = savedAlphas.pop();},
+    drawImage(image, x) {painted.push(x); paintAlphas.push(this.globalAlpha);},
   };
   const canvas = {getContext: () => context};
   const renderer = createReviewRenderer(canvas, layout);
@@ -66,6 +69,7 @@ const assert = require('node:assert/strict');
       return {
         clearRect() {}, save() {}, restore() { this.globalCompositeOperation = 'source-over'; },
         putImageData(image) { maskPixels.push(image.data); },
+        getImageData(x, y, width, height) {return {data: new Uint8ClampedArray(width * height * 4)};},
         drawImage(image, x, y, width, height) {
           if (image === source) sourceDraws.push(image);
           if (this.globalCompositeOperation === 'destination-in') maskDraws.push({image, y, height});
@@ -98,5 +102,36 @@ const assert = require('node:assert/strict');
   assert.equal(canvas.width, layout.width / 2, 'playback reduces the canvas backing resolution');
   renderer.draw(frame);
   assert.equal(canvas.width, layout.width, 'full-size rendering remains the default');
-  console.log('vap-review: cached paused frames, scaled preview, room-anchored mask, 30 FPS and template compatibility passed.');
+
+  const timed = {...frame, background:preview.background, clips:[{...clip, duration:4}, {...clip, duration:2}],
+    settings:[gift, gift], sources:[source, source]};
+  const roomAlphas = [1, 1, 1];
+  const expectAlphas = (input, timelineTime, opacity, message) => {
+    paintAlphas.length = 0;
+    renderer.draw({...input, timelineTime});
+    assert.deepEqual(paintAlphas.slice(0, 3), roomAlphas, 'room backdrop retains its original opacity');
+    assert.equal(paintAlphas.length, 3 + opacity.length, message);
+    for (const [index, expected] of opacity.entries()) assert.ok(Math.abs(paintAlphas[index + 3] - expected) < 1e-7, message);
+  };
+  expectAlphas(timed, 0, [], 'both gifts start transparent');
+  expectAlphas(timed, .5, [.5, .5], 'each gift fades in over its own interval');
+  expectAlphas(timed, 59 / 30, [1], 'the shorter gift fades out while the longer one stays visible');
+  expectAlphas(timed, 119 / 30, [], 'the longer gift fades out on its last frame');
+  expectAlphas(timed, undefined, [1, 1], 'template adjustment uses the unattenuated gift layer');
+  const short = {...timed, clips:[{...clip, duration:7/30}, {...clip, duration:2/30}]};
+  expectAlphas(short, 0, [1], 'a two-frame gift stays visible');
+  expectAlphas({...short, sources:[source]}, .1, [1], 'compressed short fades meet at full opacity');
+  const fourFrames = {...short, clips:[{...clip, duration:4/30}], sources:[source]};
+  expectAlphas(fourFrames, 0, [], 'a four-frame gift starts transparent');
+  expectAlphas(fourFrames, 2/30, [1], 'a four-frame gift reaches full opacity on a real frame');
+  expectAlphas(fourFrames, 3/30, [], 'a four-frame gift ends transparent');
+  const {makeVapc} = await import('../vap-protocol.mjs');
+  const config = makeVapc({width:16, height:16, fps:24, frames:96, alphaScale:1});
+  config.funToolkit = {rgbAlphaMode:'straight', giftFade:{enabled:true, fadeIn:1, fadeOut:0}};
+  const native = {...timed, clips:[{...timed.clips[0], config}], sources:[source]};
+  expectAlphas(native, .5, [1], 'the native gift keeps its baked fade-in');
+  expectAlphas(native, 3.5, [14 / 30], 'the native gift gets the missing fade-out');
+  config.funToolkit.giftFade.fadeOut = 1;
+  expectAlphas(native, 3.5, [1], 'the native gift keeps its baked fade-out');
+  console.log('vap-review: cached frames, scaled preview, room mask, per-clip fades, 30 FPS and template compatibility passed.');
 })().catch(error => {console.error(error); process.exitCode = 1;});

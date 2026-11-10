@@ -2,6 +2,7 @@ import {avcCodec, inspectVideo} from './vap-engine.mjs?v=20261110-review-preview
 import {applyVerticalMask, keyPixels, normalizeVerticalMask} from './vap-matte.mjs?v=20261110-luma-cache';
 import {readSourceVapConfig} from './vap-protocol.mjs';
 import {createVapUnpacker} from './vap-resources.mjs?v=20261110-unpack-cache';
+import {giftFadeOpacity} from './vap-gift-fade.mjs?v=20261029-gift-fade1';
 
 export const REVIEW_FPS = 30;
 export const MAX_REVIEW_SLOTS = 6;
@@ -205,6 +206,23 @@ function paintBackdrop(ctx, layout, rooms, background, clips, labels, showEmptyR
   }
 }
 
+function reviewGiftOpacity(clip, time) {
+  if (time === undefined) return 1;
+  // A converted VAP can already contain either side of the temporal fade.
+  const baked = clip.config?.info.f >= 3 ? clip.config.funToolkit?.giftFade : null;
+  const hasFade = value => baked?.enabled === true && Number.isFinite(value) && value > 0 && value <= 120;
+  let fadeIn = hasFade(baked?.fadeIn) ? 0 : 1;
+  let fadeOut = hasFade(baked?.fadeOut) ? 0 : 1;
+  const lastFrame = Math.ceil(clip.duration * REVIEW_FPS - 1e-7) - 1;
+  if (fadeIn && fadeOut && lastFrame >= 2 && lastFrame < 2 * REVIEW_FPS) {
+    // Fit both fades around a frame that will actually be displayed at full opacity.
+    const peakFrame = Math.ceil(lastFrame / 2);
+    fadeIn = peakFrame / REVIEW_FPS;
+    fadeOut = (lastFrame - peakFrame) / REVIEW_FPS;
+  }
+  return giftFadeOpacity(time, clip.duration, REVIEW_FPS, {enabled: true, fadeIn, fadeOut});
+}
+
 export function createReviewRenderer(canvas, layout, {exportBackdrop} = {}) {
   canvas.width = layout.width; canvas.height = layout.height;
   const ctx = canvas.getContext('2d', {alpha: false});
@@ -216,7 +234,7 @@ export function createReviewRenderer(canvas, layout, {exportBackdrop} = {}) {
   const backdrop = exportBackdrop && surface(layout.width, layout.height);
   if (backdrop) paintBackdrop(backdrop.ctx, layout, rooms, exportBackdrop.background, [], exportBackdrop.labels, true);
   return {
-    draw({background, clips, settings, sources, labels, showEmptyRooms = true, pixelScale = 1, frameTimes = []}) {
+    draw({background, clips, settings, sources, labels, showEmptyRooms = true, pixelScale = 1, frameTimes = [], timelineTime}) {
       const width = Math.max(1, Math.round(layout.width * pixelScale));
       const height = Math.max(1, Math.round(layout.height * pixelScale));
       if (canvas.width !== width || canvas.height !== height) {
@@ -234,11 +252,14 @@ export function createReviewRenderer(canvas, layout, {exportBackdrop} = {}) {
           gifts[index] = {};
         }
         if (sources[index] && clip) {
+          const opacity = reviewGiftOpacity(clip, timelineTime);
+          if (opacity === 0) continue;
           ctx.save();
           ctx.beginPath(); ctx.rect(room.x, room.y, room.w, room.h); ctx.clip();
           const {scale, offsetY} = settings[index];
           const rect = giftRect(room, clip.width, clip.height, scale, offsetY);
           const frame = paintGift(gifts[index], sources[index], clip, settings[index], rect, room, pixelScale, frameTimes[index], !!backdrop);
+          ctx.globalAlpha = opacity;
           ctx.drawImage(frame, rect.x, rect.y, rect.w, rect.h);
           ctx.restore();
         }
@@ -327,10 +348,11 @@ export async function exportReviewMp4({background, clips, settings, labels}, {si
       const failed = frames.find(result => result.status === 'rejected');
       if (failed) throw failed.reason;
       const decoded = frames.map(result => result.value);
-      renderer.draw({clips, settings, sources: decoded.map(frame => frame?.canvas), frameTimes: decoded.map(frame => frame?.timestamp)});
+      const timelineTime = i / REVIEW_FPS;
+      renderer.draw({clips, settings, timelineTime, sources: decoded.map(frame => frame?.canvas), frameTimes: decoded.map(frame => frame?.timestamp)});
       // Only prefetch after composition has finished reading the current source canvases.
       pendingFrame = i + 1 < frameCount ? readFrame(i + 1) : null;
-      await source.add(i / REVIEW_FPS, 1 / REVIEW_FPS, {keyFrame: i % (REVIEW_FPS * 2) === 0});
+      await source.add(timelineTime, 1 / REVIEW_FPS, {keyFrame: i % (REVIEW_FPS * 2) === 0});
       onProgress((i + 1) / frameCount);
       if (i % 12 === 11) await new Promise(resolve => setTimeout(resolve, 0));
     }
