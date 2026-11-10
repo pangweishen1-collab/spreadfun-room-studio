@@ -1,5 +1,16 @@
 # 更新记录
 
+## 1.18.0 - 2026-11-10
+
+### Custom avatar frames
+
+- Edit the base, highlight, and shadow colors of metallic text presets. Changes appear in the preview, the exported SVGA, and its first-frame WebP.
+
+### VAP room gift review
+
+- Save and reuse shared review templates and WebP room backgrounds. The source videos remain in the browser.
+- Adjust template masks in the review preview, keep per-slot settings, and support the software AAC encoder when browser AAC encoding is unavailable.
+
 ## 1.17.0 - 2026-11-10
 
 ### VAP room gift review
