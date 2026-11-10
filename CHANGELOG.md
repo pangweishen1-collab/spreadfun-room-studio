@@ -1,5 +1,18 @@
 # 更新记录
 
+## 1.18.2 - 2026-11-10
+
+### VAP room gift review
+
+- Export sharper two- and three-column 30 FPS MP4s with faster compositing and a smaller two-column file.
+- Label the two review slots Vehicle-1 and Vehicle-2. Show the 19-seat room as the default background in the VAP conversion preview.
+
+### Dice tool
+
+- Keep the purple 02 B toss close to its resting size while preserving spacing between all six dice.
+- Reduce the 02 B compact Spine package by compressing the atlas more during the fastest part of the toss.
+- Show a single upload button for each grade and remove the divider above the asset details.
+
 ## 1.18.1 - 2026-11-10
 
 ### Dice tool
