@@ -2,9 +2,9 @@ import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
 import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { DiceAudio } from './audio.mjs';
-import { clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261109-dice-60fps';
-import { GameRenderer } from '/dice/renderer.js?v=20261109-dice-60fps';
-import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261109-dice-60fps';
+import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261110-dice-scale95';
+import { GameRenderer } from '/dice/renderer.js?v=20261110-dice-scale95';
+import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261110-purple-default02';
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
@@ -27,9 +27,12 @@ function syncRound(status) {
 }
 
 function issue(key, values) { return Object.assign(new Error(key), {key, values}); }
-function settings() {
-  return {name:$('dice-name').value.trim(), grade, previewGrade, mode:'all',
-    point:1, composition:grade === 'green' ? 'faces' : session?.composition || 'faces', soundEnabled:$('sound-enabled').checked};
+function settings(sourceGrade = grade) {
+  const purpleVariant = sourceGrade === 'green' ? '05' :
+    (grade === 'purple' && $('purple-variant').value) || DEFAULT_PURPLE_VARIANT;
+  return {name:$('dice-name').value.trim(), grade:sourceGrade, previewGrade, mode:'all',
+    point:1, purpleVariant,
+    composition:sourceGrade === 'green' ? 'faces' : session?.composition || 'faces', soundEnabled:$('sound-enabled').checked};
 }
 function settingsDirty() {
   if (!session) return false;
@@ -45,6 +48,7 @@ function currentVideo(video = session?.video) {
 function fillSettings(value) {
   $('dice-name').value = value.name;
   grade = value.grade; previewGrade = value.previewGrade || value.grade;
+  $('purple-variant').value = (grade === 'purple' && value.purpleVariant) || DEFAULT_PURPLE_VARIANT;
   $('preview-mode').value = 'all';
   $('preview-point').value = '1';
   $('sound-enabled').checked = value.soundEnabled !== false; audio.setEnabled(value.soundEnabled !== false);
@@ -113,6 +117,8 @@ function render() {
   ['choose-files','choose-folder','choose-purple-files','choose-purple-folder','choose-preview-files','choose-preview-folder','choose-preview-purple-files','choose-preview-purple-folder','res-file-input','res-folder-input'].forEach(id => { $(id).disabled = locked; });
   $('upload-zone').hidden = !hasCanvas;
   $('background-field').hidden = !session;
+  $('purple-variant-field').hidden = session?.grade !== 'purple';
+  $('purple-variant').disabled = locked || draft;
   document.querySelectorAll('[data-upload-grade]').forEach(card => {
     card.classList.toggle('is-selected', card.dataset.uploadGrade === (draft ? uploadGrade : session?.grade));
     card.setAttribute('aria-disabled', String(locked));
@@ -210,7 +216,7 @@ async function loadSession(next, reusePresentation = false) {
 async function importPending() {
   if (requiredSlots().some(slot=>!pending.has(slot))) throw issue(grade === 'green' ? 'greenIncomplete' : 'incompleteFiles');
   if (!['green','purple'].includes(uploadGrade)) throw issue('chooseUploadGrade');
-  const values = {...settings(), grade:uploadGrade, previewGrade:uploadGrade, composition:'faces'};
+  const values = {...settings(uploadGrade), previewGrade:uploadGrade, composition:'faces'};
   if (!values.name || values.name.length > 80) throw issue('nameRequired');
   activity = {key:'buildingPreview'}; render();
   const previous = session;
@@ -239,9 +245,20 @@ async function saveSettings() {
   if (!values.name || values.name.length > 80) throw issue('nameRequired');
   const hadVideo = Boolean(currentVideo());
   const next = await post(`/api/preview/${session.id}/settings`, {...values, expectedRevision:session.revision});
-  const presentationOnly = session.id === next.id && session.mode === next.mode
+  const motionChanged = session.purpleVariant !== next.purpleVariant;
+  const presentationOnly = !motionChanged && session.id === next.id && session.mode === next.mode
     && session.point === next.point && session.resolvedComposition === next.resolvedComposition;
-  await loadSession(next, presentationOnly);
+  try { await loadSession(next, presentationOnly); }
+  catch (error) {
+    if (motionChanged) {
+      // The session already committed the new motion. Keep its revision for retry.
+      session = next;
+      fillSettings(next);
+      previewReady = false;
+      renderer?.pause();
+    }
+    throw error;
+  }
   notice = hadVideo && !next.video ? {key:'videoInvalidated'} : null;
 }
 function settingsChanged() {
@@ -298,7 +315,7 @@ function selectUploadGrade(nextGrade) {
 }
 async function switchBackground(nextGrade) {
   if (!session || !['green','purple'].includes(nextGrade) || previewGrade === nextGrade) return;
-  const draft = pending.size || settingsDirty() ? {name:$('dice-name').value, soundEnabled:$('sound-enabled').checked} : null;
+  const draft = pending.size || settingsDirty() ? {name:$('dice-name').value, soundEnabled:$('sound-enabled').checked, purpleVariant:$('purple-variant').value} : null;
   const hadVideo = Boolean(currentVideo());
   const next = await post(`/api/preview/${session.id}/settings`, {expectedRevision:session.revision, previewGrade:nextGrade});
   try { await loadSession(next, true); }
@@ -307,7 +324,7 @@ async function switchBackground(nextGrade) {
     session = next; fillSettings(next); previewReady = false; audio.stop();
     throw error;
   }
-  finally { if (draft) { $('dice-name').value=draft.name; $('sound-enabled').checked=draft.soundEnabled; audio.setEnabled(draft.soundEnabled && !audioWarning); } }
+  finally { if (draft) { $('dice-name').value=draft.name; $('sound-enabled').checked=draft.soundEnabled; $('purple-variant').value=draft.purpleVariant; audio.setEnabled(draft.soundEnabled && !audioWarning); } }
   notice = hadVideo && !next.video ? {key:'videoInvalidated'} : null;
 }
 async function stageGreen(files) {
@@ -355,6 +372,7 @@ $('close-author').addEventListener('click', () => $('author-dialog').close());
 $('dice-name').addEventListener('input', () => { if (!busy) render(); });
 $('dice-name').addEventListener('change', settingsChanged);
 ['preview-mode','preview-point','sound-enabled'].forEach(id => $(id).addEventListener('change', settingsChanged));
+$('purple-variant').addEventListener('change', () => run('updatingSettings', saveSettings));
 document.querySelectorAll('[data-preview-grade]').forEach(button => button.addEventListener('click', () => { if (!busy && previewGrade!==button.dataset.previewGrade) return run(null,()=>switchBackground(button.dataset.previewGrade)); }));
 $('apply-settings').addEventListener('click', () => run('updatingSettings', saveSettings));
 $('asset-details').addEventListener('toggle', renderAssets);

@@ -4,14 +4,20 @@ import {generateSixFaceRuntime} from './six-face/runtime.mjs';
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
-import {generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION} from './purple-reference/runtime.mjs';
+import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261110-dice-scale95';
 import {optimizeAtlasPng} from './atlas-png-optimizer.mjs';
+export {DEFAULT_PURPLE_VARIANT};
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
 export const GREEN_SLOTS = Array.from({length:6},(_,i)=>`sz_${i+1}`);
 export const VIDEO_PROFILE = VIDEO_SPEC.profile;
 const REGIONS = ['1', '2', 'anchor', ...Array.from({length:6}, (_, i) => `sz_${i+1}`)];
-const SETTING_KEYS = ['name', 'grade', 'previewGrade', 'mode', 'point', 'composition', 'soundEnabled'];
-const settingValue=(record,key)=>key==='soundEnabled'?record[key]!==false:key==='previewGrade'?(record.previewGrade||record.grade):record[key];
+const SETTING_KEYS = ['name', 'grade', 'previewGrade', 'purpleVariant', 'mode', 'point', 'composition', 'soundEnabled'];
+function settingValue(record,key) {
+  if(key==='soundEnabled')return record.soundEnabled!==false;
+  if(key==='previewGrade')return record.previewGrade||record.grade;
+  if(key==='purpleVariant')return record.purpleVariant??'05'; // Existing records without a choice used 05.
+  return record[key];
+}
 const MAX_PNG = 12 * 1024 * 1024;
 const SOUND_NAMES=['dice_roll','sound_ui_dice6'];
 const DEFAULT_AUDIO=Object.fromEntries(SOUND_NAMES.map(name=>[name,`/dice/assets/audio/${name}.mp3`]));
@@ -68,13 +74,15 @@ export function validateFiles(entries) {
   return SLOTS.map(s=>mapped.get(s));
 }
 
-export function validateSettings(payload, previous={name:'骰子预览',grade:'green',mode:'all',point:1,composition:'auto',soundEnabled:true}) {
+export function validateSettings(payload, previous={name:'骰子预览',grade:'green',purpleVariant:DEFAULT_PURPLE_VARIANT,mode:'all',point:1,composition:'auto',soundEnabled:true}) {
   if (!payload || typeof payload!=='object' || Array.isArray(payload)) throw new PreviewError('请求内容需要是对象');
-  const result=Object.fromEntries(SETTING_KEYS.map(k=>[k,Object.hasOwn(payload,k)?payload[k]:k==='soundEnabled'?(previous[k]??true):k==='previewGrade'?(previous.previewGrade??payload.grade??previous.grade):previous[k]]));
+  const result=Object.fromEntries(SETTING_KEYS.map(k=>[k,Object.hasOwn(payload,k)?payload[k]:k==='soundEnabled'?(previous[k]??true):k==='previewGrade'?(previous.previewGrade??payload.grade??previous.grade):settingValue(previous,k)]));
   if(typeof result.name!=='string' || !result.name.trim() || result.name.trim().length>80) throw new PreviewError('请填写 1～80 字的预览名称');
   result.name=result.name.trim();
   if(!['green','purple'].includes(result.grade)) throw new PreviewError('请选择绿色或紫色等级背景');
   if(!['green','purple'].includes(result.previewGrade)) throw new PreviewError('请选择绿色或紫色预览背景');
+  if(!['02','05'].includes(result.purpleVariant)) throw new PreviewError('紫色骰子方案需为 02 或 05');
+  if(result.grade==='green')result.purpleVariant='05';
   if(!['all','single','continuous'].includes(result.mode)) throw new PreviewError('预览模式需为 all、single 或 continuous');
   if(!Number.isInteger(result.point) || result.point<1 || result.point>6) throw new PreviewError('点数需为 1～6 的整数');
   if(!['auto','faces','digits'].includes(result.composition)) throw new PreviewError('素材类型需为 auto、faces 或 digits');
@@ -294,9 +302,7 @@ export function createLocalPreview(dependencies={}) {
   const render=dependencies.renderRuntime||((files,composition)=>renderRuntime(files,composition,decode));
   const renderSix=dependencies.renderSixFace||generateSixFaceRuntime;
   const renderReference=dependencies.renderPurpleReference||generatePurpleReferenceRuntime;
-  const renderPurpleRuntime=dependencies.renderPurpleGyro||renderReference;
-  const purpleVersion=dependencies.renderPurpleGyro?PURPLE_GYRO_MOTION_VERSION:PURPLE_REFERENCE_MOTION_VERSION;
-  const purpleKind=dependencies.renderPurpleGyro?'purple-gyro':'purple-reference';
+  const usesLegacyGyro=variant=>variant==='05'&&Boolean(dependencies.renderPurpleGyro);
   const hash=dependencies.hash||sha256, uuid=dependencies.uuid||(()=>crypto.randomUUID().replaceAll('-',''));
   const objectURL=dependencies.createObjectURL||(blob=>URL.createObjectURL(blob));
   const revoke=dependencies.revokeObjectURL||(url=>URL.revokeObjectURL(url));
@@ -319,6 +325,9 @@ export function createLocalPreview(dependencies={}) {
     finally{image.close?.();}
   }
   async function renderPurple(files,options={}){
+    const legacy=usesLegacyGyro(options.variant);
+    const renderPurpleRuntime=legacy?dependencies.renderPurpleGyro:renderReference;
+    const purpleKind=legacy?'purple-gyro':'purple-reference';
     const anchor=files.find(file=>file.slot==='anchor');
     const image=await decode(anchor?.blob||await defaultAsset(DEFAULT_ANCHOR),'anchor.png',{allowEmpty:true});
     try{
@@ -333,7 +342,8 @@ export function createLocalPreview(dependencies={}) {
   }
   async function renderNative(record,options={}){
     if(record.grade!=='purple')return renderGreen(record.files,{name:record.name,...options});
-    const runtime=await renderPurple(record.files,{name:record.name,composition:record.resolvedComposition,...options});
+    const runtime=await renderPurple(record.files,{name:record.name,composition:record.resolvedComposition,
+      variant:settingValue(record,'purpleVariant'),...options});
     if(referenceRuntime(runtime))runtime.assetRevision=record.revision;
     return runtime;
   }
@@ -352,6 +362,10 @@ export function createLocalPreview(dependencies={}) {
     if(!record)throw new PreviewError('预览会话不存在',404);
     const anchor=record.runtime.metadata?.anchor;
     const migrateAnchor=generatedRuntime(record.runtime)&&!(anchor?.bone==='root'&&anchor.scaleX===6&&anchor.scaleY===6&&anchor.opacity===0);
+    const variant=settingValue(record,'purpleVariant');
+    const legacy=usesLegacyGyro(variant);
+    const purpleKind=legacy?'purple-gyro':'purple-reference';
+    const purpleVersion=legacy?PURPLE_GYRO_MOTION_VERSION:variant==='02'?PURPLE_PLAN_02_MOTION_VERSION:PURPLE_REFERENCE_MOTION_VERSION;
     const migrateMotion=record.grade==='purple'
       ?record.runtime.kind!==purpleKind||record.runtime.metadata?.motionVersion!==purpleVersion||
         (referenceRuntime(record.runtime)&&!hasReferenceBinary(record.runtime))
@@ -382,6 +396,7 @@ export function createLocalPreview(dependencies={}) {
       :generated?{json:record.runtime.json,geometry:record.runtime.geometry}
         :{skel:dependencies.templateURL||'/dice/assets/template.skel'};
     const candidate={id:record.candidateId,version:record.revision,name:record.name,template:record.grade,previewGrade:settingValue(record,'previewGrade'),
+      ...(record.grade==='purple'?{purpleVariant:settingValue(record,'purpleVariant')}:{}),
       kind:generated?record.runtime.kind:'template',...skeleton,...(generated?{warnings:record.runtime.warnings||[]}:{}),
       atlasPage:record.runtime.atlasPage||'preview.png',
       atlas:url(`${record.id}/runtime/${runtimeKey}/atlas`,new Blob([record.runtime.atlasText],{type:'text/plain'})),
@@ -476,7 +491,7 @@ export function createLocalPreview(dependencies={}) {
     if(SETTING_KEYS.every(k=>settings[k]===settingValue(record,k)))return publicSession(record);
     const detection=record.runtime.kind==='six-face'?{resolvedComposition:'faces',compositionDetection:record.compositionDetection}:await resolveComposition(record.files,settings.composition);
     const next={...record,...settings,revision:record.revision+1,candidateId:uuid(),...detection};
-    if(next.resolvedComposition!==record.resolvedComposition)next.runtime=generatedRuntime(record.runtime)
+    if(next.resolvedComposition!==record.resolvedComposition||next.purpleVariant!==settingValue(record,'purpleVariant'))next.runtime=generatedRuntime(record.runtime)
       ?await renderNative(next):await render(next.files,next.resolvedComposition);
     await storage.put(next,{revision:record.revision,candidateId:record.candidateId});
     return publicSession(next);

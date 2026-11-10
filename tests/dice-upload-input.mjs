@@ -384,16 +384,16 @@ const checks=[];
 {
   // Execute the actual controller functions without booting its DOM/event shell.
   const source=await readFile(new URL('../dice/preview-app.js',import.meta.url),'utf8');
-  const fields=Object.fromEntries(['dice-name','sound-enabled','preview-mode','preview-point'].map(id=>[id,{value:'',checked:true}]));
+  const fields=Object.fromEntries(['dice-name','sound-enabled','preview-mode','preview-point','purple-variant'].map(id=>[id,{value:'',checked:true}]));
   const calls=[],renderCalls=[],revoked=[],forgotten=[],audioChanges=[],six=Array.from({length:6},(_,i)=>Object.freeze({name:`sz_${i+1}.png`,sha256:`original-${i+1}`}));
   let app,serial=0,importFailure=null,settingsFailure=null,loadFailure=null,patchFailure=null,patchAccepted=true;
   const runtimeKind=grade=>grade==='purple'?'purple-gyro':'six-face';
-  const fixtureSession=(grade='purple',composition='faces')=>({id:`old-${grade}-${composition}`,revision:1,name:'旧骰子',grade,previewGrade:grade,mode:'all',point:1,composition,resolvedComposition:composition==='faces'?'faces':'digits',soundEnabled:true,
+  const fixtureSession=(grade='purple',composition='faces')=>({id:`old-${grade}-${composition}`,revision:1,name:'旧骰子',grade,previewGrade:grade,purpleVariant:'05',mode:'all',point:1,composition,resolvedComposition:composition==='faces'?'faces':'digits',soundEnabled:true,
     resourceName:`dice_${grade}_fixture`,files:six,anchor:{sha256:'original-anchor'},audio:{dice_roll:{sha256:'original-audio'}},
     candidate:{id:`old-candidate-${grade}-${composition}`,kind:runtimeKind(grade),template:grade,previewGrade:grade,runtimeIdentity:`original-runtime-${grade}`,json:{marker:`original-json-${grade}`},geometry:{marker:`original-geometry-${grade}`},atlas:`original-atlas-${grade}`,texture:`original-texture-${grade}`,audio:{dice_roll:'original-roll-audio'}}});
   const context={document:{getElementById:id=>{assert.ok(fields[id],`unexpected controller DOM access: ${id}`);return fields[id];}},
     URL:{createObjectURL:()=>`blob:controller-${++serial}`,revokeObjectURL:value=>revoked.push(value)},VIDEO_SPEC:{profile:'test'},t:key=>key,diceFilePath,
-    forgetLocalPreview:id=>forgotten.push(id),
+    DEFAULT_PURPLE_VARIANT:'02',forgetLocalPreview:id=>forgotten.push(id),
     DiceAudio:class {ready=true;setEnabled(value){audioChanges.push(value);}async load(){}async unlock(){}stop(){}},
     localApi:async(path,options)=>{
       const body=typeof options.body==='string'?JSON.parse(options.body):options.body;calls.push({path,body});
@@ -421,7 +421,7 @@ const checks=[];
       setPending(files,extras=[]){releasePending(false);pendingExtras=extras;files.forEach(original=>pending.set(greenSlot(original),{slot:greenSlot(original),original,previewUrl:URL.createObjectURL(original)}));},
       state(){return {session,grade,uploadGrade,previewGrade,pending,extras:pendingExtras,previewReady,hasCanvas,loadingPreview,currentError,notice,rendererCandidate:renderer.candidate};}};
     renderer={data:{},candidate:null,async load(candidate){await loadCandidate(candidate);this.candidate=candidate;return true;},
-      async patchPresentation(candidate){const accepted=await patchCandidate(candidate);if(accepted)this.candidate=candidate;return accepted;},configure(){},play(){},clear(){}};
+      async patchPresentation(candidate){const accepted=await patchCandidate(candidate);if(accepted)this.candidate=candidate;return accepted;},configure(){},play(){},pause(){},clear(){}};
   `,executed);app=executed.app;
 
   app.reset();assert.equal(app.state().uploadGrade,null);assert.equal(app.state().previewGrade,'green');assert.equal(app.state().session,null);
@@ -435,11 +435,31 @@ const checks=[];
     app.reset();app.selectUploadGrade(nextGrade);assert.equal(app.state().grade,'green','Selecting a card changes only the upload target until a preview successfully loads');
     fields['dice-name'].value='新骰子';app.setPending(six);await app.importPending();
     assert.equal(calls.at(-1).body.grade,nextGrade);assert.equal(calls.at(-1).body.previewGrade,nextGrade);assert.equal(calls.at(-1).body.composition,'faces');assert.equal(calls.at(-1).body.mode,'all');assert.equal(calls.at(-1).body.point,1);
+    assert.equal(calls.at(-1).body.purpleVariant,nextGrade==='purple'?'02':'05');
     assert.deepEqual(Array.from(calls.at(-1).body.files),six);assert.equal(app.state().pending.size,0);assert.equal(app.settingsDirty(),false);
     assert.equal(app.state().grade,nextGrade);assert.equal(app.state().session.grade,nextGrade);assert.equal(app.state().uploadGrade,null);assert.equal(app.state().previewGrade,nextGrade);
     assert.equal(app.state().session.candidate.kind,runtimeKind(nextGrade));assert.ok(app.state().session.resourceName.startsWith(`dice_${nextGrade}_`));
   }
+  app.reset(fixtureSession('green'));app.selectUploadGrade('purple');app.setPending(six);await app.importPending();
+  assert.equal(calls.at(-1).body.purpleVariant,'02','Changing source grade from green starts with the purple default');
   checks.push('actual_controller_successful_green_and_purple_source_imports_use_faces_and_commit_the_matching_animation_and_prefix');
+
+  app.reset(fixtureSession('purple'));
+  assert.equal(fields['purple-variant'].value,'05');
+  fields['purple-variant'].value='02';
+  await app.saveSettings();
+  assert.equal(calls.at(-1).body.purpleVariant,'02');
+  assert.equal(renderCalls.at(-1).type,'load','A new motion needs the full baked animation');
+  assert.equal(app.state().session.purpleVariant,'02');
+  assert.equal(app.settingsDirty(),false);
+  fields['purple-variant'].value='05';
+  loadFailure=Error('new motion could not be displayed');
+  await assert.rejects(()=>app.saveSettings(),error=>error.key==='previewLoadFailed'&&error.cause===loadFailure);
+  loadFailure=null;
+  assert.equal(app.state().session.purpleVariant,'05');
+  assert.equal(app.state().previewReady,false);
+  assert.equal(app.state().session.revision,3,'The committed revision must remain available for retry');
+  checks.push('actual_controller_switches_purple_motion_with_a_full_load_and_retains_the_committed_revision_on_display_failure');
 
   for(const composition of ['auto','digits']){
     app.reset(fixtureSession('purple',composition));assert.equal(app.settingsDirty(),false);assert.equal(app.settings().composition,composition);
@@ -448,6 +468,7 @@ const checks=[];
     assert.equal(app.state().session.grade,'purple');assert.equal(app.state().session.candidate.kind,'purple-gyro');
     app.reset({...fixtureSession('purple',composition),mode:'single',point:6});app.selectUploadGrade('purple');app.setPending(six);await app.importPending();
     assert.equal(calls.at(-1).body.composition,'faces');assert.equal(calls.at(-1).body.mode,'all');assert.equal(calls.at(-1).body.point,1);
+    assert.equal(calls.at(-1).body.purpleVariant,'05','Replacing purple assets preserves a manually selected style');
   }
   checks.push('actual_controller_legacy_auto_digits_are_clean_rename_preserves_composition_and_replacement_always_uses_faces');
 

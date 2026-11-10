@@ -79,7 +79,7 @@ assert.deepEqual(first.candidate.warnings,['fixture warning']);assert.equal(firs
 assert.equal(first.audio.dice_roll.default,true);assert.equal(first.anchor.hidden,true);
 assert.equal(stored.runtime.metadata.zoomPeak,1.45);assert.doesNotThrow(()=>structuredClone(stored));
 assert.equal(stored.runtime.metadata.staticImages,14);
-assert.equal(stored.runtime.metadata.motionVersion,'rounded-roll-v7');
+assert.equal(stored.runtime.metadata.motionVersion,'rounded-roll-v8');
 for(const file of first.files)assert.deepEqual(new Uint8Array(await urls.get(file.url).arrayBuffer()),new Uint8Array(await required.find(input=>input.name===file.name).arrayBuffer()));
 checks.push('six_native_files_preserved_geometry_is_serializable_missing_hero_is_explicit_and_public_audio_anchor_contract');
 
@@ -215,6 +215,8 @@ async function compactBundle(result,record){
  assert.deepEqual(await zip.file(root+name+'.png').async('uint8array'),new Uint8Array(await record.runtime.texture.arrayBuffer()));
  const atlas=new S.TextureAtlas(atlasText),bytes=await zip.file(root+name+'.skel').async('uint8array');
  const data=new S.SkeletonBinary(new S.AtlasAttachmentLoader(atlas)).readSkeletonData(new Uint8Array(bytes));
+ const die=data.findBone('all');
+ assert.ok(Math.abs(die.scaleX-.95)<1e-6 && Math.abs(die.scaleY-.95)<1e-6,'Exported dice are uniformly 5% smaller');
  assert.equal(data.version,'4.2.43');assertRootAnchorData(data);assert.equal(data.audioPath,'./sound/');
  for(const event of data.events){const path=(data.audioPath+event.audioPath).replace(/^\.\//,'');assert.equal(path,'sound/'+event.name+'.mp3');assert.ok(zip.file(root+path));}
  assert.deepEqual(Array.from(data.events,event=>event.name),['dice_roll','sound_ui_dice6']);
@@ -336,12 +338,14 @@ const migratedBundle=await adapter.api('/api/preview/'+legacyAnchor.id+'/bundle'
 checks.push('legacy_white_anchor_migrates_once_to_actual_custom_root_six_scale_pixels_with_one_revision_and_old_video_hidden_not_deleted');
 const legacyMotion=structuredClone(await storage.get(custom.id));
 legacyMotion.id='c'.repeat(32);legacyMotion.candidateId='d'.repeat(32);legacyMotion.revision=11;
-legacyMotion.runtime.metadata.motionVersion='flat-handoff-v3';
+legacyMotion.runtime.metadata.motionVersion='rounded-roll-v7';
+delete legacyMotion.runtime.json.bones.find(bone=>bone.name==='all').scaleX;
+delete legacyMotion.runtime.json.bones.find(bone=>bone.name==='all').scaleY;
 legacyMotion.video={...structuredClone(previousVideo),revision:11,candidate:legacyMotion.candidateId};
 records.set(legacyMotion.id,structuredClone(legacyMotion));
 const motionRenders=renderCount,motionWrites=writes,migratedMotion=await adapter.api('/api/preview/'+legacyMotion.id),motionRecord=await storage.get(legacyMotion.id);
 assert.equal(migratedMotion.revision,12);assert.notEqual(migratedMotion.candidate.id,legacyMotion.candidateId);assert.equal(migratedMotion.video,null);
-assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'rounded-roll-v7');
+assert.equal(renderCount,motionRenders+1);assert.equal(writes,motionWrites+1);assert.equal(motionRecord.runtime.metadata.motionVersion,'rounded-roll-v8');
 for(let point=1;point<=6;point++)assert.ok(motionRecord.runtime.json.skins[0].attachments['face_'+point]['landed_'+point]);
 assert.deepEqual(motionRecord.files,legacyMotion.files);assert.deepEqual(motionRecord.audio,legacyMotion.audio);assert.deepEqual(motionRecord.anchor,legacyMotion.anchor);assert.deepEqual(motionRecord.video,legacyMotion.video);
 assert.deepEqual(new Uint8Array(await motionRecord.video.blob.arrayBuffer()),new Uint8Array(await legacyMotion.video.blob.arrayBuffer()));

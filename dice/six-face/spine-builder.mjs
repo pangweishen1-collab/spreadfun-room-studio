@@ -1,9 +1,10 @@
 // Browser-only replacement rig. Numeric mesh keys are not an image sequence.
 // The original source images remain separate from the browser-generated atlas.
+import {DICE_SIZE_SCALE} from '../presentation-scale.mjs';
 import {CUBE_MOTION} from './cube-roll.mjs';
 const ZOOM_PEAK=CUBE_MOTION.zoomPeak;
 import {encodeRgbaPng} from './png-rgba.mjs';
-export const SIX_FACE_MOTION_VERSION='rounded-roll-v7';
+export const SIX_FACE_MOTION_VERSION='rounded-roll-v8';
 const ROLL_START=.025;
 const LAND_START=.55,LAND_READY=.591667,HANDOFF=.6;
 const CORNER_RADIUS=.19;
@@ -175,7 +176,7 @@ export function buildSpineJson(prepared) {
       bones:{[bodyBone]:{scale:[{x:1,y:1}]},dice_1:{translate:[{x:0,y:0}]}}};
   }
   return {skeleton:{spine:'4.2.43',x:-150,y:-150,width:300,height:300,images:'./images/',audio:'./audio/'},
-    bones:[{name:'root'},{name:'all',parent:'root'},{name:'dice_1',parent:'all',x:offsetX,y:offsetY},
+    bones:[{name:'root'},{name:'all',parent:'root',scaleX:DICE_SIZE_SCALE,scaleY:DICE_SIZE_SCALE},{name:'dice_1',parent:'all',x:offsetX,y:offsetY},
       {name:bodyBone,parent:'dice_1'},{name:'shadow_size',parent:'all',x:offsetX,y:offsetY-66}],
     slots,skins:[{name:'default',attachments}],
     events:{dice_roll:{audio:'dice_roll.mp3'},sound_ui_dice6:{audio:'sound_ui_dice6.mp3'}},animations};

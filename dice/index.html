@@ -49,7 +49,7 @@
     </div><div class="upload-grade-card purple" data-upload-grade="purple" role="group" tabindex="0" aria-labelledby="purple-upload-title">
       <img class="feedback-image upload-grade-icon" src="/dice/assets/ui/upload-cricket.webp" width="96" height="96" decoding="async" alt="">
       <h3 id="purple-upload-title"><span class="level-dot purple"></span><span data-i18n="purpleUpload">紫色骰子上传</span></h3>
-      <span class="upload-motion" data-i18n="purpleMotion">倾轴陀螺</span>
+      <span class="upload-motion" data-i18n="purpleMotion">默认 02 · 双轴抛转</span>
       <p class="upload-assets-hint" data-i18n="purpleUploadAssets">拖入大骰子＋六张点数图＋无点数图（sz_0.png）</p>
       <div class="preview-upload-actions"><button id="choose-preview-purple-files" class="button primary" type="button" data-i18n="chooseFiles">选择 PNG</button><button id="choose-preview-purple-folder" data-i18n-title="folderDirectHint" class="button secondary" type="button" data-i18n="chooseFolder">选择文件夹</button></div>
       <p class="keyboard-hint" data-i18n="pasteHint">⌘V / Ctrl+V 粘贴</p>
@@ -64,6 +64,13 @@
         <p id="hero-hint" class="field-hint" role="status" hidden></p>
         <div class="settings-section">
           <div class="field"><label for="dice-name" data-i18n="name">骰子名称</label><input id="dice-name" type="text" maxlength="80" placeholder="例如：板球" data-i18n-placeholder="namePlaceholder" autocomplete="off"></div>
+          <div class="field" id="purple-variant-field" hidden>
+            <label for="purple-variant" data-i18n="purpleVariant">紫色骰子方案</label>
+            <div class="ft-select"><select id="purple-variant">
+              <option value="02" data-i18n="purpleVariant02" selected>02 · 双轴抛转（1.5×）</option>
+              <option value="05" data-i18n="purpleVariant05">05 · 倾轴陀螺</option>
+            </select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div>
+          </div>
           <div class="field-grid preview-controls" hidden><div class="field"><label for="preview-mode" data-i18n="mode">预览模式</label><div class="ft-select"><select id="preview-mode"><option value="all" data-i18n="modeAll" selected>六面同时投掷</option><option value="single" data-i18n="modeSingle">指定点数</option><option value="continuous" data-i18n="modeContinuous">连续投掷</option></select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div></div><div class="field"><label for="preview-point" data-i18n="point">点数</label><div class="ft-select"><select id="preview-point"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option></select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div></div></div>
           <label class="sound-option"><input id="sound-enabled" type="checkbox" checked><span data-i18n="soundEnabled">投掷音效</span></label>
           <p id="audio-warning" class="field-hint" role="status" hidden></p>
@@ -78,6 +85,6 @@
   <dialog id="help-dialog" class="help-dialog ft-motion-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title" data-i18n="help">使用说明</h2><button id="close-help" class="button secondary" type="button" data-i18n="close">关闭</button></div><ol class="help-list"><li data-i18n="helpUpload">两种等级均上传大骰子.png（兼容 icon.png）和 sz_1.png～sz_6.png 六张完整点数图。支持选择文件、文件夹、拖入和粘贴；大图可单独更换。</li><li data-i18n="helpSettings">选择骰子等级并填写名称，预览固定为六面同步投掷。</li><li data-i18n="helpComposition">两种等级自动补齐隐藏锚点及基础音效，也可上传 anchor.png、dice_roll.mp3、sound_ui_dice6.mp3 覆盖。</li><li data-i18n="helpDownload">预览每2秒循环，视频共6秒。资源包包含同名SKEL、图集、PNG、res原图和sound音频；MP4单独下载。</li></ol><p class="dialog-note" data-i18n="helpPreserve">导入失败会保留上一份可用预览。选择新一套素材会创建新的预览会话。</p></dialog>
   <dialog id="author-dialog" class="help-dialog ft-motion-dialog" aria-labelledby="author-title"><div class="dialog-heading"><h2 id="author-title" data-i18n="author">联系作者</h2><button id="close-author" class="button secondary" type="button" data-i18n="close">关闭</button></div><div class="author-profile"><img src="/dice/assets/fun-toolkit/assets/author-profile.webp" width="72" height="72" alt=""><div><strong>庞伟深</strong><p data-i18n="authorDescription">Fun Toolkit UI 规范作者与维护人</p></div></div><p class="dialog-note" data-i18n="resourceNote">本工具复用 Fun Toolkit 的页面、表单与反馈资源。</p><a class="button secondary" href="https://fun-toolkit.pangweishen1.workers.dev/#home" target="_blank" rel="noopener" data-i18n="moreTools">更多工具</a></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script type="module" src="/dice/preview-app.js?v=20261109-dice-60fps"></script>
+  <script type="module" src="/dice/preview-app.js?v=20261110-dice-scale95"></script>
 </body>
 </html>

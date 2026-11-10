@@ -32,13 +32,16 @@ const readAsset = (url, type, message) => fetch(url).then(response => {
 });
 const PURPLE_PRESENTATION_SCALE = 1.15;
 const PURPLE_REFERENCE_PRESENTATION_SCALE = 1.2;
+const REFERENCE_GRID_SCALE = .86 * PURPLE_REFERENCE_PRESENTATION_SCALE;
 const GRID_X = [198, 363, 529];
 const GRID_Y = [1600 - 720, 1600 - 903];
 const GRID_GAP = 8;
 const CELL_HALF_WIDTH = (Math.min(GRID_X[1] - GRID_X[0], GRID_X[2] - GRID_X[1]) - GRID_GAP) / 2;
 const CELL_HALF_HEIGHT = (GRID_Y[0] - GRID_Y[1] - GRID_GAP) / 2;
+const GRID_FIT_SAMPLE_RATE = 120;
+const GRID_FIT_MAX_STEP = .028;
 
-function gridCellFit(skeleton, centerX, centerY, vertices) {
+function gridCellFit(skeleton, centerX, centerY, vertices, sizeScale) {
   let horizontal = 0, vertical = 0;
   for (const slot of skeleton.drawOrder) {
     const attachment = slot.getAttachment();
@@ -51,7 +54,38 @@ function gridCellFit(skeleton, centerX, centerY, vertices) {
       vertical = Math.max(vertical, Math.abs(vertices[i + 1] - centerY));
     }
   }
-  return Math.min(1, CELL_HALF_WIDTH / horizontal, CELL_HALF_HEIGHT / vertical);
+  // Fit in the same proportion as the die so the cap cannot undo its size change.
+  return Math.min(1, CELL_HALF_WIDTH * sizeScale / horizontal, CELL_HALF_HEIGHT * sizeScale / vertical);
+}
+
+function plan02GridLimits(data, sizeScale) {
+  // Keep normal-size dice whenever they fit. Approach wide poses gradually
+  // instead of carrying the widest frame's scale through the entire round.
+  const skeleton = new spine.Skeleton(data);
+  const vertices = [];
+  const animations=Array.from({length:6},(_,index)=>data.findAnimation('spin_'+(index+1)));
+  const frames=Math.ceil(Math.max(...animations.map(animation=>animation.duration))*GRID_FIT_SAMPLE_RATE);
+  const limits=new Float64Array(frames+1).fill(1);
+  for(const animation of animations){
+    for(let frame=0;frame<=frames;frame++){
+      const time=Math.min(Math.fround(frame/GRID_FIT_SAMPLE_RATE),animation.duration);
+      skeleton.setToSetupPose();
+      skeleton.scaleX = skeleton.scaleY = REFERENCE_GRID_SCALE;
+      animation.apply(skeleton, -1, time, false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
+      skeleton.updateWorldTransform(spine.Physics.update);
+      limits[frame]=Math.min(limits[frame],gridCellFit(skeleton,0,0,vertices,sizeScale));
+    }
+  }
+  for(let i=1;i<=frames;i++)limits[i]=Math.min(limits[i],limits[i-1]+GRID_FIT_MAX_STEP);
+  for(let i=frames-1;i>=0;i--)limits[i]=Math.min(limits[i],limits[i+1]+GRID_FIT_MAX_STEP);
+  return limits;
+}
+
+function gridLimitAt(limits,time){
+  if(!limits)return 1;
+  const at=Math.max(0,Math.min(time*GRID_FIT_SAMPLE_RATE,limits.length-1));
+  const lower=Math.floor(at),upper=Math.min(lower+1,limits.length-1);
+  return limits[lower]+(limits[upper]-limits[lower])*(at-lower);
 }
 
 const backgroundImages = new Map();
@@ -181,10 +215,12 @@ export class GameRenderer {
         candidate.icon || candidate.png['大骰子'] ? loadImage(candidate.icon || candidate.png['大骰子']) : Promise.resolve(null),
       ]);
       if (id !== this.loadId || presentationId !== this.presentationId) { assets?.dispose(); software?.dispose(); return false; }
-      const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons};
+      const sizeScale = (generatedCandidate(candidate) ? data.findBone?.('all')?.scaleX : null) || 1;
+      const gridLimits = referenceCandidate(candidate) && candidate.purpleVariant === '02' ? plan02GridLimits(data, sizeScale) : null;
+      const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons,gridLimits:this.gridLimits,sizeScale:this.sizeScale};
       Object.assign(this, {assets, software, candidate, background,
         icon:icon && candidate.kind === 'six-face' ? greenPreviewIcon(icon) : icon, data,
-        skeletons:Array.from({length:6}, () => new spine.Skeleton(data))});
+        skeletons:Array.from({length:6}, () => new spine.Skeleton(data)),gridLimits,sizeScale});
       try { this.draw(); }
       catch (error) { Object.assign(this, previous); throw error; }
       previous.assets?.dispose(); previous.software?.dispose();
@@ -238,6 +274,8 @@ export class GameRenderer {
     this.playing = false;
     this.data = null;
     this.candidate = null;
+    this.gridLimits = null;
+    this.sizeScale = 1;
     this.assets?.dispose();
     this.assets = null;
     this.software?.dispose(); this.software = null;
@@ -338,7 +376,8 @@ export class GameRenderer {
     const animationTime = reference ? Math.fround(time) : time;
     const presentationGain = this.candidate.template === 'purple' ? PURPLE_PRESENTATION_SCALE : 1;
     const count = all ? 6 : 1;
-    let gridFit = 1;
+    const sizeScale = this.sizeScale ?? 1;
+    let gridFit = all ? gridLimitAt(this.gridLimits,animationTime) : 1;
     for (let index = 0; index < count; index++) {
       const skeleton = this.skeletons[index];
       const point = all ? index + 1 : selected;
@@ -350,17 +389,18 @@ export class GameRenderer {
       skeleton.x = centerX;
       skeleton.y = centerY;
       if (reference) {
-        skeleton.scaleX = skeleton.scaleY = (all ? .86 : 1.5) * PURPLE_REFERENCE_PRESENTATION_SCALE;
+        skeleton.scaleX = skeleton.scaleY = all ? REFERENCE_GRID_SCALE : 1.5 * PURPLE_REFERENCE_PRESENTATION_SCALE;
       } else if (generatedCandidate(this.candidate)) {
         const {crop,sourceSize,cropOffset} = this.candidate.geometry;
         const ratio = Math.max(crop[2],crop[3])/sourceSize;
         const size = (all ? 172 : 300) * Math.min(1,.655/ratio) * presentationGain;
         skeleton.scaleX = skeleton.scaleY = size/200;
-        skeleton.x -= cropOffset[0]*size/sourceSize;
-        skeleton.y += cropOffset[1]*size/sourceSize;
+        skeleton.x -= cropOffset[0]*size*sizeScale/sourceSize;
+        skeleton.y += cropOffset[1]*size*sizeScale/sourceSize;
       } else skeleton.scaleX = skeleton.scaleY = (all ? 0.9 : 1.6) * presentationGain;
       skeleton.updateWorldTransform(spine.Physics.update);
-      if (all) gridFit = Math.min(gridFit, gridCellFit(skeleton, centerX, centerY, this.gridVertices));
+      // The live bound also covers unsampled attachment switches between keys.
+      if (all) gridFit = Math.min(gridFit, gridCellFit(skeleton, centerX, centerY, this.gridVertices, sizeScale));
     }
 
     if (gpu) this.scene.begin();

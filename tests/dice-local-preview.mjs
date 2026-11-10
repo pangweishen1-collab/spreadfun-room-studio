@@ -6,7 +6,7 @@ import {deflateSync} from 'node:zlib';
 import {createLocalPreview,validateFiles,validateSettings,inspectPNG,detectComposition,atlasText,SLOTS,VIDEO_PROFILE,resourceName,validatePurpleFiles} from '../dice/local-preview.mjs';
 import {VIDEO_SPEC} from '../dice/video-export.mjs';
 import {nativeRuntimeFixture} from './helpers/purple-fixtures.mjs';
-import {PURPLE_REFERENCE_MOTION_VERSION} from '../dice/purple-reference/runtime.mjs';
+import {PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION} from '../dice/purple-reference/runtime.mjs';
 import {writeSpineBinary} from '../dice/six-face/spine-binary.mjs';
 process.on('uncaughtException',error=>{console.error(error?.message||String(error));process.exitCode=1;});
 
@@ -24,7 +24,8 @@ function png(size,alpha=255) {
   return Buffer.concat([Buffer.from([137,80,78,71,13,10,26,10]),chunk('IHDR',ihdr),chunk('IDAT',deflateSync(pixels)),chunk('IEND')]);
 }
 const files=SLOTS.map(slot=>({name:slot==='大骰子'?'icon.png':slot+'.png',data:'data:image/png;base64,'+png(slot==='大骰子'?240:200).toString('base64')}));
-const payload={name:'仙人掌旧十图',grade:'purple',mode:'all',point:1,composition:'auto',files};
+const defaultPayload={name:'仙人掌旧十图',grade:'purple',mode:'all',point:1,composition:'auto',files};
+const payload={...defaultPayload,purpleVariant:'05'};
 function memoryStore() {
   const records=new Map();return {records,fail:false,writes:0,
     async get(id){return structuredClone(records.get(id));},
@@ -89,9 +90,12 @@ assert.equal(validateFiles([...files,{...files[0],name:'大骰子.png'}])[0].nam
 assert.throws(()=>validateSettings({...payload,point:true}));assert.throws(()=>validateSettings(null));
 for(const invalid of [{mode:'unknown'},{point:0},{point:7},{point:null}])assert.throws(()=>validateSettings({...payload,...invalid}));
 for(const mode of ['all','single','continuous'])assert.deepEqual(
-  validateSettings({...payload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',previewGrade:'purple',mode:'all',point:1,composition:'auto',soundEnabled:true});
+  validateSettings({...defaultPayload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',previewGrade:'purple',purpleVariant:'02',mode:'all',point:1,composition:'auto',soundEnabled:true});
+assert.equal(validateSettings(payload).purpleVariant,'05');
 assert.equal(validateSettings({...payload,previewGrade:'green'}).previewGrade,'green');
 for(const previewGrade of ['unknown',null,true])assert.throws(()=>validateSettings({...payload,previewGrade}));
+assert.equal(validateSettings({...payload,purpleVariant:'02'}).purpleVariant,'02');
+assert.throws(()=>validateSettings({...payload,purpleVariant:'01'}),/02 或 05/);
 assert.equal(VIDEO_PROFILE,'loop6-v7-60fps-audio-1500kb');
 assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_500_000);
 assert.equal(inspectPNG(new Uint8Array(png(200)),'sz_0').width,200);
@@ -359,22 +363,26 @@ checks.push('explicit_faces_skip_six_duplicate_alpha_decodes_background_edits_st
 // Reference 05 previews and downloads use the already generated binary.
 // A rename or preview-only background edit must not rebake that runtime.
 let referenceBuilds=0;
+const referenceStorage=memoryStore();
 const referenceAdapter=createLocalPreview({
-  ...dependencies, storage:memoryStore(), renderPurpleGyro:undefined,
+  ...dependencies, storage:referenceStorage, renderPurpleGyro:undefined,
   async renderPurpleReference(_files,options) {
     referenceBuilds++;
     const fixture=nativeRuntimeFixture(options);
     fixture.json.skeleton.images='./res/';
     fixture.json.skeleton.audio='./sound/';
+    if(options.variant==='02')fixture.json.skeleton.width++;
     return {
       ...fixture, kind:'purple-reference',
       skel:new Blob([writeSpineBinary(fixture.json)],{type:'application/octet-stream'}),
-      metadata:{...fixture.metadata,motionVersion:PURPLE_REFERENCE_MOTION_VERSION},
+      metadata:{...fixture.metadata,variant:options.variant,
+        motionVersion:options.variant==='02'?PURPLE_PLAN_02_MOTION_VERSION:PURPLE_REFERENCE_MOTION_VERSION},
     };
   },
 });
 const importedReference=await referenceAdapter.api('/api/preview/import',{method:'POST',body:payload});
 assert.equal(importedReference.kind,'purple-reference');
+assert.equal(importedReference.purpleVariant,'05');
 const referenceBinary=urlBlobs.get(importedReference.candidate.skel);
 assert.ok(referenceBinary instanceof Blob);
 const renamedReference=await referenceAdapter.api(`/api/preview/${importedReference.id}/settings`,{
@@ -394,8 +402,40 @@ const packagedAtlas=await decodedReferenceZip.file(referenceBase+'.atlas').async
 const previewAtlas=await urlBlobs.get(renamedReference.candidate.atlas).text();
 assert.equal(packagedAtlas,previewAtlas.replace(/^[^\r\n]+/,referenceZip.name+'.png'));
 assert.equal(referenceBuilds,1);
-referenceAdapter.dispose();
 checks.push('reference05_preview_download_reuse_identical_native_binary_and_texture_after_name_and_background_changes');
+
+const path=`/api/preview/${importedReference.id}`;
+const referenceVideoHeaders={'Content-Type':'video/h264','X-Preview-Revision':'2','X-Candidate-Id':renamedReference.candidate.id};
+await referenceAdapter.api(path+'/video',{method:'POST',headers:referenceVideoHeaders,body:input});
+const changedReference=await referenceAdapter.api(path+'/settings',{method:'POST',body:{expectedRevision:2,purpleVariant:'02'}});
+assert.equal(changedReference.purpleVariant,'02');
+assert.equal(changedReference.candidate.purpleVariant,'02');
+assert.equal(changedReference.video,null);
+assert.notEqual(changedReference.candidate.skel,renamedReference.candidate.skel);
+assert.deepEqual(changedReference.files,renamedReference.files);
+await rejects(()=>referenceAdapter.api(path+'/video',{method:'POST',headers:referenceVideoHeaders,body:input}),409);
+const changedPackage=await referenceAdapter.api(path+'/bundle');
+const changedZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(changedPackage.url).arrayBuffer()));
+const changedBinary=await changedZip.file(`${changedPackage.name}/${changedPackage.name}.skel`).async('uint8array');
+assert.deepEqual(changedBinary,new Uint8Array(await urlBlobs.get(changedReference.candidate.skel).arrayBuffer()));
+assert.notDeepEqual(changedBinary,new Uint8Array(await referenceBinary.arrayBuffer()));
+const withBackground=await referenceAdapter.api(path+'/settings',{method:'POST',body:{expectedRevision:3,previewGrade:'purple'}});
+assert.equal(referenceBuilds,2);
+assert.equal(withBackground.purpleVariant,'02');
+assert.equal(withBackground.candidate.skel,changedReference.candidate.skel);
+const outdated=await referenceStorage.get(importedReference.id);
+outdated.runtime.metadata.motionVersion=PURPLE_REFERENCE_MOTION_VERSION;
+referenceStorage.records.set(outdated.id,outdated);
+const regenerated=await referenceAdapter.api(path);
+assert.equal(regenerated.revision,5);
+assert.equal(regenerated.purpleVariant,'02');
+assert.equal(referenceBuilds,3);
+assert.equal((await referenceStorage.get(outdated.id)).runtime.metadata.motionVersion,PURPLE_PLAN_02_MOTION_VERSION);
+const returnedReference=await referenceAdapter.api(path+'/settings',{method:'POST',body:{expectedRevision:5,purpleVariant:'05'}});
+assert.equal(returnedReference.purpleVariant,'05');
+assert.equal(referenceBuilds,4);
+referenceAdapter.dispose();
+checks.push('purple_variant_switch_rebuilds_the_baked_assets_and_exports_reject_stale_videos_while_background_changes_reuse_the_bake');
 
 const temporaryDependencies={...dependencies,storage:undefined};
 const currentPage=createLocalPreview(temporaryDependencies);
