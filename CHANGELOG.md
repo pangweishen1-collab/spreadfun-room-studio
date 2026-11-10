@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.18.1 - 2026-11-10
+
+### Dice tool
+
+- Default purple dice to 02 B, the dual-axis toss.
+- Make each die 5% smaller in live previews, MP4s, and exported Spine packages.
+
 ## 1.18.0 - 2026-11-10
 
 ### Custom avatar frames
