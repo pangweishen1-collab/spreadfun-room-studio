@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.16.0 - 2026-11-10
+
+### Custom avatar frames
+
+- List embedded SVGA bitmaps below the preview with individual downloads, multi-select deletion, original-image recovery, and support for adding multiple images.
+- Drag selected original and added images together in the preview. Export the new positions while retaining the animation timing.
+- Show estimated decoded image and canvas memory beside the source details. Reject exports that exceed 3 MB of estimated runtime memory or 3 MB on disk.
+
 ## 1.15.10 - 2026-11-09
 
 ### Dice preview
