@@ -104,7 +104,7 @@
     $('#roomTool').classList.toggle('hidden',next!=='room');$('#avatarTool').classList.toggle('hidden',next!=='avatar');$('#bannerTool').classList.toggle('hidden',next!=='banner');
     $('#resourceTool').classList.toggle('hidden',next!=='resources');
     $('#giftPreviewTool').classList.toggle('hidden',next!=='gift-preview');
-    $('#vapTool')?.classList.toggle('hidden',next!=='vap');window.VapTool?.setActive(next==='vap');
+    $('#vapTool')?.classList.toggle('hidden',next!=='vap');(window.VapWorkspace||window.VapTool)?.setActive(next==='vap');
     $('#diceTool')?.classList.toggle('hidden',next!=='dice');window.DicePreview?.setActive(next==='dice');
     window.FunToolkitUI?.activate(next);
     document.querySelectorAll('[data-tool-link]').forEach(link=>{if(link.dataset.toolLink===next)link.setAttribute('aria-current','page');else link.removeAttribute('aria-current')});

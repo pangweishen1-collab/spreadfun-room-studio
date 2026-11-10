@@ -1,7 +1,7 @@
 import {createNativeVapPlanes} from './vap-native-planes.mjs?v=20261102-native-gpu3';
 import {createQualitySampler,evaluateQualitySamples} from './vap-quality.mjs?v=20261101-smart-ultra3';
 import {computeVapLayout, makeVapc, appendVapcBox, extractVapcBox, validateVapc} from './vap-protocol.mjs?v=20261028-resources1';
-import {detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261102-gradientkey3';
+import {detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261110-custom-plate';
 import {inspectImageSequence, sequenceMetadata, decodeSequenceFrame} from './vap-sequence.mjs?v=20261029-sequence-speed1';
 export {inspectImageSequence, sequenceMetadata, decodeSequenceFrame};
 import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261102-release174';
@@ -207,27 +207,31 @@ async function open(file){
   }catch(error){input.dispose();if(error instanceof VapError)throw error;throw new VapError('file','视频读取失败，请使用完整的 MP4 文件。',error)}
 }
 
-async function detectSampledSource({M,video,info}){
+async function detectSampledSource({M,video,info},{allowCustomScreen}){
   let surface;
   try{
     const scale=Math.min(1,128/Math.max(info.width,info.height));
     const width=Math.max(1,Math.round(info.width*scale)),height=Math.max(1,Math.round(info.height*scale));
     surface=canvas(width,height);const sink=new M.CanvasSink(video,{poolSize:1}),frames=[];
     for(const fraction of [.12,.5,.85]){
-      const frame=await sink.getCanvas(info.duration*fraction);if(!frame)continue;
+      const frame=await sink.getCanvas((info.videoStart??0)+(info.videoDuration??info.duration)*fraction);if(!frame)continue;
       surface.ctx.clearRect(0,0,width,height);surface.ctx.drawImage(frame.canvas,0,0,width,height);
       frames.push(surface.ctx.getImageData(0,0,width,height));
     }
-    return detectVideoSource(frames);
+    return detectVideoSource(frames,{allowCustomScreen});
   }catch(ignored){return {sourceKind:'plain_mp4',screenColor:'auto',confidence:0}}
   finally{if(surface)surface.canvas.width=surface.canvas.height=1}
 }
 
-export async function inspectVideo(file,{detectSource=false,sourceVapConfig}={}){
+export async function inspectVideo(file,{detectSource=false,sourceVapConfig,videoTrackOnly=false,allowCustomScreen=false}={}){
   const opened=await open(file);
   try{
-    const info=sourceVapConfig?{...opened.info,videoDuration:await opened.video.computeDuration()}:opened.info;
-    return detectSource?{...info,sourceDetection:await detectSampledSource(opened)}:info;
+    const info={...opened.info};
+    if(videoTrackOnly){
+      const [start,end]=await Promise.all([opened.video.getFirstTimestamp(),opened.video.computeDuration()]);
+      info.videoStart=start;info.videoDuration=end-start;
+    }else if(sourceVapConfig)info.videoDuration=await opened.video.computeDuration();
+    return detectSource?{...info,sourceDetection:await detectSampledSource({...opened,info},{allowCustomScreen})}:info;
   }
   finally{opened.input.dispose()}
 }

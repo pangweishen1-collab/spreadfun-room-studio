@@ -14,7 +14,7 @@ export function classifyScreenColor(rgb){
   hue=(hue*60+360)%360;
   return hue<15||hue>=345?'red':hue<45?'orange':hue<75?'yellow':hue<165?'green':hue<200?'cyan':hue<270?'blue':'magenta';
 }
-function analyzeNeutralFrame(frame){
+function analyzeNeutralFrame(frame,allowCustomScreen){
   const {width,height,data}=frame||{};
   if(!Number.isInteger(width)||!Number.isInteger(height)||width<8||height<8||width>4096||height>4096||width*height>8388608||!data||data.length!==width*height*4)return null;
   // Inspect the original perimeter before the chroma detector removes black
@@ -35,7 +35,8 @@ function analyzeNeutralFrame(frame){
   if(sides.some(side=>side.length<2))return null;
   const border=sides.flat(),initial=center(border),spread=Math.max(...initial)-Math.min(...initial);
   const matteMethod=spread<=2?(Math.max(...initial)<=4?'black_luma':Math.min(...initial)>=251?'white_luma':null):null;
-  if(!matteMethod)return null;
+  const custom=allowCustomScreen&&!matteMethod&&!colored(initial);
+  if(!matteMethod&&!custom)return null;
   const matching=border.filter(rgb=>distance(rgb,initial)<=10),ratio=matching.length/border.length;
   if(ratio<.965)return null;
   const background=center(matching),near=rgb=>distance(rgb,background)<=10;
@@ -47,8 +48,8 @@ function analyzeNeutralFrame(frame){
   // ignored, but must never trigger luma removal by themselves.
   if(backgroundRatio>=.999)return {blank:true};
   const foregroundRatio=all.filter(rgb=>distance(rgb,background)>=48).length/all.length;
-  if(backgroundRatio<.30||foregroundRatio<.03||foregroundRatio>.70)return null;
-  return {matteMethod,background,confidence:Math.min(ratio,consistent,sideRatio)};
+  if(backgroundRatio<(custom ? .33 : .30)||foregroundRatio<.03||foregroundRatio>.70)return null;
+  return {...(custom?{color:'custom'}:{matteMethod}),background,confidence:Math.min(ratio,consistent,sideRatio)};
 }
 function analyzeFrame(frame,minSide){
   const {width,height,data}=frame||{};
@@ -167,10 +168,10 @@ export function detectFrameScreen(frame){
  * frames are ignored. Mixed plate RGB or regular-frame evidence falls back to
  * regular MP4 so uncertain detection never enables destructive keying.
  */
-export function detectVideoSource(frames){
+export function detectVideoSource(frames,{allowCustomScreen=false}={}){
   if(!Array.isArray(frames)||!frames.length)return plain();
   const samples=frames.map(frame=>{
-    const neutral=analyzeNeutralFrame(frame);
+    const neutral=analyzeNeutralFrame(frame,allowCustomScreen);
     if(neutral?.blank)return null;if(neutral)return neutral;
     const uniform=analyzeFrame(frame,8);return uniform?.color?uniform:analyzeGradientFrame(frame)||uniform;
   }).filter(Boolean);
@@ -186,10 +187,12 @@ export function detectVideoSource(frames){
   }
   const matches=samples.filter(sample=>sample.color);
   if(matches.length<Math.min(2,samples.length)||matches.length/samples.length<.75)return plain();
+  const custom=matches.some(sample=>sample.color==='custom');
+  if(custom&&(matches.length<2||matches.length!==samples.length||matches.some(sample=>sample.color!=='custom')))return plain();
   const background=center(matches.map(sample=>sample.background));
   // Family names alone cannot distinguish a red screen changing to orange/red,
   // or two different greens. One stable plate RGB is shared by preview/export.
-  if(matches.some(sample=>distance(sample.background,background)>18))return plain();
+  if(matches.some(sample=>distance(sample.background,background)>(custom?10:18)))return plain();
   const variation=matches.some(sample=>sample.backgroundVariation);
   if(variation){
     if(matches.some(sample=>!sample.backgroundVariation||sample.color!==matches[0].color))return plain();

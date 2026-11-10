@@ -38,6 +38,16 @@ const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*
   assert.deepEqual(detectVideoSource([red1,red1,red2]),plain,'different actual RGB plates are contradictory even within the same red family');
   const tanRoom=sample((x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[14,210,30,255]:[100,83,70,255]);
   assert.deepEqual(detectVideoSource([tanRoom,tanRoom,tanRoom]),plain,'a flat neutral brown room stays regular despite a colored subject');
+  const customOptions={allowCustomScreen:true};
+  for(const background of [[12,12,12],[145,132,164],[202,183,169],[120,120,120]]){
+    const frame=sample(plate(background));
+    const result=detectVideoSource([frame,frame,frame],customOptions);
+    assert.equal(result.sourceKind,'chroma_mp4','detect a stable custom plate in review');
+    assert.equal(result.screenColor,'custom');
+    assert.deepEqual(result.background,background);
+    assert.deepEqual(detectVideoSource([frame],customOptions),plain,'require two samples for a custom plate');
+    assert.deepEqual(detectVideoSource([frame,frame,sample(regular)],customOptions),plain,'mixed scenes stay untouched');
+  }
   for(const neutral of [[12,12,12],[125,125,125],[244,244,244],[255,253,250]]){
     const frame=sample(plate(neutral));
     assert.deepEqual(detectVideoSource([frame,frame,frame]),plain,'gray, off-white and tinted walls remain ordinary MP4');

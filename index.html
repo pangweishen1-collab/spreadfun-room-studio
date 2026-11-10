@@ -60,6 +60,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="gift-preview.css?v=20261102-soft-dividers1">
   <link rel="stylesheet" href="vap-resources.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="vap-tool.css?v=20261103-eyedropper1">
+  <link rel="stylesheet" href="vap-review.css?v=20261110-review-mask">
   <link rel="stylesheet" href="webp-settings.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="project-selector.css?v=20261026-projects1">
   <link rel="stylesheet" href="resource-library.css?v=20261101-field-labels2">
@@ -312,6 +313,11 @@ body{min-width:320px}
 </main>
 
   <main id="vapTool" class="hidden" data-tool="vap" data-state="idle" data-export-revision="rgb-feather-v1" aria-labelledby="vapTitle">
+    <div class="avatar-subtabs vap-review-tabs" role="tablist" aria-label="VAP 工作台">
+      <button id="vapConvertTab" type="button" role="tab" aria-selected="true" aria-controls="vapConvertPanel" data-review-text="convertTab">VAP 工具</button>
+      <button id="vapReviewTab" type="button" role="tab" aria-selected="false" aria-controls="vapReviewPanel" tabindex="-1" data-review-text="reviewTab">预览功能</button>
+    </div>
+    <section id="vapConvertPanel" role="tabpanel" aria-labelledby="vapConvertTab">
     <div class="intro tool-intro vap-intro"><h1 id="vapTitle" data-vap-i18n="title">VAP 转换工具</h1><button class="vap-help" id="vapHelp" type="button" data-vap-i18n="help">使用说明</button><a class="vap-help vap-inspect-link" href="vap-inspect.html?v=20261102-release174" target="_blank" rel="noopener"><svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><rect x="2.5" y="3.5" width="15" height="13" rx="3"/><path d="m8 7 5 3-5 3Z"/></svg><span data-vap-i18n="inspectVap">查看 VAP 成品</span></a></div>
     <div class="vap-workspace">
       <section class="card vap-card" aria-labelledby="vapPreviewTitle">
@@ -415,6 +421,72 @@ body{min-width:320px}
     <input id="vapSequenceInput" type="file" accept="video/mp4,image/png,image/webp,image/jpeg,application/zip,application/x-zip-compressed,.mp4,.png,.webp,.jpg,.jpeg,.zip" multiple hidden>
     <input id="vapMaskInput" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,.png,.jpg,.jpeg,.webp,.mp4" hidden>
     <dialog id="vapHelpDialog" aria-labelledby="vapHelpTitle"><div class="vap-help-head"><h2 id="vapHelpTitle" data-vap-i18n="helpTitle">VAP 转换使用说明</h2><button id="vapHelpClose" class="vap-button vap-secondary" type="button" data-vap-i18n="close">关闭</button></div><ol><li data-vap-i18n="helpOne">直接上传 MP4、同尺寸图片序列或一个 ZIP，自动识别类型；序列按文件名数字排序。</li><li data-vap-i18n="helpTwo">上传后自动识别去背景方式；需要调整时展开高级设置。先检查透明效果和 Alpha，黑白底方式可能影响相近颜色的主体。</li><li data-vap-i18n="helpThree">设置尺寸、Alpha 分辨率和目标体积，再开始转换。0.5 / 1.0 表示 Alpha 平面分辨率，不是整体透明度。</li><li data-vap-i18n="helpFour">下载 MP4，旧版网页播放器可配合 vapc.json 使用。成品是否适配具体 iOS / Android SDK，仍需目标设备实测。</li></ol><div class="vap-guide-details"><h3 data-vap-i18n="parameterGuide">参数说明</h3><p class="vap-hint vap-method-hint" id="vapMethodHint"></p><p class="vap-hint" data-vap-i18n="resultPreviewHint">VAP MP4 拼接存储 RGB 与黑白 Alpha；请在本页“透明播放”或 VAP SDK 中查看合成效果。</p><p class="vap-hint" data-vap-i18n="verticalMaskHint">拖动画面中的四条辅助线，或输入百分比。上、下边缘平滑过渡到透明，中间画面保留；辅助线不写入成品。</p><p class="vap-hint" data-vap-i18n="maskLiveHint">遮罩调整实时生效，预览与导出使用当前参数；若已生成成品，修改后需重新转换。</p><p class="vap-hint" data-vap-i18n="giftFadeHint">礼物默认淡入、淡出各 1 秒；设为 0 秒可取消对应一侧的渐变。短片会按比例缩短两端时长，少于 3 帧时保留原画面，避免整段全透明。</p><p class="vap-hint" data-vap-i18n="rgbFeatherHint">同步羽化会把渐隐写入 RGB 与 Alpha；接入要求直通 RGB 的 SDK 时请选择标准 Alpha。</p><div class="vap-lock" data-vap-i18n="ratioLocked">输出比例锁定</div><p id="vapAlphaHint" class="vap-hint" data-vap-i18n="alphaHalfHint">透明边缘宽高各减半，RGB 保持完整尺寸；不是 50% 透明度。</p><p class="vap-hint" data-vap-i18n="budgetHint">5 秒内成品上限为 1.5 MB，较长视频上限为 3 MB；可手动设置更小体积。保留所选尺寸、帧率与透明效果，按实际文件大小自动调整码率，无法达标时不提供超标文件。</p><p id="vapVolumeHint" class="vap-hint" data-vap-i18n="volumeHint">本站移动端推荐默认 60%（相对原片约 -4.4 dB），预览与导出同时生效；100% 保持原音量，0% 无声。这是音频增益预设，不是 LUFS 自动响度归一化；实际响度受原片、播放器与设备音量影响，交付前请在目标手机中试听。</p><p class="vap-hint" data-vap-i18n="codecHint">优先使用高清 H.264 编码，不支持时自动回退兼容配置；原音量 AAC 直接保留，调整音量时在本机重新编码声音。</p></div><p class="vap-hint" data-vap-i18n="privacy">视频与声音仅在本机处理，不上传至服务器。</p></dialog>
+    </section>
+    <section id="vapReviewPanel" role="tabpanel" aria-labelledby="vapReviewTab" hidden>
+      <section class="card vap-card vap-review-card" aria-labelledby="vapReviewTitle">
+        <h2 class="vap-review-heading" id="vapReviewTitle" data-review-text="title">房间礼物过稿</h2>
+        <div class="vap-review-options">
+          <div class="vap-review-field">
+            <label for="vapReviewBackground" data-review-text="background">房间背景</label>
+            <div class="ft-select">
+              <select id="vapReviewBackground"><option value="ludo" data-review-text="ludo">Hapi Ludo 房间</option><option value="dark" data-review-text="dark">深色对比</option><option value="custom" data-review-text="custom">自定义背景</option></select>
+              <svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+            </div>
+          </div>
+          <div class="vap-review-field">
+            <label for="vapReviewCount" data-review-text="count">礼物数量</label>
+            <div class="ft-select">
+              <select id="vapReviewCount"><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option></select>
+              <svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
+            </div>
+          </div>
+          <button id="vapReviewPickBackground" class="vap-button vap-secondary" type="button" data-review-text="uploadBackground">上传背景</button>
+        </div>
+        <div class="vap-review-view" id="vapReviewStage" tabindex="0" role="group" aria-label="房间对比预览">
+          <div class="vap-review-frame" id="vapReviewFrame">
+            <canvas id="vapReviewCanvas" role="img" width="672" height="500" aria-label="礼物同步播放预览"></canvas>
+            <div class="vap-review-editors" id="vapReviewEditors"></div>
+          </div>
+        </div>
+        <div class="vap-review-playback">
+          <button id="vapReviewPlay" class="vap-button vap-secondary" type="button" disabled data-review-text="play">同步播放</button>
+          <label class="vap-sr-only" for="vapReviewTimeline" data-review-text="timeline">播放时间</label>
+          <input id="vapReviewTimeline" type="range" min="0" max="0" value="0" step=".01" disabled>
+          <output id="vapReviewTime" for="vapReviewTimeline">0.00 / 0.00 s</output>
+        </div>
+        <p class="vap-hint vap-review-edit-hint" id="vapReviewEditHint" data-review-text="editHint" hidden>拖动视频调整位置，拖蓝线上的百分比手柄调整遮罩。</p>
+        <p class="vap-notice vap-review-input-status" id="vapReviewInputStatus" role="status" hidden></p>
+      </section>
+      <section class="card vap-card vap-review-card" aria-labelledby="vapReviewSlotsTitle">
+        <div class="vap-card-heading"><h2 id="vapReviewSlotsTitle" data-review-text="slots">礼物调整</h2><span class="vap-format">MP4</span></div>
+        <div id="vapReviewSlots" class="vap-review-slots"></div>
+      </section>
+      <section class="card vap-card vap-review-card vap-review-delivery" aria-labelledby="vapReviewDeliveryTitle">
+        <div><h2 data-review-text="templates">过稿模板</h2>
+          <p class="vap-hint" data-review-text="templateHint">保存背景、礼物数量、尺寸、位置和渐变。视频素材可重新替换。</p>
+          <div class="vap-review-template-controls">
+            <label class="vap-sr-only" for="vapReviewTemplateName" data-review-text="templateName">模板名称</label>
+            <input id="vapReviewTemplateName" type="text" maxlength="40" placeholder="输入模板名称">
+            <button id="vapReviewSaveTemplate" class="vap-button vap-secondary" type="button" data-review-text="saveTemplate">保存模板</button>
+            <label class="vap-sr-only" for="vapReviewTemplates" data-review-text="templates">过稿模板</label>
+            <select id="vapReviewTemplates"><option value="" data-review-text="pickTemplate">选择已保存模板</option></select>
+            <button id="vapReviewApplyTemplate" class="vap-button vap-secondary" type="button" disabled data-review-text="applyTemplate">套用模板</button>
+          </div>
+        </div>
+        <div><h2 id="vapReviewDeliveryTitle" data-review-text="delivery">合成视频</h2>
+          <p class="vap-hint" data-review-text="exportHint">时长以最长视频为准，导出一条 30 FPS 无声 MP4。</p>
+          <div class="vap-review-actions">
+            <button id="vapReviewExport" class="vap-button vap-primary" type="button" disabled data-review-text="export">导出对比 MP4</button>
+            <button id="vapReviewCancel" class="vap-button vap-secondary" type="button" hidden data-review-text="cancel">取消</button>
+            <a id="vapReviewDownload" class="vap-button vap-secondary" download hidden data-review-text="download">下载 MP4</a>
+          </div>
+          <progress id="vapReviewProgress" max="100" value="0" hidden></progress>
+        </div>
+        <p id="vapReviewStatus" class="vap-notice" role="status" hidden></p>
+      </section>
+      <input id="vapReviewFile" type="file" accept="video/mp4,.mp4" hidden>
+      <input id="vapReviewBackgroundFile" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden>
+    </section>
   </main>
 
   <main id="resourceTool" class="hidden" data-tool="resources" aria-labelledby="resourceTitle">
@@ -794,6 +866,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="vap-resource-editor.js?v=20261102-release174"></script>
   <script src="vap-tool.js?v=20261103-eyedropper1"></script>
   <script src="dice-embed.js?v=20261103-dice1"></script>
-  <script src="toolkit.js?v=20261103-dice1"></script>
+  <script src="toolkit.js?v=20261110-vap-review"></script>
+  <script type="module" src="vap-review.js?v=20261110-review-mask"></script>
   <script type="module" src="avatar-custom.js?v=20261110-svga-layout"></script>
 </body></html>
