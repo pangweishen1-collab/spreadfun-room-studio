@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.18.8 - 2026-11-11
+
+### VAP converter
+
+- Export every VAP at a packed size of 1088 × 1568 with a 720 × 1560 display area, half-resolution alpha and 24 FPS H.264 Baseline.
+- Download a 17AE preview copy for dynamic VAPs. It preserves the encoded animation, sound and transparency while the regular export retains the avatar and text tags.
+
 ## 1.18.7 - 2026-11-11
 
 ### Gift images
