@@ -59,7 +59,7 @@ let source=fs.readFileSync(path.join(__dirname,'../vap-tool.js'),'utf8');
 const engineImport=source.match(/^  const getEngine=.*$/m);assert.ok(engineImport,'engine loader must be stubbed before controller tests');source=source.replace(engineImport[0],'  const getEngine=()=>Promise.resolve(window.__engine).then(module=>(engineApi=module));');
 const resourceImport=source.match(/^  const getResourceModule=.*$/m);assert.ok(resourceImport);source=source.replace(resourceImport[0],'  const getResourceModule=()=>Promise.resolve(window.__resourceModule);');
 const fadeImport=source.match(/^  const getGiftFadeModule=.*$/m);assert.ok(fadeImport);source=source.replace(fadeImport[0],'  const getGiftFadeModule=()=>Promise.resolve(window.__giftFadeModule);');
-source=source.replace("const protocol=await import('./vap-protocol.mjs?v=20261028-resources1');",'const protocol={readSourceVapConfig:async file=>file.vapConfig||null};');
+source=source.replace(/const protocol=await import\('\.\/vap-protocol\.mjs\?v=[^']+'\);/,'const protocol={readSourceVapConfig:async file=>file.vapConfig||null};');
 source=source.replace(/if\(!previewProcessor\)previewProcessor=import\('\.\/vap-matte\.mjs\?v=[^']+'\)\.then\(module=>module\.createMatteProcessor\(opts\)\)\.catch\(error=>\{previewProcessor=null;throw error\}\);/,"if(!previewProcessor){window.__previewCreates++;window.__lastPreviewOptions=opts;previewProcessor=Promise.resolve(window.__previewProcessor)}");
 const marker='window.VapTool={setActive,setLanguage};';assert.ok(source.includes(marker));source=source.replace(marker,marker+'window.test={state,options,loadFiles,loadSequence,convert,cancel,download,filename,invalidate,validVerticalMask,setVideoOffsetY};');
 const maskPreferences=new Map(),maskStorage={getItem:key=>maskPreferences.get(key)??null,setItem:(key,value)=>maskPreferences.set(key,value)};sandbox.window.localStorage=maskStorage;
@@ -511,8 +511,17 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     await effects.loadFiles([file({name:'effects-ordinary.mp4'})]);setValue('MaskTopEnd',25);setValue('MaskBottomStart',75);setValue('GiftFadeIn',.5);setValue('GiftFadeOut',2);
     const ordinary=snapshot(),savedOrdinary=maskPreferences.get(preferenceKey),ordinaryFile=effects.state.file;
     await effects.loadFiles([nativeSource('invalid-native.mp4',{width:1087})]);assert.equal(effects.state.file,ordinaryFile);assert.equal(snapshot(),ordinary,'native validation failure leaves ordinary settings untouched');assert.equal(maskPreferences.get(preferenceKey),savedOrdinary);
-    const oldDetector=sandbox.window.__detectSource;
-    const cancelImport=async replacement=>{let finish;sandbox.window.__detectSource=async()=>new Promise(resolve=>{finish=resolve});const pending=effects.loadFiles([replacement]);await flush();effects.cancel();finish({sourceKind:'plain_mp4',screenColor:'auto',confidence:0});await pending;sandbox.window.__detectSource=oldDetector;};
+    const inspectVideo=engine.inspectVideo;
+    const cancelImport=async replacement=>{
+      let finish;
+      engine.inspectVideo=async (...args)=>{
+        await new Promise(resolve=>{finish=resolve});
+        return inspectVideo(...args);
+      };
+      try{
+        const pending=effects.loadFiles([replacement]);await flush();effects.cancel();finish();await pending;
+      }finally{engine.inspectVideo=inspectVideo;}
+    };
     await cancelImport(nativeSource('cancelled-native.mp4'));assert.equal(effects.state.file,ordinaryFile);assert.equal(snapshot(),ordinary,'cancelled native import does not enter native effect mode');
     await effects.loadFiles([nativeSource()]);assert.equal(effects.state.view,'transparent','native input stays in its unpacked transparent view even with both extra effects off');
     assert.equal(effects.options().verticalMask.enabled,false);assert.equal(effects.options().giftFade.enabled,false);assert.equal(get('#vapMaskEnabled').checked,false);assert.equal(get('#vapGiftFadeEnabled').checked,false);assert.equal(get('#vapMaskStatus').textContent,'未启用');assert.equal(get('#vapGiftFadeStatus').textContent,'未启用');assert.equal(get('#vapMaskOverlay').hidden,true);

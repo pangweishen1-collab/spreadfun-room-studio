@@ -60,7 +60,7 @@ export function computeVapLayout({
 export function makeVapc({
   width = 720, height = 1560, fps = 24, frames = 240,
   alphaScale = 0.5, gap = 8, orientation = 'horizontal', packedLayout,
-} = {}) {
+} = {}, validation) {
   checkInt('fps', fps, 1, 120);
   checkInt('frames', frames, 1, 100_000);
   const layout = packedLayout || computeVapLayout({width, height, alphaScale, gap, orientation});
@@ -79,7 +79,7 @@ export function makeVapc({
       orien: 0,
     }
   };
-  validateVapc(vapc);
+  validateVapc(vapc, validation);
   return vapc;
 }
 
@@ -88,7 +88,7 @@ function rectsOverlap(a, b) {
     && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
 }
 
-export function validateVapc(config) {
+export function validateVapc(config, {allowUnaligned = false} = {}) {
   const i = config?.info;
   if (!i || typeof i !== 'object') throw new TypeError('vapc.info missing');
   for (const k of REQUIRED_INFO_FIELDS) {
@@ -101,7 +101,7 @@ export function validateVapc(config) {
   checkInt('fps', i.fps, 1, 120);
   checkInt('videoW', i.videoW, 1, 16384);
   checkInt('videoH', i.videoH, 1, 16384);
-  if (i.videoW % 16 !== 0 || i.videoH % 16 !== 0) {
+  if (!allowUnaligned && (i.videoW % 16 !== 0 || i.videoH % 16 !== 0)) {
     throw new Error('reference exporter expects packed dimensions aligned to 16');
   }
   if (![0, 1].includes(i.isVapx) || i.orien !== 0) {

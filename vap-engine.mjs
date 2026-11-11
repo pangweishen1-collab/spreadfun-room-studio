@@ -1,7 +1,7 @@
 import {createNativeVapPlanes} from './vap-native-planes.mjs?v=20261102-native-gpu3';
 import {createQualitySampler,evaluateQualitySamples} from './vap-quality.mjs?v=20261101-smart-ultra3';
-import {computeVapLayout, makeVapc, appendVapcBox, extractVapcBox, validateVapc} from './vap-protocol.mjs?v=20261028-resources1';
-import {detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261110-custom-plate';
+import {computeVapLayout, makeVapc, appendVapcBox, extractVapcBox, validateVapc} from './vap-protocol.mjs?v=20261111-packed-alpha';
+import {detectPackedAlphaSide, detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261111-packed-alpha';
 import {inspectImageSequence, sequenceMetadata, decodeSequenceFrame} from './vap-sequence.mjs?v=20261029-sequence-speed1';
 export {inspectImageSequence, sequenceMetadata, decodeSequenceFrame};
 import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261102-release174';
@@ -91,7 +91,7 @@ export function normalizeOptions(options={},metadata={}){
   if(!['dynamic','baked'].includes(o.resourceMode??'dynamic'))throw new VapError('invalid','资源导出方式无效。');
   o.resourceMode ??= 'dynamic';
   if(o.sourceVapConfig){
-    try{validateVapc(o.sourceVapConfig)}catch(error){throw new VapError('invalid','原 VAP 配置无效，无法读取头像或文字动画。',error)}
+    try{validateVapc(o.sourceVapConfig,{allowUnaligned:true})}catch(error){throw new VapError('invalid','原 VAP 配置无效，无法读取头像或文字动画。',error)}
     if(metadata.width&&(metadata.width!==o.sourceVapConfig.info.videoW||metadata.height!==o.sourceVapConfig.info.videoH))throw new VapError('invalid','原 VAP 配置与视频实际尺寸不符。');
   }
   try{o.resources=normalizeResources(o.resources||[],{width:o.width,height:o.height,duration:metadata.duration||120,sourceVapConfig:o.sourceVapConfig})}
@@ -222,11 +222,12 @@ async function open(file,{videoTrackOnly=false}={}){
   }catch(error){input.dispose();if(error instanceof VapError)throw error;throw new VapError('file','视频读取失败，请使用完整的 MP4 文件。',error)}
 }
 
-async function detectSampledSource({M,video,info},{allowCustomScreen,videoTrackOnly}){
+async function detectSampledSource({M,video,info},{allowCustomScreen,videoTrackOnly,detectPackedAlpha}){
   let surface;
   try{
     const scale=Math.min(1,128/Math.max(info.width,info.height));
-    const width=Math.max(1,Math.round(info.width*scale)),height=Math.max(1,Math.round(info.height*scale));
+    const width=detectPackedAlpha?Math.max(2,2*Math.round(info.width*scale/2)):Math.max(1,Math.round(info.width*scale));
+    const height=Math.max(1,Math.round(info.height*scale));
     surface=canvas(width,height);
     const sizing=videoTrackOnly?{width,height,fit:'fill'}:{};
     const sink=new M.CanvasSink(video,{poolSize:1,...sizing}),frames=[];
@@ -235,6 +236,8 @@ async function detectSampledSource({M,video,info},{allowCustomScreen,videoTrackO
       surface.ctx.clearRect(0,0,width,height);surface.ctx.drawImage(frame.canvas,0,0,width,height);
       frames.push(surface.ctx.getImageData(0,0,width,height));
     }
+    const alphaSide=detectPackedAlpha?detectPackedAlphaSide(frames):null;
+    if(alphaSide)return {sourceKind:'packed_alpha',alphaSide};
     return detectVideoSource(frames,{allowCustomScreen});
   }catch(ignored){return {sourceKind:'plain_mp4',screenColor:'auto',confidence:0}}
   finally{if(surface)surface.canvas.width=surface.canvas.height=1}
@@ -245,7 +248,20 @@ export async function inspectVideo(file,{detectSource=false,sourceVapConfig,vide
   try{
     const info={...opened.info};
     if(!videoTrackOnly&&sourceVapConfig)info.videoDuration=await opened.video.computeDuration();
-    return detectSource?{...info,sourceDetection:await detectSampledSource({...opened,info},{allowCustomScreen,videoTrackOnly})}:info;
+    if(!detectSource)return info;
+    info.sourceDetection=await detectSampledSource({...opened,info},{allowCustomScreen,videoTrackOnly,detectPackedAlpha:!sourceVapConfig&&info.width%2===0});
+    const {alphaSide}=info.sourceDetection;
+    if(alphaSide){
+      const w=info.width/2,h=info.height;
+      const aFrame=[alphaSide==='left'?0:w,0,w,h];
+      const rgbFrame=[alphaSide==='left'?w:0,0,w,h];
+      const fps=Math.max(1,Math.min(120,Math.round(info.fps)));
+      info.videoDuration??=await opened.video.computeDuration();
+      const frames=Math.max(1,Math.ceil(info.videoDuration*fps-1e-7));
+      const packedLayout={w,h,videoW:info.width,videoH:h,aFrame,rgbFrame};
+      info.inferredVapConfig=makeVapc({fps,frames,packedLayout},{allowUnaligned:true});
+    }
+    return info;
   }
   finally{opened.input.dispose()}
 }

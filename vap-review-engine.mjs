@@ -1,6 +1,6 @@
-import {avcCodec, inspectVideo} from './vap-engine.mjs?v=20261110-review-preview-perf';
+import {avcCodec, inspectVideo} from './vap-engine.mjs?v=20261111-packed-alpha';
 import {applyVerticalMask, keyPixels, normalizeVerticalMask} from './vap-matte.mjs?v=20261110-luma-cache';
-import {readSourceVapConfig} from './vap-protocol.mjs';
+import {readSourceVapConfig} from './vap-protocol.mjs?v=20261111-packed-alpha';
 import {createVapUnpacker} from './vap-resources.mjs?v=20261110-unpack-cache';
 import {giftFadeOpacity} from './vap-gift-fade.mjs?v=20261029-gift-fade1';
 
@@ -72,8 +72,9 @@ export function giftRect(tile, width, height, percent, offsetY = 0) {
 }
 
 export async function inspectReviewClip(file, {allowCustomScreen = false} = {}) {
-  const config = await readSourceVapConfig(file);
-  const meta = await inspectVideo(file, {detectSource: !config, videoTrackOnly: true, allowCustomScreen});
+  const embeddedConfig = await readSourceVapConfig(file);
+  const meta = await inspectVideo(file, {detectSource: !embeddedConfig, videoTrackOnly: true, allowCustomScreen});
+  const config = embeddedConfig ?? meta.inferredVapConfig ?? null;
   if (config && (meta.width !== config.info.videoW || meta.height !== config.info.videoH))
     throw new Error('VAP frame geometry does not match its metadata');
   const declared = config ? config.info.f / config.info.fps : Infinity;

@@ -78,6 +78,8 @@
   const colorProbe=document.createElement('canvas');
   const maxOutputBytes=3000000;
   const outputFps=24;
+  copy.zh.packedAlpha='已识别 Alpha 通道';
+  copy.en.packedAlpha='Alpha channel detected';
   $('Quality').value='ultra';$('Method').value='auto';$('Width').value='720';$('Height').value='1560';$('Target').value='3';$('Volume').value='60';$('VerticalMask').open=true;
   let sequenceLoadController=null,sequenceStarted=0;
   const isSequence=()=>state.file?.kind==='image_sequence';
@@ -110,7 +112,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[],autoplaySource=null;
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261110-fixed-fps').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261111-packed-alpha').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
   function budgetCap(){return engineApi?.outputBudget(maxOutputBytes,state.meta||{},state.sourceVapConfig)??maxOutputBytes}
   function applyBudget(){
     const cap=budgetCap();$('Target').max=String(cap/1e6);
@@ -298,6 +300,7 @@
     root.dataset.sourceFrameReady=String(state.sourceFrameReady);root.dataset.previewReady=String(state.previewReady);
     const method=activeMethod(),chroma=method==='chroma_key';
     $('DetectedType').textContent=t(state.loading?'sourceDetecting':!ready?(sequenceInput?'sequenceType':'sourceAuto'):sequence?'sequenceType':state.sourceVapConfig?'nativeVap':({chroma_key:'chroma',black_luma:'blackLuma',white_luma:'whiteLuma',opaque:'plain'}[method]||'plain'));
+    if(ready&&!state.loading&&state.meta.inferredVapConfig)$('DetectedType').textContent=t('packedAlpha');
     if(ready&&!state.loading&&chroma)$('DetectedType').textContent=t('chroma')+' · '+($('Screen').value==='auto'?screenLabel(state.detectedScreen):screenLabel($('Screen').value));
     $('MethodWrap').hidden=(!ready&&sequenceInput)||sequence||!!state.sourceVapConfig;$('ScreenWrap').hidden=!chroma;
     const canPick=ready&&!sequence&&!state.sourceVapConfig,customColor=chroma&&$('Screen').value==='custom'&&validScreenBackground(state.keyColor);
@@ -326,7 +329,7 @@
     $('Volume').disabled=locked||!state.meta?.hasAudio||!$('KeepAudio').checked;$('VolumeValue').textContent=state.meta&&!state.meta.hasAudio?t('noAudioLabel'):!$('KeepAudio').checked?t('audioOffLabel'):$('Volume').value+'%';$('Volume').setAttribute('aria-valuetext',$('Volume').value+'%');
     $('VolumeHint').textContent=t(state.meta&&!state.meta.hasAudio?'noAudioHint':!$('KeepAudio').checked?'disabledAudioHint':'volumeHint');$('Volume').title=$('VolumeHint').textContent;syncPreviewVolume();
     $('VolumePresets').setAttribute('aria-label',t('volumePresets'));for(const [id,percent] of [['VolumeMobile',60],['VolumeOriginal',100]]){$(id).disabled=$('Volume').disabled;$(id).setAttribute('aria-pressed',String(Number($('Volume').value)===percent));$(id).title=$('VolumeHint').textContent}
-    if(ready){$('FileName').textContent=neutralName(state.file.name).replace(/\.sequence$/i,'');$('FileMeta').textContent=`${state.meta.width} × ${state.meta.height} px · ${sequence?state.file.frameCount+' '+t('frames')+' · ':''}${state.meta.duration.toFixed(2)} s · ${(state.file.size/1e6).toFixed(2)} MB · ${t(state.meta.hasAudio?'audioYes':'audioNo')}`}
+    if(ready){$('FileName').textContent=neutralName(state.file.name).replace(/\.sequence$/i,'');$('FileMeta').textContent=`${state.meta.width} × ${state.meta.height} px · ${sequence?state.file.frameCount+' '+t('frames')+' · ':''}${state.meta.duration.toFixed(2)} s · ${(state.file.size/1e6).toFixed(2)} MB · ${t(state.meta.hasAudio?'audioYes':'audioNo')}${state.meta.inferredVapConfig?' · '+t('packedAlpha'):''}`}
     $('Time').textContent=`${sourceTime().toFixed(2)} / ${(state.meta?.duration||0).toFixed(2)} s`;
     $('Timeline').max=String(state.meta?.duration||0);$('Timeline').value=String(Math.min(sourceTime(),state.meta?.duration||0));
     const validSize=['Width','Height'].every(id=>{const n=Number($(id).value);return Number.isInteger(n)&&n>=16&&n<=2048});
@@ -480,15 +483,19 @@
     const file=selection.files[0];
     const version=++loadVersion;pause();state.loading=true;state.notice=null;state.progress=0;sync();let url=URL.createObjectURL(file);
     try{
-      const browserMeta=await readMetadata(url);const engine=await getEngine();let meta={...browserMeta,...await engine.inspectVideo(file,{detectSource:true})},sourceVapConfig=null;
+      const browserMeta=await readMetadata(url);
+      const engine=await getEngine();
+      let sourceVapConfig=null;
       if(file instanceof Blob){
-        const protocol=await import('./vap-protocol.mjs?v=20261028-resources1');
+        const protocol=await import('./vap-protocol.mjs?v=20261111-packed-alpha');
         try{sourceVapConfig=await protocol.readSourceVapConfig(file)}catch(error){throw Object.assign(error,{uiKey:'errorVapSource'})}
-        if(sourceVapConfig){
-          if((sourceVapConfig.src?.length||0)>6)throw Object.assign(new Error('too many native resource slots'),{uiKey:'errorResourceLimit'});
-          if(sourceVapConfig.info.videoW!==meta.width||sourceVapConfig.info.videoH!==meta.height)throw Object.assign(new Error('VAP source dimensions differ'),{uiKey:'errorVapSource'});
-          meta={...meta,packedWidth:meta.width,packedHeight:meta.height,width:sourceVapConfig.info.w,height:sourceVapConfig.info.h};
-        }
+      }
+      let meta={...browserMeta,...await engine.inspectVideo(file,{detectSource:!sourceVapConfig,sourceVapConfig})};
+      sourceVapConfig??=meta.inferredVapConfig??null;
+      if(sourceVapConfig){
+        if((sourceVapConfig.src?.length||0)>6)throw Object.assign(new Error('too many native resource slots'),{uiKey:'errorResourceLimit'});
+        if(sourceVapConfig.info.videoW!==meta.width||sourceVapConfig.info.videoH!==meta.height)throw Object.assign(new Error('VAP source dimensions differ'),{uiKey:'errorVapSource'});
+        meta={...meta,packedWidth:meta.width,packedHeight:meta.height,width:sourceVapConfig.info.w,height:sourceVapConfig.info.h};
       }
       if(version!==loadVersion)return;
       if(!Number.isFinite(meta.duration)||meta.duration<=0||meta.duration>120||meta.width<1||meta.height<1||Math.max(meta.width,meta.height)>4096)throw Object.assign(new Error('source exceeds limits'),{code:'limits'});

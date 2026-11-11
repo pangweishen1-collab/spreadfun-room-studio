@@ -11,7 +11,7 @@ const green=(x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[210,145,105,255]:[18,
 const blue=(x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[210,145,105,255]:[20,38,225,255];
 const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*.2,32+y*.2,255];
 (async()=>{
-  const {detectVideoSource,detectFrameScreen,classifyScreenColor,SCREEN_COLORS}=await import(pathToFileURL(path.join(__dirname,'../vap-source-detection.mjs')));
+  const {detectPackedAlphaSide,detectVideoSource,detectFrameScreen,classifyScreenColor,SCREEN_COLORS}=await import(pathToFileURL(path.join(__dirname,'../vap-source-detection.mjs')));
   const plain={sourceKind:'plain_mp4',screenColor:'auto',confidence:0};
   assert.deepEqual(detectVideoSource([]),plain);assert.deepEqual(detectVideoSource(null),plain);
   assert.deepEqual(detectVideoSource([{width:96,height:128,data:new Uint8Array(2)}]),plain);
@@ -102,6 +102,27 @@ const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*
 
   const blank=sample(()=>[0,0,0,255]);
   const whiteBlank=sample(()=>[255,255,255,255]);
+  const splitAlpha=(alphaSide,shift=0,opacity=1,monochromeCopy=false)=>sample((x,y,w,h)=>{
+    const half=w/2,localX=x%half,inMask=localX>6+shift&&localX<half-6+shift&&y>h*.22&&y<h*.85;
+    const gray=inMask?Math.round(235*opacity):0;
+    const channels=monochromeCopy?[120,174,230]:[30,64,125];
+    const rgb=inMask?channels.map(channel=>Math.round(channel*opacity)):[0,0,0];
+    const luminance=monochromeCopy?Math.round(.21*rgb[0]+.72*rgb[1]+.07*rgb[2]):gray;
+    return [...((x<half)===(alphaSide==='left')?[luminance,luminance,luminance]:rgb),255];
+  });
+  const paired=splitAlpha('left'),pairedBefore=paired.data.slice();
+  assert.equal(detectPackedAlphaSide([blank,paired,splitAlpha('left',2,.57)]),'left','detect matching left alpha planes even during a partial fade');
+  assert.equal(detectPackedAlphaSide([splitAlpha('right'),splitAlpha('right',2),blank]),'right','detect matching right alpha planes');
+  assert.deepEqual(paired.data,pairedBefore,'packed detection never changes source pixels');
+  assert.equal(detectPackedAlphaSide([blank,paired,blank]),null,'require two informative alpha samples');
+  assert.equal(detectPackedAlphaSide([paired,splitAlpha('left',2),splitAlpha('right')]),null,'disagreeing plane order disables inference');
+  assert.equal(detectPackedAlphaSide([paired,splitAlpha('left',2),sample(regular)]),null,'an ordinary nonblank frame disables inference');
+  const monochrome=splitAlpha('left',0,1,true);
+  assert.equal(detectPackedAlphaSide([monochrome,monochrome]),null,'a grayscale copy has no independent matte evidence');
+  const unpaired=sample((x,y,w,h)=>x<w/2?[...paired.data.subarray((y*w+x)*4,(y*w+x)*4+4)]:[25,85,165,255]);
+  assert.equal(detectPackedAlphaSide([unpaired,unpaired]),null,'unrelated colorful scene does not align with the transparent mask');
+  const clearAlpha=sample((x,y,w)=>[x<w/2?255:70,40,10,0]);
+  assert.equal(detectPackedAlphaSide([clearAlpha,clearAlpha]),null,'existing Canvas alpha does not imply packed opacity');
   assert.equal(detectVideoSource([blank,g,g]).screenColor,'green','black intros do not force a chroma asset to regular');
   assert.deepEqual(detectVideoSource([blank,blank,blank]),plain);
   assert.deepEqual(detectVideoSource([whiteBlank,whiteBlank,whiteBlank]),plain);

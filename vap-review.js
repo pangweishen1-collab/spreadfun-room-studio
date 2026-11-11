@@ -845,7 +845,7 @@ async function initialize() {
   if (!initTask) initTask = (async () => {
     state.busy = 'init';sync();
     try {
-      state.engine = await import('./vap-review-engine.mjs?v=20261110-review-gift-fade2');
+      state.engine = await import('./vap-review-engine.mjs?v=20261111-packed-alpha');
       state.slots = Array.from({length: state.engine.MAX_REVIEW_SLOTS}, () => ({settings: state.engine.defaultReviewSlot(), clip: null}));
       state.backgroundImage = await readBackground('ludo');
       renderSlots();updateLayout();

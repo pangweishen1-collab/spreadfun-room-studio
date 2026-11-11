@@ -163,6 +163,67 @@ export function detectFrameScreen(frame){
   const gradient=analyzeGradientFrame(frame);if(!gradient)return null;const {gradientProfile,...screen}=gradient;return screen;
 }
 
+function packedPlaneEvidence({width, height, data}, alphaX) {
+  const half = width / 2;
+  const colorX = half - alphaX;
+  const step = Math.max(1, Math.ceil(Math.max(half, height) / 128));
+  let total = 0, blank = 0, gray = 0, transparent = 0, matchedBlack = 0;
+  let bright = 0, brighterThanColor = 0, colorful = 0, matchedColor = 0;
+  for (let y = 0; y < height; y += step) {
+    for (let x = 0; x < half; x += step) {
+      const alpha = (y * width + alphaX + x) * 4;
+      const color = (y * width + colorX + x) * 4;
+      if (data[alpha + 3] < 250 || data[color + 3] < 250) return null;
+      const alphaMax = Math.max(data[alpha], data[alpha + 1], data[alpha + 2]);
+      const alphaMin = Math.min(data[alpha], data[alpha + 1], data[alpha + 2]);
+      const colorMax = Math.max(data[color], data[color + 1], data[color + 2]);
+      const colorMin = Math.min(data[color], data[color + 1], data[color + 2]);
+      total++;
+      if (Math.max(alphaMax, colorMax) <= 16) blank++;
+      if (alphaMax - alphaMin <= 10) gray++;
+      if (alphaMax <= 20) {
+        transparent++;
+        if (colorMax <= 32) matchedBlack++;
+      }
+      if (alphaMin >= 96) {
+        bright++;
+        if (alphaMin - colorMax >= 24) brighterThanColor++;
+      }
+      if (colorMax >= 32 && colorMax - colorMin >= 20) {
+        colorful++;
+        if (alphaMax >= 40) matchedColor++;
+      }
+    }
+  }
+  if (blank >= total * .985) return 'blank';
+  // A grayscale copy of the RGB image follows its brightness. A true mask
+  // remains bright even over many darker but visible pixels of the subject.
+  const hasAlphaRange = gray >= total * .975 && transparent >= total * .08 && bright >= total * .05;
+  const hasAlignedColor = colorful >= total * .04 && matchedColor >= colorful * .90 && matchedBlack >= transparent * .90;
+  return hasAlphaRange && hasAlignedColor && brighterThanColor >= total * .03 ? 'paired' : null;
+}
+
+/** Identify equal-width horizontal alpha and RGB planes without VAP metadata. */
+export function detectPackedAlphaSide(frames) {
+  if (!Array.isArray(frames) || frames.length < 2) return null;
+  let side = null, evidence = 0;
+  for (const frame of frames) {
+    const {width, height, data} = frame || {};
+    if (!Number.isInteger(width) || !Number.isInteger(height) || width % 2 || width < 16 || height < 8 ||
+      width > 4096 || height > 4096 || width * height > 8388608 || data?.length !== width * height * 4) return null;
+    if (width !== frames[0].width || height !== frames[0].height) return null;
+    const left = packedPlaneEvidence(frame, 0);
+    if (left === 'blank') continue;
+    const right = packedPlaneEvidence(frame, width / 2);
+    if ((left === 'paired') === (right === 'paired')) return null;
+    const frameSide = left === 'paired' ? 'left' : 'right';
+    if (side && side !== frameSide) return null;
+    side = frameSide;
+    evidence++;
+  }
+  return evidence >= 2 ? side : null;
+}
+
 /**
  * Classify small, unmodified RGBA samples from multiple video times. Blank intro
  * frames are ignored. Mixed plate RGB or regular-frame evidence falls back to
