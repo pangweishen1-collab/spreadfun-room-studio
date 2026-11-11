@@ -10,9 +10,11 @@ const copy = {
     photoMode: '换头像',
     frameMode: '加头像框',
     batch: '批量上传',
+    append: '继续上传',
     export: '打包下载 ZIP',
     reviewExport: '下载过稿图 WebP',
     reviewVideoExport: '下载 6 秒过稿视频',
+    addCue: '上传',
     replaceCue: '替换',
     privacy: '图片仅在本地处理。',
     loadedLabel: '已导入',
@@ -26,6 +28,7 @@ const copy = {
     replaced: count => `已更新 ${count} 个麦位。`,
     downloaded: count => `已发起下载，包含 ${count} 张素材。`,
     tooMany: count => `一次最多上传 ${count} 个素材。`,
+    noVacancy: '空麦位不足，请减少上传数量。需要替换时，可点击已有素材的麦位。',
     frameMoved: '已移动头像框。',
     framesSwapped: '已互换头像框。',
     invalid: (name, reason) => `${name}：${reason}`,
@@ -51,9 +54,11 @@ const copy = {
     photoMode: 'Replace photo',
     frameMode: 'Add frame',
     batch: 'Bulk upload',
+    append: 'Add more files',
     export: 'Download ZIP',
     reviewExport: 'Download review WebP',
     reviewVideoExport: 'Download 6-second review',
+    addCue: 'Upload',
     replaceCue: 'Replace',
     privacy: 'Images are processed on this device.',
     loadedLabel: 'Imported',
@@ -67,6 +72,7 @@ const copy = {
     replaced: count => `Updated ${count} seats.`,
     downloaded: count => `Download started with ${count} images.`,
     tooMany: count => `Upload up to ${count} files at a time.`,
+    noVacancy: 'There are not enough empty seats. Upload fewer files or select an occupied seat to replace its asset.',
     frameMoved: 'Avatar frame moved.',
     framesSwapped: 'Avatar frames swapped.',
     invalid: (name, reason) => `${name}: ${reason}`,
@@ -153,6 +159,7 @@ function sync() {
   const replaced = assets[mode].filter(Boolean).length;
   count.textContent = `${replaced} / ${seats.length}`;
   batch.disabled = busy;
+  batch.textContent = strings[replaced ? 'append' : 'batch'];
   download.disabled = busy || !Object.values(assets).some(layer => layer.some(Boolean));
   reviewDownload.disabled = busy;
   reviewDownload.textContent = hasSvga() ? strings.reviewVideoExport : strings.reviewExport;
@@ -165,10 +172,11 @@ function sync() {
   overlay.setAttribute('aria-busy', String(busy));
   seats.forEach((seat, index) => {
     seat.disabled = busy;
-    const label = strings.seat(index + 1, assets[mode][index]?.name, mode);
+    const asset = assets[mode][index];
+    const label = strings.seat(index + 1, asset?.name, mode);
     seat.setAttribute('aria-label', label);
     seat.title = label;
-    seat.querySelector('.gift-avatar-replace-cue').textContent = mode === 'photo' ? strings.photoMode : strings.replaceCue;
+    seat.querySelector('.gift-avatar-replace-cue').textContent = strings[asset ? 'replaceCue' : 'addCue'];
   });
   syncNotice(strings);
 }
@@ -220,40 +228,49 @@ function replaceSeat(index, asset, type) {
   if (type === 'frame') seats[index].classList.add('has-frame');
 }
 
-async function loadFiles(files, firstSeat, trigger) {
+async function loadFiles(files, targetSeat, trigger) {
   if (busy || !files.length) return;
   if (files.length > seats.length) {
     notice = {key: 'tooMany', count: seats.length, tone: 'error'};
     sync();
     return;
   }
+  const vacancies = Object.fromEntries(Object.entries(assets).map(([type, layer]) =>
+    [type, layer.flatMap((asset, index) => asset ? [] : [index])]));
+  const assignments = files.map(file => {
+    const animated = isSvga(file);
+    const type = animated ? 'frame' : mode;
+    return {file, animated, type, index: targetSeat ?? vacancies[type].shift()};
+  });
+  if (assignments.some(({index}) => index === undefined)) {
+    notice = {key: 'noVacancy', tone: 'error'};
+    sync();
+    return;
+  }
   const prepared = [];
-  const selectedMode = mode;
   busy = true;
   notice = {key: 'processing'};
   sync();
-  let activeFile;
-  let type;
-  let animated;
+  let activeAssignment;
   try {
-    // Validate and process the whole batch before replacing any existing seat.
+    // Validate and process the whole batch before updating the assigned seats.
     // Keeping one image decode in flight also bounds memory on mobile.
-    for (const file of files) {
-      activeFile = file;
-      animated = isSvga(file);
-      type = animated ? 'frame' : selectedMode;
+    for (const assignment of assignments) {
+      activeAssignment = assignment;
+      const {file, type, animated, index} = assignment;
       const asset = await prepareAsset(file, type, animated);
-      prepared.push({asset, type});
+      prepared.push({asset, type, index});
     }
-    prepared.forEach(({asset, type}, i) => replaceSeat(firstSeat + i, asset, type));
+    for (const {asset, type, index} of prepared) replaceSeat(index, asset, type);
     if (prepared.every(({asset}) => asset.animation)) mode = 'frame';
     notice = {key: 'replaced', count: prepared.length};
   } catch (error) {
     for (const {asset} of prepared) disposeAsset(asset);
+    const {file, type, animated} = activeAssignment;
     let reason = error?.code;
     if (animated) reason = reason === 'size' ? 'svgaSize' : 'svgaDecode';
     else if (type === 'frame' && reason === 'type') reason = 'frameType';
-    notice = {key: 'invalid', name: activeFile.name, reason, tone: 'error'};
+    notice = {key: 'invalid', name: file.name, reason, tone: 'error'};
   } finally {
     busy = false;
     sync();
@@ -276,7 +293,7 @@ batch.addEventListener('click', () => batchInput.click());
 batchInput.addEventListener('change', () => {
   const files = Array.from(batchInput.files);
   batchInput.value = '';
-  void loadFiles(files, 0, batch);
+  void loadFiles(files, null, batch);
 });
 singleInput.addEventListener('change', () => {
   const file = singleInput.files[0];
@@ -382,13 +399,8 @@ window.addEventListener('keydown', event => {
 });
 
 function loadTransferredFiles(files, target) {
-  if (files.length !== 1) {
-    void loadFiles(files, 0, batch);
-    return;
-  }
-  const vacancy = assets[isSvga(files[0]) ? 'frame' : mode].findIndex(asset => !asset);
-  const index = target ?? Math.max(0, vacancy);
-  void loadFiles(files, index, target === null ? batch : seats[index]);
+  const seat = files.length === 1 ? target : null;
+  void loadFiles(files, seat, seat === null ? batch : seats[seat]);
 }
 
 function clearDragTarget() {
