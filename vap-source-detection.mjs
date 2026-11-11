@@ -169,6 +169,7 @@ function packedPlaneEvidence({width, height, data}, alphaX) {
   const step = Math.max(1, Math.ceil(Math.max(half, height) / 128));
   let total = 0, blank = 0, gray = 0, transparent = 0, matchedBlack = 0;
   let bright = 0, brighterThanColor = 0, colorful = 0, matchedColor = 0;
+  let partial = 0, colorAboveAlpha = 0, largeColorAboveAlpha = 0, hiddenColor = 0;
   for (let y = 0; y < height; y += step) {
     for (let x = 0; x < half; x += step) {
       const alpha = (y * width + alphaX + x) * 4;
@@ -185,6 +186,12 @@ function packedPlaneEvidence({width, height, data}, alphaX) {
         transparent++;
         if (colorMax <= 32) matchedBlack++;
       }
+      if (alphaMax < 16 && colorMax > 32) hiddenColor++;
+      if (alphaMax >= 16 && alphaMax <= 234) {
+        partial++;
+        if (colorMax > alphaMax + 12) colorAboveAlpha++;
+        if (colorMax > alphaMax + 20) largeColorAboveAlpha++;
+      }
       if (alphaMin >= 96) {
         bright++;
         if (alphaMin - colorMax >= 24) brighterThanColor++;
@@ -200,13 +207,17 @@ function packedPlaneEvidence({width, height, data}, alphaX) {
   // remains bright even over many darker but visible pixels of the subject.
   const hasAlphaRange = gray >= total * .975 && transparent >= total * .08 && bright >= total * .05;
   const hasAlignedColor = colorful >= total * .04 && matchedColor >= colorful * .90 && matchedBlack >= transparent * .90;
-  return hasAlphaRange && hasAlignedColor && brighterThanColor >= total * .03 ? 'paired' : null;
+  if (!hasAlphaRange || !hasAlignedColor || brighterThanColor < total * .03) return null;
+  // RGB above Alpha signals a straight-color input. Allow a small amount
+  // of H.264 chroma ringing, but leave ambiguous edges to normal conversion.
+  return {canPreserveRgb: hiddenColor <= transparent * .002 &&
+    colorAboveAlpha <= partial * .01 && largeColorAboveAlpha <= partial * .003};
 }
 
 /** Identify equal-width horizontal alpha and RGB planes without VAP metadata. */
-export function detectPackedAlphaSide(frames) {
+export function detectPackedAlpha(frames) {
   if (!Array.isArray(frames) || frames.length < 2) return null;
-  let side = null, evidence = 0;
+  let side = null, evidence = 0, canPreserveRgb = true;
   for (const frame of frames) {
     const {width, height, data} = frame || {};
     if (!Number.isInteger(width) || !Number.isInteger(height) || width % 2 || width < 16 || height < 8 ||
@@ -215,14 +226,19 @@ export function detectPackedAlphaSide(frames) {
     const left = packedPlaneEvidence(frame, 0);
     if (left === 'blank') continue;
     const right = packedPlaneEvidence(frame, width / 2);
-    if ((left === 'paired') === (right === 'paired')) return null;
-    const frameSide = left === 'paired' ? 'left' : 'right';
+    const leftPaired = typeof left?.canPreserveRgb === 'boolean';
+    const rightPaired = typeof right?.canPreserveRgb === 'boolean';
+    if (leftPaired === rightPaired) return null;
+    const frameSide = leftPaired ? 'left' : 'right';
     if (side && side !== frameSide) return null;
+    canPreserveRgb &&= (leftPaired ? left : right).canPreserveRgb;
     side = frameSide;
     evidence++;
   }
-  return evidence >= 2 ? side : null;
+  return evidence >= 2 ? {alphaSide: side, canPreserveRgb} : null;
 }
+
+export const detectPackedAlphaSide = frames => detectPackedAlpha(frames)?.alphaSide ?? null;
 
 /**
  * Classify small, unmodified RGBA samples from multiple video times. Blank intro

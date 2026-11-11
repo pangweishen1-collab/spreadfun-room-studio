@@ -1,11 +1,12 @@
 import {createNativeVapPlanes} from './vap-native-planes.mjs?v=20261102-native-gpu3';
 import {createQualitySampler,evaluateQualitySamples} from './vap-quality.mjs?v=20261101-smart-ultra3';
 import {computeVapLayout, makeVapc, appendVapcBox, extractVapcBox, validateVapc} from './vap-protocol.mjs?v=20261111-packed-alpha';
-import {detectPackedAlphaSide, detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261111-packed-alpha';
+import {detectPackedAlpha, detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261111-preserve3';
 import {inspectImageSequence, sequenceMetadata, decodeSequenceFrame} from './vap-sequence.mjs?v=20261029-sequence-speed1';
 export {inspectImageSequence, sequenceMetadata, decodeSequenceFrame};
 import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261102-release174';
 import {normalizeGiftFade, giftFadeOpacity, applyGiftFade} from './vap-gift-fade.mjs?v=20261029-gift-fade1';
+import {copyPackedVideo} from './vap-copy-packets.mjs?v=20261111-preserve3';
 
 export const LIMITS = Object.freeze({fileBytes:200*1024*1024,outputBytes:3000000,durationSeconds:120,sourceMaxSide:4096,outputMinSide:16,outputMaxSide:2048,fps:60,packedMaxSide:4096});
 export class VapError extends Error {
@@ -43,17 +44,19 @@ function fileCheck(file){
 
 // One source-frame of endpoint padding is common; cap that tolerance at 1/24s
 // so low-frame-rate videos cannot expand the five-second size policy.
+const defaultOutputBytes=2000000;
+
 export function outputBudget(requestedBytes=LIMITS.outputBytes,metadata={},sourceVapConfig){
   const nativeFps=sourceVapConfig?.info?.fps;
   const sourceFps=Number.isSafeInteger(nativeFps)&&nativeFps>=1&&nativeFps<=60?nativeFps:metadata.fps;
   const fps=finite(sourceFps)&&sourceFps>0?Math.max(24,sourceFps):24;
   const duration=effectiveVideoDuration(metadata,sourceVapConfig);
   const short=finite(duration)&&duration>0&&duration<=5+1/fps+1e-7;
-  return Math.min(requestedBytes,short?1500000:LIMITS.outputBytes);
+  return Math.min(requestedBytes,short?defaultOutputBytes:LIMITS.outputBytes);
 }
 
 export function normalizeOptions(options={},metadata={}){
-  const o={sourceKind:'plain_mp4',matteMethod:'black_luma',screenColor:'auto',alphaScale:.5,width:720,height:1560,fps:24,targetBytes:3000000,quality:'balanced',optimizeSize:false,rgbAlphaMode:'straight',keepAudio:true,audioGain:1,confirmedOpaque:false,lightRecovery:false,adaptiveChroma:false,videoOffsetY:0,...options};
+  const o={sourceKind:'plain_mp4',matteMethod:'black_luma',screenColor:'auto',alphaScale:.5,width:720,height:1560,fps:24,targetBytes:defaultOutputBytes,quality:'balanced',optimizeSize:false,rgbAlphaMode:'straight',keepAudio:true,audioGain:1,confirmedOpaque:false,lightRecovery:false,adaptiveChroma:false,videoOffsetY:0,...options};
   if(typeof o.optimizeSize!=='boolean')throw new VapError('invalid','体积优化设置无效。');
   if(!finite(o.videoOffsetY)||o.videoOffsetY< -1||o.videoOffsetY>1)throw new VapError('invalid','视频位置须在画布高度的 -100%–100% 内。');
   try{o.giftFade=normalizeGiftFade(o.giftFade===undefined&&o.sourceVapConfig?{enabled:false}:o.giftFade)}catch(error){throw new VapError('invalid',error.message,error)}
@@ -222,11 +225,11 @@ async function open(file,{videoTrackOnly=false}={}){
   }catch(error){input.dispose();if(error instanceof VapError)throw error;throw new VapError('file','视频读取失败，请使用完整的 MP4 文件。',error)}
 }
 
-async function detectSampledSource({M,video,info},{allowCustomScreen,videoTrackOnly,detectPackedAlpha}){
+async function detectSampledSource({M,video,info},{allowCustomScreen,videoTrackOnly,detectPacked}){
   let surface;
   try{
     const scale=Math.min(1,128/Math.max(info.width,info.height));
-    const width=detectPackedAlpha?Math.max(2,2*Math.round(info.width*scale/2)):Math.max(1,Math.round(info.width*scale));
+    const width=detectPacked?Math.max(2,2*Math.round(info.width*scale/2)):Math.max(1,Math.round(info.width*scale));
     const height=Math.max(1,Math.round(info.height*scale));
     surface=canvas(width,height);
     const sizing=videoTrackOnly?{width,height,fit:'fill'}:{};
@@ -236,8 +239,8 @@ async function detectSampledSource({M,video,info},{allowCustomScreen,videoTrackO
       surface.ctx.clearRect(0,0,width,height);surface.ctx.drawImage(frame.canvas,0,0,width,height);
       frames.push(surface.ctx.getImageData(0,0,width,height));
     }
-    const alphaSide=detectPackedAlpha?detectPackedAlphaSide(frames):null;
-    if(alphaSide)return {sourceKind:'packed_alpha',alphaSide};
+    const packed=detectPacked?detectPackedAlpha(frames):null;
+    if(packed)return {sourceKind:'packed_alpha',...packed};
     return detectVideoSource(frames,{allowCustomScreen});
   }catch(ignored){return {sourceKind:'plain_mp4',screenColor:'auto',confidence:0}}
   finally{if(surface)surface.canvas.width=surface.canvas.height=1}
@@ -249,7 +252,7 @@ export async function inspectVideo(file,{detectSource=false,sourceVapConfig,vide
     const info={...opened.info};
     if(!videoTrackOnly&&sourceVapConfig)info.videoDuration=await opened.video.computeDuration();
     if(!detectSource)return info;
-    info.sourceDetection=await detectSampledSource({...opened,info},{allowCustomScreen,videoTrackOnly,detectPackedAlpha:!sourceVapConfig&&info.width%2===0});
+    info.sourceDetection=await detectSampledSource({...opened,info},{allowCustomScreen,videoTrackOnly,detectPacked:!sourceVapConfig&&info.width%2===0});
     const {alphaSide}=info.sourceDetection;
     if(alphaSide){
       const w=info.width/2,h=info.height;
@@ -600,10 +603,12 @@ export async function convertVideo(file,options={}, {signal,onProgress=()=>{},on
   const progress=event=>{const next=Math.max(last,Math.min(1,event.progress));last=next;onProgress({...event,progress:next})};
   progress({phase:'loading',progress:0});const sequence=file?.kind==='image_sequence',info=sequence?sequenceMetadata(file,options.fps??24):await inspectVideo(file,{sourceVapConfig:options.sourceVapConfig});cancelled(signal);const analysisMs=clock()-started;
   const o=normalizeOptions(sequence?{...options,sourceKind:'plain_mp4',matteMethod:'opaque',confirmedOpaque:true,sourceVapConfig:undefined}:options,info),plan=planEncoding(o,info),M=await media();
-  if(globalThis.isSecureContext!==true||typeof VideoEncoder!=='function'||typeof VideoDecoder!=='function')throw new VapError('unsupported','浏览器不支持所选 H.264 本地转换，请使用最新版 Chrome／Edge 或降低尺寸。');
-  if(plan.budgetBitrate<32000)throw new VapError('budget','当前时长与音轨无法满足体积上限，请缩短视频或关闭声音后重试。');
+  const copied=!sequence&&!onPreview&&globalThis.isSecureContext===true?await copyPackedVideo(M,file,o,info,plan,signal):null;
+  cancelled(signal);
+  if(!copied&&(globalThis.isSecureContext!==true||typeof VideoEncoder!=='function'||typeof VideoDecoder!=='function'))throw new VapError('unsupported','浏览器不支持所选 H.264 本地转换，请使用最新版 Chrome／Edge 或降低尺寸。');
+  if(!copied&&plan.budgetBitrate<32000)throw new VapError('budget','当前时长与音轨无法满足体积上限，请缩短视频或关闭声音后重试。');
   let qualityReferences=null,qualityCheck=null,qualityCheckMs=0;
-  const passes=4,timings={};let attempts=0,probeMs=0,qualityPasses=0,refinementSkipped=false;
+  const passes=4,timings={...copied?.times};let attempts=0,probeMs=0,qualityPasses=0,refinementSkipped=false;
   async function pass(bitrate,reason){
     const startedProbe=clock(),encoding=await selectEncodingPlan(M,{...plan,bitrate},o.fps,signal);probeMs+=clock()-startedProbe;cancelled(signal);
     const result=await runPass(file,o,encoding,{signal,progress:event=>progress({...event,reason}),onPreview,pass:++attempts,totalPasses:passes,captureQuality:o.optimizeSize&&qualityReferences===null});
@@ -611,8 +616,8 @@ export async function convertVideo(file,options={}, {signal,onProgress=()=>{},on
     for(const [key,value] of Object.entries(result.times))timings[key]=!(key in timings)?value:timings[key]===null&&value===null?null:(timings[key]??0)+(value??0);
     return result;
   }
-  let lastPass=await pass(plan.bitrate,'initial'),selected=lastPass.blob.size<=plan.byteLimit?lastPass:null,triedQuality=false;
-  while(attempts<passes){
+  let lastPass=copied??await pass(plan.bitrate,'initial'),selected=lastPass.blob.size<=plan.byteLimit?lastPass:null,triedQuality=false;
+  while(!copied&&attempts<passes){
     cancelled(signal);let bitrate,reason;
     const fixedBytes=Math.min(plan.byteLimit*.95,plan.audioRate*info.duration/8+plan.resourceConfigBytes+Math.min(8192,plan.byteLimit*.02));
     if(lastPass.blob.size>plan.byteLimit&&lastPass.bitrate>32000){
@@ -639,9 +644,10 @@ export async function convertVideo(file,options={}, {signal,onProgress=()=>{},on
   if(!selected)throw new VapError('budget','已完成有界压缩，但文件仍超过体积上限，未输出超标成品。请缩短视频或调整参数后重试。');
   cancelled(signal);const warnings=[];
   if(refinementSkipped)warnings.push('quality-refinement-skipped');
-  if(plan.layout.legacyDimensionWarning)warnings.push('legacy-size');
-  if(['black_luma','white_luma'].includes(o.matteMethod))warnings.push('luma-may-remove-subject');if(o.matteMethod==='opaque'&&!sequence)warnings.push('opaque');if(o.matteMethod==='ai_foreground')warnings.push('ai-person-only');if(selected.audioMode==='transcoded')warnings.push('audio-transcoded');if(o.quality==='size')warnings.push('size-priority-loss');
-  const report={valid:true,version:2,transparentRGB:'black',rgbAlphaMode:o.rgbAlphaMode,giftFade:{...o.giftFade},resourceMode:o.resourceMode,resourceCount:o.resources.length,sourceVap:!!o.sourceVapConfig,inputKind:sequence?'image_sequence':'mp4',quality:o.quality,optimizeSize:o.optimizeSize,qualityCheck,adaptiveChroma:o.adaptiveChroma&&o.matteMethod==='chroma_key',lightRecovery:o.lightRecovery&&o.matteMethod==='chroma_key',qualityBudgetLimited:plan.qualityBudgetLimited,frames:selected.frames,fps:o.fps,width:o.width,height:o.height,packedWidth:plan.layout.videoW,packedHeight:plan.layout.videoH,alphaScale:o.alphaScale,bytes:selected.blob.size,targetBytes:o.targetBytes,maxBytes:LIMITS.outputBytes,budgetExceeded:false,durationSeconds:effectiveVideoDuration(info,o.sourceVapConfig),audioKept:selected.audioMode==='copied'||selected.audioMode==='transcoded',audioCodec:info.hasAudio&&o.keepAudio&&o.audioGain>0?'aac':null,audioMode:selected.audioMode,audioGain:o.audioGain,bitrate:selected.bitrate,codec:selected.actualCodec,requestedCodec:selected.requestedCodec,codecProfile:({64:'high','4d':'main',42:'baseline'}[selected.actualCodec?.slice(5,7)]||'unknown'),qualityPasses,attempts,processingPath:selected.processingPath,nativeGpuFallback:selected.nativeGpuFallback,matteWorkerCount:selected.matteWorkerCount,sequenceDecodeSlots:selected.sequenceDecodeSlots,nativeOpaqueFallback:selected.nativeOpaqueFallback,timings:{...timings,analysisMs,probeMs,qualityCheckMs,wallMs:clock()-started},timingNotes:{decodeMs:'Wait for the next decoded frame; sequence prefetch overlaps future decoding with current drawing/encoding, so this is stall time rather than aggregate decode work.',packMs:'Elapsed Canvas calls/submission, not a GPU timer.',matteMs:'CPU processing elapsed, or main-thread readback plus ordered worker wait; workerMs is parallel aggregate work and is not additive wall time. Null for native paths without preview processing.',previewMs:'Null when no preview callback was called; callback elapsed only.'},warnings};
+  const layout=selected.layout??plan.layout;
+  if(layout.legacyDimensionWarning)warnings.push('legacy-size');
+  if(['black_luma','white_luma'].includes(o.matteMethod))warnings.push('luma-may-remove-subject');if(o.matteMethod==='opaque'&&!sequence&&!o.sourceVapConfig)warnings.push('opaque');if(o.matteMethod==='ai_foreground')warnings.push('ai-person-only');if(selected.audioMode==='transcoded')warnings.push('audio-transcoded');if(o.quality==='size'&&!copied)warnings.push('size-priority-loss');
+  const report={valid:true,version:2,transparentRGB:copied?'source':'black',rgbAlphaMode:o.rgbAlphaMode,giftFade:{...o.giftFade},resourceMode:o.resourceMode,resourceCount:o.resources.length,sourceVap:!!o.sourceVapConfig,inputKind:sequence?'image_sequence':'mp4',quality:o.quality,optimizeSize:o.optimizeSize,qualityCheck,adaptiveChroma:o.adaptiveChroma&&o.matteMethod==='chroma_key',lightRecovery:o.lightRecovery&&o.matteMethod==='chroma_key',qualityBudgetLimited:!copied&&plan.qualityBudgetLimited,frames:selected.frames,fps:o.fps,width:o.width,height:o.height,packedWidth:layout.videoW,packedHeight:layout.videoH,alphaScale:o.alphaScale,bytes:selected.blob.size,targetBytes:o.targetBytes,maxBytes:LIMITS.outputBytes,budgetExceeded:false,durationSeconds:effectiveVideoDuration(info,o.sourceVapConfig),audioKept:selected.audioMode==='copied'||selected.audioMode==='transcoded',audioCodec:info.hasAudio&&o.keepAudio&&o.audioGain>0?'aac':null,audioMode:selected.audioMode,audioGain:o.audioGain,bitrate:selected.bitrate,codec:selected.actualCodec,requestedCodec:selected.requestedCodec,codecProfile:({64:'high','4d':'main',42:'baseline'}[selected.actualCodec?.slice(5,7)]||'unknown'),qualityPasses,attempts,processingPath:selected.processingPath,nativeGpuFallback:selected.nativeGpuFallback,matteWorkerCount:selected.matteWorkerCount,sequenceDecodeSlots:selected.sequenceDecodeSlots,nativeOpaqueFallback:selected.nativeOpaqueFallback,timings:{...timings,analysisMs,probeMs,qualityCheckMs,wallMs:clock()-started},timingNotes:{decodeMs:'Wait for the next decoded frame; sequence prefetch overlaps future decoding with current drawing/encoding, so this is stall time rather than aggregate decode work.',packMs:'Elapsed Canvas calls/submission, not a GPU timer.',matteMs:'CPU processing elapsed, or main-thread readback plus ordered worker wait; workerMs is parallel aggregate work and is not additive wall time. Null for native paths without preview processing.',previewMs:'Null when no preview callback was called; callback elapsed only.'},warnings};
   progress({phase:'packaging',progress:1,frame:selected.frames,totalFrames:selected.frames});
   return {blob:selected.blob,config:selected.config,report};
 }

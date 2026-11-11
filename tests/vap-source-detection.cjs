@@ -11,7 +11,7 @@ const green=(x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[210,145,105,255]:[18,
 const blue=(x,y,w,h)=>x>w*.28&&x<w*.72&&y>h*.12&&y<h*.89?[210,145,105,255]:[20,38,225,255];
 const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*.2,32+y*.2,255];
 (async()=>{
-  const {detectPackedAlphaSide,detectVideoSource,detectFrameScreen,classifyScreenColor,SCREEN_COLORS}=await import(pathToFileURL(path.join(__dirname,'../vap-source-detection.mjs')));
+  const {detectPackedAlpha,detectPackedAlphaSide,detectVideoSource,detectFrameScreen,classifyScreenColor,SCREEN_COLORS}=await import(pathToFileURL(path.join(__dirname,'../vap-source-detection.mjs')));
   const plain={sourceKind:'plain_mp4',screenColor:'auto',confidence:0};
   assert.deepEqual(detectVideoSource([]),plain);assert.deepEqual(detectVideoSource(null),plain);
   assert.deepEqual(detectVideoSource([{width:96,height:128,data:new Uint8Array(2)}]),plain);
@@ -111,6 +111,13 @@ const regular=(x,y,w,h)=>y<h*.48?[50+x*.4,120+y*.2,190-y*.5,255]:[45+x*.5,105+x*
     return [...((x<half)===(alphaSide==='left')?[luminance,luminance,luminance]:rgb),255];
   });
   const paired=splitAlpha('left'),pairedBefore=paired.data.slice();
+  const faded=splitAlpha('left',2,.57),straight=splitAlpha('left',2,.57);
+  for(let y=0;y<straight.height;y++)for(let x=straight.width/2;x<straight.width;x++){
+    const i=(y*straight.width+x)*4;
+    if(x<straight.width*.74&&straight.data[i+2])straight.data[i]=220;
+  }
+  assert.deepEqual(detectPackedAlpha([blank,paired,faded]),{alphaSide:'left',canPreserveRgb:true});
+  assert.deepEqual(detectPackedAlpha([blank,paired,straight]),{alphaSide:'left',canPreserveRgb:false},'straight RGB still previews as paired alpha but cannot be copied as premultiplied');
   assert.equal(detectPackedAlphaSide([blank,paired,splitAlpha('left',2,.57)]),'left','detect matching left alpha planes even during a partial fade');
   assert.equal(detectPackedAlphaSide([splitAlpha('right'),splitAlpha('right',2),blank]),'right','detect matching right alpha planes');
   assert.deepEqual(paired.data,pairedBefore,'packed detection never changes source pixels');
