@@ -149,7 +149,7 @@
 #vapTool .vap-success-heading strong{font-weight:600}
 #vapTool #vapResultMeta{margin:10px 0 0;color:var(--tool-heading);font-size:12px;line-height:20px;font-variant-numeric:tabular-nums}
 #vapTool .vap-downloads{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
-#vapTool #vapDownloadMp4,#vapTool #vapDownloadPreview{grid-column:1/-1}
+#vapTool #vapDownloadMp4{grid-column:1/-1}
 #vapTool .vap-budget-status{margin:8px 0 0;color:#8a4b00;font-size:12px;line-height:20px}
 #vapTool .vap-result-preview{display:contents}
 #vapTool .vap-result-frame{position:relative;overflow:hidden;border:1px solid var(--tool-blue-line);border-radius:16px;isolation:isolate}

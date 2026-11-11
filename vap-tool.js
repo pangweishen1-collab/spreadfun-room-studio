@@ -29,8 +29,8 @@
   Object.assign(copy.en,{rgbFeather:'RGB feathering',rgbFeatherReference:'Feather RGB and Alpha',rgbFeatherStraight:'Straight RGB compatibility',rgbFeatherHint:'Feathered RGB also shows soft edges in regular video players. This site reads the embedded mode. Choose straight RGB for SDKs that require it.'});
   Object.assign(copy.zh,{rgbFeatherApplied:'RGB 同步羽化',errorFeather:'羽化组件版本不一致，请刷新页面后重新转换。'});
   Object.assign(copy.en,{rgbFeatherApplied:'RGB + Alpha feathered',errorFeather:'The feathering component is outdated. Refresh this page and convert again.'});
-  Object.assign(copy.zh,{nativeVap:'VAP · 已识别资源与透明通道',resourceInvalid:'请补齐头像和文字，并检查资源标签、位置与时间。',errorVapSource:'VAP 配置与视频不匹配，无法读取资源与透明通道。',dynamicResources:'动态资源',bakedResources:'固定合成',resourceBundleHint:'头像按Key替换，完整包 ZIP 包含占位资源与接入示例。'});
-  Object.assign(copy.en,{nativeVap:'VAP · Resources and alpha detected',resourceInvalid:'Complete the avatar and text, then check tags, position and timing.',errorVapSource:'The VAP configuration does not match the video.',dynamicResources:'Dynamic resources',bakedResources:'Baked resources',resourceBundleHint:'Avatars use key bindings. The ZIP includes placeholders and integration examples.'});
+  Object.assign(copy.zh,{nativeVap:'VAP · 已识别资源与透明通道',resourceInvalid:'请补齐头像和文字，并检查资源标签、位置与时间。',errorVapSource:'VAP 配置与视频不匹配，无法读取资源与透明通道。',dynamicResources:'动态资源',bakedResources:'固定合成'});
+  Object.assign(copy.en,{nativeVap:'VAP · Resources and alpha detected',resourceInvalid:'Complete the avatar and text, then check tags, position and timing.',errorVapSource:'The VAP configuration does not match the video.',dynamicResources:'Dynamic resources',bakedResources:'Baked resources'});
   copy.zh.errorResourceLimit='原 VAP 超过 6 个资源位，请先减少资源后导入。';copy.en.errorResourceLimit='This VAP has more than 6 resource slots. Reduce its resources before importing.';
   Object.assign(copy.zh,{screenRed:'红色',screenOrange:'橙色',screenYellow:'黄色',screenCyan:'青色',screenMagenta:'紫 / 品红',screenCustom:'其他纯色'});
   Object.assign(copy.en,{screenRed:'Red',screenOrange:'Orange',screenYellow:'Yellow',screenCyan:'Cyan',screenMagenta:'Purple / magenta',screenCustom:'Other solid color'});
@@ -79,18 +79,16 @@
   const defaultOutputBytes=2000000,maxOutputBytes=3000000;
   const outputWidth=720,outputHeight=1560,outputFps=24,outputAlphaScale=.5;
   Object.assign(copy.zh,{
-    packedSize:'打包尺寸',downloadPreview:'下载 17AE 预览版',
-    previewCopyHint:'用于 17AE 播放检查。保留动画、声音和透明度，动态头像和文字显示底图。',
+    packedSize:'打包尺寸',
     helpThree:'打包尺寸固定为 1088 × 1568，画面为 720 × 1560，Alpha 分辨率为 0.5。可调整目标体积。',
-    helpFour:'下载 VAP 资源可保留头像和文字标签。使用 17AE 检查动画时，下载 17AE 预览版。',
-    codecHint:'使用 H.264 Baseline 兼容编码。原音量 AAC 直接保留，调整音量时在本机重新编码声音。'
+    helpFour:'下载 VAP 可保留头像和文字标签。点击「查看 VAP 成品」检查播放效果。',
+    codecHint:'采用官方 VAP 工具的 H.264 Main 4.0 封装规格。原音量 AAC 直接保留，调整音量时在本机重新编码声音。'
   });
   Object.assign(copy.en,{
-    packedSize:'Packed size',downloadPreview:'Download 17AE preview',
-    previewCopyHint:'For playback in 17AE. Preserves animation, audio and transparency with the base artwork.',
+    packedSize:'Packed size',
     helpThree:'The packed size is fixed at 1088 × 1568, with a 720 × 1560 display area and 0.5 alpha resolution. You can change the file size limit.',
-    helpFour:'Download the VAP to keep avatar and text tags. Use the 17AE preview copy to check playback in 17AE.',
-    codecHint:'Uses H.264 Baseline for compatibility. AAC at source volume is copied. Volume adjustments re-encode audio on-device.'
+    helpFour:'Download the VAP to keep avatar and text tags. Open the VAP checker to verify playback.',
+    codecHint:'Uses the official VAP tool’s H.264 Main 4.0 output format. AAC at source volume is copied. Volume adjustments re-encode audio on-device.'
   });
   copy.zh.packedAlpha='已识别 Alpha 通道';
   copy.en.packedAlpha='Alpha channel detected';
@@ -107,7 +105,7 @@
   let resourceModulePromise=null,resourcePreview=null,resourcePreviewRevision=-1;
   let giftFadeModulePromise=null;
   const getGiftFadeModule=()=>giftFadeModulePromise||(giftFadeModulePromise=import('./vap-gift-fade.mjs?v=20261029-gift-fade1').catch(error=>{giftFadeModulePromise=null;throw error}));
-  const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261111-standard-pack1').catch(error=>{resourceModulePromise=null;throw error}));
+  const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261111-official-pack').catch(error=>{resourceModulePromise=null;throw error}));
   const resourceEditor=window.VapResourceEditor?.create({root,stage,canvas,onChange(event={}){
     if(state.loading||state.converting||state.packing)return;
     if(event.reason==='interaction-start'){pause();return}
@@ -126,7 +124,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[],autoplaySource=null;
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261111-standard-pack1').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261111-official-pack').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
   function budgetCap(){return engineApi?.outputBudget(maxOutputBytes,state.meta||{},state.sourceVapConfig)??maxOutputBytes}
   function applyBudget(){
     const cap=budgetCap();$('Target').max=String(cap/1e6);
@@ -156,7 +154,7 @@
     const customColor=matteMethod==='chroma_key'&&$('Screen').value==='custom';
     if(customColor&&!validScreenBackground(state.keyColor))throw Object.assign(new Error('screen color required'),{code:'invalid'});
     const background=customColor?state.keyColor:matteMethod==='chroma_key'&&$('Screen').value==='auto'&&state.sourceKind==='chroma_mp4'?state.detectedBackground:null;
-    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,sourceVapCopyEligible:!!state.meta?.inferredVapConfig&&state.meta?.sourceDetection?.canPreserveRgb===true,rgbAlphaMode:resourceOptions.resourceMode==='dynamic'&&resourceOptions.resources.length?'premultiplied':$('RgbAlphaMode').value||'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(background?{background:background.slice()}:{}),adaptiveChroma:matteMethod==='chroma_key'&&state.adaptiveChroma&&($('Screen').value==='auto'||customColor),fixedStandard:true,alphaScale:outputAlphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:engineApi?.outputBudget(Math.round(target*1e6),state.meta||{},state.sourceVapConfig)??Math.round(target*1e6),quality:'ultra',optimizeSize:true,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
+    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,rgbAlphaMode:'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(background?{background:background.slice()}:{}),adaptiveChroma:matteMethod==='chroma_key'&&state.adaptiveChroma&&($('Screen').value==='auto'||customColor),fixedStandard:true,alphaScale:outputAlphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:engineApi?.outputBudget(Math.round(target*1e6),state.meta||{},state.sourceVapConfig)??Math.round(target*1e6),quality:'ultra',optimizeSize:true,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
   }
   function stopColorPick(restore=true){
     if(!state.pickingColor)return;
@@ -300,7 +298,7 @@
     locked=busy();const valid=validOptions();if(locked)endVideoDrag();
     root.dataset.state=state.loading?'loading':state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'idle';
     root.setAttribute('aria-busy',String(locked));stage.setAttribute('aria-busy',String(locked));stage.classList.toggle('has-file',ready);stage.classList.toggle('upload-ready',!ready);
-    for(const id of ['Upload','Replace','Input','SequenceInput','InputVideo','InputSequence','Budget1','Budget2','Budget3','Method','Screen','MaskPick','MaskInput','Target','Quality','RgbAlphaMode','KeepAudio','Tolerance','Softness','Spill','LightRecovery'])$(id).disabled=locked;
+    for(const id of ['Upload','Replace','Input','SequenceInput','InputVideo','InputSequence','Budget1','Budget2','Budget3','Method','Screen','MaskPick','MaskInput','Target','Quality','KeepAudio','Tolerance','Softness','Spill','LightRecovery'])$(id).disabled=locked;
     for(const id of ['Play','Mute','Timeline','ViewOriginal','ViewTransparent','ViewAlpha'])$(id).disabled=locked||!ready||state.pickingColor;
     for(const [id] of previewBackgrounds)$('Bg'+id).disabled=locked;
     $('Empty').hidden=ready;$('Sourcebar').hidden=!ready;$('Playback').hidden=!ready;$('ViewToolbar').hidden=false;
@@ -324,7 +322,6 @@
     const color=customColor?state.keyColor:chroma&&$('Screen').value==='auto'?state.detectedBackground:null,hex=validScreenBackground(color)?'#'+color.map(v=>v.toString(16).padStart(2,'0')).join('').toUpperCase():null;
     $('ColorSwatch').style.setProperty('--vap-key-color',hex||'#f1f5f9');$('PickedColorValue').textContent=customColor?hex:t('resetColor');$('PickedColor').title=hex||t('resetColor');
     stage.classList.toggle('is-color-picking',state.pickingColor);$('ColorPickHint').hidden=!state.pickingColor;
-    const dynamicResources=resourceEditor?.getOptions();if(dynamicResources?.resources.length){$('RgbAlphaMode').value='premultiplied';$('RgbAlphaMode').disabled=true}
     $('MaskRow').hidden=sequence||chroma||method!=='manual_mask';
     $('KeySettings').hidden=sequence||!chroma&&!['black_luma','white_luma'].includes(method);$('LightRecoveryRow').hidden=!chroma;$('LightRecovery').title=t('lightRecoveryHint');
     $('MethodHint').textContent=t(sequence?'sequenceHelp':$('Method').value==='auto'&&!state.sourceVapConfig?'autoMethodHint':chroma?'chromaHint':method==='opaque'&&state.verticalMask.enabled?'frameMaskHint':({black_luma:'blackHint',white_luma:'whiteHint',ai_foreground:'aiHint',manual_mask:'maskHint',opaque:'opaqueHint'}[method]||'opaqueHint'));
@@ -350,10 +347,8 @@
     $('Notice').hidden=!state.notice;$('Notice').textContent=state.notice?t(state.notice):'';$('Notice').dataset.tone=state.errorTone;
     $('PreviewError').hidden=!state.previewError;$('PreviewError').textContent=t('previewFailed');
     $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareResultLabel').hidden=!state.result;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(outputWidth/outputHeight));syncOutputPlaceholder();
-    for(const id of ['DownloadMp4','DownloadJson','DownloadZip','DownloadPreview'])$(id).disabled=locked||!state.result;
+    for(const id of ['DownloadMp4','DownloadJson','DownloadZip'])$(id).disabled=locked||!state.result;
     $('ResultPlay').hidden=!state.result;$('ResultPlay').disabled=locked||!state.result||state.playerState!=='ready';$('DownloadMp4').title=t('vapPlaybackNotice');
-    $('DownloadPreview').hidden=state.result?.config?.info?.isVapx!==1;$('DownloadPreview').title=t('previewCopyHint');
-    $('ResourceBundleHint').hidden=state.result?.config?.info?.isVapx!==1;$('ResourceBundleHint').textContent=t('resourceBundleHint');
     if(state.result){
       const {blob,config,report}=state.result,info=config.info;const seconds=Number(report.timings?.wallMs)/1000;
       $('ResultMeta').textContent=`${info.videoW} × ${info.videoH} px · ${info.fps} FPS · Alpha ${outputAlphaScale.toFixed(1)}${config.funToolkit?.rgbAlphaMode==='premultiplied'?' · '+t('rgbFeatherApplied'):''}${report.resourceCount?' · '+t(report.resourceMode==='dynamic'?'dynamicResources':'bakedResources')+' '+report.resourceCount:''}\n${(blob.size/1e6).toFixed(2)} MB · ${t(report.audioKept?'audioKept':state.meta.hasAudio?'audioMuted':'audioNone')}${report.audioKept&&Number.isFinite(report.audioGain)&&report.audioGain!==1?` · ${t('volume')} ${Math.round(report.audioGain*100)}%`:''}${Number.isFinite(seconds)?` · ${seconds.toFixed(2)} s`:''}`;
@@ -497,7 +492,7 @@
       const engine=await getEngine();
       let sourceVapConfig=null;
       if(file instanceof Blob){
-        const protocol=await import('./vap-protocol.mjs?v=20261111-standard-pack1');
+        const protocol=await import('./vap-protocol.mjs?v=20261111-official-pack');
         try{sourceVapConfig=await protocol.readSourceVapConfig(file)}catch(error){throw Object.assign(error,{uiKey:'errorVapSource'})}
       }
       let meta={...browserMeta,...await engine.inspectVideo(file,{detectSource:!sourceVapConfig,sourceVapConfig})};
@@ -584,16 +579,15 @@
     try{
       const {blob,config}=state.result;
       if(kind==='mp4')triggerDownload(blob,filename()+'.mp4');
-      else if(kind==='preview'){
-        if(config.info.isVapx!==1)return;
-        state.packing=true;sync();
-        const {makeVapPreviewCopy}=await import('./vap-protocol.mjs?v=20261111-standard-pack1');
-        const bytes=makeVapPreviewCopy(new Uint8Array(await blob.arrayBuffer()));
-        triggerDownload(new Blob([bytes],{type:'video/mp4'}),filename()+'_17AE.mp4');
-      }
-      else if(kind==='json')triggerDownload(new Blob([JSON.stringify(config,null,2)],{type:'application/json'}),'vapc.json');
       else{
-        state.packing=true;sync();const Zip=await loadZip();const zip=new Zip();zip.file(filename()+'.mp4',blob);zip.file('vapc.json',JSON.stringify(config));
+        state.packing=true;sync();
+        const {nativeVapConfig}=await import('./vap-protocol.mjs?v=20261111-official-pack');
+        const nativeConfig=nativeVapConfig(config);
+        if(kind==='json'){
+          triggerDownload(new Blob([JSON.stringify(nativeConfig,null,2)],{type:'application/json'}),'vapc.json');
+          return;
+        }
+        const Zip=await loadZip();const zip=new Zip();zip.file(filename()+'.mp4',blob);zip.file('vapc.json',JSON.stringify(nativeConfig));
         if(config.info.isVapx===1){
           for(const file of state.result.resourceFiles||[])zip.file(file.name,file.blob);
           zip.file('resources.json',JSON.stringify(config.funToolkit?.resourceManifest||[],null,2));
@@ -605,7 +599,7 @@
   }
   function resourceBundleReadme(config){
     const entries=config.funToolkit?.resourceManifest||[],bindings=Object.fromEntries(entries.map(item=>['['+item.tag+']',item.type==='image'?'./'+item.file:item.text]));
-    return 'Fun Toolkit · VAP 动态资源 / Dynamic resources\n\nMP4 包含 RGB、Alpha、资源遮罩和 VAP v2 src/frame 配置。头像文件不嵌入 MP4，请将 resources/ 中的文件与视频一起接入。\nMP4 contains RGB, alpha, resource masks and VAP v2 src/frame metadata. Avatar images are supplied separately from resources/.\n\nTencent Web SDK example:\nnew Vap().play({container:document.querySelector("#player"),src:"./'+filename()+'.mp4",config:"./vapc.json",...'+JSON.stringify(bindings,null,2)+'});\n\n文本、头像可用相同标签传入新的值，视频无需重新编码。本站“查看 VAP 成品”页面也可以重新绑定标签测试。\nReplace these tag values to change the avatar or text without re-encoding. You can also bind resources in this site’s VAP output checker.\n\nNative iOS / Android: use the target SDK resource delegate and the srcTag values in vapc.json. Device compatibility must be tested on the target SDK.\n';
+    return 'Fun Toolkit · VAP 动态资源 / Dynamic resources\n\nMP4 包含 RGB、Alpha、资源遮罩和 VAP v2 src/frame 配置。头像文件不嵌入 MP4，请将 resources/ 中的文件与视频一起接入。\nMP4 contains RGB, alpha, resource masks and VAP v2 src/frame metadata. Avatar images are supplied separately from resources/.\n\nTencent Web SDK example:\nconst config = await fetch("./vapc.json").then(response => response.json());\nfor (const source of config.src) source.srcTag = "[" + source.srcTag + "]";\nnew Vap().play({container:document.querySelector("#player"),src:"./'+filename()+'.mp4",config,...'+JSON.stringify(bindings,null,2)+'});\n\n文本、头像可用相同标签传入新的值，视频无需重新编码。本站“查看 VAP 成品”页面也可以重新绑定标签测试。\nReplace these tag values to change the avatar or text without re-encoding. You can also bind resources in this site’s VAP output checker.\n\nNative iOS / Android: use the target SDK resource delegate and the srcTag values in vapc.json. Device compatibility must be tested on the target SDK.\n';
   }
   let zipPromise=null;
   function loadZip(){
@@ -637,7 +631,7 @@
   $('MaskInput').addEventListener('change',event=>{loadMask(event.target.files);event.target.value=''});
   window.UploadPaste?.register({zone:stage,isActive:()=>state.active,isBusy:busy,onFiles:loadFiles});
   window.UploadPaste?.register({zone:$('MaskRow'),isActive:event=>state.active&&!$('MaskRow').hidden&&($('MaskRow').contains(event.target)||$('MaskRow').contains(document.activeElement)),isBusy:busy,onFiles:loadMask});
-  for(const id of ['KeepAudio','RgbAlphaMode','LightRecovery'])$(id).addEventListener('change',invalidate);
+  for(const id of ['KeepAudio','LightRecovery'])$(id).addEventListener('change',invalidate);
   $('Method').addEventListener('change',()=>{if(busy())return;if($('Method').value!=='chroma_key'){state.keyColor=null;if($('Screen').value==='custom')$('Screen').value='auto'}invalidate()});
   $('Screen').addEventListener('change',()=>{if(busy())return;if($('Screen').value!=='custom')state.keyColor=null;invalidate()});
   $('PickColor').addEventListener('click',startColorPick);
@@ -677,7 +671,7 @@
   $('VerticalMask').addEventListener('toggle',()=>{syncMaskControls();if($('VerticalMask').open&&state.verticalMask.enabled)requestPreview()});
   if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(positionMaskOverlay);observer.observe(canvas);observer.observe(stage)}else window.addEventListener('resize',positionMaskOverlay);
   $('Convert').addEventListener('click',convert);$('Cancel').addEventListener('click',cancel);
-  for(const [id,kind] of [['DownloadMp4','mp4'],['DownloadJson','json'],['DownloadZip','zip'],['DownloadPreview','preview']])$(id).addEventListener('click',()=>download(kind));
+  for(const [id,kind] of [['DownloadMp4','mp4'],['DownloadJson','json'],['DownloadZip','zip']])$(id).addEventListener('click',()=>download(kind));
   $('Help').addEventListener('click',()=>$('HelpDialog').showModal());$('HelpClose').addEventListener('click',()=>$('HelpDialog').close());$('HelpDialog').addEventListener('click',event=>{if(event.target===$('HelpDialog')){const r=$('HelpDialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('HelpDialog').close()}});
   document.addEventListener('dragover',event=>{if(state.active&&Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();stage.classList.add('is-dragging')}});
   document.addEventListener('dragleave',event=>{if(!event.relatedTarget)stage.classList.remove('is-dragging')});

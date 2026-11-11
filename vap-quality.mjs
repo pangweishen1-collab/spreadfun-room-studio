@@ -29,7 +29,8 @@ function surface(width,height){
 function readPlane(target,source,rect){target.ctx.drawImage(source,...rect,0,0,target.canvas.width,target.canvas.height);return target.ctx.getImageData(0,0,target.canvas.width,target.canvas.height).data;}
 export function createQualitySampler(layout,frames,fps){
   const indices=new Set([.1,.3,.5,.7,.9].map(f=>Math.min(frames-1,Math.round((frames-1)*f))));
-  const specs=[{name:'rgb',kind:'rgb',rect:layout.rgbFrame},{name:'alpha',kind:'alpha',rect:layout.aFrame},...Object.entries(layout.resourceMasks||{}).map(([id,rect])=>({name:'mask:'+id,kind:'alpha',rect}))],planes=[],samples=[];
+  const masks=layout.resourceMaskRegion?[['resources',layout.resourceMaskRegion]]:Object.entries(layout.resourceMasks||{});
+  const specs=[{name:'rgb',kind:'rgb',rect:layout.rgbFrame},{name:'alpha',kind:'alpha',rect:layout.aFrame},...masks.map(([id,rect])=>({name:'mask:'+id,kind:'alpha',rect}))],planes=[],samples=[];
   try{for(const p of specs){
     const scale=Math.min(1,(p.name.startsWith('mask:')?256:512)/Math.max(p.rect[2],p.rect[3]));planes.push({...p,...surface(Math.max(1,Math.round(p.rect[2]*scale)),Math.max(1,Math.round(p.rect[3]*scale)))});
   }}catch(error){for(const p of planes)p.canvas.width=p.canvas.height=1;throw error;}

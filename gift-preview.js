@@ -7,8 +7,8 @@
   const defaults={zoom:1,offsetX:0,offsetY:0,saturation:100,brightness:100,contrast:100,feather:10,radius:22,rotation:0,flipX:false,flipY:false};
   const rangeFields=[['Zoom','zoom'],['Feather','feather'],['Radius','radius'],['Saturation','saturation'],['Brightness','brightness'],['Contrast','contrast'],['Rotation','rotation']];
   const copy={
-    zh:{title:'礼物&座驾预览图生产工具',preview:'效果预览',modeLabel:'处理方式',modeFeather:'场景羽化',modeTransparent:'透明素材',uploadTitle:'点击、拖入或粘贴礼物图片',uploadHint:'支持 PNG、JPG、WebP',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',upload:'上传图片',dragHint:'拖动图片调整位置，双击居中；方向键微调',previewBackground:'预览背景',backgroundBlack:'黑色',backgroundTransparent:'透明',replace:'替换图片',privacy:'图片仅在本地处理，不会上传至服务器。',adjustments:'调整与导出',outputSize:'输出尺寸',lockedRatio:'1:1 比例锁定',width:'宽度',height:'高度',sizeError:'请输入 16–2048 之间的整数。',composition:'画面位置',center:'居中',zoom:'缩放',edges:'边缘处理',feather:'羽化',radius:'圆角',color:'色彩调整',saturation:'饱和度',brightness:'亮度',contrast:'对比度',reset:'重置调整',download:'导出 WebP',reading:'正在读取图片…',encoding:'正在生成 WebP…',saved:'已发起下载',again:'再次下载',fileCount:'一次请选择一张图片。',typeError:'请选择 PNG、JPG 或 WebP 图片。',fileSizeError:'请选择 30 MB 以内的图片。',loadError:'图片无法读取，请更换文件。',pixelError:'请使用 4000 万像素以内的图片。',exportError:'导出失败，请重试。',downloadError:'未能发起下载，请重试。',encoderError:'WebP 编码组件未能加载，请刷新后重试。',canvasLabel:'礼物预览图；可拖动或用方向键调整位置'},
-    en:{title:'Gift & vehicle preview maker',preview:'Preview',modeLabel:'Treatment',modeFeather:'Feathered scene',modeTransparent:'Transparent artwork',uploadTitle:'Click, drop or paste gift artwork',uploadHint:'PNG, JPG or WebP',pasteHint:'Paste with ⌘V / Ctrl+V to upload',upload:'Upload image',dragHint:'Drag to position. Double-click to center. Arrow keys to nudge.',previewBackground:'Preview background',backgroundBlack:'Black',backgroundTransparent:'Transparent',replace:'Replace image',privacy:'Processed locally. Your image never leaves this device.',adjustments:'Adjust and export',outputSize:'Output size',lockedRatio:'1:1 locked',width:'Width',height:'Height',sizeError:'Enter a whole number from 16 to 2048.',composition:'Position',center:'Center',zoom:'Zoom',edges:'Edges',feather:'Feather',radius:'Corners',color:'Color',saturation:'Saturation',brightness:'Brightness',contrast:'Contrast',reset:'Reset adjustments',download:'Export WebP',reading:'Reading image…',encoding:'Creating WebP…',saved:'Download requested',again:'Download again',fileCount:'Choose one image at a time.',typeError:'Choose a PNG, JPG or WebP image.',fileSizeError:'Choose an image under 30 MB.',loadError:'Could not read this image. Try another file.',pixelError:'Choose an image with no more than 40 million pixels.',exportError:'Could not export. Please retry.',downloadError:'Could not start the download. Please retry.',encoderError:'Could not load the WebP encoder. Refresh and try again.',canvasLabel:'Gift preview. Drag or use arrow keys to position the image'}
+    zh:{title:'礼物&座驾预览图生产工具',preview:'效果预览',modeLabel:'处理方式',modeFeather:'场景羽化',modeTransparent:'透明素材',uploadTitle:'点击、拖入或粘贴一张或多张图片',uploadHint:'支持 PNG、JPG、WebP',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',upload:'上传图片',dragHint:'拖动图片调整位置，双击居中；方向键微调',previewBackground:'预览背景',backgroundBlack:'黑色',backgroundTransparent:'透明',replace:'替换图片',privacy:'图片仅在本地处理，不会上传至服务器。',adjustments:'调整与导出',outputSize:'输出尺寸',lockedRatio:'1:1 比例锁定',width:'宽度',height:'高度',sizeError:'请输入 16–2048 之间的整数。',composition:'画面位置',center:'居中',zoom:'缩放',edges:'边缘处理',feather:'羽化',radius:'圆角',color:'色彩调整',saturation:'饱和度',brightness:'亮度',contrast:'对比度',reset:'重置调整',download:'导出 WebP',reading:'正在读取图片…',encoding:'正在生成 WebP…',saved:'已发起下载',again:'再次下载',typeError:'请选择 PNG、JPG 或 WebP 图片。',fileSizeError:'请选择 30 MB 以内的图片。',loadError:'图片无法读取，请更换文件。',pixelError:'请使用 4000 万像素以内的图片。',exportError:'导出失败，请重试。',downloadError:'未能发起下载，请重试。',encoderError:'WebP 编码组件未能加载，请刷新后重试。',canvasLabel:'礼物预览图；可拖动或用方向键调整位置'},
+    en:{title:'Gift & vehicle preview maker',preview:'Preview',modeLabel:'Treatment',modeFeather:'Feathered scene',modeTransparent:'Transparent artwork',uploadTitle:'Click, drop or paste one or more images',uploadHint:'PNG, JPG or WebP',pasteHint:'Paste with ⌘V / Ctrl+V to upload',upload:'Upload image',dragHint:'Drag to position. Double-click to center. Arrow keys to nudge.',previewBackground:'Preview background',backgroundBlack:'Black',backgroundTransparent:'Transparent',replace:'Replace image',privacy:'Processed locally. Your image never leaves this device.',adjustments:'Adjust and export',outputSize:'Output size',lockedRatio:'1:1 locked',width:'Width',height:'Height',sizeError:'Enter a whole number from 16 to 2048.',composition:'Position',center:'Center',zoom:'Zoom',edges:'Edges',feather:'Feather',radius:'Corners',color:'Color',saturation:'Saturation',brightness:'Brightness',contrast:'Contrast',reset:'Reset adjustments',download:'Export WebP',reading:'Reading image…',encoding:'Creating WebP…',saved:'Download requested',again:'Download again',typeError:'Choose a PNG, JPG or WebP image.',fileSizeError:'Choose an image under 30 MB.',loadError:'Could not read this image. Try another file.',pixelError:'Choose an image with no more than 40 million pixels.',exportError:'Could not export. Please retry.',downloadError:'Could not start the download. Please retry.',encoderError:'Could not load the WebP encoder. Refresh and try again.',canvasLabel:'Gift preview. Drag or use arrow keys to position the image'}
   };
   Object.assign(copy.zh,{alignment:'画布对齐',alignHorizontal:'水平对齐',alignVertical:'垂直对齐',contextTitle:'礼物栏实时预览',contextLabel:'礼物栏实时预览',live:'实时',sizePresets:'常用尺寸',dragHint:'拖动图片定位，滚轮缩放，双击居中；方向键微调'});
   Object.assign(copy.en,{alignment:'Canvas alignment',alignHorizontal:'Horizontal align',alignVertical:'Vertical align',contextTitle:'Live gift panel preview',contextLabel:'Live gift panel preview',live:'Live',sizePresets:'Common sizes',dragHint:'Drag to position, scroll to zoom, double-click to center. Arrow keys to nudge.'});
@@ -16,14 +16,18 @@
   Object.assign(copy.en,{advanced:'Advanced adjustments',retouch:'Retouch',toolMove:'Move',toolErase:'Erase',toolRestore:'Restore',brushSize:'Brush size',brushHardness:'Hardness',brushOpacity:'Opacity',clearErase:'Clear erasing',history:'Edit history',undo:'Undo',redo:'Redo',transform:'Rotate and flip',rotation:'Rotation',rotateLeft:'Rotate left 90°',rotateRight:'Rotate right 90°',flipHorizontal:'Flip horizontally',flipVertical:'Flip vertically',safeArea:'Safe area guides',safeToggle:'Show safe area and center lines',safeInset:'Safe margin',brushHint:'Drag to retouch. [ / ] size, Esc to move, Cmd/Ctrl Z to undo.'});
   Object.assign(copy.zh,{removeBackground:'一键抠图',restoreBackground:'还原背景',removing:'正在抠图…',removeProgress:'抠图进度',modelLoading:'正在加载抠图组件',removeError:'抠图失败，请检查网络或稍后重试；原图已保留。',removeHint:'先识别主体，再精修黑底边缘并恢复光效与粒子。图片仅在本地处理。'});
   Object.assign(copy.en,{removeBackground:'Remove background',restoreBackground:'Restore background',removing:'Removing background…',removeProgress:'Background removal progress',modelLoading:'Loading background removal',removeError:'Background removal failed. Check your connection and retry. Your original image is preserved.',removeHint:'Detects the subject, refines dark-backed edges and recovers light effects. Your image stays on this device.'});
+  Object.assign(copy.zh,{batchTitle:'已导入图片',batchAdd:'继续添加',batchRemove:'移除图片',batchMatting:'批量抠图',batchDownload:'批量下载 ZIP',batchProgress:'正在处理',batchDone:'已完成',batchSkipped:'未成功',batchImport:'未能导入',batchExport:'没有可导出的图片，请重试。'});
+  Object.assign(copy.en,{batchTitle:'Imported images',batchAdd:'Add images',batchRemove:'Remove image',batchMatting:'Remove backgrounds',batchDownload:'Download batch ZIP',batchProgress:'Processing',batchDone:'Completed',batchSkipped:'Failed',batchImport:'Could not import',batchExport:'No images could be exported. Please retry.'});
   const state={image:null,file:null,settings:{...defaults},strokes:[],baseMask:null,removing:false,removeProgress:null,tool:'move',brush:{size:20,hardness:70,opacity:100},safe:{enabled:false,inset:10},mode:'feather',modeChosen:false,side:200,valid:true,loading:false,exporting:false,notice:null,background:'black',download:null,revision:0};
+  const jobs=[];
+  let activeJob=null,batchStatus=null,replaceOnPick=false;
   const t=key=>(copy[language]||copy.en)[key]||copy.en[key]||key;
   let renderRequest=0,drag=null,loadToken=0,editGroup=null,wheelTimer=0,hoverPoint=null,mattingTimer=0,mattingPresentation=0,mattingPercent=0,mattingVisible=false;
   const webpMode=()=>window.FunWebP?.getMode?.()||'high';
   const busy=()=>state.loading||state.exporting||state.removing;
   const snapshot=()=>({settings:{...state.settings},strokes:state.strokes,baseMask:state.baseMask,mode:state.mode,side:state.side});
-  const history=window.GiftPreviewHistory.create(snapshot());
-  function pendingEdit(){const saved=history.current();return saved.strokes!==state.strokes||saved.baseMask!==state.baseMask||saved.mode!==state.mode||saved.side!==state.side||Object.keys(state.settings).some(key=>!Object.is(saved.settings[key],state.settings[key]))||!!drag?.stroke?.points.length}
+  let history=window.GiftPreviewHistory.create(snapshot());
+  function pendingEdit(){const saved=history.current();return saved.strokes!==state.strokes||saved.baseMask!==state.baseMask||saved.mode!==state.mode||(jobs.length<2&&saved.side!==state.side)||Object.keys(state.settings).some(key=>!Object.is(saved.settings[key],state.settings[key]))||!!drag?.stroke?.points.length}
   function syncHistory(){const locked=busy()||!state.image;$('#giftPreviewUndo').disabled=locked||!(history.canUndo()||pendingEdit());$('#giftPreviewRedo').disabled=locked||pendingEdit()||!history.canRedo()}
   function commitEdit(){if(editGroup){editGroup=null;history.push(snapshot())}if(wheelTimer){clearTimeout(wheelTimer);wheelTimer=0}syncHistory()}
   function beginEdit(group){if(editGroup!==group){commitEdit();editGroup=group}}
@@ -31,8 +35,8 @@
   function historyStep(direction){
     if(busy()||!state.image)return;
     prepareEdit();const saved=history[direction]();if(!saved)return;
-    state.settings={...saved.settings};state.strokes=saved.strokes;state.baseMask=saved.baseMask;state.mode=saved.mode;state.side=saved.side;state.valid=true;
-    for(const id of ['Width','Height'])$('#giftPreview'+id).value=state.side;
+    applyEdits(saved);
+    if(jobs.length<2){state.side=saved.side;state.valid=true;for(const id of ['Width','Height'])$('#giftPreview'+id).value=state.side}
     syncRanges();invalidate();
   }
   const renderSettings=()=>({...state.settings,mode:state.mode,baseMask:state.baseMask,strokes:drag?.stroke?.points.length?[...state.strokes,drag.stroke]:state.strokes});
@@ -68,11 +72,12 @@
     for(const id of ['ToolMove','ToolErase','ToolRestore','BrushSize','BrushHardness','BrushOpacity','Rotation','RotateLeft','RotateRight','FlipHorizontal','FlipVertical','SafeToggle'])$('#giftPreview'+id).disabled=locked||!ready;
     $('#giftPreviewClearErase').disabled=locked||!ready||!state.strokes.length;
     $('#giftPreviewSafeInset').disabled=locked||!ready||!state.safe.enabled;
-    $('#giftPreviewDownload').disabled=locked||!ready||!state.valid;$('#giftPreviewDownload').textContent=t(state.exporting?'encoding':'download');
+    const exportingSingle=state.exporting&&batchStatus?.phase!=='export';
+    $('#giftPreviewDownload').disabled=locked||!ready||!state.valid;$('#giftPreviewDownload').textContent=t(exportingSingle?'encoding':'download');
     const removeButton=$('#giftPreviewRemoveBackground'),removeLabel=removeButton.querySelector?.('[data-gift-matting-label]')||removeButton;removeButton.disabled=locked||!ready;removeLabel.textContent=t(state.removing?'removing':state.baseMask?'restoreBackground':'removeBackground');removeButton.setAttribute('aria-busy',String(state.removing));removeButton.title=t('removeHint');
     removeButton.dataset.method=state.baseMask?.method||'';removeButton.dataset.processingMs=String(state.baseMask?.elapsedMs??'');
     for(const id of ['Upload','Replace'])$('#giftPreview'+id).setAttribute('aria-busy',String(state.loading));
-    $('#giftPreviewDownload').setAttribute('aria-busy',String(state.exporting));stage.setAttribute('aria-busy',String(locked));
+    $('#giftPreviewDownload').setAttribute('aria-busy',String(exportingSingle));stage.setAttribute('aria-busy',String(locked));
     stage.classList.toggle('upload-ready',!ready);stage.classList.toggle('has-image',ready);
     stage.setAttribute('role','group');stage.removeAttribute('tabindex');stage.setAttribute('aria-label',t(ready?'preview':'uploadTitle'));
     canvas.hidden=!ready;$('#giftPreviewEmpty').hidden=ready;$('#giftPreviewSourcebar').hidden=!ready;
@@ -102,7 +107,7 @@
     for(const [id,key] of [['BrushSize','size'],['BrushHardness','hardness'],['BrushOpacity','opacity']])$('#giftPreview'+id+'Value').textContent=state.brush[key]+(key==='size'?'px':'%');
     $('#giftPreviewSafeToggle').checked=state.safe.enabled;$('#giftPreviewSafeInsetValue').textContent=state.safe.inset+'%';
     $('#giftPreviewSafeArea').hidden=!ready||!state.safe.enabled;$('#giftPreviewSafeArea').style.setProperty('--gift-safe-inset',state.safe.inset+'%');
-    syncHistory();syncCursor();syncMattingProgress();
+    syncHistory();syncCursor();syncMattingProgress();syncBatchControls();
     const phase=state.loading?'loading':state.exporting||state.removing?'processing':state.notice||!state.valid?'error':state.download?'success':ready?'ready':'empty';
     const removalMessage=state.removeProgress?.phase==='loading'?`${t('modelLoading')} · ${Math.round((state.removeProgress.progress||0)*100)}%`:t('removing');
     window.FunToolkitUI?.setState('gift-preview',{phase,message:state.loading?t('reading'):state.exporting?t('encoding'):state.removing?removalMessage:undefined});syncReceipt();
@@ -137,38 +142,127 @@
     return clear/(32*32)>.45?'transparent':'feather';
   }
   function readImage(url){return new Promise((resolve,reject)=>{const image=new Image();image.decoding='async';image.onload=()=>image.naturalWidth&&image.naturalHeight?resolve(image):reject(new Error('loadError'));image.onerror=()=>reject(new Error('loadError'));image.src=url})}
-  async function loadFiles(files){
+  async function readSource(file){
+    if(!/\.(png|jpe?g|webp)$/i.test(file.name)||file.type&&!/^image\/(png|jpeg|webp)$/.test(file.type))throw new Error('typeError');
+    if(file.size>30*1024*1024)throw new Error('fileSizeError');
+    const url=URL.createObjectURL(file);
+    try{
+      const image=await readImage(url);
+      if(image.naturalWidth*image.naturalHeight>40000000)throw new Error('pixelError');
+      return image;
+    }finally{URL.revokeObjectURL(url)}
+  }
+  function applyEdits(edits){
+    state.settings={...edits.settings};state.strokes=edits.strokes;state.baseMask=edits.baseMask;state.mode=edits.mode;
+  }
+  function showJob(job,image){
+    const edits=job.history.current();
+    window.GiftPreviewRenderer.render(canvas,image,{...edits.settings,mode:edits.mode,baseMask:edits.baseMask,strokes:edits.strokes});
+    if(activeJob)activeJob.modeChosen=state.modeChosen;
+    activeJob=job;history=job.history;applyEdits(edits);
+    state.image=image;state.file=job.file;state.modeChosen=job.modeChosen;state.tool='move';hoverPoint=null;
+    state.revision++;releaseDownload();syncRanges();syncContextPreview();
+  }
+  function makeJob(file,image,modeChosen){
+    const mode=modeChosen?state.mode:guessMode(image);
+    const job={file,modeChosen,history:window.GiftPreviewHistory.create({settings:{...defaults},strokes:[],baseMask:null,mode,side:state.side})};
+    const row=document.createElement('li'),select=document.createElement('button'),remove=document.createElement('button');
+    const thumb=document.createElement('canvas'),name=document.createElement('span');
+    row.className='gift-batch-item';select.className='gift-batch-select';remove.className='gift-batch-remove';
+    select.type=remove.type='button';select.title=file.name;name.className='gift-batch-name';name.textContent=file.name;
+    thumb.width=thumb.height=64;thumb.className='gift-batch-thumb';thumb.setAttribute('aria-hidden','true');
+    const scale=64/Math.max(image.naturalWidth,image.naturalHeight),w=image.naturalWidth*scale,h=image.naturalHeight*scale;
+    thumb.getContext('2d').drawImage(image,(64-w)/2,(64-h)/2,w,h);
+    select.append(thumb,name);remove.textContent='×';row.append(select,remove);
+    select.addEventListener('click',()=>selectJob(job));remove.addEventListener('click',()=>removeJob(job));
+    return Object.assign(job,{row,select,remove});
+  }
+  function syncBatchControls(){
+    const multiple=jobs.length>1,locked=busy();
+    $('#giftBatchPanel').hidden=!jobs.length;
+    $('#giftBatchAdd').disabled=locked;
+    const matting=$('#giftBatchRemoveBackground'),exportZip=$('#giftBatchDownload');
+    matting.hidden=exportZip.hidden=!multiple;
+    matting.disabled=locked||jobs.every(job=>job.history.current().baseMask);
+    exportZip.disabled=locked||!state.valid;
+    matting.setAttribute('aria-busy',String(batchStatus?.phase==='matting'));
+    exportZip.setAttribute('aria-busy',String(batchStatus?.phase==='export'));
+    for(const job of jobs){
+      job.select.disabled=job.remove.disabled=locked;job.select.setAttribute('aria-pressed',String(job===activeJob));
+      job.remove.setAttribute('aria-label',t('batchRemove')+' · '+job.file.name);
+    }
+    const status=$('#giftBatchStatus');status.hidden=!batchStatus;
+    const {done,total,failed,phase}=batchStatus||{};
+    let message='';
+    if(phase==='import')message=t('batchImport')+' '+failed;
+    else if(phase)message=t(phase==='done'?'batchDone':'batchProgress')+' '+(phase==='done'?done-failed:done)+'/'+total+(failed?' · '+t('batchSkipped')+' '+failed:'');
+    if(status.textContent!==message)status.textContent=message;
+    status.dataset.tone=failed?'error':'';
+  }
+  function renderJobList(){
+    $('#giftBatchList').replaceChildren(...jobs.map(job=>job.row));
+  }
+  async function loadFiles(files,{replace=true}={}){
     if(busy())return;
     const selected=Array.from(files);if(!selected.length)return;
-    let problem;
-    if(selected.length!==1)problem='fileCount';
-    const file=selected[0];
-    if(!problem&&(!/\.(png|jpe?g|webp)$/i.test(file.name)||file.type&&!/^image\/(png|jpeg|webp)$/.test(file.type)))problem='typeError';
-    if(!problem&&file.size>30*1024*1024)problem='fileSizeError';
-    if(problem){state.notice=problem;syncControls();return}
+    const replaced=replace&&selected.length===1?activeJob:null;
+    const modeChosen=state.modeChosen&&(!!replaced||!activeJob);
     const uploadHadFocus=document.activeElement===$('#giftPreviewUpload')||document.activeElement===stage;
-    clearMattingProgress();prepareEdit();state.loading=true;state.notice=null;syncControls();const token=++loadToken;let url,loaded=false;
+    clearMattingProgress();prepareEdit();state.loading=true;state.notice=null;batchStatus=null;syncControls();
+    const token=++loadToken;let loaded=false,failed=0,problem;
     try{
-      url=URL.createObjectURL(file);const image=await readImage(url);
-      if(token!==loadToken)return;
-      if(image.naturalWidth*image.naturalHeight>40000000)throw new Error('pixelError');
-      const mode=state.modeChosen?state.mode:guessMode(image);
-      window.GiftPreviewRenderer.render(canvas,image,{...defaults,mode});
-      state.image=image;state.file=file;state.mode=mode;state.settings={...defaults};state.strokes=[];state.baseMask=null;state.tool='move';hoverPoint=null;history.reset(snapshot());state.revision++;releaseDownload();syncRanges();loaded=true;
-    }catch(error){state.notice=copy.en[error.message]?error.message:'loadError';if(state.image)try{render()}catch(ignored){}}
-    finally{if(url)URL.revokeObjectURL(url);if(token===loadToken){state.loading=false;syncControls();if(loaded){
-      syncContextPreview();window.FunToolkitUI?.reveal(canvas);if(uploadHadFocus)canvas.focus({preventScroll:true});
-      const prewarm=()=>{if(active()&&token===loadToken&&!state.removing&&!state.baseMask)window.GiftBackground?.prewarm?.(state.image)};
-      if(typeof requestIdleCallback==='function')requestIdleCallback(prewarm,{timeout:500});
-      else setTimeout(prewarm,0);
-    }}}
+      for(const file of selected){
+        try{
+          const image=await readSource(file);if(token!==loadToken)return;
+          const job=makeJob(file,image,modeChosen);
+          if(replaced||!activeJob){showJob(job,image);loaded=true}
+          if(replaced)jobs.splice(jobs.indexOf(replaced),1,job);else jobs.push(job);
+        }catch(error){failed++;problem=copy.en[error.message]?error.message:'loadError'}
+      }
+      if(failed===selected.length){state.notice=problem;if(state.image)try{render()}catch(ignored){}}
+      else if(failed)batchStatus={phase:'import',failed};
+    }finally{
+      if(token===loadToken){
+        state.loading=false;renderJobList();syncControls();
+        if(loaded){
+          window.FunToolkitUI?.reveal(canvas);if(uploadHadFocus)canvas.focus({preventScroll:true});
+          const prewarm=()=>{if(token===loadToken&&active()&&!busy())window.GiftBackground?.prewarm?.(state.image)};
+          if(typeof requestIdleCallback==='function')requestIdleCallback(prewarm,{timeout:500});else setTimeout(prewarm,0);
+        }
+      }
+    }
+  }
+  async function selectJob(job){
+    if(busy()||job===activeJob)return false;
+    clearMattingProgress();prepareEdit();state.loading=true;state.notice=null;syncControls();
+    const token=++loadToken;let loaded=false;
+    try{
+      const image=await readSource(job.file);if(token!==loadToken)return false;
+      showJob(job,image);loaded=true;return true;
+    }catch(error){state.notice='loadError';if(state.image)try{render()}catch(ignored){}return false}
+    finally{if(token===loadToken){state.loading=false;syncControls();if(loaded)job.select.focus({preventScroll:true})}}
+  }
+  async function removeJob(job){
+    if(busy())return;
+    const index=jobs.indexOf(job);if(index===-1)return;
+    const next=jobs[index+1]||jobs[index-1];
+    if(job===activeJob){
+      if(next&&!await selectJob(next))return;
+      if(!next){
+        clearMattingProgress();prepareEdit();releaseDownload();
+        activeJob=null;state.file=null;state.image=null;state.baseMask=null;state.strokes=[];state.tool='move';hoverPoint=null;
+        history=window.GiftPreviewHistory.create(snapshot());
+      }
+    }
+    jobs.splice(index,1);batchStatus=null;state.notice=null;renderJobList();syncControls();
+    (next?.select||$('#giftPreviewUpload')).focus({preventScroll:true});
   }
   function syncRanges(){
     for(const [name,key] of rangeFields)$('#giftPreview'+name).value=key==='zoom'?Math.round(state.settings[key]*100):state.settings[key];
   }
   function changeSize(input){
     if(busy())return;
-    beginEdit('size');
+    if(jobs.length<2)beginEdit('size');
     const side=Number(input.value);state.valid=input.value.trim()!==''&&Number.isInteger(side)&&side>=16&&side<=2048;
     if(state.valid){state.side=side;$('#giftPreviewWidth').value=side;$('#giftPreviewHeight').value=side}
     state.notice=null;releaseDownload();syncControls();
@@ -223,22 +317,89 @@
     state.settings.offsetX=Math.max(-1,Math.min(1,drag.offsetX+(event.clientX-drag.x)/box.width));
     state.settings.offsetY=Math.max(-1,Math.min(1,drag.offsetY+(event.clientY-drag.y)/box.height));changed();event.preventDefault();
   }
+  function webpName(file,side){
+    const base=file.name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'gift';
+    return base+'-gift-preview-'+side+'x'+side+'.webp';
+  }
+  async function encodeImage(image,settings,side,mode){
+    await new Promise(resolve=>requestAnimationFrame(resolve));
+    const output=document.createElement('canvas');output.width=output.height=side;
+    try{
+      window.GiftPreviewRenderer.render(output,image,settings);
+      const blob=await canvasToWebP(output,{mode});
+      if(!blob||blob.type!=='image/webp')throw new Error('exportError');
+      return blob;
+    }finally{output.width=output.height=1}
+  }
+  async function downloadBatch(){
+    if(busy()||jobs.length<2||!state.valid)return;
+    prepareEdit();
+    const side=state.side,mode=webpMode(),names=new Set();
+    const progress={phase:'export',done:0,total:jobs.length,failed:0};
+    state.exporting=true;state.notice=null;batchStatus=progress;syncControls();
+    let url;
+    try{
+      const zip=new JSZip();
+      for(const job of jobs){
+        if(mode!==webpMode())return;
+        try{
+          const edits=job.history.current(),image=job===activeJob?state.image:await readSource(job.file);
+          const blob=await encodeImage(image,{...edits.settings,mode:edits.mode,baseMask:edits.baseMask,strokes:edits.strokes},side,mode);
+          if(mode!==webpMode())return;
+          const base=webpName(job.file,side);let name=base,suffix=2;
+          while(names.has(name.toLowerCase())){name=base.replace(/\.webp$/,' ('+suffix+').webp');suffix++}
+          const bytes=new Uint8Array(await blob.arrayBuffer());
+          zip.file(name,bytes);names.add(name.toLowerCase());
+        }catch(error){progress.failed++}
+        progress.done++;syncBatchControls();
+      }
+      if(!names.size){state.notice='batchExport';return}
+      const blob=await zip.generateAsync({type:'blob',compression:'STORE'});
+      if(mode!==webpMode())return;
+      url=URL.createObjectURL(blob);
+      const link=document.createElement('a');link.href=url;link.download='gift-previews-'+side+'x'+side+'.zip';link.hidden=true;document.body.append(link);
+      try{link.click()}catch(error){throw new Error('downloadError')}finally{link.remove()}
+      window.Hub?.record('gift','generated',names.size);window.Hub?.record('gift','download');
+    }catch(error){state.notice=error.message==='downloadError'?'downloadError':'exportError'}
+    finally{
+      if(url){const downloadUrl=url;setTimeout(()=>URL.revokeObjectURL(downloadUrl),60000)}
+      state.exporting=false;progress.phase='done';
+      if(mode!==webpMode()||state.notice)batchStatus=null;
+      syncControls();
+    }
+  }
+  async function removeBatchBackgrounds(){
+    if(busy()||jobs.length<2||jobs.every(job=>job.history.current().baseMask))return;
+    clearMattingProgress();prepareEdit();
+    const progress={phase:'matting',done:0,total:jobs.length,failed:0};
+    state.removing=true;state.notice=null;batchStatus=progress;syncControls();
+    try{
+      for(const job of jobs){
+        const edits=job.history.current();
+        if(!edits.baseMask){
+          try{
+            const image=job===activeJob?state.image:await readSource(job.file),startedAt=Date.now();
+            const mask=await window.GiftBackground.remove(image);
+            mask.elapsedMs=Date.now()-startedAt;
+            job.history.push({...edits,mode:'transparent',baseMask:mask});
+            job.modeChosen=true;
+            if(job===activeJob){applyEdits(job.history.current());state.modeChosen=true;invalidate()}
+          }catch(error){progress.failed++}
+        }
+        progress.done++;syncBatchControls();
+      }
+      if(progress.failed===progress.total)state.notice='removeError';
+    }finally{state.removing=false;progress.phase='done';syncControls()}
+  }
   async function download(){
     if(busy()||!state.image||!state.valid)return;
     prepareEdit();state.exporting=true;state.notice=null;syncControls();let freshUrl;
     const mode=webpMode(),key=state.revision+':'+state.side+':'+mode;
     try{
       const cached=state.download?.key===key;let blob=cached?state.download.blob:null;
-      if(!blob){
-        await new Promise(resolve=>requestAnimationFrame(resolve));
-        const output=document.createElement('canvas');output.width=output.height=state.side;
-        window.GiftPreviewRenderer.render(output,state.image,renderSettings());
-        try{blob=await canvasToWebP(output,{mode})}finally{output.width=output.height=1}
-        if(!blob||blob.type!=='image/webp')throw new Error('exportError');
-      }
+      if(!blob)blob=await encodeImage(state.image,renderSettings(),state.side,mode);
       if(mode!==webpMode())return;
-      const base=state.file.name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'gift';
-      const name=`${base}-gift-preview-${state.side}x${state.side}.webp`;
+      const name=webpName(state.file,state.side);
       freshUrl=URL.createObjectURL(blob);const link=document.createElement('a');link.href=freshUrl;link.download=name;link.hidden=true;document.body.append(link);
       try{link.click()}catch(error){throw new Error('downloadError')}finally{link.remove()}
       releaseDownload();state.download={key,blob,name,url:freshUrl};freshUrl=null;if(!cached)window.Hub?.record('gift','generated');window.Hub?.record('gift','download');syncReceipt();window.FunToolkitUI?.reveal($('#giftPreviewReceipt'));
@@ -262,15 +423,26 @@
   }
   function activate(){if(state.download&&!state.download.key.endsWith(':'+webpMode()))releaseDownload();syncControls();if(state.image)scheduleRender()}
   document.addEventListener('webp:mode-change',()=>{releaseDownload();syncControls()});
-  for(const id of ['Upload','Replace'])$('#giftPreview'+id).addEventListener('click',event=>{event.stopPropagation();if(!busy())$('#giftPreviewInput').click()});
-  $('#giftPreviewInput').addEventListener('change',event=>{loadFiles(event.target.files);event.target.value=''});
-  stage.addEventListener('click',()=>{if(!state.image&&!busy())$('#giftPreviewInput').click()});
-  stage.addEventListener('keydown',event=>{if(event.target===stage&&!state.image&&!busy()&&['Enter',' '].includes(event.key)){event.preventDefault();$('#giftPreviewInput').click()}});
+  const input=$('#giftPreviewInput');
+  function pickFiles(replace=false){
+    if(busy())return;
+    replaceOnPick=replace;input.multiple=!replace;input.click();
+  }
+  for(const [id,replace] of [['#giftPreviewUpload',false],['#giftPreviewReplace',true],['#giftBatchAdd',false]]){
+    $(id).addEventListener('click',event=>{event.stopPropagation();pickFiles(replace)});
+  }
+  input.addEventListener('change',event=>{
+    const selected=Array.from(event.target.files),replace=replaceOnPick;
+    replaceOnPick=false;input.multiple=true;event.target.value='';loadFiles(selected,{replace});
+  });
+  stage.addEventListener('click',()=>{if(!state.image)pickFiles()});
+  stage.addEventListener('keydown',event=>{if(event.target===stage&&!state.image&&!busy()&&['Enter',' '].includes(event.key)){event.preventDefault();pickFiles()}});
   const active=()=>location.hash==='#gift-previews';
-  window.UploadPaste?.register({zone:stage,isActive:active,isBusy:busy,onFiles:loadFiles});
+  const appendFiles=files=>loadFiles(files,{replace:false});
+  window.UploadPaste?.register({zone:stage,isActive:active,isBusy:busy,onFiles:appendFiles});
   document.addEventListener('dragover',event=>{if(active()&&Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();stage.classList.add('drag')}});
   document.addEventListener('dragleave',event=>{if(!event.relatedTarget)stage.classList.remove('drag')});
-  document.addEventListener('drop',event=>{stage.classList.remove('drag');if(active()&&event.dataTransfer?.files.length){event.preventDefault();loadFiles(event.dataTransfer.files)}});
+  document.addEventListener('drop',event=>{stage.classList.remove('drag');if(active()&&event.dataTransfer?.files.length){event.preventDefault();appendFiles(event.dataTransfer.files)}});
   canvas.addEventListener('pointerdown',pointerDown);canvas.addEventListener('pointermove',pointerMove);
   canvas.addEventListener('pointerup',event=>{if(drag?.id!==event.pointerId)return;if(drag.stroke)addBrushPoint(event,true);stopDrag()});
   for(const event of ['pointercancel','lostpointercapture'])canvas.addEventListener(event,event=>{if(drag?.id===event.pointerId)stopDrag()});
@@ -317,6 +489,8 @@
   $('#giftPreviewReset').addEventListener('click',()=>{if(busy()||!state.image)return;clearMattingProgress();prepareEdit();state.settings={...defaults};if(state.strokes.length)state.strokes=[];state.baseMask=null;state.tool='move';syncRanges();changed()});
   $('#giftPreviewBackgroundBlack').addEventListener('click',()=>setBackground('black'));$('#giftPreviewBackgroundTransparent').addEventListener('click',()=>setBackground('transparent'));
   $('#giftPreviewDownload').addEventListener('click',download);
+  $('#giftBatchDownload').addEventListener('click',downloadBatch);
+  $('#giftBatchRemoveBackground').addEventListener('click',removeBatchBackgrounds);
   window.addEventListener('hashchange',()=>{if(!active()){clearMattingProgress();prepareEdit();hoverPoint=null;syncControls()}stage.classList.remove('drag')});
   window.addEventListener('blur',()=>{prepareEdit();hoverPoint=null;syncCursor()});
   window.addEventListener('pagehide',event=>{clearMattingProgress();prepareEdit();if(!event.persisted){loadToken++;if(renderRequest)cancelAnimationFrame(renderRequest);if(state.download)URL.revokeObjectURL(state.download.url)}});

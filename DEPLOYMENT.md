@@ -12,6 +12,8 @@
 
 Use Node.js 22+ and pnpm. Authentication stays in the owner's GitHub and Wrangler login sessions; never commit tokens or `.env` files.
 
+Before deploying, complete the [VAP regression checks](AGENTS.md#fun-toolkit-项目验收) on the current build and record the results.
+
 ```sh
 pnpm install --frozen-lockfile
 pnpm test

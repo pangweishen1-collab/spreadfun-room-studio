@@ -24,6 +24,7 @@
   const clamp=(value,min,max)=>Math.min(max,Math.max(min,value));
   const percent=value=>String(Math.round(value*1000)/10);
   const cleanTag=value=>String(value||'').replace(/^\[|\]$/g,'');
+  const exportSignature=config=>JSON.stringify(Object.keys(config).sort().map(key=>[key,config[key]]));
   const usefulNativeRect=rect=>Array.isArray(rect)&&rect.length===4&&rect.every(Number.isFinite)&&rect[2]>0&&rect[3]>0&&!(rect[0]===0&&rect[1]===0&&rect[2]===1&&rect[3]===1);
   const representativeFrame=frames=>frames.reduce((best,frame)=>!best||frame.rect[2]*frame.rect[3]>best.rect[2]*best.rect[3]?frame:best,null);
   function nativeTextStyle(source){
@@ -36,6 +37,7 @@
   function create({root,stage,canvas,onChange=()=>{}}={}){
     const $=suffix=>root.querySelector('#vapResource'+suffix),panel=$('Panel');if(!panel)return null;
     let resources=[],selectedId=null,nextId=1,sourceConfig=null,loading=false,version=0,disposed=false,notice='',lastExportSignature=null;
+    let lastExportResourceIds=new Map();
     let context={ready:false,busy:false,width:720,height:1560,duration:0,time:0,fps:24,resourceOpacity:1,view:'transparent',language:'zh'},drag=null,inlineId=null,pendingMotionFocus=null;
     const t=key=>(copy[context.language]||copy.zh)[key]||key;
     const selected=()=>resources.find(item=>item.id===selectedId);
@@ -298,9 +300,9 @@
     function setSource(config){
       // Common tag names are not identity. Only this editor's exact accepted
       // export can absorb its local layers into the imported native slots.
-      if(config===sourceConfig)return;const ownExport=!!config&&lastExportSignature!==null&&JSON.stringify(config)===lastExportSignature;sourceConfig=config||null;const previous=resources,manual=previous.filter(r=>r.sourceId===undefined),consumed=new Set(),bound=[];
+      if(config===sourceConfig)return;const ownExport=!!config&&lastExportSignature!==null&&exportSignature(config)===lastExportSignature;sourceConfig=config||null;const previous=resources,manual=previous.filter(r=>r.sourceId===undefined),consumed=new Set(),bound=[];
       for(const src of (config?.src||[]).slice(0,MAX_RESOURCES)){
-        if(!['img','txt'].includes(src.srcType))continue;const sourceId=String(src.srcId),type=src.srcType==='img'?'image':'text',tag=cleanTag(src.srcTag)||nextTag([...bound.map(item=>item.tag),...(config.src||[]).map(item=>cleanTag(item.srcTag))]),exported=ownExport?previous.find(r=>r.id===sourceId&&r.tag===tag&&r.type===type):null,old=exported||previous.find(r=>r.sourceId!==undefined&&r.tag===tag&&r.type===type),frames=(config.frame||[]).flatMap(f=>(f.obj||[]).filter(o=>String(o.srcId)===sourceId&&usefulNativeRect(o.frame)).map(o=>({i:f.i,rect:o.frame}))).sort((a,b)=>a.i-b.i),rect=representativeFrame(frames)?.rect||[0,0,src.w,src.h],fps=config.info?.fps||24,w=config.info?.w||context.width,h=config.info?.h||context.height;
+        if(!['img','txt'].includes(src.srcType))continue;const sourceId=String(src.srcId),type=src.srcType==='img'?'image':'text',tag=cleanTag(src.srcTag)||nextTag([...bound.map(item=>item.tag),...(config.src||[]).map(item=>cleanTag(item.srcTag))]),exported=ownExport?previous.find(r=>r.id===lastExportResourceIds.get(sourceId)&&r.tag===tag&&r.type===type):null,old=exported||previous.find(r=>r.sourceId!==undefined&&r.tag===tag&&r.type===type),frames=(config.frame||[]).flatMap(f=>(f.obj||[]).filter(o=>String(o.srcId)===sourceId&&usefulNativeRect(o.frame)).map(o=>({i:f.i,rect:o.frame}))).sort((a,b)=>a.i-b.i),rect=representativeFrame(frames)?.rect||[0,0,src.w,src.h],fps=config.info?.fps||24,w=config.info?.w||context.width,h=config.info?.h||context.height;
         if(exported)consumed.add(exported);
         const [x,y,width,height]=rect,storedText=config.funToolkit?.resourceDefaults?.[tag],defaultText=typeof storedText==='string'?storedText:t('defaultText'),textStyle=nativeTextStyle(src);
         bound.push({...old,...(exported?{animation:undefined,avatarFrame:undefined}:{}),id:old?.id||'resource-'+nextId++,tag,type,sourceId,offsetX:exported?0:old?.offsetX||0,offsetY:exported?0:old?.offsetY||0,scaleX:exported?1:old?.scaleX??1,scaleY:exported?1:old?.scaleY??1,file:old?.file||null,url:old?.url,text:typeof old?.text==='string'&&old.text?old.text:type==='text'?defaultText:'',x:clamp(x/w,0,1),y:clamp(y/h,0,1),width:clamp(width/w,.001,1),height:clamp(height/h,.001,1),start:frames[0]?.i/fps||0,end:frames.length?(frames.at(-1).i+1)/fps:null,opacity:exported?1:old?.opacity??1,shape:old?.shape||'square',fit:old?.fit||'cover',fontSize:old?.fontSize||textStyle.fontSize,color:old?.color||textStyle.color});
@@ -308,7 +310,17 @@
       const remaining=manual.filter(r=>!consumed.has(r)),tags=new Set(bound.map(r=>r.tag));for(const r of remaining){const base=r.tag.slice(0,36);let tag=r.tag,n=2;while(tags.has(tag))tag=base+'_'+n++;r.tag=tag;tags.add(tag);}
       resources=[...bound,...remaining].slice(0,MAX_RESOURCES);cancelInline();drag=null;selectedId=resources[0]?.id||null;notice='';if(bound.length)panel.open=true;resetHistory();syncList();syncFields();syncOverlay();ensureDefaultAvatars();
     }
-    function rememberExport(config){lastExportSignature=JSON.stringify(config);}
+    function rememberExport(config){
+      lastExportSignature=exportSignature(config);
+      // VAP IDs are assigned by export order. Remember the local identities so
+      // a later layer using the same tag is not mistaken for the exported layer.
+      lastExportResourceIds=new Map();
+      for(const source of config.src||[]){
+        const tag=cleanTag(source.srcTag),type=source.srcType==='img'?'image':'text';
+        const layer=resources.find(r=>r.tag===tag&&r.type===type);
+        if(layer)lastExportResourceIds.set(String(source.srcId),layer.id);
+      }
+    }
     function getOptions(){return {resourceMode:'dynamic',resources:resources.map(({url,...r})=>({...r}))};}
     function setContext(value={}){
       if(disposed)return;const languageChanged=value.language&&value.language!==context.language,geometryChanged=value.width&&value.width!==context.width||value.height&&value.height!==context.height,timeChanged=value.time!==undefined&&value.time!==context.time&&selected()?.sourceId!==undefined;context={...context,...value};

@@ -44,7 +44,7 @@ const sandbox={document,language:'zh',location:{hash:'#gift-previews'},Image:Moc
 };
 let source=fs.readFileSync(path.join(__dirname,'../gift-preview.js'),'utf8');
 const marker='window.GiftPreviewTool={activate,syncLanguage};';assert.ok(source.includes(marker),'test injection point must match the public API');
-source=source.replace(marker,marker+'window.test={state,loadFiles,chooseMode,changeSize,center,download,removeBackground,setBackground,pointerDown,pointerMove,stopDrag,align,zoomWheel,syncContextPreview,history,commitEdit,historyStep,setTool,rotate};');
+source=source.replace(marker,marker+'window.test={state,loadFiles,chooseMode,changeSize,center,download,removeBackground,setBackground,pointerDown,pointerMove,stopDrag,align,zoomWheel,syncContextPreview,get history(){return history},commitEdit,historyStep,setTool,rotate};');
 vm.createContext(sandbox);
 for(const module of ['gift-preview-history.js','gift-preview-render.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',module),'utf8'),sandbox);
 sandbox.window.GiftPreviewRenderer.render=(canvas,image,settings)=>{renders.push({canvas,image,width:canvas.width,height:canvas.height,settings:{...settings}});canvas.renderedSettings={...settings};canvas.renderSequence=renders.length};
@@ -91,7 +91,7 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
   click('Size200');assert.equal(api.state.side,200);
   assert.equal(get('#giftPreviewRemoveBackground').disabled,true);assert.equal(get('#giftPreviewRemoveBackground').textContent,'一键抠图');assert.equal(get('#giftPreviewRemoveBackground').getAttribute('aria-busy'),'false');await api.removeBackground();assert.equal(mattingCalls.length,0,'background removal cannot start without a source');
   const emptyRevision=api.state.revision;assert.equal(wheel().prevented,false);api.align('horizontal');api.align('vertical');assert.equal(api.state.settings.zoom,1);assert.equal(api.state.revision,emptyRevision,'empty-image gestures do not change pixels');
-  assert.equal(get('#giftPreviewStage').getAttribute('role'),'group');assert.equal(get('#giftPreviewStage').getAttribute('tabindex'),undefined,'upload contains one native button, without a nested button role');assert.equal(get('#giftPreviewStage').getAttribute('aria-label'),'点击、拖入或粘贴礼物图片');assert.match(canvas.getAttribute('aria-label'),/方向键调整位置/);
+  assert.equal(get('#giftPreviewStage').getAttribute('role'),'group');assert.equal(get('#giftPreviewStage').getAttribute('tabindex'),undefined,'upload contains one native button, without a nested button role');assert.equal(get('#giftPreviewStage').getAttribute('aria-label'),'点击、拖入或粘贴一张或多张图片');assert.match(canvas.getAttribute('aria-label'),/方向键调整位置/);
   await api.download();assert.equal(downloads.length,0);assert.equal(encodes.length,0);
   const uploadButton=get('#giftPreviewUpload');uploadButton.focus();await api.loadFiles([file('initial-broken.webp',{bad:true})]);assert.equal(document.activeElement,uploadButton,'failed initial imports do not move focus');assert.equal(canvas.focusCalls,undefined);assert.equal(api.state.image,null);assert.equal(get('#giftPreviewContext').hidden,true,'a failed first image never reveals the room');
 
@@ -119,7 +119,7 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
   // Validation/decode errors preserve the preceding image and valid receipt.
   const previous=api.state.image,validDownload=api.state.download;
   holdLoads=true;const pendingReplacement=api.loadFiles([file('pending-broken.webp',{bad:true})]);await flush();assert.equal(api.state.loading,true);assert.equal(api.state.image,previous);assert.equal(get('#giftPreviewContext').hidden,false,'replacement decoding keeps the existing live gift panel');images.at(-1).complete();holdLoads=false;await pendingReplacement;assert.equal(get('#giftPreviewContext').hidden,false,'a failed replacement keeps the existing live gift panel');
-  for(const [files,notice] of [[[file('bad.txt')],'typeError'],[[file('bad.webp',{type:'image/svg+xml'})],'typeError'],[[file('large.webp',{size:30*1024*1024+1})],'fileSizeError'],[[file(),file()],'fileCount'],[[file('broken.webp',{bad:true})],'loadError'],[[file('huge.webp',{width:10000,height:10000})],'pixelError']]){
+  for(const [files,notice] of [[[file('bad.txt')],'typeError'],[[file('bad.webp',{type:'image/svg+xml'})],'typeError'],[[file('large.webp',{size:30*1024*1024+1})],'fileSizeError'],[[file('broken.webp',{bad:true})],'loadError'],[[file('huge.webp',{width:10000,height:10000})],'pixelError']]){
     replaceButton.focus();const focusCount=canvas.focusCalls.length;await api.loadFiles(files);assert.equal(api.state.notice,notice);assert.equal(api.state.image,previous);assert.equal(api.state.download,validDownload);assert.equal(api.state.loading,false);assert.equal(get('#giftPreviewContext').hidden,false,'a failed replacement never hides the preceding image preview');assert.equal(feedback.at(-1).phase,'error');assert.equal(document.activeElement,replaceButton);assert.equal(canvas.focusCalls.length,focusCount,'a failed replacement never shifts focus to the canvas');
   }
   for(const value of ['',0,15,2049,12.5,'bad']){input('Width',value);assert.equal(api.state.valid,false);assert.equal(get('#giftPreviewDownload').disabled,true);assert.equal(api.state.download,null);const count=downloads.length;await api.download();assert.equal(downloads.length,count)}
@@ -318,5 +318,36 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
   assert.equal(documentListenerCounts.get('webp:mode-change'),1,'quality listener is registered once, outside repeated control synchronization');
   const beforeModeDownloads=downloads.length;compressionMode='lossless';documentListeners.get('webp:mode-change')();assert.equal(api.state.download,null);assert.equal(downloads.length,beforeModeDownloads,'changing quality never starts an on-demand download');await freshDownload();assert.equal(encodes.at(-1).mode,'lossless');assert.ok(api.state.download.key.endsWith(':lossless'));await cachedDownload();
   input('Contrast',90);let finishMode;holdEncode=new Promise(resolve=>finishMode=resolve);const beforeStaleDownload=downloads.length,staleExport=api.download();await flush();compressionMode='high';documentListeners.get('webp:mode-change')();finishMode();await staleExport;holdEncode=null;assert.equal(downloads.length,beforeStaleDownload,'an old-profile asynchronous result cannot download after a global switch');assert.equal(api.state.download,null);
-  console.log('PASS: gift controller upload/alpha/persistent-size-presets/download/cache/live-context/alignment/wheel/focus; grouped history, source-anchored retouch, multi-pointer isolation, immediate clear availability, transforms, safe guides and busy locks; collapsed composition, bilingual matting progress, reversible local masks, protected inference and failure/cache preservation.');
+
+  sandbox.language='zh';sandbox.window.GiftPreviewTool.syncLanguage();
+  const first=api.state.file;
+  click('Reset');input('Brightness',117);commit('Brightness');
+  const second=file(first.name,{alphaClear:.8});
+  await api.loadFiles([file('broken.webp',{bad:true}),second],{replace:false});
+  const rows=get('#giftBatchList').children;
+  assert.equal(rows.length,2);assert.equal(api.state.file,first);assert.match(get('#giftBatchStatus').textContent,/未能导入 1/);
+  await rows[1].children[0].fire('click');assert.equal(api.state.file,second);assert.equal(api.state.settings.brightness,100);
+  input('Brightness',83);commit('Brightness');
+  await rows[0].children[0].fire('click');assert.equal(api.state.settings.brightness,117);
+  click('Undo');assert.notEqual(api.state.settings.brightness,117);click('Redo');assert.equal(api.state.settings.brightness,117);
+  click('Size240');
+  const batchMask={width:2,height:2,data:new Uint8ClampedArray([0,255,255,0])};
+  mattingRun=async image=>{if(image.file===second)throw Error('fixture inference failed');return batchMask};
+  await get('#giftBatchRemoveBackground').fire('click');
+  assert.equal(api.state.baseMask,batchMask);assert.match(get('#giftBatchStatus').textContent,/已完成 1\/2.*未成功 1/);
+  const batchEntries=[];
+  sandbox.JSZip=class{file(name){batchEntries.push(name)}async generateAsync(){return new Blob(['batch'],{type:'application/zip'})}};
+  const batchStart=encodes.length,batchStats=stats.length;
+  await get('#giftBatchDownload').fire('click');
+  assert.deepEqual(batchEntries,[first.name.replace(/\.webp$/,'-gift-preview-240x240.webp'),first.name.replace(/\.webp$/,'-gift-preview-240x240 (2).webp')]);
+  assert.deepEqual(encodes.slice(batchStart).map(({width,height})=>[width,height]),[[240,240],[240,240]]);
+  assert.deepEqual(stats.slice(batchStats),[['gift','generated',2],['gift','download']]);
+  await rows[1].children[0].fire('click');assert.equal(api.state.settings.brightness,83);assert.equal(api.state.baseMask,null);assert.equal(api.state.side,240);
+  await rows[1].children[1].fire('click');assert.equal(api.state.file,first);assert.equal(get('#giftBatchList').children.length,1);assert.equal(get('#giftBatchDownload').hidden,true);
+  await rows[0].children[1].fire('click');assert.equal(api.state.image,null);
+  api.chooseMode('feather');
+  await api.loadFiles([file('cutout-a.webp',{alphaClear:.8}),file('cutout-b.webp',{alphaClear:.8})],{replace:false});
+  assert.equal(api.state.mode,'feather');
+  await get('#giftBatchList').children[1].children[0].fire('click');assert.equal(api.state.mode,'feather','an explicit pre-import treatment applies to the whole initial batch');
+  console.log('PASS: gift controller single and batch upload, independent edits, ordered switching, partial failure recovery, ZIP export, shared dimensions and treatment, local mask progress, export cache, canvas editing and busy locks.');
 })().catch(error=>{console.error(error);process.exitCode=1});

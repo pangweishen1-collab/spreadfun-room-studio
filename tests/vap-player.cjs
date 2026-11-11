@@ -92,6 +92,10 @@ const premultipliedResult={autoplay:false,url:'blob:feather',config:{info:{...re
   nativePlayer.options.config.src[0].img={runtime:true};assert.equal(JSON.stringify(nativeConfig),nativeBefore,'SDK resource decoding never mutates export metadata');
   const uniformCalls=[];nativePlayer.program={};nativePlayer.gl={getUniformLocation:(program,name)=>name,uniform1fv:(location,values)=>uniformCalls.push([location,Array.from(values)])};nativePlayer.drawFrame();assert.equal(nativePlayer.draws,1);assert.equal(uniformCalls[0][0],'image_pos');assert.deepEqual(uniformCalls[0][1],Array(18).fill(0),'sparse frames cannot retain a preceding avatar or text position');
   await native.api.updateTags({tag1:'blob:replacement',text:'替换昵称'});assert.equal(nativePlayer.destroyed,1);assert.equal(native.instances[1].options['[tag1]'],'blob:replacement');assert.equal(native.instances[1].options['[text]'],'替换昵称');assert.equal(native.instances[1].options.src,'blob:native','runtime replacement reuses encoded video');
+  const official=harness(),officialConfig={info:{...nativeConfig.info,videoW:1088,videoH:1568,aFrame:[724,0,360,780]},src:[nativeConfig.src[0]],frame:[]};
+  await official.api.mount({url:'blob:official',config:officialConfig,tags:{'[tag1]':'blob:official-avatar'}});
+  assert.equal(official.instances[0].options['[tag1]'],'blob:official-avatar','the official bare tag accepts existing bracketed bindings');
+  assert.equal(official.host.dataset.alphaMode,'premultiplied','the original Tencent layout uses premultiplied RGB even without local metadata');
   const aliases=harness(),aliasConfig={...nativeConfig,src:[{...nativeConfig.src[0],srcTag:'[tag1]'},{...nativeConfig.src[1],srcTag:'tag2'}]},aliasBefore=JSON.stringify(aliasConfig),lastAlias=()=>aliases.instances.at(-1).options;
   await aliases.api.mount({url:'blob:alias-video',config:aliasConfig,tags:{'[tag1]':'blob:original',tag2:'原昵称'}});
   await aliases.api.updateTags({tag1:'blob:plain-update'});assert.equal(lastAlias()['[tag1]'],'blob:plain-update','plain replacement overrides an older bracketed binding');assert.equal(lastAlias()['[tag2]'],'原昵称','updating one slot preserves other bindings');

@@ -8,8 +8,9 @@
 
 const utf8Encoder = new TextEncoder();
 const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
-export const VAP_STANDARD = Object.freeze({width:720,height:1560,alphaScale:.5,fps:24,videoW:1088,videoH:1568});
-export const isStandardVapCodec = codec => typeof codec === 'string' && /^avc1\.42[0-9a-f]{2}28$/i.test(codec);
+const projectMetadataPrefix = utf8Encoder.encode('FTVAP1\0');
+export const VAP_STANDARD = Object.freeze({width:720,height:1560,alphaScale:.5,fps:24,videoW:1088,videoH:1568,gap:4,bitrate:2000000});
+export const isStandardVapCodec = codec => typeof codec === 'string' && /^avc1\.4d[0-9a-f]{2}28$/i.test(codec);
 const REQUIRED_INFO_FIELDS = [
   'v', 'f', 'w', 'h', 'fps', 'videoW', 'videoH',
   'aFrame', 'rgbFrame', 'isVapx', 'orien',
@@ -187,19 +188,109 @@ export function appendVapcBox(mp4Bytes, config, {maxJsonBytes = 1_000_000} = {})
   if (boxes.some(b => b.extendsToEof)) {
     throw new Error('cannot append a box after an MP4 atom with size=0 extending to EOF');
   }
+  const box = makeVapcAtom(config, maxJsonBytes);
+  const result = new Uint8Array(mp4Bytes.byteLength + box.byteLength);
+  result.set(mp4Bytes, 0);
+  result.set(box, mp4Bytes.byteLength);
+  return result;
+}
+
+function makeMp4Atom(type, payload, prefix = new Uint8Array(0)) {
+  const size = 8 + prefix.byteLength + payload.byteLength;
+  if (size > 0xffff_ffff) throw new Error(`${type} box too large`);
+  const box = new Uint8Array(size);
+  new DataView(box.buffer).setUint32(0, size);
+  box.set(utf8Encoder.encode(type), 4);
+  box.set(prefix, 8);
+  box.set(payload, 8 + prefix.byteLength);
+  return box;
+}
+
+function makeVapcAtom(config, maxJsonBytes) {
   const payload = utf8Encoder.encode(JSON.stringify(config));
   if (payload.byteLength > maxJsonBytes) throw new Error('vapc JSON exceeds configured limit');
-  const boxLength = payload.byteLength + 8;
-  if (boxLength > 0xffff_ffff) throw new Error('vapc box too large');
+  return makeMp4Atom('vapc', payload);
+}
 
-  const result = new Uint8Array(mp4Bytes.byteLength + boxLength);
-  result.set(mp4Bytes, 0);
-  const pos = mp4Bytes.byteLength;
-  const dv = new DataView(result.buffer, pos, 8);
-  dv.setUint32(0, boxLength, false);
-  result.set([0x76, 0x61, 0x70, 0x63], pos + 4); // 'vapc'
-  result.set(payload, pos + 8);
+function shiftChunkOffsets(moov, headerSize, mdat, delta) {
+  const containers = ['trak', 'mdia', 'minf', 'stbl'];
+  const mediaStart = mdat.offset + mdat.headerSize;
+  const mediaEnd = mdat.offset + mdat.size;
+  let count = 0;
+  function visit(children, depth) {
+    for (const box of parseMp4TopLevelBoxes(children)) {
+      const payload = children.subarray(box.offset + box.headerSize, box.offset + box.size);
+      if (depth < containers.length) {
+        if (box.type === containers[depth]) visit(payload, depth + 1);
+        continue;
+      }
+      if (box.type !== 'stco' && box.type !== 'co64') continue;
+      const wide = box.type === 'co64', stride = wide ? 8 : 4;
+      const view = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+      if (payload.byteLength < 8 || view.getUint32(0) !== 0) throw new Error('invalid MP4 chunk offset table');
+      const entries = view.getUint32(4);
+      if (payload.byteLength !== 8 + entries * stride) throw new Error('invalid MP4 chunk offset count');
+      for (let index = 8; index < payload.byteLength; index += stride) {
+        const offset = wide ? Number(view.getBigUint64(index)) : view.getUint32(index);
+        if (offset < mediaStart || offset >= mediaEnd) throw new Error('MP4 chunk is outside the media box');
+        const next = offset + delta;
+        if (wide) view.setBigUint64(index, BigInt(next));
+        else {
+          if (next > 0xffff_ffff) throw new Error('MP4 chunk exceeds 32-bit offset range');
+          view.setUint32(index, next);
+        }
+      }
+      count += entries;
+    }
+  }
+  visit(moov.subarray(headerSize), 0);
+  if (!count) throw new Error('MP4 has no media chunk offsets');
+}
+
+export function nativeVapConfig(config) {
+  const {funToolkit, ...nativeConfig} = config;
+  if (Array.isArray(nativeConfig.src)) nativeConfig.src = nativeConfig.src.map(({fontStyle, ...source}) => source);
+  return nativeConfig;
+}
+
+function writeOfficialVap(mp4Bytes, boxes, config, maxJsonBytes) {
+  validateVapc(config);
+  const mediaBoxes = ['ftyp', 'moov', 'mdat'].map(type => boxes.filter(box => box.type === type));
+  if (mediaBoxes.some(matches => matches.length !== 1) ||
+      boxes.some(box => !['ftyp', 'moov', 'mdat', 'free', 'vapc'].includes(box.type) ||
+        box.extendsToEof && box.type !== 'mdat')) {
+    throw new Error('VAP requires a finalized MP4 with one movie and one media box');
+  }
+  const [[ftyp], [moov], [mdat]] = mediaBoxes;
+  const {funToolkit, src} = config;
+  const sourceFontStyles = Array.isArray(src) && src.some(source => Object.hasOwn(source, 'fontStyle'))
+    ? src.map(source => source.fontStyle)
+    : undefined;
+  // Keep the standard vapc JSON consumable by Tencent clients. Our editor's
+  // optional project fields live in the otherwise unused MP4 padding box.
+  const project = utf8Encoder.encode(funToolkit || sourceFontStyles ? JSON.stringify({funToolkit,sourceFontStyles}) : '');
+  if (project.byteLength > maxJsonBytes) throw new Error('VAP project metadata exceeds configured limit');
+  const free = makeMp4Atom('free', project, project.byteLength ? projectMetadataPrefix : undefined);
+  const vapc = makeVapcAtom(nativeVapConfig(config), maxJsonBytes);
+  const moovStart = ftyp.size + free.byteLength;
+  const vapcStart = moovStart + moov.size;
+  const mediaStart = vapcStart + vapc.byteLength;
+  const result = new Uint8Array(mediaStart + mdat.size);
+  const copyBox = (box, offset) => result.set(mp4Bytes.subarray(box.offset, box.offset + box.size), offset);
+  copyBox(ftyp, 0);
+  result.set(free, ftyp.size);
+  copyBox(moov, moovStart);
+  result.set(vapc, vapcStart);
+  copyBox(mdat, mediaStart);
+  shiftChunkOffsets(result.subarray(moovStart, vapcStart), moov.headerSize, mdat, mediaStart - mdat.offset);
   return result;
+}
+
+/** Package the same atom order as the Tencent VAP Tool 2.0.6 export. */
+export function insertVapcBox(mp4Bytes, config, {maxJsonBytes = 1_000_000} = {}) {
+  const boxes = parseMp4TopLevelBoxes(mp4Bytes);
+  if (boxes.some(box => box.type === 'vapc')) throw new Error('MP4 already contains vapc');
+  return writeOfficialVap(mp4Bytes, boxes, config, maxJsonBytes);
 }
 
 export function extractVapcBox(mp4Bytes) {
@@ -215,19 +306,18 @@ export function extractVapcBox(mp4Bytes) {
 /** Generate a base VAP for players that only support RGB and alpha playback. */
 export function makeVapPreviewCopy(mp4Bytes) {
   const config = extractVapcBox(mp4Bytes);
-  const finalBox = parseMp4TopLevelBoxes(mp4Bytes).at(-1);
-  // Toolkit exports append vapc after the media. Keep all MP4 offsets intact.
-  if (finalBox.type !== 'vapc') throw new Error('expected a final vapc box');
-  return appendVapcBox(mp4Bytes.subarray(0, finalBox.offset), {
-    info: {...config.info, isVapx: 0},
-  });
+  const boxes = parseMp4TopLevelBoxes(mp4Bytes), finalBox = boxes.at(-1);
+  const baseConfig = {info: {...config.info, isVapx: 0}};
+  // Preserve the original byte layout for legacy Toolkit exports.
+  if (finalBox.type === 'vapc') return appendVapcBox(mp4Bytes.subarray(0, finalBox.offset), baseConfig);
+  return writeOfficialVap(mp4Bytes, boxes, baseConfig, 1_000_000);
 }
 
 /** Inspect only MP4 atom headers and the bounded vapc payload, not video bytes. */
 export async function readSourceVapConfig(blob,{maxJsonBytes=1_000_000}={}){
   if(!(blob instanceof Blob)||!Number.isSafeInteger(blob.size)||blob.size<8||blob.size>200*1024*1024)throw new TypeError('Invalid MP4 source');
   checkInt('maxJsonBytes',maxJsonBytes,1,1_000_000);
-  let offset=0,config=null;
+  let offset=0,config=null,project=null;
   while(offset<blob.size){
     if(offset+8>blob.size)throw new Error('truncated MP4 box header');
     const head=new Uint8Array(await blob.slice(offset,Math.min(blob.size,offset+16)).arrayBuffer());
@@ -246,7 +336,30 @@ export async function readSourceVapConfig(blob,{maxJsonBytes=1_000_000}={}){
       config=JSON.parse(utf8Decoder.decode(await blob.slice(offset+headerSize,offset+size).arrayBuffer()));
       validateVapc(config);
     }
+    if(type==='free'&&!project){
+      const payloadSize=size-headerSize-projectMetadataPrefix.byteLength;
+      if(payloadSize>0&&payloadSize<=maxJsonBytes){
+        const start=offset+headerSize,end=start+projectMetadataPrefix.byteLength;
+        const prefix=new Uint8Array(await blob.slice(start,end).arrayBuffer());
+        if(projectMetadataPrefix.every((byte,index)=>byte===prefix[index]))try{
+          const value=JSON.parse(utf8Decoder.decode(await blob.slice(end,offset+size).arrayBuffer()));
+          if(value&&typeof value==='object'&&!Array.isArray(value))project=value;
+        }catch{/* Invalid optional project metadata does not block native playback. */}
+      }
+    }
     offset+=size;
+  }
+  if(config&&project){
+    const {funToolkit,sourceFontStyles}=project;
+    if(funToolkit&&typeof funToolkit==='object'&&!Array.isArray(funToolkit)&&!Object.hasOwn(config,'funToolkit')){
+      config.funToolkit=funToolkit;
+    }
+    if(Array.isArray(sourceFontStyles)&&sourceFontStyles.length===config.src?.length){
+      config.src.forEach((source,index)=>{
+        const style=sourceFontStyles[index];
+        if(source.srcType==='txt'&&style&&!Object.hasOwn(source,'fontStyle'))source.fontStyle=style;
+      });
+    }
   }
   return config;
 }

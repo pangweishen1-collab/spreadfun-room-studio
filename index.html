@@ -57,9 +57,9 @@ body{min-width:320px}
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
-  <link rel="stylesheet" href="gift-preview.css?v=20261111-seat-layout20">
+  <link rel="stylesheet" href="gift-preview.css?v=20261111-gift-batch">
   <link rel="stylesheet" href="vap-resources.css?v=20261101-field-labels1">
-  <link rel="stylesheet" href="vap-tool.css?v=20261111-standard-pack1">
+  <link rel="stylesheet" href="vap-tool.css?v=20261111-official-downloads">
   <link rel="stylesheet" href="vap-review.css?v=20261110-review-background-library">
   <link rel="stylesheet" href="webp-settings.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="project-selector.css?v=20261026-projects1">
@@ -254,13 +254,13 @@ body{min-width:320px}
         <button id="giftPreviewModeTransparent" class="gift-mode" type="button" aria-pressed="false"><span class="gift-mode-art" aria-hidden="true"><img src="assets/gift-preview/mode-transparent.webp" alt="" width="40" height="40"></span><span data-gift-i18n="modeTransparent">透明素材</span><svg class="gift-mode-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 8 2.5 2.5L12 5"/></svg></button>
       </fieldset><button id="giftPreviewRemoveBackground" class="gift-matting-button" type="button" aria-busy="false" data-feedback-button data-ft-activity disabled><svg class="gift-matting-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m2.5 12.5 6.5-6.5 2 2-6.5 6.5-2-2Zm5-5 2 2M11.5 1.5v3M10 3h3M3.5 4v3M2 5.5h3M13 11v3M11.5 12.5h3"/></svg><span data-gift-matting-label>一键抠图</span></button></div>
       <span class="tool-feedback-status" data-feedback-status role="status" aria-live="polite"></span>
-      <div class="stage gift-stage upload-ready ft-upload-zone" id="giftPreviewStage" data-background="black" data-feedback-stage role="group" aria-label="点击、拖入或粘贴礼物图片">
+      <div class="stage gift-stage upload-ready ft-upload-zone" id="giftPreviewStage" data-background="black" data-feedback-stage role="group" aria-label="点击、拖入或粘贴一张或多张图片">
         <div class="tool-stage-busy" data-ft-activity aria-hidden="true"><span class="ft-spinner" data-size="16"></span><span data-feedback-message></span></div>
         <div id="giftPreviewMattingProgress" class="gift-matting-progress" role="progressbar" aria-label="抠图进度" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" hidden><svg viewBox="0 0 44 44" aria-hidden="true"><circle class="gift-progress-track" cx="22" cy="22" r="18"/><circle class="gift-progress-ring" cx="22" cy="22" r="18"/></svg><span id="giftPreviewMattingPercent">0%</span></div>
         <div class="gift-canvas-pane">
         <div class="upload-empty gift-empty" id="giftPreviewEmpty">
           <img class="tool-empty-art" data-feedback-art="empty-upload" src="design-system/assets/feedback/empty-upload.svg" alt="" width="120" height="90">
-          <strong data-gift-i18n="uploadTitle">点击、拖入或粘贴礼物图片</strong><span data-gift-i18n="uploadHint">支持 PNG、JPG、WebP</span><span class="upload-paste-hint" data-gift-i18n="pasteHint">支持复制粘贴，按 ⌘V / Ctrl+V 上传</span>
+          <strong data-gift-i18n="uploadTitle">点击、拖入或粘贴一张或多张图片</strong><span data-gift-i18n="uploadHint">支持 PNG、JPG、WebP</span><span class="upload-paste-hint" data-gift-i18n="pasteHint">支持复制粘贴，按 ⌘V / Ctrl+V 上传</span>
           <button class="preview-upload ft-motion-sheen" id="giftPreviewUpload" type="button" data-gift-i18n="upload" aria-busy="false" data-feedback-button data-ft-activity>上传图片</button>
         </div>
         <div id="giftPreviewSurface" class="gift-edit-surface" data-tool="move" hidden>
@@ -279,6 +279,17 @@ body{min-width:320px}
       </div><div class="gift-background-switch" role="group" aria-labelledby="giftPreviewBackgroundLabel"><span id="giftPreviewBackgroundLabel" class="gift-sr-only" data-gift-i18n="previewBackground">预览背景</span><button id="giftPreviewBackgroundBlack" type="button" aria-pressed="true" data-gift-i18n="backgroundBlack">黑色</button><button id="giftPreviewBackgroundTransparent" type="button" aria-pressed="false" data-gift-i18n="backgroundTransparent">透明</button></div></div>
       <p id="giftPreviewDragHint" class="gift-drag-hint" data-gift-i18n="dragHint">拖动图片调整位置，滚轮缩放，双击居中</p>
       <div class="frame-sourcebar gift-sourcebar" id="giftPreviewSourcebar" hidden><div><strong id="giftPreviewName"></strong><span id="giftPreviewSourceSize"></span></div><button class="tiny" id="giftPreviewReplace" type="button" data-gift-i18n="replace" data-feedback-button data-ft-activity>替换图片</button></div>
+      <section class="gift-batch-panel" id="giftBatchPanel" aria-labelledby="giftBatchHeading" hidden>
+        <div class="gift-batch-heading">
+          <h3 id="giftBatchHeading" data-gift-i18n="batchTitle">已导入图片</h3>
+          <div class="gift-batch-actions">
+            <button class="gift-toolbar-button" id="giftBatchRemoveBackground" type="button" data-gift-i18n="batchMatting" hidden disabled>批量抠图</button>
+            <button class="gift-toolbar-button" id="giftBatchAdd" type="button" data-gift-i18n="batchAdd" disabled>继续添加</button>
+          </div>
+        </div>
+        <p class="gift-batch-status" id="giftBatchStatus" role="status" aria-live="polite" hidden></p>
+        <ul class="gift-batch-list" id="giftBatchList"></ul>
+      </section>
       <p class="tool-notice" id="giftPreviewNotice" role="alert" hidden></p>
       <p class="local-privacy" id="giftPreviewPrivacy"><span class="privacy-dot" aria-hidden="true"></span><span data-gift-i18n="privacy">图片仅在本地处理，不会上传至服务器。</span></p>
     </section>
@@ -347,11 +358,15 @@ body{min-width:320px}
     </section>
   </div>
 </details>
-      <div class="gift-export-actions"><button class="gift-secondary" id="giftPreviewReset" type="button" data-gift-i18n="reset">重置调整</button><button class="primary ft-motion-sheen" id="giftPreviewDownload" type="button" data-gift-i18n="download" aria-busy="false" data-feedback-button data-ft-activity disabled>导出 WebP</button></div>
+      <div class="gift-export-actions">
+        <button class="gift-secondary" id="giftPreviewReset" type="button" data-gift-i18n="reset">重置调整</button>
+        <button class="primary ft-motion-sheen" id="giftPreviewDownload" type="button" data-gift-i18n="download" aria-busy="false" data-feedback-button data-ft-activity disabled>导出 WebP</button>
+        <button class="primary ft-motion-sheen" id="giftBatchDownload" type="button" data-gift-i18n="batchDownload" hidden disabled>批量下载 ZIP</button>
+      </div>
       <div class="frame-download-result gift-receipt" id="giftPreviewReceipt" role="status" aria-live="polite" hidden></div>
     </aside>
   </section>
-  <input id="giftPreviewInput" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden>
+  <input id="giftPreviewInput" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple hidden>
 </main>
 
   <main id="vapTool" class="hidden" data-tool="vap" data-state="idle" data-export-revision="rgb-feather-v1" aria-labelledby="vapTitle">
@@ -450,17 +465,17 @@ body{min-width:320px}
             <div class="ft-select vap-inline-select" id="vapScreenWrap" hidden><label for="vapScreen" id="vapScreenLabel" data-vap-i18n="screenColor">幕布颜色</label><select id="vapScreen" aria-labelledby="vapScreenLabel" aria-describedby="vapMethodHint"><option value="auto" data-vap-i18n="screenAuto">自动识别幕色</option><option value="red" data-vap-i18n="screenRed">红色</option><option value="orange" data-vap-i18n="screenOrange">橙色</option><option value="yellow" data-vap-i18n="screenYellow">黄色</option><option value="green" data-vap-i18n="screenGreen">绿色</option><option value="cyan" data-vap-i18n="screenCyan">青色</option><option value="blue" data-vap-i18n="screenBlue">蓝色</option><option value="magenta" data-vap-i18n="screenMagenta">紫 / 品红</option><option id="vapScreenCustom" value="custom" data-vap-i18n="screenCustom" disabled>吸管取色</option></select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div>
             <div id="vapMaskRow" class="vap-mask-row" hidden><button id="vapMaskPick" class="vap-button vap-secondary" type="button" data-vap-i18n="chooseMask">选择遮罩图片 / 视频</button><span id="vapMaskName" class="vap-hint" data-vap-i18n="noMask">尚未选择遮罩</span></div>
           </div>
-          <div id="vapLegacyOutputOptions" hidden><label class="vap-check"><input id="vapKeepAudio" type="checkbox" checked><span data-vap-i18n="keepAudio">保留原片声音</span></label><label class="vap-field-label" for="vapRgbAlphaMode" data-vap-i18n="rgbFeather">RGB 羽化</label><div class="ft-select"><select id="vapRgbAlphaMode"><option value="premultiplied" selected data-vap-i18n="rgbFeatherReference">同步羽化（参考效果）</option><option value="straight" data-vap-i18n="rgbFeatherStraight">标准 Alpha（兼容直通）</option></select><svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></div></div></details>
+          <div id="vapLegacyOutputOptions" hidden><label class="vap-check"><input id="vapKeepAudio" type="checkbox" checked><span data-vap-i18n="keepAudio">保留原片声音</span></label></div></details>
         <div class="vap-task-progress" id="vapProgressRow" hidden><div><span id="vapPhase"></span><strong id="vapPercent">0%</strong></div><progress id="vapProgress" max="1" value="0" aria-label="转换进度"></progress></div>
         <p class="vap-notice" id="vapNotice" role="status" aria-live="polite" hidden></p>
         <div class="vap-actions"><button id="vapConvert" class="vap-button vap-primary ft-motion-sheen" type="button" data-feedback-button disabled data-vap-i18n="convert">开始转换 VAP</button><button id="vapCancel" class="vap-button vap-secondary" type="button" hidden data-vap-i18n="cancel">取消</button></div>
-        <div class="vap-result" id="vapResult" hidden><div class="vap-success-heading"><span aria-hidden="true">✓</span><strong data-vap-i18n="generated">VAP v2 已生成</strong></div><p id="vapResultMeta"></p><p id="vapBudgetNotice" class="vap-budget-status" role="status" hidden></p><div class="vap-downloads"><button id="vapDownloadMp4" class="vap-button vap-primary" type="button" data-vap-i18n="downloadMp4">下载 VAP 资源</button><button id="vapDownloadJson" class="vap-button vap-secondary" type="button" data-vap-i18n="downloadJson">配置 JSON</button><button id="vapDownloadZip" class="vap-button vap-secondary" type="button" data-vap-i18n="downloadZip">完整包 ZIP</button><button id="vapDownloadPreview" class="vap-button vap-secondary" type="button" data-vap-i18n="downloadPreview" hidden>下载 17AE 预览版</button></div><p id="vapResourceBundleHint" class="vap-hint" hidden></p><p id="vapDownloadReceipt" class="vap-hint" role="status" hidden></p></div>
+        <div class="vap-result" id="vapResult" hidden><div class="vap-success-heading"><span aria-hidden="true">✓</span><strong data-vap-i18n="generated">VAP v2 已生成</strong></div><p id="vapResultMeta"></p><p id="vapBudgetNotice" class="vap-budget-status" role="status" hidden></p><div class="vap-downloads"><button id="vapDownloadMp4" class="vap-button vap-primary" type="button" data-vap-i18n="downloadMp4">下载 VAP 资源</button><button id="vapDownloadJson" class="vap-button vap-secondary" type="button" data-vap-i18n="downloadJson">配置 JSON</button><button id="vapDownloadZip" class="vap-button vap-secondary" type="button" data-vap-i18n="downloadZip">完整包 ZIP</button></div><p id="vapDownloadReceipt" class="vap-hint" role="status" hidden></p></div>
       </aside>
     </div>
     <input id="vapInput" type="file" accept="video/mp4,image/png,image/webp,image/jpeg,application/zip,application/x-zip-compressed,.mp4,.png,.webp,.jpg,.jpeg,.zip" multiple hidden>
     <input id="vapSequenceInput" type="file" accept="video/mp4,image/png,image/webp,image/jpeg,application/zip,application/x-zip-compressed,.mp4,.png,.webp,.jpg,.jpeg,.zip" multiple hidden>
     <input id="vapMaskInput" type="file" accept="image/png,image/jpeg,image/webp,video/mp4,.png,.jpg,.jpeg,.webp,.mp4" hidden>
-    <dialog id="vapHelpDialog" aria-labelledby="vapHelpTitle"><div class="vap-help-head"><h2 id="vapHelpTitle" data-vap-i18n="helpTitle">VAP 转换使用说明</h2><button id="vapHelpClose" class="vap-button vap-secondary" type="button" data-vap-i18n="close">关闭</button></div><ol><li data-vap-i18n="helpOne">直接上传 MP4、同尺寸图片序列或一个 ZIP，自动识别类型；序列按文件名数字排序。</li><li data-vap-i18n="helpTwo">上传后自动识别去背景方式；需要调整时展开高级设置。先检查透明效果和 Alpha，黑白底方式可能影响相近颜色的主体。</li><li data-vap-i18n="helpThree">打包尺寸固定为 1088 × 1568，画面为 720 × 1560，Alpha 分辨率为 0.5。可调整目标体积。</li><li data-vap-i18n="helpFour">下载 VAP 资源可保留头像和文字标签。使用 17AE 检查动画时，下载 17AE 预览版。</li></ol><div class="vap-guide-details"><h3 data-vap-i18n="parameterGuide">参数说明</h3><p class="vap-hint vap-method-hint" id="vapMethodHint"></p><p class="vap-hint" data-vap-i18n="resultPreviewHint">VAP MP4 拼接存储 RGB 与黑白 Alpha；请在本页“透明播放”或 VAP SDK 中查看合成效果。</p><p class="vap-hint" data-vap-i18n="verticalMaskHint">拖动画面中的四条辅助线，或输入百分比。上、下边缘平滑过渡到透明，中间画面保留；辅助线不写入成品。</p><p class="vap-hint" data-vap-i18n="maskLiveHint">遮罩调整实时生效，预览与导出使用当前参数；若已生成成品，修改后需重新转换。</p><p class="vap-hint" data-vap-i18n="giftFadeHint">礼物默认淡入、淡出各 1 秒；设为 0 秒可取消对应一侧的渐变。短片会按比例缩短两端时长，少于 3 帧时保留原画面，避免整段全透明。</p><p class="vap-hint" data-vap-i18n="rgbFeatherHint">同步羽化会把渐隐写入 RGB 与 Alpha；接入要求直通 RGB 的 SDK 时请选择标准 Alpha。</p><p id="vapAlphaHint" class="vap-hint" data-vap-i18n="alphaHalfHint">Alpha 平面宽高各减半，保留画面原有的透明度。</p><p class="vap-hint" data-vap-i18n="budgetHint">成品默认上限为 2 MB，超过 5 秒可手动设到 3 MB；可手动设置更小体积。保留所选尺寸、24 FPS 与透明效果，按实际文件大小自动调整码率，无法达标时不提供超标文件。</p><p id="vapVolumeHint" class="vap-hint" data-vap-i18n="volumeHint">本站移动端推荐默认 60%（相对原片约 -4.4 dB），预览与导出同时生效；100% 保持原音量，0% 无声。这是音频增益预设，不是 LUFS 自动响度归一化；实际响度受原片、播放器与设备音量影响，交付前请在目标手机中试听。</p><p class="vap-hint" data-vap-i18n="codecHint">优先使用高清 H.264 编码，不支持时自动回退兼容配置；原音量 AAC 直接保留，调整音量时在本机重新编码声音。</p></div><p class="vap-hint" data-vap-i18n="privacy">视频与声音仅在本机处理，不上传至服务器。</p></dialog>
+    <dialog id="vapHelpDialog" aria-labelledby="vapHelpTitle"><div class="vap-help-head"><h2 id="vapHelpTitle" data-vap-i18n="helpTitle">VAP 转换使用说明</h2><button id="vapHelpClose" class="vap-button vap-secondary" type="button" data-vap-i18n="close">关闭</button></div><ol><li data-vap-i18n="helpOne">直接上传 MP4、同尺寸图片序列或一个 ZIP，自动识别类型；序列按文件名数字排序。</li><li data-vap-i18n="helpTwo">上传后自动识别去背景方式；需要调整时展开高级设置。先检查透明效果和 Alpha，黑白底方式可能影响相近颜色的主体。</li><li data-vap-i18n="helpThree">打包尺寸固定为 1088 × 1568，画面为 720 × 1560，Alpha 分辨率为 0.5。可调整目标体积。</li><li data-vap-i18n="helpFour">下载 VAP 可保留头像和文字标签。点击「查看 VAP 成品」检查播放效果。</li></ol><div class="vap-guide-details"><h3 data-vap-i18n="parameterGuide">参数说明</h3><p class="vap-hint vap-method-hint" id="vapMethodHint"></p><p class="vap-hint" data-vap-i18n="resultPreviewHint">VAP MP4 拼接存储 RGB 与黑白 Alpha；请在本页“透明播放”或 VAP SDK 中查看合成效果。</p><p class="vap-hint" data-vap-i18n="verticalMaskHint">拖动画面中的四条辅助线，或输入百分比。上、下边缘平滑过渡到透明，中间画面保留；辅助线不写入成品。</p><p class="vap-hint" data-vap-i18n="maskLiveHint">遮罩调整实时生效，预览与导出使用当前参数；若已生成成品，修改后需重新转换。</p><p class="vap-hint" data-vap-i18n="giftFadeHint">礼物默认淡入、淡出各 1 秒；设为 0 秒可取消对应一侧的渐变。短片会按比例缩短两端时长，少于 3 帧时保留原画面，避免整段全透明。</p><p id="vapAlphaHint" class="vap-hint" data-vap-i18n="alphaHalfHint">Alpha 平面宽高各减半，保留画面原有的透明度。</p><p class="vap-hint" data-vap-i18n="budgetHint">成品默认上限为 2 MB，超过 5 秒可手动设到 3 MB；可手动设置更小体积。保留所选尺寸、24 FPS 与透明效果，按实际文件大小自动调整码率，无法达标时不提供超标文件。</p><p id="vapVolumeHint" class="vap-hint" data-vap-i18n="volumeHint">本站移动端推荐默认 60%（相对原片约 -4.4 dB），预览与导出同时生效；100% 保持原音量，0% 无声。这是音频增益预设，不是 LUFS 自动响度归一化；实际响度受原片、播放器与设备音量影响，交付前请在目标手机中试听。</p><p class="vap-hint" data-vap-i18n="codecHint">采用官方 VAP 工具的 H.264 Main 4.0 封装规格。原音量 AAC 直接保留，调整音量时在本机重新编码声音。</p></div><p class="vap-hint" data-vap-i18n="privacy">视频与声音仅在本机处理，不上传至服务器。</p></dialog>
     </section>
     <section id="vapReviewPanel" role="tabpanel" aria-labelledby="vapReviewTab" hidden>
       <div class="vap-workspace">
@@ -970,13 +985,13 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="gift-preview-render.js?v=20261025-quality1"></script>
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
   <script src="gift-background.js?v=20261111-prewarm1"></script>
-  <script src="gift-preview.js?v=20261111-prewarm1"></script>
+  <script src="gift-preview.js?v=20261111-gift-batch"></script>
   <script type="module" src="gift-avatar-preview.mjs?v=20261111-seat-append"></script>
-  <script src="vap-player.js?v=20261102-release174"></script>
-  <script src="vap-resource-editor.js?v=20261102-release174"></script>
-  <script src="vap-tool.js?v=20261111-standard-pack1"></script>
+  <script src="vap-player.js?v=20261111-official-pack"></script>
+  <script src="vap-resource-editor.js?v=20261111-official-pack"></script>
+  <script src="vap-tool.js?v=20261111-official-downloads"></script>
   <script src="dice-embed.js?v=20261103-dice1"></script>
   <script src="toolkit.js?v=20261111-seat-svga1"></script>
-  <script type="module" src="vap-review.js?v=20261111-packed-alpha"></script>
+  <script type="module" src="vap-review.js?v=20261111-official-pack"></script>
   <script type="module" src="avatar-custom.js?v=20261111-seat-svga1"></script>
 </body></html>

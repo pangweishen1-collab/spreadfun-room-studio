@@ -12,7 +12,8 @@
       if(typeof tag!=='string'||!tag||tag.length>128||!['img','txt'].includes(source.srcType))throw new Error('Invalid VAP resource tag');
       const short=tag.replace(/^\[(.*)\]$/,'$1');
       if(seen.has(short))throw new Error('Duplicate VAP resource tag');seen.add(short);
-      let value=own(tags,tag)?tags[tag]:own(tags,short)?tags[short]:source.srcType==='txt'&&(own(defaults,tag)||own(defaults,short))?(own(defaults,tag)?defaults[tag]:defaults[short]):undefined;
+      const binding=[tag,short,'['+short+']'].find(key=>own(tags,key));
+      let value=binding!==undefined?tags[binding]:source.srcType==='txt'&&(own(defaults,tag)||own(defaults,short))?(own(defaults,tag)?defaults[tag]:defaults[short]):undefined;
       if(source.srcType==='txt'&&typeof value==='string'&&value.length<=2000)bindings[tag]=value||'\u200b';
       else if(source.srcType==='img'&&typeof value==='string'&&/^(blob:|data:image\/(?:png|jpe?g|webp);base64,)/i.test(value))bindings[tag]=value;
       else if(value===undefined||value===null||value==='')missing.push(tag);
@@ -80,9 +81,11 @@
       // Native buffer dimensions preserve the output ratio; CSS fits it beside the editing canvas.
       const width=config.info.w,height=config.info.h;
       candidate=new Vap();
-      // New feather exports declare their RGB convention. Unmarked legacy files
-      // remain straight; choose the first WebGL context before the SDK reuses it.
-      const premultiplied=config.funToolkit?.rgbAlphaMode==='premultiplied';
+      // Tencent's original 4px layout premultiplies RGB even without a mode marker.
+      const {aFrame,videoW,videoH}=config.info,mode=config.funToolkit?.rgbAlphaMode;
+      const official=width===720&&height===1560&&videoW===1088&&videoH===1568&&
+        aFrame?.[0]===724&&aFrame[1]===0&&aFrame[2]===360&&aFrame[3]===780;
+      const premultiplied=mode===undefined?official:mode==='premultiplied';
       const canvas=document.createElement('canvas'),attributes={alpha:true,premultipliedAlpha:premultiplied};
       candidate.canvas=canvas;
       const gl=canvas.getContext('webgl',attributes)||canvas.getContext('experimental-webgl',attributes),actual=gl?.getContextAttributes?.();

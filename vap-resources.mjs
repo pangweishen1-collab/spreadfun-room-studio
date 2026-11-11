@@ -121,35 +121,44 @@ export function resourceFrame(resource,{width,height,sourceVapConfig,timestamp=0
 function fade(y,height,mask){return mask?.enabled?smooth(mask.topStart,mask.topEnd,height===1?.5:y/(height-1))*(1-smooth(mask.bottomStart,mask.bottomEnd,height===1?.5:y/(height-1))):1;}
 
 function fixedResourceLayout(base,resources,sourceVapConfig){
-  const {aFrame,gap,videoW,videoH,alphaScale}=base;
+  // Validate resource texture limits before allocating their working canvases.
+  for(const resource of resources)dimensions(resource,base.w,base.h,sourceVapConfig);
+  const {aFrame,gap,videoW,videoH}=base;
   const left=aFrame[0],top=aFrame[1]+aFrame[3]+gap;
-  const sizes=resources.map(r=>[r.id,...dimensions(r,base.w,base.h,sourceVapConfig)])
-    .sort((a,b)=>b[2]-a[2]||b[1]-a[1]);
+  return {...base,officialResourceMasks:true,resourceMaskRegion:[left,top,videoW-left,videoH-top]};
+}
+
+function placeOfficialMasks(objects,layout){
+  const [left,top,width,height]=layout.resourceMaskRegion,right=left+width,bottom=top+height;
   const pack=scale=>{
-    const placements=[];
+    const packed=[];
     let x=left,y=top,rowHeight=0;
-    for(const [id,width,height] of sizes){
-      const w=Math.max(2,Math.ceil(width*scale)),h=Math.max(2,Math.ceil(height*scale));
-      if(w>videoW-left)return null;
-      if(x+w>videoW){x=left;y+=rowHeight+gap;rowHeight=0;}
-      if(y+h>videoH)return null;
-      placements.push([id,[x,y,w,h]]);
-      x+=w+gap;rowHeight=Math.max(rowHeight,h);
+    for(const object of objects){
+      const [,,frameW,frameH]=object.frame,fit=Math.min(scale,width/frameW);
+      const w=Math.max(1,Math.floor(frameW*fit+1e-7)),h=Math.max(1,Math.floor(frameH*fit+1e-7));
+      if(x+w>right){x=left;y+=rowHeight+layout.gap;rowHeight=0;}
+      if(y+h>bottom)return null;
+      packed.push({...object,mFrame:[x,y,w,h]});
+      x+=w+layout.gap;rowHeight=Math.max(rowHeight,h);
     }
-    return Object.fromEntries(placements);
+    return packed;
   };
-  const full=pack(alphaScale);
-  if(full)return {...base,resourceMasks:full,resourceMaskScale:alphaScale};
-  // Scale only the mask textures when the fixed bay is full. Display sizes
-  // and positions are still written from the original resource geometry.
-  let low=0,high=alphaScale,resourceMasks=pack(0);
+  // The original tool packs full-resolution masks in source order below alpha.
+  // Keep all slots inside the fixed dimensions by reducing only mask textures
+  // when large or overlapping-in-time resources exhaust the available rows.
+  const full=pack(1);if(full)return full;
+  let low=0,high=1,packed=pack(0);
   for(let pass=0;pass<12;pass++){
-    const scale=(low+high)/2,placements=pack(scale);
-    if(placements){low=scale;resourceMasks=placements;}
+    const scale=(low+high)/2,candidate=pack(scale);
+    if(candidate){low=scale;packed=candidate;}
     else high=scale;
   }
-  if(!resourceMasks||!low)throw new RangeError('资源遮罩无法放入固定画布，请减小资源尺寸。');
-  return {...base,resourceMasks,resourceMaskScale:low};
+  if(!packed)throw new RangeError('资源遮罩无法放入固定画布，请减小资源尺寸。');
+  return packed;
+}
+
+function officialMaskObject(z,geometry){
+  return {srcId:String(z),z,frame:geometry.rect,mt:0};
 }
 
 /** Place independent masks below the base alpha, using its otherwise unused column first. */
@@ -176,19 +185,37 @@ export function computeResourceLayout(base,resources,{sourceVapConfig,fixedStand
   return {...base,videoH,resourceMasks,legacyDimensionWarning:Math.max(base.videoW,videoH)>1504};
 }
 
-export function addResourceConfig(config,{resources,layout,fps,frames,duration,sourceVapConfig}={}){
+export function addResourceConfig(config,{resources,layout,fps,frames,duration,sourceVapConfig,renderedFrames}={}){
   if(!resources?.length)return config;
   config.info.videoW=layout.videoW;config.info.videoH=layout.videoH;config.info.isVapx=1;
-  config.src=resources.map(r=>{
-    const [w,h]=dimensions(r,config.info.w,config.info.h,sourceVapConfig);
-    return {srcId:r.id,srcType:r.type==='image'?'img':'txt',loadType:r.type==='image'?'net':'local',srcTag:`[${r.tag}]`,w,h,fitType:'fitXY',...(r.type==='text'?{color:r.color,style:'b',fontStyle:{font:`bold ${r.fontSize}px Arial`,color:r.color}}:{})};
+  const official=layout.officialResourceMasks===true,width=config.info.w,height=config.info.h;
+  const geometry=(r,i)=>resourceFrame(r,{width,height,sourceVapConfig,timestamp:i/fps,duration,fps});
+  if(official){
+    // Geometry alone provides an upper bound for the preflight estimate. The
+    // export records the actual painted masks so fully transparent frames are absent.
+    config.frame=renderedFrames ?? Array.from({length:frames},(_,i)=>{
+      const objects=[];
+      for(const [z,r] of resources.entries()){
+        const frame=geometry(r,i);
+        if(frame&&r.opacity*frame.motionOpacity>0)objects.push(officialMaskObject(z,frame));
+      }
+      return {i,obj:placeOfficialMasks(objects,layout)};
+    }).filter(frame=>frame.obj.length);
+  }else{
+    // Legacy writers keep their dense representation and stable mask positions.
+    config.frame=Array.from({length:frames},(_,i)=>({i,obj:resources.map((r,z)=>({
+      srcId:r.id,z,frame:geometry(r,i)?.rect||[0,0,1,1],mFrame:layout.resourceMasks[r.id],mt:0,
+    }))}));
+  }
+  const maximumFrames=new Map();
+  if(official)for(const {obj} of config.frame)for(const {srcId,frame} of obj){
+    if(!maximumFrames.has(srcId)||frame[2]>maximumFrames.get(srcId)[0])maximumFrames.set(srcId,frame.slice(2));
+  }
+  config.src=resources.map((r,z)=>{
+    const srcId=official?String(z):r.id;
+    const [w,h]=maximumFrames.get(srcId)??dimensions(r,width,height,sourceVapConfig);
+    return {srcId,srcType:r.type==='image'?'img':'txt',loadType:r.type==='image'?'net':'local',srcTag:official?r.tag:`[${r.tag}]`,w,h,fitType:'fitXY',...(r.type==='text'?{color:r.color,style:'b',fontStyle:{font:`bold ${r.fontSize}px Arial`,color:r.color}}:{})};
   });
-  // Every frame explicitly lists every slot. Inactive slots sample a black mask,
-  // preventing older web SDKs from retaining the preceding frame's uniform data.
-  config.frame=Array.from({length:frames},(_,i)=>({i,obj:resources.map((r,z)=>{
-    const frame=resourceFrame(r,{width:config.info.w,height:config.info.h,sourceVapConfig,timestamp:i/fps,duration,fps});
-    return {srcId:r.id,z,frame:frame?.rect||[0,0,1,1],mFrame:layout.resourceMasks[r.id],mt:0};
-  })}));
   config.funToolkit={...config.funToolkit,resourceMode:'dynamic',resourceDefaults:Object.fromEntries(resources.filter(r=>r.type==='text').map(r=>[r.tag,r.text])),resourceManifest:resources.map(r=>({tag:r.tag,type:r.type,...(r.type==='image'?{file:`resources/${r.tag}.png`,...(r.defaultAvatar===true?{placeholder:true}:{})}:{text:r.text}),...(r.animation==='float-pop'?{animation:r.animation}:{}),...(r.avatarFrame===true?{avatarFrame:true}:{}),...(r.type==='image'?{transparentAvatar:transparentAvatarSlot(r,sourceVapConfig)}:{}),...(r.sourceId!==undefined?{sourceId:r.sourceId}:{})}))};
   return config;
 }
@@ -312,6 +339,7 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       const {r,w,h,mask}=entry,geometry=resourceFrame(r,{width,height,sourceVapConfig,timestamp,duration,fps});
       if(!geometry){
         if(entry.maskKey!==0){mask.ctx.fillStyle='#000';mask.ctx.fillRect(0,0,w,h);entry.maskKey=0;}
+        entry.maskHasCoverage=false;
         return null;
       }
       const weight=r.opacity*Math.min(resourceOpacity,geometry.motionOpacity??1);
@@ -329,11 +357,13 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
       // coverage and pixel buffer; native masks must still be read every frame.
       const shape=entry.shapeCoverage ||= Float64Array.from({length:w*h},(_,i)=>r.shape==='circle'?circleCoverage((i%w+.5)/w,(Math.floor(i/w)+.5)/h,w,h):1);
       const pixels=geometry.sourceObject?mask.ctx.getImageData(0,0,w,h):(entry.maskPixels ||= new ImageData(new Uint8ClampedArray(w*h*4),w,h));
+      let coverage=0;
       for(let i=0;i<shape.length;i++){
-        const p=i*4,value=Math.round((geometry.sourceObject?pixels.data[p]:255)*(shape[i]*r.opacity*Math.min(resourceOpacity,geometry.motionOpacity??1)));
+        const p=i*4,value=Math.round((geometry.sourceObject?pixels.data[p]:255)*shape[i]*weight);
         pixels.data[p]=pixels.data[p+1]=pixels.data[p+2]=value;pixels.data[p+3]=255;
+        coverage|=value;
       }
-      entry.maskKey=geometry.sourceObject?null:weight;
+      entry.maskKey=geometry.sourceObject?null:weight;entry.maskHasCoverage=coverage!==0;
       mask.ctx.putImageData(pixels,0,0);return geometry;
     }
     // Spatial video masks stay independent; the temporal gift envelope fades
@@ -372,7 +402,22 @@ export async function createResourceRenderer(input,{width=720,height=1560,durati
           ctx.save();ctx.beginPath();ctx.rect(ax,ay,aw,ah);ctx.clip();ctx.drawImage(e.background.alpha.canvas,ax+x*aw/width,ay+y*ah/height,w*aw/width,h*ah/height);ctx.restore();
         }
       },
-      drawMasks(ctx,layout,timestamp,sourceCanvas,{resourceOpacity=1}={}){valid(resourceOpacity);for(const e of entries){active(e,timestamp,sourceCanvas,resourceOpacity);ctx.drawImage(e.mask.canvas,...layout.resourceMasks[e.r.id]);}},
+      drawMasks(ctx,layout,timestamp,sourceCanvas,{resourceOpacity=1}={}){
+        valid(resourceOpacity);
+        if(!layout.officialResourceMasks){
+          for(const e of entries){active(e,timestamp,sourceCanvas,resourceOpacity);ctx.drawImage(e.mask.canvas,...layout.resourceMasks[e.r.id]);}
+          return;
+        }
+        if(resourceOpacity===0)return [];
+        const visible=[];
+        for(const [z,e] of entries.entries()){
+          const geometry=active(e,timestamp,sourceCanvas,resourceOpacity);
+          if(geometry&&e.maskHasCoverage)visible.push(officialMaskObject(z,geometry));
+        }
+        const packed=placeOfficialMasks(visible,layout);
+        for(const object of packed)ctx.drawImage(entries[object.z].mask.canvas,...object.mFrame);
+        return packed;
+      },
       getPlayerTags(){return tagsPromise ||= Promise.all(entries.map(async e=>{if(e.r.type==='text')return [e.r.tag,e.r.text];const url=URL.createObjectURL(await toBlob(e.r.defaultAvatar===true?emptyTexture():e.texture.canvas));urls.push(url);return [e.r.tag,url];})).then(Object.fromEntries);},
       getPackageFiles(){return filesPromise ||= Promise.all(entries.filter(e=>e.r.type==='image').map(async e=>({name:`resources/${e.r.tag}.png`,blob:await toBlob(e.r.defaultAvatar===true?emptyTexture():e.texture.canvas)})));},
       dispose(){if(disposed)return;disposed=true;for(const url of urls)URL.revokeObjectURL(url);for(const e of entries)for(const s of [e.texture,e.mask,e.layer,e.background,e.background?.alpha,e.cutout].filter(Boolean))s.canvas.width=s.canvas.height=1;if(composition)composition.canvas.width=composition.canvas.height=1;if(placeholder)placeholder.canvas.width=placeholder.canvas.height=1;}

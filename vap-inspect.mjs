@@ -1,9 +1,9 @@
-import {extractVapcBox} from './vap-protocol.mjs?v=20261028-resources1';
+import {readSourceVapConfig} from './vap-protocol.mjs?v=20261111-official-pack';
 
 // A VAP resource stays packed H.264. Playback must reconstruct its embedded alpha.
 export async function readVapFile(file){
   if(!file||!Number.isFinite(file.size)||file.size<=0||file.size>200*1024*1024)throw new Error('file');
-  let config;try{config=extractVapcBox(new Uint8Array(await file.arrayBuffer()))}catch{throw new Error('format')}
+  let config;try{config=await readSourceVapConfig(file);if(!config)throw new Error('missing vapc')}catch{throw new Error('format')}
   return {blob:file,config};
 }
 
