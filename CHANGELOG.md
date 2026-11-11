@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.18.12 - 2026-11-11
+
+- VAP conversion uses the CPU packing path when WebGL runs in software. Fixed-profile exports verify the first decoded frame of the actual file.
+- VAP size limits follow duration. Up to 5 seconds uses 1.5 MB, over 5 through 10 seconds uses 2.5 MB, and longer clips use 3.5 MB. Smaller manual limits remain available.
+- Avatar room review videos export at 720 × 1560 and 30 FPS with a higher quality target for encoding.
+
 ## 1.18.11 - 2026-11-11
 
 - Gift previews accept multiple files through the picker, drop, or paste. Each image keeps its own adjustments, and the batch can be cut out and exported as WebP files in a ZIP.
