@@ -1,4 +1,4 @@
-import {GIFT_AVATAR_SEATS, prepareGiftAvatar} from './gift-avatar-image.mjs?v=20261111-seats1';
+import {GIFT_AVATAR_SEATS, prepareGiftAvatar, prepareGiftAvatarFrame} from './gift-avatar-image.mjs?v=20261111-avatar-seats1';
 
 const copy = {
   zh: {
@@ -6,24 +6,28 @@ const copy = {
     productionTab: '生产工具',
     heading: '麦位预览',
     controlsTitle: '头像素材',
-    help: '点击麦位可单独替换，或批量上传，按从上到下、从左到右排列。',
-    spec: '240 × 240 px · 静态 WebP',
+    help: '点击麦位选图，也可拖入或粘贴。多张按从上到下、从左到右排列。',
+    spec: '导出 240 × 240 px 静态 WebP',
+    modeLabel: '素材类型',
+    photoMode: '换头像',
+    frameMode: '加头像框',
     batch: '批量上传',
     export: '打包下载 ZIP',
     reviewExport: '下载过稿图 WebP',
     privacy: '图片仅在本地处理。',
-    loadedLabel: '已替换',
-    seat: (number, name) => `替换第 ${number} 个麦位头像${name ? '，当前为 ' + name : ''}`,
-    processing: '正在处理头像…',
+    loadedLabel: '已导入',
+    seat: (number, name, type) => `第 ${number} 个麦位${type === 'frame' ? '头像框' : '头像'}${name ? '，当前为 ' + name : ''}`,
+    processing: '正在处理素材…',
     packing: '正在打包…',
     renderingReview: '正在生成过稿图…',
     downloadedReview: '已发起过稿图下载。',
-    replaced: count => `已替换 ${count} 个麦位头像。`,
-    downloaded: count => `已发起下载，包含 ${count} 张头像。`,
-    tooMany: '一次最多上传 14 张头像。',
+    replaced: count => `已更新 ${count} 个麦位。`,
+    downloaded: count => `已发起下载，包含 ${count} 张素材。`,
+    tooMany: '一次最多上传 14 张图片。',
     invalid: (name, reason) => `${name}：${reason}`,
     type: '请选择静态 WebP 图片。',
-    animated: '暂不支持动态 WebP，请上传静态图。',
+    frameType: '请选择透明 PNG 或静态 WebP 头像框。',
+    animated: '请上传静态图片。',
     size: '图片过大，请缩小后重试。',
     decode: '无法读取图片，请检查文件后重试。',
     encode: '无法处理这张图片，请重试。',
@@ -35,24 +39,28 @@ const copy = {
     productionTab: 'Production',
     heading: 'Room seat preview',
     controlsTitle: 'Avatar files',
-    help: 'Click a seat to replace it, or upload in bulk to fill seats from top to bottom, left to right.',
-    spec: '240 × 240 px · Static WebP',
+    help: 'Click a seat, drop an image or paste. Multiple files fill seats from top to bottom, left to right.',
+    spec: 'Exports static 240 × 240 px WebP',
+    modeLabel: 'Asset type',
+    photoMode: 'Replace photo',
+    frameMode: 'Add frame',
     batch: 'Bulk upload',
     export: 'Download ZIP',
     reviewExport: 'Download review WebP',
     privacy: 'Images are processed on this device.',
-    loadedLabel: 'Replaced',
-    seat: (number, name) => `Replace avatar at seat ${number}${name ? ', currently ' + name : ''}`,
-    processing: 'Preparing avatars…',
+    loadedLabel: 'Imported',
+    seat: (number, name, type) => `${type === 'frame' ? 'Avatar frame' : 'Avatar photo'} at seat ${number}${name ? ', currently ' + name : ''}`,
+    processing: 'Preparing images…',
     packing: 'Creating ZIP…',
     renderingReview: 'Creating review image…',
     downloadedReview: 'Review image download started.',
-    replaced: count => `Replaced ${count} seat avatars.`,
-    downloaded: count => `Download started with ${count} avatars.`,
-    tooMany: 'Upload up to 14 avatars at a time.',
+    replaced: count => `Updated ${count} seats.`,
+    downloaded: count => `Download started with ${count} images.`,
+    tooMany: 'Upload up to 14 images at a time.',
     invalid: (name, reason) => `${name}: ${reason}`,
     type: 'Choose a static WebP image.',
-    animated: 'Choose a static WebP instead of an animated image.',
+    frameType: 'Choose a PNG or static WebP avatar frame.',
+    animated: 'Choose a static image.',
     size: 'The image is too large. Resize it and try again.',
     decode: 'The image could not be read. Check the file and try again.',
     encode: 'This image could not be processed. Try again.',
@@ -63,9 +71,10 @@ const copy = {
 
 const byId = id => document.getElementById(id);
 const preview = byId('giftAvatarPreview');
-const production = byId('giftProduction');
-const tabs = [byId('giftAvatarPreviewTab'), byId('giftProductionTab')];
+const production = byId('avatarSeatProduction');
+const tabs = [byId('avatarSeatPreviewTab'), byId('avatarSeatProductionTab')];
 const panels = [preview, production];
+const modes = {photo: byId('giftAvatarUsePhoto'), frame: byId('giftAvatarUseFrame')};
 const batch = byId('giftAvatarBatch');
 const download = byId('giftAvatarExport');
 const reviewDownload = byId('giftAvatarReviewExport');
@@ -75,10 +84,16 @@ const status = byId('giftAvatarStatus');
 const batchInput = byId('giftAvatarFiles');
 const singleInput = byId('giftAvatarSingle');
 const overlay = byId('giftAvatarSeats');
-const avatars = Array(GIFT_AVATAR_SEATS.length).fill(null);
-const labels = byId('giftPreviewTool').querySelectorAll('[data-gift-avatar-text]');
+const assets = {
+  photo: Array(GIFT_AVATAR_SEATS.length).fill(null),
+  frame: Array(GIFT_AVATAR_SEATS.length).fill(null)
+};
+const labels = byId('avatarTool').querySelectorAll('[data-gift-avatar-text]');
+let mode = 'frame';
 let busy = false;
 let pickedSeat = null;
+let hoveredSeat = null;
+let dragTarget = null;
 let notice = null;
 
 function selectTab(index) {
@@ -88,7 +103,12 @@ function selectTab(index) {
     tab.tabIndex = selected ? 0 : -1;
     panels[i].hidden = !selected;
   });
-  if (index === 1) window.GiftPreviewTool?.activate();
+  if (index === 0) {
+    window.Toolkit?.pauseAvatar();
+    window.AvatarCustom?.pause();
+  } else {
+    clearDragTarget();
+  }
 }
 
 tabs.forEach((tab, index) => {
@@ -109,6 +129,7 @@ const seats = GIFT_AVATAR_SEATS.map(({x, y, size}, index) => {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'gift-avatar-seat';
+  button.dataset.seatIndex = String(index);
   button.style.setProperty('--seat-x', `${x / 720 * 100}%`);
   button.style.setProperty('--seat-y', `${y / 1560 * 100}%`);
   button.style.setProperty('--seat-size', `${size / 720 * 100}%`);
@@ -116,6 +137,8 @@ const seats = GIFT_AVATAR_SEATS.map(({x, y, size}, index) => {
     pickedSeat = index;
     singleInput.click();
   });
+  button.addEventListener('pointerenter', event => { if (event.pointerType === 'mouse') hoveredSeat = index; });
+  button.addEventListener('pointerleave', () => { if (hoveredSeat === index) hoveredSeat = null; });
   overlay.append(button);
   return button;
 });
@@ -123,15 +146,20 @@ const seats = GIFT_AVATAR_SEATS.map(({x, y, size}, index) => {
 function sync() {
   const strings = copy[document.documentElement.lang.startsWith('zh') ? 'zh' : 'en'];
   for (const label of labels) label.textContent = strings[label.dataset.giftAvatarText];
-  const replaced = avatars.filter(Boolean).length;
-  count.textContent = `${replaced} / ${avatars.length}`;
+  const replaced = assets[mode].filter(Boolean).length;
+  count.textContent = `${replaced} / ${seats.length}`;
   batch.disabled = busy;
-  download.disabled = busy || replaced === 0;
+  download.disabled = busy || !Object.values(assets).some(layer => layer.some(Boolean));
   reviewDownload.disabled = busy;
+  for (const [key, button] of Object.entries(modes)) {
+    button.disabled = busy;
+    button.setAttribute('aria-pressed', String(mode === key));
+  }
+  batchInput.accept = singleInput.accept = mode === 'frame' ? 'image/png,image/webp,.png,.webp' : 'image/webp,.webp';
   overlay.setAttribute('aria-busy', String(busy));
   seats.forEach((seat, index) => {
     seat.disabled = busy;
-    const label = strings.seat(index + 1, avatars[index]?.name);
+    const label = strings.seat(index + 1, assets[mode][index]?.name, mode);
     seat.setAttribute('aria-label', label);
     seat.title = label;
   });
@@ -142,25 +170,31 @@ function sync() {
     : typeof message === 'function' ? message(notice.count) : message ?? '';
 }
 
-function replaceSeat(index, file, blob) {
+function replaceSeat(index, file, blob, type) {
   const image = document.createElement('img');
   const url = URL.createObjectURL(blob);
   image.src = url;
   image.alt = '';
-  const previous = avatars[index];
-  avatars[index] = {blob, image, url, name: file.name};
-  seats[index].replaceChildren(image);
-  seats[index].classList.add('has-avatar');
-  if (previous) URL.revokeObjectURL(previous.url);
+  image.className = type === 'photo' ? 'gift-avatar-photo' : 'gift-avatar-frame-image';
+  const previous = assets[type][index];
+  assets[type][index] = {blob, image, url, name: file.name};
+  if (previous) {
+    previous.image.replaceWith(image);
+    URL.revokeObjectURL(previous.url);
+  } else {
+    seats[index].append(image);
+  }
 }
 
 async function loadFiles(files, firstSeat, trigger) {
   if (busy || !files.length) return;
-  if (files.length > avatars.length) {
+  if (files.length > seats.length) {
     notice = {key: 'tooMany', tone: 'error'};
     sync();
     return;
   }
+  const type = mode;
+  const prepareImage = type === 'frame' ? prepareGiftAvatarFrame : prepareGiftAvatar;
   busy = true;
   notice = {key: 'processing'};
   sync();
@@ -171,19 +205,28 @@ async function loadFiles(files, firstSeat, trigger) {
     // Keeping one image decode in flight also bounds memory on mobile.
     for (const file of files) {
       activeFile = file;
-      prepared.push(await prepareGiftAvatar(file));
+      prepared.push(await prepareImage(file));
     }
-    prepared.forEach((blob, i) => replaceSeat(firstSeat + i, files[i], blob));
+    prepared.forEach((blob, i) => replaceSeat(firstSeat + i, files[i], blob, type));
     notice = {key: 'replaced', count: prepared.length};
   } catch (error) {
-    notice = {key: 'invalid', name: activeFile.name, reason: error.code, tone: 'error'};
+    const reason = type === 'frame' && error?.code === 'type' ? 'frameType' : error?.code;
+    notice = {key: 'invalid', name: activeFile.name, reason, tone: 'error'};
   } finally {
     busy = false;
     sync();
     if (document.activeElement === document.body && !preview.hidden) {
-      trigger.focus({preventScroll: true});
+      trigger?.focus({preventScroll: true});
     }
   }
+}
+
+for (const [key, button] of Object.entries(modes)) {
+  button.addEventListener('click', () => {
+    mode = key;
+    notice = null;
+    sync();
+  });
 }
 
 batch.addEventListener('click', () => batchInput.click());
@@ -201,6 +244,56 @@ singleInput.addEventListener('change', () => {
 });
 singleInput.addEventListener('cancel', () => { pickedSeat = null; });
 
+function seatIndex(node) {
+  const seat = node?.closest?.('.gift-avatar-seat');
+  return seat && overlay.contains(seat) ? Number(seat.dataset.seatIndex) : null;
+}
+
+function loadTransferredFiles(files, target) {
+  if (files.length !== 1) {
+    void loadFiles(files, 0, batch);
+    return;
+  }
+  const vacancy = assets[mode].findIndex(asset => !asset);
+  const index = target ?? Math.max(0, vacancy);
+  void loadFiles(files, index, target === null ? batch : seats[index]);
+}
+
+function clearDragTarget() {
+  delete preview.dataset.dragging;
+  if (dragTarget !== null) delete seats[dragTarget].dataset.dragging;
+  dragTarget = null;
+}
+
+preview.addEventListener('dragover', event => {
+  if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = busy ? 'none' : 'copy';
+  if (busy) return;
+  const target = seatIndex(event.target);
+  if (target !== dragTarget) clearDragTarget();
+  preview.dataset.dragging = 'true';
+  dragTarget = target;
+  if (target !== null) seats[target].dataset.dragging = 'true';
+});
+preview.addEventListener('dragleave', event => {
+  if (!preview.contains(event.relatedTarget)) clearDragTarget();
+});
+preview.addEventListener('drop', event => {
+  clearDragTarget();
+  const files = Array.from(event.dataTransfer?.files || []);
+  if (!files.length) return;
+  event.preventDefault();
+  loadTransferredFiles(files, seatIndex(event.target));
+});
+window.addEventListener('blur', clearDragTarget);
+window.UploadPaste?.register({
+  zone: preview,
+  isActive: () => location.hash === '#avatar-frames' && !preview.hidden,
+  isBusy: () => busy,
+  onFiles: files => loadTransferredFiles(files, seatIndex(document.activeElement) ?? hoveredSeat)
+});
+
 function downloadFile(blob, filename) {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -216,22 +309,25 @@ function downloadFile(blob, filename) {
 }
 
 download.addEventListener('click', async () => {
-  if (busy || !avatars.some(Boolean)) return;
+  if (busy || !Object.values(assets).some(layer => layer.some(Boolean))) return;
   busy = true;
   notice = {key: 'packing'};
   sync();
   try {
     const zip = new window.JSZip();
     let packed = 0;
-    avatars.forEach((avatar, index) => {
-      if (!avatar) return;
-      zip.file(`avatar-${String(index + 1).padStart(2, '0')}.webp`, avatar.blob);
-      packed++;
-    });
+    for (const [type, layer] of Object.entries(assets)) {
+      const prefix = type === 'photo' ? 'avatar' : 'frame';
+      layer.forEach((asset, index) => {
+        if (!asset) return;
+        zip.file(`${prefix}-${String(index + 1).padStart(2, '0')}.webp`, asset.blob);
+        packed++;
+      });
+    }
     const blob = await zip.generateAsync({type: 'blob', compression: 'STORE'});
     downloadFile(blob, 'gift-room-avatars-240x240.zip');
     notice = {key: 'downloaded', count: packed};
-    window.Hub?.record('gift', 'download');
+    window.Hub?.record('avatar', 'download');
   } catch {
     notice = {key: 'zipError', tone: 'error'};
   } finally {
@@ -248,7 +344,7 @@ reviewDownload.addEventListener('click', async () => {
   sync();
   const canvas = document.createElement('canvas');
   try {
-    await Promise.all([room.decode(), ...avatars.filter(Boolean).map(({image}) => image.decode())]);
+    await Promise.all([room.decode(), ...Object.values(assets).flat().filter(Boolean).map(({image}) => image.decode())]);
     canvas.width = room.naturalWidth;
     canvas.height = room.naturalHeight;
     const ctx = canvas.getContext('2d');
@@ -256,13 +352,14 @@ reviewDownload.addEventListener('click', async () => {
     const plate = style.getPropertyValue('--gift-avatar-plate').trim();
     const frame = style.getPropertyValue('--gift-avatar-frame').trim();
     const frameWidth = Number(style.getPropertyValue('--gift-avatar-frame-size'));
+    const frameScale = Number(style.getPropertyValue('--gift-avatar-frame-scale'));
     ctx.drawImage(room, 0, 0);
     ctx.imageSmoothingQuality = 'high';
     ctx.lineWidth = frameWidth;
     ctx.strokeStyle = frame;
     GIFT_AVATAR_SEATS.forEach(({x, y, size}, index) => {
       const radius = size / 2;
-      const avatar = avatars[index];
+      const avatar = assets.photo[index];
       if (avatar) {
         ctx.save();
         ctx.beginPath();
@@ -276,12 +373,17 @@ reviewDownload.addEventListener('click', async () => {
       ctx.beginPath();
       ctx.arc(x, y, radius - frameWidth / 2, 0, 2 * Math.PI);
       ctx.stroke();
+      const avatarFrame = assets.frame[index];
+      if (avatarFrame) {
+        const diameter = size * frameScale;
+        ctx.drawImage(avatarFrame.image, x - diameter / 2, y - diameter / 2, diameter, diameter);
+      }
     });
     const blob = await window.canvasToLosslessWebP(canvas);
     downloadFile(blob, `gift-room-review-${canvas.width}x${canvas.height}.webp`);
     notice = {key: 'downloadedReview'};
-    window.Hub?.record('gift', 'generated');
-    window.Hub?.record('gift', 'download');
+    window.Hub?.record('avatar', 'generated');
+    window.Hub?.record('avatar', 'download');
   } catch {
     notice = {key: 'reviewError', tone: 'error'};
   } finally {
@@ -294,6 +396,8 @@ reviewDownload.addEventListener('click', async () => {
 
 new MutationObserver(sync).observe(document.documentElement, {attributes: true, attributeFilter: ['lang']});
 window.addEventListener('pagehide', event => {
-  if (!event.persisted) for (const avatar of avatars) if (avatar) URL.revokeObjectURL(avatar.url);
+  if (!event.persisted) {
+    for (const asset of Object.values(assets).flat()) if (asset) URL.revokeObjectURL(asset.url);
+  }
 });
 sync();

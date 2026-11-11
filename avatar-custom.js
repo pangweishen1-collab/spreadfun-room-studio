@@ -41,7 +41,7 @@ let player,exportPlayer,exportHost,drag,imageDrag,assetDrag,assetPaint,stageVisi
 const isZh=()=>document.documentElement.lang.startsWith('zh');
 const t=key=>copy[isZh()?'zh':'en'][key]||key;
 const selected=()=>state.mode==='custom';
-const active=()=>selected()&&!root.classList.contains('hidden');
+const active=()=>selected()&&!root.classList.contains('hidden')&&!$('avatarSeatProduction')?.hidden;
 const busy=()=>state.loading||state.imageLoading||state.exporting||state.assetBusy;
 const weights=()=>['bebas','pacifico'].includes($('avatarCustomFont').value)?[400,700]:$('avatarCustomFont').value==='oswald'?[400,500,600,700]:[400,500,600,700,800];
 const weight=()=>Number($('avatarCustomWeight').value)||fonts[$('avatarCustomFont').value]?.[1]||600;
@@ -124,7 +124,7 @@ function chooseMode(next){
 }
 function syncLanguage(){
   root.querySelectorAll('[data-custom-i18n]').forEach(node=>node.textContent=t(node.dataset.customI18n));
-  root.querySelector('.avatar-subtabs').setAttribute('aria-label',isZh()?'头像框功能':'Avatar frame tools');
+  ($('avatarProductionTabs')||root.querySelector('.avatar-subtabs')).setAttribute('aria-label',isZh()?'头像框生产工具':'Avatar frame production tools');
   $('avatarCustomStage').setAttribute('aria-label',t('uploadTitle'));$('avatarCustomTextLayer').setAttribute('aria-label',t('drag'));$('avatarCustomImageLayer').setAttribute('aria-label',t('imageDrag'));$('avatarCustomImageResize').setAttribute('aria-label',t('imageResize'));
   $('avatarCustomImageResize').title=t('imageResize');
   $('avatarCustomAssetDrag').setAttribute('aria-label',t('moveAssets'));
@@ -586,4 +586,4 @@ new ResizeObserver(layout).observe($('avatarCustomStage'));
 new IntersectionObserver(entries=>{stageVisible=entries[0].isIntersecting;if(!stageVisible)pause()}).observe($('avatarCustomStage'));
 new MutationObserver(syncLanguage).observe(document.documentElement,{attributes:true,attributeFilter:['lang']});
 new MutationObserver(syncTabs).observe(root,{subtree:true,attributes:true,attributeFilter:['aria-busy']});
-window.AvatarCustom={isSelected:selected,syncLanguage};syncWeights();syncLanguage();
+window.AvatarCustom={isSelected:selected,syncLanguage,pause};syncWeights();syncLanguage();
