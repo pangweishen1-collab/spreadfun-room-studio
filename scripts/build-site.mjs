@@ -17,7 +17,7 @@ entries.push('vap-copy-packets.mjs','vap-avc-padding.mjs');
 await rm(target,{recursive:true,force:true});
 await mkdir(target,{recursive:true});
 for(const name of entries)await copyFile(path.join(root,name),path.join(target,name));
-for(const name of ['assets','vendor','design-system','dice'])await cp(path.join(root,name),path.join(target,name),{recursive:true,dereference:false});
+for(const name of ['assets','vendor','design-system','dice','token'])await cp(path.join(root,name),path.join(target,name),{recursive:true,dereference:false});
 const compress = promisify(gzip);
 for (const file of ['assets/lucida/manifest.json', 'vendor/ort-lucida/asyncify-manifest.json']) {
   const manifestPath = path.join(target, file);
@@ -46,6 +46,8 @@ await writeFile(path.join(target,'_headers'),`/*
 /vendor/ort-lucida/transfer/*
   Cache-Control: public, max-age=31536000, immutable
 /dice/*
+  Cache-Control: no-cache
+/token/*
   Cache-Control: no-cache
 /design-system/
   Cache-Control: no-cache

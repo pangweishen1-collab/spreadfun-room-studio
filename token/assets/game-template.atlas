@@ -1,0 +1,52 @@
+token_green_rose.png
+	size: 1024, 128
+	filter: Linear, Linear
+yanwu201
+	bounds: 591, 76, 46, 50
+	offsets: 11, 2, 58, 58
+yanwu202
+	bounds: 591, 24, 40, 50
+	offsets: 10, 2, 58, 58
+yanwu203
+	bounds: 639, 87, 39, 52
+	offsets: 8, 1, 58, 58
+	rotate: 90
+yanwu204
+	bounds: 693, 91, 35, 51
+	offsets: 8, 3, 58, 58
+	rotate: 90
+yanwu205
+	bounds: 746, 93, 33, 51
+	offsets: 7, 3, 58, 58
+	rotate: 90
+yanwu206
+	bounds: 799, 95, 31, 42
+	offsets: 7, 3, 58, 58
+	rotate: 90
+yanwu207
+	bounds: 843, 96, 30, 40
+	offsets: 5, 6, 58, 58
+	rotate: 90
+yanwu208
+	bounds: 885, 102, 24, 24
+	offsets: 3, 10, 58, 58
+yanwu209
+	bounds: 2, 2, 21, 24
+	offsets: 1, 11, 58, 58
+	rotate: 90
+棋子-红
+	bounds: 150, 25, 101, 145
+	offsets: 29, 5, 160, 160
+	rotate: 90
+棋子-绿
+	bounds: 2, 25, 101, 146
+	offsets: 29, 5, 160, 160
+	rotate: 90
+棋子-蓝
+	bounds: 297, 24, 102, 145
+	offsets: 29, 5, 160, 160
+	rotate: 90
+棋子-黄
+	bounds: 444, 25, 101, 145
+	offsets: 29, 5, 160, 160
+	rotate: 90

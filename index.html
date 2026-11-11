@@ -60,6 +60,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
   <link rel="stylesheet" href="gift-preview.css?v=20261111-gift-batch">
   <link rel="stylesheet" href="profile-preview.css?v=20261111-profile-icons">
+  <link rel="stylesheet" href="token/workspace.css?v=20261111-token6">
   <link rel="stylesheet" href="vap-resources.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="vap-tool.css?v=20261111-vap-size-estimate">
   <link rel="stylesheet" href="vap-review.css?v=20261110-review-background-library">
@@ -71,7 +72,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="vap-player.css?v=20261026-play-icon1">
 </head>
 <body>
-  <header class="topbar"><a class="brand" id="brandHome" href="#room-backgrounds" data-i18n-label="homeLink" aria-label="Fun Toolkit · Room backgrounds"><div class="mark" aria-hidden="true"><img src="assets/spreadfun-mark.webp" alt="" width="30" height="30"></div><div class="brand-copy"><span class="brand-name">Fun Toolkit</span></div></a><nav class="tool-navigation" id="toolsNavigation" aria-label="Tools"><a href="#room-backgrounds" data-tool-link="room" data-i18n-label="roomNav" aria-current="page"><span class="nav-label-full" data-i18n="roomNav">Room backgrounds</span><span class="nav-label-short" data-i18n="roomNavShort">Room BG</span></a><a id="avatarToolLink" href="#avatar-frames" data-tool-link="avatar" data-i18n-label="avatarNav"><span class="nav-label-full" data-i18n="avatarNav">Avatar frames</span><span class="nav-label-short" data-i18n="avatarNavShort">Avatar</span></a><a href="#banners" data-tool-link="banner" data-i18n-label="bannerNav"><span data-i18n="bannerNav">Banner</span></a><a id="giftPreviewLink" href="#gift-previews" data-tool-link="gift-preview" data-i18n-label="giftPreviewNav"><span data-i18n="giftPreviewNav">预览图</span></a><a id="vapToolLink" href="#vap-tools" data-tool-link="vap" data-i18n-label="vapNav"><span data-i18n="vapNav">VAP工具</span></a><a id="diceToolLink" href="#dice-preview" data-tool-link="dice" data-i18n-label="diceNav"><span data-i18n="diceNav">骰子</span></a><a id="resourcesLink" href="#resources" data-tool-link="resources" data-i18n-label="resourcesNav"><span data-i18n="resourcesNav">资源库</span></a></nav><div class="top-actions"><button class="tiny lang-button" id="langToggle" onclick="toggleLanguage()" aria-label="切换语言"><span class="lang-icon">文</span><span class="lang-label" id="langLabel">中文</span></button><button class="tiny" id="contactButton" onclick="openContact()"><span class="nav-author-avatar" aria-hidden="true"><img src="assets/author-profile.webp" alt="" width="452" height="544"></span><span id="contactButtonText">Contact author</span></button></div></header>
+  <header class="topbar"><a class="brand" id="brandHome" href="#room-backgrounds" data-i18n-label="homeLink" aria-label="Fun Toolkit · Room backgrounds"><div class="mark" aria-hidden="true"><img src="assets/spreadfun-mark.webp" alt="" width="30" height="30"></div><div class="brand-copy"><span class="brand-name">Fun Toolkit</span></div></a><nav class="tool-navigation" id="toolsNavigation" aria-label="Tools"><a href="#room-backgrounds" data-tool-link="room" data-i18n-label="roomNav" aria-current="page"><span class="nav-label-full" data-i18n="roomNav">Room backgrounds</span><span class="nav-label-short" data-i18n="roomNavShort">Room BG</span></a><a id="avatarToolLink" href="#avatar-frames" data-tool-link="avatar" data-i18n-label="avatarNav"><span class="nav-label-full" data-i18n="avatarNav">Avatar frames</span><span class="nav-label-short" data-i18n="avatarNavShort">Avatar</span></a><a href="#banners" data-tool-link="banner" data-i18n-label="bannerNav"><span data-i18n="bannerNav">Banner</span></a><a id="giftPreviewLink" href="#gift-previews" data-tool-link="gift-preview" data-i18n-label="giftPreviewNav"><span data-i18n="giftPreviewNav">预览图</span></a><a id="vapToolLink" href="#vap-tools" data-tool-link="vap" data-i18n-label="vapNav"><span data-i18n="vapNav">VAP工具</span></a><a id="diceToolLink" href="#dice-preview" data-tool-link="dice" data-i18n-label="diceNav"><span data-i18n="diceNav">骰子</span></a><a id="tokenToolLink" href="#token-preview" data-tool-link="token" data-i18n-label="tokenNav"><span data-i18n="tokenNav">棋子</span></a><a id="resourcesLink" href="#resources" data-tool-link="resources" data-i18n-label="resourcesNav"><span data-i18n="resourcesNav">资源库</span></a></nav><div class="top-actions"><button class="tiny lang-button" id="langToggle" onclick="toggleLanguage()" aria-label="切换语言"><span class="lang-icon">文</span><span class="lang-label" id="langLabel">中文</span></button><button class="tiny" id="contactButton" onclick="openContact()"><span class="nav-author-avatar" aria-hidden="true"><img src="assets/author-profile.webp" alt="" width="452" height="544"></span><span id="contactButtonText">Contact author</span></button></div></header>
 <dialog class="hub-request-dialog ft-motion-dialog" id="hubRequestDialog" aria-labelledby="hubRequestDialogTitle">
   <div class="hub-dialog-heading"><h2 id="hubRequestDialogTitle" data-hub-i18n="requestDialogTitle">提出工具需求</h2><button type="button" class="hub-button hub-secondary" id="hubRequestClose" data-hub-i18n="close">关闭</button></div>
   <p class="hub-dialog-description" data-hub-i18n="requestDialogDescription">描述具体任务和期望的输出，有助于作者判断需求与实现方式。</p>
@@ -775,6 +776,110 @@ body{min-width:320px}
   <p class="help-followup" data-banner-i18n="helpFollowup">Save the image and upload it here. The tool automatically crops and exports a room banner and a game banner as WebP files.</p>
 </dialog>
 <main id="diceTool" class="hidden" data-tool="dice"><iframe id="dicePreviewFrame" title="骰子预览" src="about:blank" allow="autoplay" referrerpolicy="same-origin"></iframe></main>
+<main id="tokenTool" class="hidden" data-tool="token" aria-labelledby="tokenToolLink">
+  <div class="token-workspace">
+    <section class="card token-preview-card" aria-labelledby="tokenToolLink">
+      <div id="tokenEmptyExamples">
+        <div id="tokenExamples" class="token-examples" role="group" aria-label="体验案例">
+          <button class="token-secondary" type="button" data-token-sample="green">
+            <img src="token/assets/rose/sample.webp" width="26" height="26" alt="">
+            <span data-token-text="exampleRose">体验玫瑰</span>
+          </button>
+          <button class="token-secondary" type="button" data-token-sample="purple">
+            <img src="token/assets/anubis/sample.webp" width="26" height="26" alt="">
+            <span data-token-text="exampleAnubis">体验阿努比斯</span>
+          </button>
+        </div>
+      </div>
+      <div id="tokenEmpty" class="token-empty token-upload-zone ft-upload-zone upload-ready">
+        <img class="tool-empty-art" src="design-system/assets/feedback/empty-upload.svg" width="120" height="90" alt="">
+        <strong data-token-text="drop">拖入四色棋子 PNG</strong>
+        <p data-token-text="sizes">红、绿、蓝、黄各一张 160 × 160 PNG。可加 240 × 240 封面。</p>
+        <button class="primary" id="tokenUploadEmpty" type="button" data-token-text="choose">选择 PNG</button>
+      </div>
+      <div id="tokenBoard" class="token-board" hidden>
+        <canvas id="tokenCanvas" width="720" height="1600" role="img" aria-label="棋盘动画预览"></canvas>
+      </div>
+    </section>
+    <aside class="card token-settings" aria-labelledby="tokenMaterialsTitle">
+      <div class="token-heading">
+        <h2 id="tokenMaterialsTitle">绿色棋子素材</h2>
+        <span id="tokenCount" class="token-count">0 / 4 PNG</span>
+      </div>
+      <div id="tokenGrade" class="token-grades" role="group" aria-label="棋子等级">
+        <button class="token-secondary" type="button" data-token-grade="green" aria-pressed="true"><span aria-hidden="true"></span><b data-token-text="gradeGreen">绿色</b></button>
+        <button class="token-secondary" type="button" data-token-grade="purple" aria-pressed="false"><span aria-hidden="true"></span><b data-token-text="gradePurple">紫色</b></button>
+      </div>
+      <div id="tokenPreviewExamples"></div>
+      <div id="tokenReplace" class="token-upload-zone token-upload-buttons">
+        <button id="tokenUpload" type="button" class="token-secondary" data-token-text="choose">选择 PNG</button>
+        <button id="tokenFolder" type="button" class="token-secondary" data-token-text="folder">选择文件夹</button>
+      </div>
+      <details class="token-assets" id="tokenAssets" hidden>
+        <summary data-token-text="assetDetails">查看已选素材</summary>
+        <div id="tokenAssetList"></div>
+        <a id="tokenCover" download="大图.png" data-token-text="coverDownload" hidden>下载封面 PNG</a>
+      </details>
+      <div id="tokenTrail" class="token-field token-trail token-upload-zone" role="group" tabindex="0" aria-labelledby="tokenTrailLabel" aria-describedby="tokenTrailPaste" hidden>
+        <span id="tokenTrailLabel" data-token-text="trail">拖尾素材</span>
+        <div class="token-trail-scope">
+          <label for="tokenTrailScope" data-token-text="trailScope">替换范围</label>
+          <select id="tokenTrailScope">
+            <option value="all" data-token-text="trailAll">全部颜色</option>
+            <option value="red" data-token-text="red">红</option>
+            <option value="green" data-token-text="green">绿</option>
+            <option value="blue" data-token-text="blue">蓝</option>
+            <option value="yellow" data-token-text="yellow">黄</option>
+          </select>
+        </div>
+        <div class="token-trail-buttons">
+          <button id="tokenTrailChoose" class="token-secondary" type="button" data-token-text="trailChoose">更换拖尾 PNG</button>
+          <button id="tokenTrailReset" class="token-example" type="button" data-token-text="trailReset" hidden>恢复默认</button>
+        </div>
+        <p id="tokenTrailStatus" class="token-hint"></p>
+        <p id="tokenTrailPaste" class="token-hint" data-token-text="trailPaste">点此区域后按 ⌘V / Ctrl+V 粘贴 PNG</p>
+      </div>
+      <div class="token-field">
+        <label for="tokenName" data-token-text="name">资源名称</label>
+        <input id="tokenName" type="text" maxlength="64" placeholder="例如 rose" autocomplete="off" spellcheck="false">
+        <p id="tokenPackageLabel" class="token-hint">token_green_custom.zip</p>
+      </div>
+      <div id="tokenMotion" class="token-motion" hidden>
+        <div class="token-field">
+          <span id="tokenColorLabel" data-token-text="color">棋子颜色</span>
+          <div class="token-colors" role="group" aria-labelledby="tokenColorLabel">
+            <button type="button" data-token-color="red" aria-pressed="false"><span></span><b data-token-text="red">红</b></button>
+            <button type="button" data-token-color="green" aria-pressed="true"><span></span><b data-token-text="green">绿</b></button>
+            <button type="button" data-token-color="blue" aria-pressed="false"><span></span><b data-token-text="blue">蓝</b></button>
+            <button type="button" data-token-color="yellow" aria-pressed="false"><span></span><b data-token-text="yellow">黄</b></button>
+          </div>
+        </div>
+        <div class="token-field">
+          <span id="tokenActionLabel" data-token-text="action">棋子动作</span>
+          <div class="token-actions" role="group" aria-labelledby="tokenActionLabel">
+            <button type="button" data-token-action="jump" aria-pressed="true" data-token-text="jump">跳跃</button>
+            <button type="button" data-token-action="kill" aria-pressed="false" data-token-text="kill">吃子</button>
+            <button type="button" data-token-action="bekill" aria-pressed="false" data-token-text="bekill">被吃</button>
+            <button type="button" data-token-action="boom" aria-pressed="false" data-token-text="boom">被炸</button>
+          </div>
+        </div>
+        <div class="token-play-row">
+          <button id="tokenPlay" type="button" class="token-secondary" data-token-text="replay">重播动作</button>
+          <label id="tokenSoundOption" hidden><input id="tokenSound" type="checkbox" checked> <span data-token-text="sound">播放音效</span></label>
+        </div>
+      </div>
+      <div class="token-output">
+        <button id="tokenVideo" class="primary ft-motion-sheen" type="button" data-token-text="video" disabled>生成并下载视频</button>
+        <button id="tokenBundle" class="token-secondary" type="button" data-token-text="bundle" disabled>打包下载 ZIP</button>
+      </div>
+      <progress id="tokenExportProgress" max="1" value="0" hidden></progress>
+      <p id="tokenStatus" class="token-status" role="status" aria-live="polite"></p>
+      <input id="tokenFiles" type="file" accept="image/png,.png" multiple hidden>
+      <input id="tokenFolderFiles" type="file" webkitdirectory directory multiple hidden>
+      <input id="tokenTrailFile" type="file" accept="image/png,.png" hidden>
+    </aside>
+  </div>
+</main>
 <footer class="site-footer" id="siteFooter"><div class="footer-inner">
   <span class="footer-copyright">© 2026 Fun Toolkit</span>
   <span class="footer-production" id="footerProduction" aria-live="polite" aria-atomic="true"><span data-hub-i18n="productionLabel">全站已生产</span><strong data-stat="generated">—</strong><span data-hub-i18n="productionUnit">份</span></span>
@@ -1075,7 +1180,8 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="vap-resource-editor.js?v=20261111-upload-progress"></script>
   <script src="vap-tool.js?v=20261111-native-quality"></script>
   <script src="dice-embed.js?v=20261103-dice1"></script>
-  <script src="toolkit.js?v=20261111-upload-progress"></script>
+  <script src="toolkit.js?v=20261111-token1"></script>
+  <script type="module" src="token/workspace.mjs?v=20261111-token6"></script>
   <script type="module" src="vap-review.js?v=20261111-upload-progress"></script>
   <script type="module" src="avatar-custom.js?v=20261111-upload-progress"></script>
 </body></html>
