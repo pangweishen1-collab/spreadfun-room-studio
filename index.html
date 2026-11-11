@@ -57,7 +57,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
-  <link rel="stylesheet" href="gift-preview.css?v=20261102-soft-dividers1">
+  <link rel="stylesheet" href="gift-preview.css?v=20261111-seats2">
   <link rel="stylesheet" href="vap-resources.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="vap-tool.css?v=20261110-room-preview1">
   <link rel="stylesheet" href="vap-review.css?v=20261110-review-background-library">
@@ -209,7 +209,42 @@ body{min-width:320px}
       <input type="file" id="avatarCustomAssetInput" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden>
     </section>
   </main>
-  <main id="giftPreviewTool" class="hidden" data-tool="gift-preview" aria-labelledby="giftPreviewTitle">
+  <main id="giftPreviewTool" class="hidden" data-tool="gift-preview" aria-labelledby="giftPreviewLink">
+  <div id="giftAvatarTabs" class="avatar-subtabs" role="tablist" aria-labelledby="giftPreviewLink">
+    <button id="giftAvatarPreviewTab" type="button" role="tab" aria-selected="true" aria-controls="giftAvatarPreview" data-gift-avatar-text="previewTab">预览效果</button>
+    <button id="giftProductionTab" type="button" role="tab" aria-selected="false" aria-controls="giftProduction" tabindex="-1" data-gift-avatar-text="productionTab">生产工具</button>
+  </div>
+  <section id="giftAvatarPreview" role="tabpanel" aria-labelledby="giftAvatarPreviewTab">
+    <div class="gift-avatar-workspace">
+      <aside class="card gift-avatar-controls" aria-labelledby="giftAvatarControlsTitle">
+        <div class="gift-avatar-card-heading">
+          <h2 id="giftAvatarControlsTitle" data-gift-avatar-text="controlsTitle">头像素材</h2>
+          <p class="gift-avatar-count"><span data-gift-avatar-text="loadedLabel">已替换</span> <span id="giftAvatarCount">0 / 14</span></p>
+        </div>
+        <p id="giftAvatarHelp" class="gift-avatar-help" data-gift-avatar-text="help">点击麦位可单独替换，或批量上传，按从上到下、从左到右排列。</p>
+        <p class="gift-avatar-spec" data-gift-avatar-text="spec">240 × 240 px · 静态 WebP</p>
+        <div class="gift-avatar-actions">
+          <button id="giftAvatarBatch" class="primary ft-motion-sheen" type="button" data-gift-avatar-text="batch">批量上传</button>
+          <button id="giftAvatarExport" class="gift-secondary" type="button" data-gift-avatar-text="export" disabled>打包下载 ZIP</button>
+          <button id="giftAvatarReviewExport" class="gift-secondary" type="button" data-gift-avatar-text="reviewExport">下载过稿图 WebP</button>
+        </div>
+        <p id="giftAvatarStatus" class="gift-avatar-status" role="status" aria-live="polite" aria-atomic="true"></p>
+        <p class="local-privacy"><span class="privacy-dot" aria-hidden="true"></span><span data-gift-avatar-text="privacy">图片仅在本地处理。</span></p>
+      </aside>
+      <section class="card gift-avatar-scene" aria-labelledby="giftAvatarHeading">
+        <h2 id="giftAvatarHeading" data-gift-avatar-text="heading">麦位预览</h2>
+        <div class="gift-avatar-scene-mat">
+          <div id="giftAvatarStage" class="gift-avatar-stage" role="group" aria-labelledby="giftAvatarHeading" aria-describedby="giftAvatarHelp">
+            <img id="giftAvatarRoom" src="assets/gift-avatar-room.webp" alt="" width="720" height="1560" loading="lazy" decoding="async">
+            <div id="giftAvatarSeats" class="gift-avatar-seats"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <input id="giftAvatarFiles" type="file" accept="image/webp,.webp" multiple hidden>
+    <input id="giftAvatarSingle" type="file" accept="image/webp,.webp" hidden>
+  </section>
+  <section id="giftProduction" role="tabpanel" aria-labelledby="giftProductionTab" hidden>
   <div class="intro tool-intro"><div><h1 id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具</h1></div></div>
   <section class="workspace gift-workspace">
     <section class="preview card gift-preview-card" aria-labelledby="giftPreviewHeading">
@@ -317,6 +352,7 @@ body{min-width:320px}
     </aside>
   </section>
   <input id="giftPreviewInput" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden>
+  </section>
 </main>
 
   <main id="vapTool" class="hidden" data-tool="vap" data-state="idle" data-export-revision="rgb-feather-v1" aria-labelledby="vapTitle">
@@ -936,7 +972,8 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="gift-preview-render.js?v=20261025-quality1"></script>
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
   <script src="gift-background.js?v=20261111-prewarm1"></script>
-  <script src="gift-preview.js?v=20261111-prewarm1"></script>
+  <script src="gift-preview.js?v=20261111-seats1"></script>
+  <script type="module" src="gift-avatar-preview.mjs?v=20261111-seats2"></script>
   <script src="vap-player.js?v=20261102-release174"></script>
   <script src="vap-resource-editor.js?v=20261102-release174"></script>
   <script src="vap-tool.js?v=20261111-preserve3"></script>

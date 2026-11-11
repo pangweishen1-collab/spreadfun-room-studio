@@ -1,5 +1,164 @@
 /* Gift preview reuses Fun Toolkit cards, buttons, fields and feedback assets. */
 #giftPreviewTool [hidden]{display:none!important}
+
+#giftPreviewTool .gift-avatar-workspace {
+  display:grid;
+  grid-template-columns:minmax(0,1fr) minmax(280px,340px);
+  grid-template-areas:"scene controls";
+  align-items:start;
+  gap:16px;
+  max-width:1024px;
+  margin-inline:auto;
+}
+#giftPreviewTool .gift-avatar-scene,
+#giftPreviewTool .gift-avatar-controls {
+  min-width:0;
+  padding:24px;
+  border-radius:22px;
+}
+#giftPreviewTool .gift-avatar-scene {grid-area:scene}
+#giftPreviewTool .gift-avatar-controls {grid-area:controls}
+#giftPreviewTool .gift-avatar-card-heading {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px;
+}
+#giftPreviewTool .gift-avatar-count {
+  margin:0;
+  padding:4px 9px;
+  border-radius:999px;
+  background:var(--tool-blue-soft);
+  color:#25598e;
+  font-size:12px;
+  line-height:18px;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+#giftPreviewTool .gift-avatar-help,
+#giftPreviewTool .gift-avatar-spec,
+#giftPreviewTool .gift-avatar-status {
+  color:var(--tool-muted);
+  font-size:13px;
+  line-height:20px;
+  overflow-wrap:anywhere;
+}
+#giftPreviewTool .gift-avatar-help {margin:10px 0 0}
+#giftPreviewTool .gift-avatar-spec {margin:6px 0 0;font-variant-numeric:tabular-nums}
+#giftPreviewTool .gift-avatar-actions {display:grid;gap:8px;margin-top:16px}
+#giftPreviewTool .gift-avatar-actions button {
+  min-height:44px;
+  border-radius:12px;
+  font-family:inherit;
+  font-size:14px;
+  line-height:20px;
+}
+#giftPreviewTool .gift-avatar-status {margin:0}
+#giftPreviewTool .gift-avatar-status:not(:empty) {margin-top:12px}
+#giftPreviewTool .gift-avatar-status:is(.is-error,[data-tone="error"]) {color:var(--tool-error)}
+#giftPreviewTool .gift-avatar-scene-mat {
+  display:grid;
+  justify-items:center;
+  margin-top:14px;
+  padding:14px;
+  border-radius:16px;
+  background:#f1f4f8;
+}
+#giftPreviewTool .gift-avatar-stage {
+  --gift-avatar-plate:#102b40;
+  --gift-avatar-frame:#d9eeff69;
+  --gift-avatar-frame-size:2;
+  position:relative;
+  width:min(100%,388px);
+  aspect-ratio:720/1560;
+  overflow:hidden;
+  border-radius:14px;
+  background:#071c2d;
+  box-shadow:0 5px 16px #18335224;
+}
+#giftPreviewTool .gift-avatar-stage>img {
+  display:block;
+  width:100%;
+  height:auto;
+  pointer-events:none;
+  user-select:none;
+}
+#giftPreviewTool .gift-avatar-seats {
+  position:absolute;
+  inset:0;
+  container-type:inline-size;
+  pointer-events:none;
+}
+#giftPreviewTool .gift-avatar-seat {
+  --gift-avatar-portrait:calc(100cqw * 92 / 720);
+  position:absolute;
+  left:var(--seat-x);
+  top:var(--seat-y);
+  translate:-50% -50%;
+  width:max(44px,var(--seat-size,12.777778%));
+  aspect-ratio:1;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:transparent;
+  color:#fff;
+  cursor:pointer;
+  pointer-events:auto;
+  -webkit-tap-highlight-color:transparent;
+}
+#giftPreviewTool .gift-avatar-seat::before,
+#giftPreviewTool .gift-avatar-seat>img {
+  position:absolute;
+  top:50%;
+  left:50%;
+  translate:-50% -50%;
+  width:var(--gift-avatar-portrait);
+  height:var(--gift-avatar-portrait);
+  border-radius:50%;
+  pointer-events:none;
+}
+#giftPreviewTool .gift-avatar-seat::before {content:""}
+/* A solid plate hides the old portrait when a replacement has transparent pixels. */
+#giftPreviewTool .gift-avatar-seat.has-avatar::before {background:var(--gift-avatar-plate)}
+#giftPreviewTool .gift-avatar-seat>img {display:block;object-fit:cover}
+#giftPreviewTool .gift-avatar-seat::after {
+  content:"";
+  position:absolute;
+  inset:50% auto auto 50%;
+  translate:-50% -50%;
+  width:var(--gift-avatar-portrait);
+  height:var(--gift-avatar-portrait);
+  border:calc(100cqw * var(--gift-avatar-frame-size) / 720) solid var(--gift-avatar-frame);
+  border-radius:50%;
+  pointer-events:none;
+}
+#giftPreviewTool .gift-avatar-seat:focus-visible {outline-color:#c0e4ff}
+#giftPreviewTool .gift-avatar-seat:disabled {background:transparent}
+@media(hover:hover) and (pointer:fine) {
+  #giftPreviewTool .gift-avatar-seat:hover:not(:disabled)::after {
+    border-color:#d9eeff;
+    box-shadow:0 0 0 3px #75b8f996;
+  }
+}
+@media(min-width:901px) {
+  #giftPreviewTool .gift-avatar-controls {position:sticky;top:100px}
+}
+@media(max-width:760px) {
+  #giftPreviewTool .gift-avatar-workspace {
+    grid-template-columns:minmax(0,1fr);
+    grid-template-areas:"controls" "scene";
+  }
+}
+@media(max-width:540px) {
+  #giftPreviewTool .gift-avatar-workspace {gap:12px}
+  #giftPreviewTool .gift-avatar-scene,
+  #giftPreviewTool .gift-avatar-controls {padding:16px;border-radius:18px}
+  #giftPreviewTool .gift-avatar-scene-mat {padding:0;background:transparent}
+  #giftPreviewTool .gift-avatar-actions {grid-template-columns:repeat(2,minmax(0,1fr))}
+  #giftAvatarReviewExport {grid-column:1/-1}
+}
+
 #giftPreviewTool .gift-workspace{display:grid;grid-template-columns:minmax(0,7fr) minmax(300px,3fr);align-items:start;gap:16px}
 #giftPreviewTool .gift-preview-card,#giftPreviewTool .gift-controls{min-width:0;padding:24px;border-radius:22px}
 #giftPreviewTool h2{margin:0;color:var(--tool-heading);font-size:16px;line-height:24px;font-weight:650}
