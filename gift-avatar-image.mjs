@@ -1,8 +1,9 @@
 export const GIFT_AVATAR_SEATS = [
-  {x:270,y:264,size:92}, {x:450,y:264,size:92},
-  {x:90,y:436,size:92}, {x:270,y:436,size:92}, {x:450,y:436,size:92}, {x:630,y:436,size:92},
-  {x:90,y:608,size:92}, {x:270,y:608,size:92}, {x:450,y:608,size:92}, {x:630,y:608,size:92},
-  {x:90,y:780,size:92}, {x:270,y:780,size:92}, {x:450,y:780,size:92}, {x:630,y:780,size:92},
+  {x:92,y:254,size:92}, {x:272,y:254,size:92}, {x:452,y:254,size:92}, {x:632,y:254,size:92},
+  {x:90,y:426,size:92}, {x:270,y:426,size:92}, {x:450,y:426,size:92}, {x:630,y:426,size:92},
+  {x:90,y:598,size:92}, {x:270,y:598,size:92}, {x:450,y:598,size:92}, {x:630,y:598,size:92},
+  {x:90,y:770,size:92}, {x:270,y:770,size:92}, {x:450,y:770,size:92}, {x:630,y:770,size:92},
+  {x:90,y:942,size:92}, {x:270,y:942,size:92}, {x:450,y:942,size:92}, {x:630,y:942,size:92},
 ];
 
 const outputSize = 240;

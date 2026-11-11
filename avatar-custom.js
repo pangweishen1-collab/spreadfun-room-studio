@@ -27,7 +27,7 @@ Object.assign(copy.en,{
   runtimeMemory:'Estimated runtime memory',runtimeLimit:'Decoded images and the canvas exceed 3 MB. Remove assets or use smaller images before exporting.',unknownRuntimeSize:'An image could not be measured. Replace the source file or remove that asset.',
   runtimeHint:'Counts decoded RGBA images and one native-size canvas. Total player memory depends on the platform.',overRuntime:'Over limit',unknownRuntime:'Unavailable',
 });
-const state={mode:'images',style:'plain',source:null,file:null,video:null,loading:false,imageLoading:false,exporting:false,playing:false,position:{x:.5,y:.82},bitmap:null,image:null,result:null,notice:'',noticeKind:'error',renderId:0,frame:0,
+const state={mode:'preview',style:'plain',source:null,file:null,video:null,loading:false,imageLoading:false,exporting:false,playing:false,position:{x:.5,y:.82},bitmap:null,image:null,result:null,notice:'',noticeKind:'error',renderId:0,frame:0,
   images:[],sourceAssets:[],removedImages:new Set(),assetSelection:new Set(),assetOffsets:new Map(),assetBusy:false,
   highlightColor:null,shadowColor:null};
 const textColors=[
@@ -40,8 +40,13 @@ const MAX_ADDED_IMAGES=7;
 let player,exportPlayer,exportHost,drag,imageDrag,assetDrag,assetPaint,stageVisible=true;
 const isZh=()=>document.documentElement.lang.startsWith('zh');
 const t=key=>copy[isZh()?'zh':'en'][key]||key;
+const avatarModes = [
+  {name:'preview', tab:'avatarSeatPreviewTab', panel:'giftAvatarPreview'},
+  {name:'images', tab:'avatarImagesTab', panel:'avatarImagesPanel'},
+  {name:'custom', tab:'avatarCustomTab', panel:'avatarCustomPanel'}
+];
 const selected=()=>state.mode==='custom';
-const active=()=>selected()&&!root.classList.contains('hidden')&&!$('avatarSeatProduction')?.hidden;
+const active=()=>selected()&&!root.classList.contains('hidden');
 const busy=()=>state.loading||state.imageLoading||state.exporting||state.assetBusy;
 const weights=()=>['bebas','pacifico'].includes($('avatarCustomFont').value)?[400,700]:$('avatarCustomFont').value==='oswald'?[400,500,600,700]:[400,500,600,700,800];
 const weight=()=>Number($('avatarCustomWeight').value)||fonts[$('avatarCustomFont').value]?.[1]||600;
@@ -116,15 +121,26 @@ function chooseStyle(key){
   if(key!=='plain'){$('avatarCustomColor').value=preset.baseColor;$('avatarCustomStrokeColor').value=preset.outlineColor;$('avatarCustomStrokeWidth').value=preset.outlineWidth}
   syncStyles();changed();
 }
-function syncTabs(){const locked=busy()||window.Toolkit?.isAvatarBusy?.();for(const [id,name] of [['avatarImagesTab','images'],['avatarCustomTab','custom']]){const button=$(id);button.disabled=!!locked;button.setAttribute('aria-selected',String(state.mode===name));button.tabIndex=state.mode===name?0:-1}}
+function syncTabs(){
+  const locked=busy()||window.Toolkit?.isAvatarBusy?.();
+  for(const {tab,name} of avatarModes){
+    const button=$(tab), isSelected=state.mode===name;
+    button.disabled=!!locked;
+    button.setAttribute('aria-selected',String(isSelected));
+    button.tabIndex=isSelected?0:-1;
+  }
+}
 function chooseMode(next){
-  if(!['images','custom'].includes(next)||busy()||window.Toolkit?.isAvatarBusy?.())return;
+  if(!avatarModes.some(({name})=>name===next)||busy()||window.Toolkit?.isAvatarBusy?.())return false;
+  if(state.mode===next)return true;
   window.Toolkit?.pauseAvatar?.();pause();state.mode=next;
-  $('avatarImagesPanel').hidden=selected();$('avatarCustomPanel').hidden=!selected();syncTabs();layout();
+  for(const {name,panel} of avatarModes)$(panel).hidden=name!==next;
+  syncTabs();
+  if(next==='custom')layout();
+  return true;
 }
 function syncLanguage(){
   root.querySelectorAll('[data-custom-i18n]').forEach(node=>node.textContent=t(node.dataset.customI18n));
-  ($('avatarProductionTabs')||root.querySelector('.avatar-subtabs')).setAttribute('aria-label',isZh()?'头像框生产工具':'Avatar frame production tools');
   $('avatarCustomStage').setAttribute('aria-label',t('uploadTitle'));$('avatarCustomTextLayer').setAttribute('aria-label',t('drag'));$('avatarCustomImageLayer').setAttribute('aria-label',t('imageDrag'));$('avatarCustomImageResize').setAttribute('aria-label',t('imageResize'));
   $('avatarCustomImageResize').title=t('imageResize');
   $('avatarCustomAssetDrag').setAttribute('aria-label',t('moveAssets'));
@@ -485,10 +501,21 @@ async function exportFiles(){
   }catch(error){notice(['sizeLimit','runtimeLimit','unknownRuntimeSize'].includes(error.code)?error.code:['sizeLimit','fontError','strokeError','textTooLarge'].includes(error.message)?error.message:'exportError')}
   finally{state.exporting=false;sync()}
 }
-for(const [id,name] of [['avatarImagesTab','images'],['avatarCustomTab','custom']]){
-  $(id).addEventListener('click',()=>chooseMode(name));
-  $(id).addEventListener('keydown',event=>{if(!['ArrowLeft','ArrowRight','Home','End'].includes(event.key))return;event.preventDefault();const next=event.key==='Home'?'images':event.key==='End'?'custom':state.mode==='images'?'custom':'images';chooseMode(next);$(next==='images'?'avatarImagesTab':'avatarCustomTab').focus()});
-}
+avatarModes.forEach(({tab,name}, index)=>{
+  $(tab).addEventListener('click',()=>chooseMode(name));
+  $(tab).addEventListener('keydown',event=>{
+    let target;
+    switch(event.key){
+      case 'Home': target=avatarModes[0];break;
+      case 'End': target=avatarModes.at(-1);break;
+      case 'ArrowLeft': target=avatarModes[(index+avatarModes.length-1)%avatarModes.length];break;
+      case 'ArrowRight': target=avatarModes[(index+1)%avatarModes.length];break;
+      default: return;
+    }
+    event.preventDefault();
+    if(chooseMode(target.name))$(target.tab).focus();
+  });
+});
 for(const id of ['avatarCustomText','avatarCustomFontSize','avatarCustomStrokeWidth'])$(id).addEventListener('input',changed);
 for(const button of root.querySelectorAll('button[data-text-style]'))button.addEventListener('click',()=>chooseStyle(button.dataset.textStyle));
 $('avatarCustomWeight').addEventListener('change',changed);

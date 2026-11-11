@@ -77,7 +77,7 @@ function harness() {
   const get=id=>{if(!nodes.has(id))nodes.set(id,new Element());return nodes.get(id);};
   for(const id of ['avatarTool','avatarImagesPanel','avatarCustomPanel','avatarImagesTab','avatarCustomTab','avatarCustomTextLayer','avatarCustomFirstFrame','avatarCustomFont','avatarCustomFontSize','avatarCustomText','avatarCustomColor'])get(id);
   for(const key of ['plain','brightGold','champagne','silver','roseGold'])get('style-'+key).dataset.textStyle=key;
-  get('avatarCustomPanel').hidden=true;get('avatarCustomText').value='VIP';get('avatarCustomFont').value='inter';get('avatarCustomFontSize').value='32';get('avatarCustomColor').value='#ffffff';
+  get('avatarImagesPanel').hidden=get('avatarCustomPanel').hidden=true;get('avatarCustomText').value='VIP';get('avatarCustomFont').value='inter';get('avatarCustomFontSize').value='32';get('avatarCustomColor').value='#ffffff';
   get('avatarCustomWeight').value='600';get('avatarCustomWeight').options=['400','500','600','700','800'].map(value=>({value,disabled:false}));get('avatarCustomStrokeWidth').value='0';get('avatarCustomStrokeColor').value='#000000';get('avatarCustomStrokeColorValue').value='#000000';get('avatarCustomResult').hidden=true;
   class Player {
     constructor(host) { this.host=host;this._renderer={_prepared:true,_owner:this,drawSprite:sprite=>{this.lastTransform={...sprite.frames[this._currentFrame].transform}}};this.steps=[];this.pauses=0;this.canvas=new Element('canvas');host.append(this.canvas);players.push(this); }
@@ -100,11 +100,12 @@ function harness() {
   styleRenderer=await import('../avatar-text-style.mjs');
   checkVendoredRenderer();
   const h=harness(),api=h.api;
-  assert.equal(api.state.mode,'images');assert.equal(h.paste[0].isActive(),false,'custom paste target starts inactive');
+  assert.equal(api.state.mode,'preview');assert.equal(h.paste[0].isActive(),false,'custom paste target starts inactive');
+  h.get('avatarSeatPreviewTab').emit('keydown',{key:'ArrowRight'});assert.equal(api.state.mode,'images');assert.equal(h.document.activeElement,h.get('avatarImagesTab'));assert.equal(h.get('giftAvatarPreview').hidden,true);assert.equal(h.get('avatarImagesPanel').hidden,false);
   h.get('avatarImagesTab').emit('keydown',{key:'End'});assert.equal(api.state.mode,'custom');assert.equal(h.document.activeElement,h.get('avatarCustomTab'));assert.equal(h.get('avatarCustomTab').getAttribute('aria-selected'),'true');assert.equal(h.get('avatarImagesPanel').hidden,true);assert.equal(h.get('avatarCustomPanel').hidden,false);assert.equal(h.paste[0].isActive(),true);
-  h.get('avatarCustomTab').emit('keydown',{key:'Home'});assert.equal(api.state.mode,'images');assert.equal(h.document.activeElement,h.get('avatarImagesTab'));h.get('avatarImagesTab').emit('keydown',{key:'ArrowRight'});assert.equal(api.state.mode,'custom');
+  h.get('avatarCustomTab').emit('keydown',{key:'Home'});assert.equal(api.state.mode,'preview');assert.equal(h.document.activeElement,h.get('avatarSeatPreviewTab'));assert.equal(h.get('giftAvatarPreview').hidden,false);h.get('avatarSeatPreviewTab').emit('keydown',{key:'ArrowLeft'});assert.equal(api.state.mode,'custom');
   h.get('avatarTool').classList.add('hidden');assert.equal(h.paste[0].isActive(),false,'route hiding also disables custom paste');h.get('avatarTool').classList.remove('hidden');
-  h.controls.oldBusy=true;api.sync();api.chooseMode('images');assert.equal(api.state.mode,'custom');assert.equal(h.get('avatarImagesTab').disabled,true,'old workflow busy state locks both tabs');h.controls.oldBusy=false;api.sync();
+  h.controls.oldBusy=true;api.sync();api.chooseMode('images');assert.equal(api.state.mode,'custom');assert.equal(h.get('avatarImagesTab').disabled,true,'old workflow busy state locks the tabs');h.controls.oldBusy=false;api.sync();
   await api.loadFiles([h.file('bad.png')]);assert.equal(api.state.notice,'fileType');assert.equal(h.parses.length,0);
   await api.loadFiles([{name:'huge.svga',size:50*1024*1024+1}]);assert.equal(api.state.notice,'fileSize');assert.equal(h.parses.length,0);
   h.controls.readHold=deferred();const loading=api.loadFiles([h.file()]);assert.equal(api.state.loading,true);assert.equal(h.get('avatarCustomFields').disabled,true);assert.equal(h.get('avatarCustomUpload').disabled,true);assert.equal(h.get('avatarCustomTab').disabled,true);api.chooseMode('images');assert.equal(api.state.mode,'custom');h.controls.readHold.resolve();await loading;h.controls.readHold=null;

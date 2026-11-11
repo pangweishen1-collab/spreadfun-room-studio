@@ -44,7 +44,7 @@
   window.JSZipUtils=window.JSZipUtils||{};
   const exportHost=document.createElement('div');exportHost.setAttribute('aria-hidden','true');exportHost.style.cssText='position:fixed;left:-20000px;top:0;pointer-events:none;visibility:hidden';document.body.append(exportHost);
   const t=key=>(strings[language]||strings.en)[key]||key;
-  const avatarImagesActive=()=>state.active==='avatar'&&!$('#avatarSeatProduction')?.hidden&&!window.AvatarCustom?.isSelected?.();
+  const avatarImagesActive=()=>state.active==='avatar'&&!$('#avatarImagesPanel')?.hidden&&!window.AvatarCustom?.isSelected?.();
   const currentTool=()=>({'#banners':'banner','#avatar-frames':'avatar','#room-backgrounds':'room','#gift-previews':'gift-preview','#vap-tools':'vap','#resources':'resources','#dice-preview':'dice'}[location.hash]||'room');
   function syncFeedback(){
     const phase=state.loading?'loading':state.exporting?'processing':state.notice||!state.dimensionValid?'error':state.download?'success':state.video?'ready':'empty';
