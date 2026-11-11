@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.18.11 - 2026-11-11
+
+- Gift previews accept multiple files through the picker, drop, or paste. Each image keeps its own adjustments, and the batch can be cut out and exported as WebP files in a ZIP.
+- Room preview uploads fill the next empty avatar frame seats in order and preserve occupied seats. An empty seat can also be selected for an individual upload.
+- Standard VAP downloads use the Tencent VAP Tool 2.0.6 packing profile, including 1088 × 1568 H.264 Main Level 4.0 video, 24 FPS, 0.5 Alpha, and native resource tags. The separate 17AE preview download was removed.
+
 ## 1.18.10 - 2026-11-11
 
 ### Avatar frames
