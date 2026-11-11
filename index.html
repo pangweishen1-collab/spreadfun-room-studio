@@ -58,6 +58,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
   <link rel="stylesheet" href="gift-preview.css?v=20261111-gift-batch">
+  <link rel="stylesheet" href="profile-preview.css?v=20261111-profile3">
   <link rel="stylesheet" href="vap-resources.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="vap-tool.css?v=20261111-official-downloads">
   <link rel="stylesheet" href="vap-review.css?v=20261110-review-background-library">
@@ -69,7 +70,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="vap-player.css?v=20261026-play-icon1">
 </head>
 <body>
-  <header class="topbar"><a class="brand" id="brandHome" href="#room-backgrounds" data-i18n-label="homeLink" aria-label="Fun Toolkit · Room backgrounds"><div class="mark" aria-hidden="true"><img src="assets/spreadfun-mark.webp" alt="" width="30" height="30"></div><div class="brand-copy"><span class="brand-name">Fun Toolkit</span></div></a><nav class="tool-navigation" id="toolsNavigation" aria-label="Tools"><a href="#room-backgrounds" data-tool-link="room" data-i18n-label="roomNav" aria-current="page"><span class="nav-label-full" data-i18n="roomNav">Room backgrounds</span><span class="nav-label-short" data-i18n="roomNavShort">Room BG</span></a><a id="avatarToolLink" href="#avatar-frames" data-tool-link="avatar" data-i18n-label="avatarNav"><span class="nav-label-full" data-i18n="avatarNav">Avatar frames</span><span class="nav-label-short" data-i18n="avatarNavShort">Avatar</span></a><a href="#banners" data-tool-link="banner" data-i18n-label="bannerNav"><span data-i18n="bannerNav">Banner</span></a><a id="giftPreviewLink" href="#gift-previews" data-tool-link="gift-preview" data-i18n-label="giftPreviewNav"><span data-i18n="giftPreviewNav">礼物图</span></a><a id="vapToolLink" href="#vap-tools" data-tool-link="vap" data-i18n-label="vapNav"><span data-i18n="vapNav">VAP工具</span></a><a id="diceToolLink" href="#dice-preview" data-tool-link="dice" data-i18n-label="diceNav"><span data-i18n="diceNav">骰子</span></a><a id="resourcesLink" href="#resources" data-tool-link="resources" data-i18n-label="resourcesNav"><span data-i18n="resourcesNav">资源库</span></a></nav><div class="top-actions"><button class="tiny lang-button" id="langToggle" onclick="toggleLanguage()" aria-label="切换语言"><span class="lang-icon">文</span><span class="lang-label" id="langLabel">中文</span></button><button class="tiny" id="contactButton" onclick="openContact()"><span class="nav-author-avatar" aria-hidden="true"><img src="assets/author-profile.webp" alt="" width="452" height="544"></span><span id="contactButtonText">Contact author</span></button></div></header>
+  <header class="topbar"><a class="brand" id="brandHome" href="#room-backgrounds" data-i18n-label="homeLink" aria-label="Fun Toolkit · Room backgrounds"><div class="mark" aria-hidden="true"><img src="assets/spreadfun-mark.webp" alt="" width="30" height="30"></div><div class="brand-copy"><span class="brand-name">Fun Toolkit</span></div></a><nav class="tool-navigation" id="toolsNavigation" aria-label="Tools"><a href="#room-backgrounds" data-tool-link="room" data-i18n-label="roomNav" aria-current="page"><span class="nav-label-full" data-i18n="roomNav">Room backgrounds</span><span class="nav-label-short" data-i18n="roomNavShort">Room BG</span></a><a id="avatarToolLink" href="#avatar-frames" data-tool-link="avatar" data-i18n-label="avatarNav"><span class="nav-label-full" data-i18n="avatarNav">Avatar frames</span><span class="nav-label-short" data-i18n="avatarNavShort">Avatar</span></a><a href="#banners" data-tool-link="banner" data-i18n-label="bannerNav"><span data-i18n="bannerNav">Banner</span></a><a id="giftPreviewLink" href="#gift-previews" data-tool-link="gift-preview" data-i18n-label="giftPreviewNav"><span data-i18n="giftPreviewNav">预览图</span></a><a id="vapToolLink" href="#vap-tools" data-tool-link="vap" data-i18n-label="vapNav"><span data-i18n="vapNav">VAP工具</span></a><a id="diceToolLink" href="#dice-preview" data-tool-link="dice" data-i18n-label="diceNav"><span data-i18n="diceNav">骰子</span></a><a id="resourcesLink" href="#resources" data-tool-link="resources" data-i18n-label="resourcesNav"><span data-i18n="resourcesNav">资源库</span></a></nav><div class="top-actions"><button class="tiny lang-button" id="langToggle" onclick="toggleLanguage()" aria-label="切换语言"><span class="lang-icon">文</span><span class="lang-label" id="langLabel">中文</span></button><button class="tiny" id="contactButton" onclick="openContact()"><span class="nav-author-avatar" aria-hidden="true"><img src="assets/author-profile.webp" alt="" width="452" height="544"></span><span id="contactButtonText">Contact author</span></button></div></header>
 <dialog class="hub-request-dialog ft-motion-dialog" id="hubRequestDialog" aria-labelledby="hubRequestDialogTitle">
   <div class="hub-dialog-heading"><h2 id="hubRequestDialogTitle" data-hub-i18n="requestDialogTitle">提出工具需求</h2><button type="button" class="hub-button hub-secondary" id="hubRequestClose" data-hub-i18n="close">关闭</button></div>
   <p class="hub-dialog-description" data-hub-i18n="requestDialogDescription">描述具体任务和期望的输出，有助于作者判断需求与实现方式。</p>
@@ -244,7 +245,12 @@ body{min-width:320px}
       <input type="file" id="avatarCustomAssetInput" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" hidden>
     </section>
   </main>
-  <main id="giftPreviewTool" class="hidden" data-tool="gift-preview" aria-labelledby="giftPreviewTitle">
+  <main id="giftPreviewTool" class="hidden" data-tool="gift-preview" aria-labelledby="giftPreviewLink">
+    <div id="profileTabs" class="avatar-subtabs" role="tablist" aria-labelledby="giftPreviewLink">
+      <button id="profileProductionTab" type="button" role="tab" aria-selected="true" aria-controls="profileProduction" data-profile-text="productionTab">预览图生产</button>
+      <button id="profileDeviceTab" type="button" role="tab" aria-selected="false" aria-controls="profileDevice" tabindex="-1" data-profile-text="deviceTab">实机效果</button>
+    </div>
+    <section id="profileProduction" role="tabpanel" aria-labelledby="profileProductionTab">
   <div class="intro tool-intro"><div><h1 id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具</h1></div></div>
   <section class="workspace gift-workspace">
     <section class="preview card gift-preview-card" aria-labelledby="giftPreviewHeading">
@@ -367,7 +373,40 @@ body{min-width:320px}
     </aside>
   </section>
   <input id="giftPreviewInput" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple hidden>
-</main>
+    </section>
+    <section id="profileDevice" role="tabpanel" aria-labelledby="profileDeviceTab" hidden>
+      <div class="profile-workspace">
+        <aside class="card profile-controls" aria-labelledby="profileMaterialsHeading">
+          <div class="profile-card-heading">
+            <h2 id="profileMaterialsHeading" data-profile-text="materialsHeading">预览素材</h2>
+            <p class="profile-count"><span data-profile-text="countLabel">已放置</span> <span id="profileCount">0 / 4</span></p>
+          </div>
+          <div class="profile-modes" role="group" aria-labelledby="profileMaterialsHeading">
+            <button id="profileMedal" type="button" aria-pressed="true" data-profile-text="medal">勋章</button>
+            <button id="profileVehicle" type="button" aria-pressed="false" data-profile-text="vehicle">座驾</button>
+          </div>
+          <p id="profileExportSize">400 × 400 px</p>
+          <button id="profileUpload" class="primary ft-motion-sheen" type="button" data-profile-text="upload">批量上传</button>
+          <div class="profile-download">
+            <button id="profileExport" type="button" aria-describedby="profileExportSize" disabled>下载勋章 WebP</button>
+            <button id="profileReviewExport" type="button">下载实机预览图</button>
+          </div>
+          <p id="profileStatus" class="profile-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="local-privacy"><span class="privacy-dot" aria-hidden="true"></span><span data-profile-text="privacy">图片仅在本地处理。</span></p>
+          <input id="profileFiles" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple hidden>
+        </aside>
+        <section class="card profile-scene" aria-labelledby="profileDeviceHeading">
+          <h2 id="profileDeviceHeading" data-profile-text="deviceHeading">实机预览</h2>
+          <div class="profile-stage-wrap">
+            <div id="profileStage" class="profile-stage" role="group" aria-labelledby="profileDeviceHeading">
+              <img class="profile-stage-background" src="assets/profile-preview/profile-main.webp" alt="" width="720" height="1613" loading="lazy" decoding="async" draggable="false">
+              <div id="profileSlots" class="profile-slots"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+  </main>
 
   <main id="vapTool" class="hidden" data-tool="vap" data-state="idle" data-export-revision="rgb-feather-v1" aria-labelledby="vapTitle">
     <div class="avatar-subtabs vap-review-tabs" role="tablist" aria-label="VAP 工作台">
@@ -985,13 +1024,14 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="gift-preview-render.js?v=20261025-quality1"></script>
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
   <script src="gift-background.js?v=20261111-prewarm1"></script>
-  <script src="gift-preview.js?v=20261111-gift-batch"></script>
-  <script type="module" src="gift-avatar-preview.mjs?v=20261111-seat-review-hd30"></script>
+  <script src="gift-preview.js?v=20261111-profile-release"></script>
+  <script type="module" src="profile-preview.mjs?v=20261111-profile3"></script>
+  <script type="module" src="gift-avatar-preview.mjs?v=20261111-profile-release"></script>
   <script src="vap-player.js?v=20261111-official-pack"></script>
   <script src="vap-resource-editor.js?v=20261111-official-pack"></script>
   <script src="vap-tool.js?v=20261111-vap-faster"></script>
   <script src="dice-embed.js?v=20261103-dice1"></script>
-  <script src="toolkit.js?v=20261111-seat-svga1"></script>
+  <script src="toolkit.js?v=20261111-profile-release"></script>
   <script type="module" src="vap-review.js?v=20261111-vap-faster"></script>
   <script type="module" src="avatar-custom.js?v=20261111-seat-svga1"></script>
 </body></html>

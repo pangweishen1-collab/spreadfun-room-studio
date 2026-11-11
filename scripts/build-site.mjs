@@ -11,6 +11,7 @@ const entries=['index.html','upload-paste.js','Room BG Studio.html','toolkit.css
 entries.push('dice-embed.js','avatar-text-style.mjs','avatar-custom.js','avatar-custom.css','avatar-custom-engine.mjs','avatar-lossless.mjs','avatar-lossless-worker.mjs','avatar-lossless-codec.mjs','avatar-fonts.css','vap-chroma-plate.mjs','vap-native-planes.mjs','vap-quality.mjs','webp-encode.mjs','webp-encoder-worker.mjs','vap-gift-fade.mjs','webp-settings.js','webp-settings.css');
 entries.push('gift-lucida-download.mjs');
 entries.push('gift-avatar-preview.mjs','gift-avatar-image.mjs','gift-avatar-svga.mjs','gift-avatar-review-video.mjs');
+entries.push('profile-preview.mjs','profile-preview.css','preview-slot-drag.mjs');
 entries.push('vap-review.css','vap-review.js','vap-review-engine.mjs');
 entries.push('vap-copy-packets.mjs','vap-avc-padding.mjs');
 await rm(target,{recursive:true,force:true});

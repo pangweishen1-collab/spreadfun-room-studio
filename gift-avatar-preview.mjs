@@ -1,3 +1,4 @@
+import {bindPreviewSlotDrag} from './preview-slot-drag.mjs?v=20261111-profile1';
 import {GIFT_AVATAR_SEATS, prepareGiftAvatar, prepareGiftAvatarFrame} from './gift-avatar-image.mjs?v=20261111-seat-layout20';
 
 const copy = {
@@ -118,8 +119,6 @@ let hoveredSeat = null;
 let dragTarget = null;
 let notice = null;
 let reviewJob = null;
-let frameMove = null;
-let suppressSeatClick = false;
 
 const seats = GIFT_AVATAR_SEATS.map(({x, y, size}, index) => {
   const button = document.createElement('button');
@@ -134,11 +133,7 @@ const seats = GIFT_AVATAR_SEATS.map(({x, y, size}, index) => {
   replaceCue.setAttribute('aria-hidden', 'true');
   button.append(replaceCue);
   button.addEventListener('click', event => {
-    if (suppressSeatClick && event.detail > 0) {
-      suppressSeatClick = false;
-      event.preventDefault();
-      return;
-    }
+    if (frameDrag.consumeClick(event)) return;
     pickedSeat = index;
     singleInput.click();
   });
@@ -309,92 +304,26 @@ function seatIndex(node) {
   return seat && overlay.contains(seat) ? Number(seat.dataset.seatIndex) : null;
 }
 
-function setMoveTarget(index) {
-  if (index === frameMove.from) index = null;
-  if (frameMove.target === index) return;
-  if (frameMove.target !== null) delete seats[frameMove.target].dataset.moveTarget;
-  frameMove.target = index;
-  if (index !== null) seats[index].dataset.moveTarget = 'true';
-}
-
-function startFrameDrag() {
-  const {from} = frameMove;
-  const {element, image, animation} = assets.frame[from];
-  const ghost = document.createElement('canvas');
-  ghost.width = ghost.height = 240;
-  ghost.className = 'gift-avatar-drag-ghost';
-  ghost.setAttribute('aria-hidden', 'true');
-  ghost.style.width = ghost.style.height = getComputedStyle(element).width;
-  if (animation || image.naturalWidth) ghost.getContext('2d').drawImage(image, 0, 0, 240, 240);
-  document.body.append(ghost);
-  frameMove.ghost = ghost;
-  seats[from].dataset.moving = 'true';
-  suppressSeatClick = true;
-}
-
-function finishFrameDrag(destination = null) {
-  if (!frameMove) return;
-  const {from, target, ghost} = frameMove;
-  frameMove = null;
-  if (!ghost) return;
-  ghost.remove();
-  delete seats[from].dataset.moving;
-  if (target !== null) delete seats[target].dataset.moveTarget;
-  if (busy || destination === null || destination === from) return;
-
-  const frame = assets.frame[from];
-  const other = assets.frame[destination];
-  assets.frame[from] = other;
-  assets.frame[destination] = frame;
-  seats[destination].append(frame.element);
-  if (other) seats[from].append(other.element);
-  seats[from].classList.toggle('has-frame', Boolean(other));
-  seats[destination].classList.add('has-frame');
-  notice = {key: other ? 'framesSwapped' : 'frameMoved'};
-  sync();
-  syncPlayback();
-  seats[destination].focus({preventScroll: true});
-}
-
-overlay.addEventListener('pointerdown', event => {
-  if (!event.isPrimary || event.button !== 0) return;
-  // A drag can still dispatch a click on its source button. A new
-  // pointer gesture clears that suppression, even after canceling a drag.
-  suppressSeatClick = false;
-  if (busy || frameMove) return;
-  const from = seatIndex(event.target);
-  if (from === null || !assets.frame[from]) return;
-  frameMove = {from, pointerId: event.pointerId, x: event.clientX, y: event.clientY, target: null, ghost: null};
-});
-window.addEventListener('pointermove', event => {
-  if (frameMove?.pointerId !== event.pointerId) return;
-  if (event.pointerType === 'mouse' && !(event.buttons & 1)) {
-    finishFrameDrag();
-    return;
-  }
-  if (!frameMove.ghost) {
-    if (busy || Math.hypot(event.clientX - frameMove.x, event.clientY - frameMove.y) < 6) return;
-    startFrameDrag();
-  }
-  event.preventDefault();
-  frameMove.ghost.style.left = `${event.clientX}px`;
-  frameMove.ghost.style.top = `${event.clientY}px`;
-  setMoveTarget(seatIndex(document.elementFromPoint(event.clientX, event.clientY)));
-});
-window.addEventListener('pointerup', event => {
-  if (frameMove?.pointerId !== event.pointerId) return;
-  finishFrameDrag(seatIndex(document.elementFromPoint(event.clientX, event.clientY)));
-});
-window.addEventListener('pointercancel', event => {
-  if (frameMove?.pointerId === event.pointerId) finishFrameDrag();
-});
-window.addEventListener('pointerout', event => {
-  if (frameMove?.pointerId === event.pointerId && event.pointerType === 'mouse' && !event.relatedTarget) finishFrameDrag();
-});
-window.addEventListener('keydown', event => {
-  if (event.key === 'Escape' && frameMove?.ghost) {
-    event.preventDefault();
-    finishFrameDrag();
+const frameDrag = bindPreviewSlotDrag({
+  overlay,
+  buttons: seats,
+  slotAt: seatIndex,
+  assetAt: index => assets.frame[index],
+  isBusy: () => busy,
+  canMove: () => true,
+  ghostClass: 'gift-avatar-drag-ghost',
+  move(from, destination) {
+    const frame = assets.frame[from];
+    const other = assets.frame[destination];
+    assets.frame[from] = other;
+    assets.frame[destination] = frame;
+    seats[destination].append(frame.element);
+    if (other) seats[from].append(other.element);
+    seats[from].classList.toggle('has-frame', Boolean(other));
+    seats[destination].classList.add('has-frame');
+    notice = {key: other ? 'framesSwapped' : 'frameMoved'};
+    sync();
+    syncPlayback();
   }
 });
 
@@ -430,10 +359,7 @@ preview.addEventListener('drop', event => {
   event.preventDefault();
   loadTransferredFiles(files, seatIndex(event.target));
 });
-window.addEventListener('blur', () => {
-  clearDragTarget();
-  finishFrameDrag();
-});
+window.addEventListener('blur', clearDragTarget);
 window.UploadPaste?.register({
   zone: preview,
   isActive: () => location.hash === '#avatar-frames' && !preview.hidden,
@@ -446,7 +372,7 @@ function syncPlayback() {
   if (!active) {
     hoveredSeat = null;
     clearDragTarget();
-    if (preview.hidden || location.hash !== '#avatar-frames' || document.hidden) finishFrameDrag();
+    if (preview.hidden || location.hash !== '#avatar-frames' || document.hidden) frameDrag.cancel();
   }
   assets.frame.forEach((asset, index) => {
     if (!asset?.animation) return;
@@ -633,7 +559,7 @@ reviewDownload.addEventListener('click', async () => {
 
 new MutationObserver(sync).observe(document.documentElement, {attributes: true, attributeFilter: ['lang']});
 window.addEventListener('pagehide', event => {
-  finishFrameDrag();
+  frameDrag.cancel();
   reviewJob?.abort();
   for (const asset of Object.values(assets).flat()) {
     if (!asset) continue;

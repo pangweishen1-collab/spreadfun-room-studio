@@ -136,7 +136,29 @@ function sharpenUpscaledAvatar(context) {
   context.putImageData(image, 0, 0);
 }
 
-async function prepareImage(file, isFrame) {
+function readJpegDimensions(view) {
+  const frameMarkers = [0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf];
+  for (let offset = 2; offset + 4 <= view.byteLength;) {
+    if (view.getUint8(offset++) !== 0xff) break;
+    while (offset < view.byteLength && view.getUint8(offset) === 0xff) offset++;
+    if (offset + 3 > view.byteLength) break;
+    const marker = view.getUint8(offset++);
+    if (marker === 0xda || marker === 0xd9) break;
+    if (marker === 0x01 || (marker >= 0xd0 && marker <= 0xd7)) continue;
+    const length = view.getUint16(offset);
+    if (length < 2 || offset + length > view.byteLength) break;
+    if (frameMarkers.includes(marker)) {
+      if (length < 8) break;
+      const dimensions = {height: view.getUint16(offset + 3), width: view.getUint16(offset + 5)};
+      checkDimensions(dimensions);
+      return dimensions;
+    }
+    offset += length;
+  }
+  throw avatarError('decode');
+}
+
+async function prepareImage(file, isFrame, allowJpeg = false, outputSide = outputSize) {
   if (!(file instanceof Blob)) throw avatarError('type');
   if (file.size > maxFileBytes) throw avatarError('size');
   let buffer;
@@ -144,27 +166,28 @@ async function prepareImage(file, isFrame) {
   catch (error) { throw avatarError('decode', error); }
   const view = new DataView(buffer);
   const isPng = isFrame && view.byteLength >= 8 && view.getUint32(0) === 0x89504e47 && view.getUint32(4) === 0x0d0a1a0a;
-  const dimensions = isPng ? readStaticPng(view) : readStaticWebP(buffer);
-  const type = isPng ? 'image/png' : 'image/webp';
+  const isJpeg = allowJpeg && view.byteLength >= 2 && view.getUint16(0) === 0xffd8;
+  const dimensions = isPng ? readStaticPng(view) : isJpeg ? readJpegDimensions(view) : readStaticWebP(buffer);
+  const type = isPng ? 'image/png' : isJpeg ? 'image/jpeg' : 'image/webp';
   const source = file.type === type ? file : file.slice(0, file.size, type);
   const decoded = await decodeAvatar(source);
   try {
     const {image, width, height} = decoded;
     checkDimensions(decoded);
-    if (!isPng && width === outputSize && height === outputSize && dimensions.width === width && dimensions.height === height) return source;
+    if (type === 'image/webp' && width === outputSide && height === outputSide && dimensions.width === width && dimensions.height === height) return source;
     const canvas = document.createElement('canvas');
-    canvas.width = outputSize;
-    canvas.height = outputSize;
+    canvas.width = outputSide;
+    canvas.height = outputSide;
     const context = canvas.getContext('2d', {willReadFrequently:true});
     try {
       context.imageSmoothingEnabled = true;
       context.imageSmoothingQuality = 'high';
       if (isFrame) {
-        const scale = outputSize / Math.max(width, height);
+        const scale = outputSide / Math.max(width, height);
         const scaledWidth = Math.max(1, Math.round(width * scale));
         const scaledHeight = Math.max(1, Math.round(height * scale));
-        const x = Math.floor((outputSize - scaledWidth) / 2);
-        const y = Math.floor((outputSize - scaledHeight) / 2);
+        const x = Math.floor((outputSide - scaledWidth) / 2);
+        const y = Math.floor((outputSide - scaledHeight) / 2);
         context.drawImage(image, x, y, scaledWidth, scaledHeight);
       } else {
         const side = Math.min(width, height);
@@ -186,4 +209,8 @@ export function prepareGiftAvatar(file) {
 
 export function prepareGiftAvatarFrame(file) {
   return prepareImage(file, true);
+}
+
+export function prepareProfileArtwork(file, side) {
+  return prepareImage(file, true, true, side);
 }

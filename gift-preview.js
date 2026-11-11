@@ -437,7 +437,8 @@
   });
   stage.addEventListener('click',()=>{if(!state.image)pickFiles()});
   stage.addEventListener('keydown',event=>{if(event.target===stage&&!state.image&&!busy()&&['Enter',' '].includes(event.key)){event.preventDefault();pickFiles()}});
-  const active=()=>location.hash==='#gift-previews';
+  const profileProduction=$('#profileProduction');
+  const active=()=>location.hash==='#gift-previews'&&!profileProduction?.hidden;
   const appendFiles=files=>loadFiles(files,{replace:false});
   window.UploadPaste?.register({zone:stage,isActive:active,isBusy:busy,onFiles:appendFiles});
   document.addEventListener('dragover',event=>{if(active()&&Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();stage.classList.add('drag')}});
@@ -481,6 +482,7 @@
   $('#giftPreviewAlignVertical').addEventListener('click',()=>align('vertical'));
   $('#giftPreviewRemoveBackground').addEventListener('click',removeBackground);
   root.addEventListener('keydown',event=>{
+    if(profileProduction?.hidden)return;
     const editable=event.target?.closest?.('input:not([type="range"]),textarea,[contenteditable="true"]');
     if(!editable&&!busy()&&state.image&&(event.metaKey||event.ctrlKey)&&event.key.toLowerCase()==='z'){event.preventDefault();historyStep(event.shiftKey?'redo':'undo');return}
     if(!editable&&!busy()&&state.image&&state.tool!=='move'&&['[',']'].includes(event.key)){event.preventDefault();state.brush.size=Math.max(1,Math.min(100,state.brush.size+(event.key===']'?1:-1)*(event.shiftKey?10:1)));$('#giftPreviewBrushSize').value=state.brush.size;syncControls();return}

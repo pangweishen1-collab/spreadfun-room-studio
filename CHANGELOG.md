@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.18.13 - 2026-11-11
+
+- Rename Gift images to Preview images and add Device preview alongside the existing Production workspace.
+- Place and reorder medal and vehicle artwork on the profile preview. Empty slots show dimmed examples after artwork is added.
+- Export 400 × 400 medal or 200 × 200 vehicle WebP assets, and download the full 720 × 1613 WebP for review.
+
 ## 1.18.12 - 2026-11-11
 
 - VAP conversion uses the CPU packing path when WebGL runs in software. Fixed-profile exports verify the first decoded frame of the actual file.
