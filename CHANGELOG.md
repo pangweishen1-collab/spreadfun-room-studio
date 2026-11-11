@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.18.6 - 2026-11-11
+
+### VAP converter
+
+- Default to a 2 MB budget and retain the full-resolution alpha plane for recognized paired-alpha videos.
+- Preserve encoded H.264 frames when compatible paired-alpha inputs already fit the budget at 24 FPS and require no edits; otherwise use the regular conversion path.
+
 ## 1.18.5 - 2026-11-11
 
 ### VAP converter and room review
