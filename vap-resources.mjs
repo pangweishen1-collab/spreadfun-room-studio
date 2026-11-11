@@ -120,9 +120,42 @@ export function resourceFrame(resource,{width,height,sourceVapConfig,timestamp=0
 }
 function fade(y,height,mask){return mask?.enabled?smooth(mask.topStart,mask.topEnd,height===1?.5:y/(height-1))*(1-smooth(mask.bottomStart,mask.bottomEnd,height===1?.5:y/(height-1))):1;}
 
+function fixedResourceLayout(base,resources,sourceVapConfig){
+  const {aFrame,gap,videoW,videoH,alphaScale}=base;
+  const left=aFrame[0],top=aFrame[1]+aFrame[3]+gap;
+  const sizes=resources.map(r=>[r.id,...dimensions(r,base.w,base.h,sourceVapConfig)])
+    .sort((a,b)=>b[2]-a[2]||b[1]-a[1]);
+  const pack=scale=>{
+    const placements=[];
+    let x=left,y=top,rowHeight=0;
+    for(const [id,width,height] of sizes){
+      const w=Math.max(2,Math.ceil(width*scale)),h=Math.max(2,Math.ceil(height*scale));
+      if(w>videoW-left)return null;
+      if(x+w>videoW){x=left;y+=rowHeight+gap;rowHeight=0;}
+      if(y+h>videoH)return null;
+      placements.push([id,[x,y,w,h]]);
+      x+=w+gap;rowHeight=Math.max(rowHeight,h);
+    }
+    return Object.fromEntries(placements);
+  };
+  const full=pack(alphaScale);
+  if(full)return {...base,resourceMasks:full,resourceMaskScale:alphaScale};
+  // Scale only the mask textures when the fixed bay is full. Display sizes
+  // and positions are still written from the original resource geometry.
+  let low=0,high=alphaScale,resourceMasks=pack(0);
+  for(let pass=0;pass<12;pass++){
+    const scale=(low+high)/2,placements=pack(scale);
+    if(placements){low=scale;resourceMasks=placements;}
+    else high=scale;
+  }
+  if(!resourceMasks||!low)throw new RangeError('资源遮罩无法放入固定画布，请减小资源尺寸。');
+  return {...base,resourceMasks,resourceMaskScale:low};
+}
+
 /** Place independent masks below the base alpha, using its otherwise unused column first. */
-export function computeResourceLayout(base,resources,{sourceVapConfig}={}){
+export function computeResourceLayout(base,resources,{sourceVapConfig,fixedStandard=false}={}){
   if(!resources.length)return base;
+  if(fixedStandard)return fixedResourceLayout(base,resources,sourceVapConfig);
   const gap=base.gap||8,scale=base.alphaScale||.5;
   let x=base.w+gap,y=base.aFrame[1]+base.aFrame[3]+gap,rowHeight=0,bottom=base.videoH;
   let inColumn=base.orientation==='horizontal',limit=inColumn?base.videoW:base.videoW;

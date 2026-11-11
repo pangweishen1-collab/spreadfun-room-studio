@@ -63,6 +63,22 @@ const {pathToFileURL}=require('node:url');
   assert.equal(c.frame.length,48);assert.deepEqual(c.frame[0].obj[0].frame,[180,390,360,390]);assert.deepEqual(c.frame[24].obj[0].frame,[0,0,1,1],'inactive slots explicitly zero-mask instead of retaining stale SDK uniforms');
   assert.equal(c.funToolkit.resourceDefaults.userName,'你好');
   assert(!JSON.stringify(c).includes('blob:'));
+  const fixedResources=R.normalizeResources(Array.from({length:6},(_,i)=>({
+    ...text,id:`full-${i}`,tag:`tag${i+1}`,x:0,y:0,width:1,height:1,
+  })),{duration:2});
+  const fixedLayout=R.computeResourceLayout(base,fixedResources,{fixedStandard:true});
+  assert.deepEqual([fixedLayout.videoW,fixedLayout.videoH],[1088,1568]);
+  assert.ok(fixedLayout.resourceMaskScale>0&&fixedLayout.resourceMaskScale<.5);
+  const fixedConfig=P.makeVapc({packedLayout:fixedLayout,frames:48});
+  R.addResourceConfig(fixedConfig,{resources:fixedResources,layout:fixedLayout,fps:24,frames:48,duration:2});
+  assert.equal(P.validateVapc(fixedConfig),true);
+  const boxes=Object.values(fixedLayout.resourceMasks);
+  assert.equal(boxes.length,6);
+  assert.ok(boxes.every(([x,y,w,h])=>x>=728&&y>=788&&x+w<=1088&&y+h<=1568));
+  const overlaps=([x,y,w,h],[a,b,c,d])=>x<a+c&&a<x+w&&y<b+d&&b<y+h;
+  assert.ok(boxes.every((box,i)=>boxes.slice(i+1).every(other=>!overlaps(box,other))));
+  assert.deepEqual(fixedConfig.frame[0].obj.map(item=>item.frame),Array.from({length:6},()=>[0,0,720,1560]));
+  assert.deepEqual(R.computeResourceLayout(base,rs,{fixedStandard:true}).resourceMasks,layout.resourceMasks);
   function box(type,payload=new Uint8Array()){const b=new Uint8Array(8+payload.length),v=new DataView(b.buffer);v.setUint32(0,b.length);b.set([...type].map(x=>x.charCodeAt(0)),4);b.set(payload,8);return b;}
   const scanned=[];class TrackedBlob extends Blob{slice(start,end,...args){scanned.push([start,end]);return super.slice(start,end,...args);}}
   const json=new TextEncoder().encode(JSON.stringify(c)),source=new TrackedBlob([box('ftyp'),box('mdat',new Uint8Array(4*1024*1024)),box('vapc',json)]);

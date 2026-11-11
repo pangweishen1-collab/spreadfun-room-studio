@@ -15,6 +15,11 @@ const {pathToFileURL}=require('node:url');
   for(const [scale,packedW,a] of [[.5,1088,[728,0,360,780]],[1,1456,[728,0,720,1560]]]){
     const layout=computeVapLayout({width:720,height:1560,alphaScale:scale});assert.equal(layout.videoW,packedW);assert.equal(layout.videoH,1568);assert.deepEqual(layout.aFrame,a);
   }
+  const fixed=E.normalizeOptions({fixedStandard:true,width:1440,height:1920,alphaScale:1,fps:60,orientation:'vertical',gap:32});
+  assert.deepEqual([fixed.width,fixed.height,fixed.alphaScale,fixed.fps,fixed.orientation,fixed.gap],[720,1560,.5,24,'horizontal',8]);
+  const fixedPlan=E.planEncoding({...fixed,quality:'ultra'},{duration:.1});
+  assert.equal(fixedPlan.codec,'avc1.420028');assert.equal(fixedPlan.maxBitrate,20000000);
+  assert.deepEqual([fixedPlan.layout.videoW,fixedPlan.layout.videoH],[1088,1568]);
   const fixture=new Uint8Array(await fs.readFile(path.join(__dirname,'fixtures/vap-aac-source.mp4')));
   const config=makeVapc({width:256,height:256,alphaScale:.5,fps:24,frames:48});
   const appended=appendVapcBox(fixture,config);assert.deepEqual(extractVapcBox(appended),config);assert.equal(parseMp4TopLevelBoxes(appended).at(-1).type,'vapc');
@@ -164,7 +169,7 @@ const {pathToFileURL}=require('node:url');
     `);
     await fs.writeFile(path.join(temp,'vendor/mediabunny/mediabunny.mjs'),`const S=()=>globalThis.__vapEngineTest;
       export const MP4={};export class Quality{constructor(o){Object.assign(this,o)}}export class BlobSource{constructor(blob){this.blob=blob}}export class BufferSource{constructor(buffer){this.buffer=buffer}}
-      export class Input{constructor(o){this.probe=o.source instanceof BufferSource;this.source=o.source}canRead(){return true}getPrimaryVideoTrack(){const probe=this.probe;return {getDisplayWidth:()=>S().displayWidth||2,getDisplayHeight:()=>S().displayHeight||1,getCodedWidth:()=>{if(S().geometryError)throw Error('unknown geometry');return S().codedWidth||2},getCodedHeight:()=>1,getPixelAspectRatio:()=>S().sar||{num:1,den:1},getRotation:()=>S().rotation||0,getFlip:()=>!!S().flip,computeDuration:()=>S().videoDuration??S().duration??2/24,getFirstTimestamp:()=>0,computeFrameRateMetrics:()=>({bestGuessFrameRate:24}),getCodec:()=>probe?'avc':S().sourceCodec||'hevc',canDecode:()=>S().canDecode,hasHighDynamicRange:()=>false,probe}}getPrimaryAudioTrack(){return this.probe?null:{getCodec:()=>S().codec,computePacketStats:()=>({averageBitrate:80000}),getDecoderConfig:()=>({codec:'mp4a.40.2',sampleRate:48000,numberOfChannels:2,description:new Uint8Array([17,144])}),getNumberOfChannels:()=>2,getSampleRate:()=>48000,canDecode:()=>true}}computeDuration(){return S().duration||2/24}dispose(){S().inputDisposals=(S().inputDisposals||0)+1}}
+      export class Input{constructor(o){this.probe=o.source instanceof BufferSource;this.source=o.source}canRead(){return true}getPrimaryVideoTrack(){const probe=this.probe;return {getDecoderConfig:()=>({codec:probe?(S().actualMuxedCodec||S().lastVideoOptions.fullCodecString):S().sourceCodec}),getDisplayWidth:()=>probe?S().lastDimensions[0]:S().displayWidth||2,getDisplayHeight:()=>probe?S().lastDimensions[1]:S().displayHeight||1,getCodedWidth:()=>{if(S().geometryError)throw Error('unknown geometry');return probe?S().lastDimensions[0]:S().codedWidth||2},getCodedHeight:()=>probe?S().lastDimensions[1]:1,getPixelAspectRatio:()=>S().sar||{num:1,den:1},getRotation:()=>S().rotation||0,getFlip:()=>!!S().flip,computeDuration:()=>S().videoDuration??S().duration??2/24,getFirstTimestamp:()=>0,computeFrameRateMetrics:()=>({bestGuessFrameRate:24}),getCodec:()=>probe?'avc':S().sourceCodec||'hevc',canDecode:()=>S().canDecode,hasHighDynamicRange:()=>false,probe}}getPrimaryAudioTrack(){return this.probe?null:{getCodec:()=>S().codec,computePacketStats:()=>({averageBitrate:80000}),getDecoderConfig:()=>({codec:'mp4a.40.2',sampleRate:48000,numberOfChannels:2,description:new Uint8Array([17,144])}),getNumberOfChannels:()=>2,getSampleRate:()=>48000,canDecode:()=>true}}computeDuration(){return S().duration||2/24}dispose(){S().inputDisposals=(S().inputDisposals||0)+1}}
       export const canEncodeVideo=async(codec,options)=>{const query={codec,...options,quality:{...options.quality}};(S().supportQueries||=[]).push(query);return S().supportVideo?S().supportVideo(query):true},canEncodeAudio=async()=>S().canEncodeAudio!==false||S().fallbackRegistered&&S().fallbackCanEncode;
       export class BufferTarget{buffer=null}export class Mp4OutputFormat{}
       export class Output{constructor(o){this.target=o.target;this.sources=[];this.canceled=false}addVideoTrack(s){s.output=this;this.sources.push(s);this.video=s}addAudioTrack(s){s.output=this;this.sources.push(s)}async start(){}async finalize(){const real=!!this.video.options.onEncoderConfig,size=Math.max(24,Math.floor(real&&S().outputSizeForPlan?S().outputSizeForPlan(this.video.options):S().fixedOutputBytes||(S().mockOutputSize?this.video.options.quality.bitrate/20:24)));if(real)(S().finishedPasses||=[]).push({bitrate:this.video.options.quality.bitrate,codec:this.video.options.fullCodecString,bytes:size});const d=new Uint8Array(size),v=new DataView(d.buffer);['ftyp','moov','mdat'].forEach((t,i)=>{v.setUint32(i*8,i===2?size-16:8);for(let j=0;j<4;j++)d[i*8+4+j]=t.charCodeAt(j)});this.target.buffer=d.buffer;S().lastDimensions=[this.video.canvas.width,this.video.canvas.height]}async cancel(){this.canceled=true;S().canceled++}}
@@ -398,6 +403,15 @@ const {pathToFileURL}=require('node:url');
     }
     resetVideoLogs();s.supportVideo=()=>true;s.failProbeProfile=codec=>profile(codec)==='64';const probeFallback=await engine.convertVideo(file,{width:16,height:16});assert.equal(profile(probeFallback.report.codec),'4d','a failed real three-frame High probe falls back to Main');assert.ok(s.videoConfigs.some(config=>config.probe&&profile(config.fullCodecString)==='64'));delete s.failProbeProfile;
     resetVideoLogs();s.supportVideo=()=>false;await assert.rejects(engine.convertVideo(file,{width:16,height:16}),error=>error.code==='unsupported','no supported profile is an explicit failure');assert.equal(s.videoConfigs.filter(config=>!config.probe).length,0);delete s.supportVideo;
+    resetVideoLogs();
+    const standard=await engine.convertVideo(file,{fixedStandard:true,width:128,height:128,alphaScale:1,fps:30,keepAudio:false});
+    assert.deepEqual([standard.config.info.w,standard.config.info.h,standard.config.info.videoW,standard.config.info.videoH,standard.config.info.fps],[720,1560,1088,1568,24]);
+    assert.deepEqual(standard.config.info.aFrame,[728,0,360,780]);
+    assert.equal(standard.report.codec,'avc1.420028');
+    assert.ok(s.supportQueries.every(query=>query.fullCodecString==='avc1.420028'&&query.frameRate===24));
+    s.actualMuxedCodec='avc1.640028';
+    await assert.rejects(engine.convertVideo(file,{fixedStandard:true,keepAudio:false}),error=>error.code==='unsupported','fixed export rejects a browser that returns High despite a Baseline request');
+    delete s.actualMuxedCodec;
     // A smaller retry may expose different encoder support from the first
     // attempt. Select/probe its real bitrate again rather than reusing a codec.
     resetVideoLogs();s.mockOutputSize=true;s.supportVideo=query=>query.quality.bitrate>100000||profile(query.fullCodecString)!=='64';const retryReasons=[];

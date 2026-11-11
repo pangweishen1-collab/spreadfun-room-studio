@@ -1,5 +1,5 @@
 import {exposeAvcPadding} from './vap-avc-padding.mjs';
-import {appendVapcBox,makeVapc} from './vap-protocol.mjs?v=20261111-packed-alpha';
+import {appendVapcBox,isStandardVapCodec,makeVapc} from './vap-protocol.mjs?v=20261111-fixed-pack';
 
 // avc1 uses the parameter sets in avcC. A sample that carries its own
 // parameter sets could restore the old crop after the container is rewritten.
@@ -26,6 +26,7 @@ export async function copyPackedVideo(M,file,options,metadata,plan,signal){
     source.fps!==options.fps||source.aFrame[2]!==plan.layout.aFrame[2]||source.aFrame[3]!==plan.layout.aFrame[3]||
     !metadata.nativeOpaqueSource||(metadata.hasAudio&&options.keepAudio&&options.audioGain>0)||
     file.size>plan.byteLimit||typeof globalThis.VideoDecoder?.isConfigSupported!=='function')return null;
+  if(options.fixedStandard&&['rgbFrame','aFrame'].some(key=>source[key].some((value,index)=>value!==plan.layout[key][index])))return null;
 
   const started=performance.now();
   let input,output,verification;
@@ -35,6 +36,8 @@ export async function copyPackedVideo(M,file,options,metadata,plan,signal){
     if(!decoderConfig?.codec.startsWith('avc1.')||(decoderConfig.description?.[4]&3)!==3)return null;
     const padded=exposeAvcPadding(decoderConfig.description,source.videoW,source.videoH);
     if(!padded||padded.width>4096||padded.height>4096)return null;
+    if(options.fixedStandard&&(!isStandardVapCodec(decoderConfig.codec)||
+      padded.width!==plan.layout.videoW||padded.height!==plan.layout.videoH))return null;
     const decode={...decoderConfig,description:padded.description,codedWidth:padded.width,codedHeight:padded.height};
     if(!(await VideoDecoder.isConfigSupported(decode)).supported)return null;
 
@@ -50,6 +53,8 @@ export async function copyPackedVideo(M,file,options,metadata,plan,signal){
       seen[index]=1;packets.push(packet);
     }
     if(packets.length!==source.f||signal?.aborted)return null;
+    const bitrate=Math.round(packetBytes*8*source.fps/source.f);
+    if(options.fixedStandard&&bitrate>plan.maxBitrate)return null;
 
     const target=new M.BufferTarget();
     output=new M.Output({format:new M.Mp4OutputFormat({fastStart:'in-memory'}),target});
@@ -73,11 +78,13 @@ export async function copyPackedVideo(M,file,options,metadata,plan,signal){
     verification=new M.Input({source:new M.BlobSource(blob),formats:[M.MP4]});
     const remuxedTrack=await verification.getPrimaryVideoTrack();
     if(!remuxedTrack||await remuxedTrack.getDisplayWidth()!==padded.width||await remuxedTrack.getDisplayHeight()!==padded.height)return null;
+    if(options.fixedStandard&&(!isStandardVapCodec((await remuxedTrack.getDecoderConfig())?.codec)||
+      await remuxedTrack.getCodedWidth()!==padded.width||await remuxedTrack.getCodedHeight()!==padded.height))return null;
     const first=await new M.CanvasSink(remuxedTrack,{poolSize:1,width:2,height:2,fit:'fill'}).getCanvas(0);
     if(!first||signal?.aborted)return null;
     return {blob,config,layout,frames:source.f,
       audioMode:metadata.hasAudio?'muted':'none',actualCodec:decode.codec,requestedCodec:decode.codec,
-      bitrate:Math.round(packetBytes*8*source.fps/source.f),
+      bitrate,
       processingPath:'native-vap-copy',times:{wallMs:performance.now()-started}};
   }catch{
     // This is an optimization. Unsupported containers and decoder layouts

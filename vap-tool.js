@@ -71,17 +71,30 @@
   }
   let lang=typeof language!=='undefined'&&language==='en'?'en':'zh';
   const t=key=>(copy[lang]||copy.zh)[key]||key;
-  const state={active:false,file:null,meta:null,sourceUrl:null,inputMode:'video',sequenceTime:0,videoOffsetY:0,maskFile:null,sourceKind:'plain_mp4',detectedMethod:'opaque',detectedScreen:'auto',detectedBackground:null,adaptiveChroma:false,alphaScale:.5,outputRatio:720/1560,sizePreset:'default',view:'original',background:'room',loading:false,converting:false,packing:false,playing:false,revision:0,result:null,notice:null,errorTone:'error',progress:0,phase:'loading',previewError:false};
+  const state={active:false,file:null,meta:null,sourceUrl:null,inputMode:'video',sequenceTime:0,videoOffsetY:0,maskFile:null,sourceKind:'plain_mp4',detectedMethod:'opaque',detectedScreen:'auto',detectedBackground:null,adaptiveChroma:false,view:'original',background:'room',loading:false,converting:false,packing:false,playing:false,revision:0,result:null,notice:null,errorTone:'error',progress:0,phase:'loading',previewError:false};
   state.verticalMask=savedMask();state.giftFade={enabled:true,fadeIn:1,fadeOut:1};state.playerState='empty';state.sourceFrameReady=false;state.previewReady=false;
   let ordinaryEffects=null,colorPickView=null;
-  let manualOutputSize=false,manualAlphaScale=false;
   state.keyColor=null;state.pickingColor=false;
   const colorProbe=document.createElement('canvas');
   const defaultOutputBytes=2000000,maxOutputBytes=3000000;
-  const outputFps=24;
+  const outputWidth=720,outputHeight=1560,outputFps=24,outputAlphaScale=.5;
+  Object.assign(copy.zh,{
+    packedSize:'打包尺寸',downloadPreview:'下载 17AE 预览版',
+    previewCopyHint:'用于 17AE 播放检查。保留动画、声音和透明度，动态头像和文字显示底图。',
+    helpThree:'打包尺寸固定为 1088 × 1568，画面为 720 × 1560，Alpha 分辨率为 0.5。可调整目标体积。',
+    helpFour:'下载 VAP 资源可保留头像和文字标签。使用 17AE 检查动画时，下载 17AE 预览版。',
+    codecHint:'使用 H.264 Baseline 兼容编码。原音量 AAC 直接保留，调整音量时在本机重新编码声音。'
+  });
+  Object.assign(copy.en,{
+    packedSize:'Packed size',downloadPreview:'Download 17AE preview',
+    previewCopyHint:'For playback in 17AE. Preserves animation, audio and transparency with the base artwork.',
+    helpThree:'The packed size is fixed at 1088 × 1568, with a 720 × 1560 display area and 0.5 alpha resolution. You can change the file size limit.',
+    helpFour:'Download the VAP to keep avatar and text tags. Use the 17AE preview copy to check playback in 17AE.',
+    codecHint:'Uses H.264 Baseline for compatibility. AAC at source volume is copied. Volume adjustments re-encode audio on-device.'
+  });
   copy.zh.packedAlpha='已识别 Alpha 通道';
   copy.en.packedAlpha='Alpha channel detected';
-  $('Quality').value='ultra';$('Method').value='auto';$('Width').value='720';$('Height').value='1560';$('Target').value=String(defaultOutputBytes/1e6);$('Volume').value='60';$('VerticalMask').open=true;
+  $('Quality').value='ultra';$('Method').value='auto';$('Target').value=String(defaultOutputBytes/1e6);$('Volume').value='60';$('VerticalMask').open=true;
   let sequenceLoadController=null,sequenceStarted=0;
   const isSequence=()=>state.file?.kind==='image_sequence';
   Object.assign(copy.zh,{lightRecovery:'光效透明修复',lightRecoveryHint:'适合光圈、粒子等半透明特效；同色实体材质可关闭。'});
@@ -94,7 +107,7 @@
   let resourceModulePromise=null,resourcePreview=null,resourcePreviewRevision=-1;
   let giftFadeModulePromise=null;
   const getGiftFadeModule=()=>giftFadeModulePromise||(giftFadeModulePromise=import('./vap-gift-fade.mjs?v=20261029-gift-fade1').catch(error=>{giftFadeModulePromise=null;throw error}));
-  const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261102-release174').catch(error=>{resourceModulePromise=null;throw error}));
+  const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261111-standard-pack1').catch(error=>{resourceModulePromise=null;throw error}));
   const resourceEditor=window.VapResourceEditor?.create({root,stage,canvas,onChange(event={}){
     if(state.loading||state.converting||state.packing)return;
     if(event.reason==='interaction-start'){pause();return}
@@ -113,7 +126,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[],autoplaySource=null;
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261111-preserve3').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261111-standard-pack1').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
   function budgetCap(){return engineApi?.outputBudget(maxOutputBytes,state.meta||{},state.sourceVapConfig)??maxOutputBytes}
   function applyBudget(){
     const cap=budgetCap();$('Target').max=String(cap/1e6);
@@ -128,8 +141,8 @@
     return codes[error?.code]||fallback;
   }
   function options({preview=false}={}){
-    const width=Number($('Width').value),height=Number($('Height').value),fps=outputFps,target=Number($('Target').value);
-    if(!Number.isInteger(width)||!Number.isInteger(height)||width<16||height<16||width>2048||height>2048||!Number.isFinite(target)||target<.1||target>3)throw Object.assign(new Error('invalid export fields'),{code:'invalid'});
+    const width=outputWidth,height=outputHeight,fps=outputFps,target=Number($('Target').value);
+    if(!Number.isFinite(target)||target<.1||target>3)throw Object.assign(new Error('invalid export fields'),{code:'invalid'});
     const matteMethod=activeMethod(),sourceKind=matteMethod==='chroma_key'?'chroma_mp4':'plain_mp4';
     if(isSequence()&&state.file.frameCount/fps>120)throw Object.assign(new Error('sequence duration exceeds limit'),{code:'limits'});
     if(matteMethod==='manual_mask'&&!state.maskFile)throw Object.assign(new Error('mask required'),{uiKey:'errorMask'});
@@ -143,7 +156,7 @@
     const customColor=matteMethod==='chroma_key'&&$('Screen').value==='custom';
     if(customColor&&!validScreenBackground(state.keyColor))throw Object.assign(new Error('screen color required'),{code:'invalid'});
     const background=customColor?state.keyColor:matteMethod==='chroma_key'&&$('Screen').value==='auto'&&state.sourceKind==='chroma_mp4'?state.detectedBackground:null;
-    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,sourceVapCopyEligible:!!state.meta?.inferredVapConfig&&state.meta?.sourceDetection?.canPreserveRgb===true,rgbAlphaMode:resourceOptions.resourceMode==='dynamic'&&resourceOptions.resources.length?'premultiplied':$('RgbAlphaMode').value||'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(background?{background:background.slice()}:{}),adaptiveChroma:matteMethod==='chroma_key'&&state.adaptiveChroma&&($('Screen').value==='auto'||customColor),alphaScale:state.alphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:engineApi?.outputBudget(Math.round(target*1e6),state.meta||{},state.sourceVapConfig)??Math.round(target*1e6),quality:'ultra',optimizeSize:true,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
+    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,sourceVapCopyEligible:!!state.meta?.inferredVapConfig&&state.meta?.sourceDetection?.canPreserveRgb===true,rgbAlphaMode:resourceOptions.resourceMode==='dynamic'&&resourceOptions.resources.length?'premultiplied':$('RgbAlphaMode').value||'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(background?{background:background.slice()}:{}),adaptiveChroma:matteMethod==='chroma_key'&&state.adaptiveChroma&&($('Screen').value==='auto'||customColor),fixedStandard:true,alphaScale:outputAlphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:engineApi?.outputBudget(Math.round(target*1e6),state.meta||{},state.sourceVapConfig)??Math.round(target*1e6),quality:'ultra',optimizeSize:true,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
   }
   function stopColorPick(restore=true){
     if(!state.pickingColor)return;
@@ -282,12 +295,12 @@
   function sync(){
     if(state.pickingColor&&(busy()||!state.active||state.view!=='original'))stopColorPick(state.view==='original');
     let locked=busy();const ready=!!state.file,sequence=isSequence(),sequenceInput=state.inputMode==='sequence';
-    resourceEditor?.setContext({ready,busy:locked,width:Number($('Width').value)||720,height:Number($('Height').value)||1560,duration:state.meta?.duration||0,fps:outputFps,time:sourceTime(),view:state.view,language:lang});
+    resourceEditor?.setContext({ready,busy:locked,width:outputWidth,height:outputHeight,duration:state.meta?.duration||0,fps:outputFps,time:sourceTime(),view:state.view,language:lang});
     // A native avatar slot may start loading its default portrait during context sync.
     locked=busy();const valid=validOptions();if(locked)endVideoDrag();
     root.dataset.state=state.loading?'loading':state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'idle';
     root.setAttribute('aria-busy',String(locked));stage.setAttribute('aria-busy',String(locked));stage.classList.toggle('has-file',ready);stage.classList.toggle('upload-ready',!ready);
-    for(const id of ['Upload','Replace','Input','SequenceInput','InputVideo','InputSequence','Budget1','Budget2','Budget3','Method','Screen','MaskPick','MaskInput','Width','Height','Target','Quality','RgbAlphaMode','KeepAudio','Tolerance','Softness','Spill','LightRecovery','AlphaHalf','AlphaFull','SizeDefault','Size750'])$(id).disabled=locked;
+    for(const id of ['Upload','Replace','Input','SequenceInput','InputVideo','InputSequence','Budget1','Budget2','Budget3','Method','Screen','MaskPick','MaskInput','Target','Quality','RgbAlphaMode','KeepAudio','Tolerance','Softness','Spill','LightRecovery'])$(id).disabled=locked;
     for(const id of ['Play','Mute','Timeline','ViewOriginal','ViewTransparent','ViewAlpha'])$(id).disabled=locked||!ready||state.pickingColor;
     for(const [id] of previewBackgrounds)$('Bg'+id).disabled=locked;
     $('Empty').hidden=ready;$('Sourcebar').hidden=!ready;$('Playback').hidden=!ready;$('ViewToolbar').hidden=false;
@@ -318,9 +331,6 @@
     root.querySelector('[data-vap-i18n="opaque"]').textContent=t(state.verticalMask.enabled?'keepFrameMask':'opaque');
     $('Spill').closest('.vap-range-row').hidden=!chroma;
     $('MaskName').textContent=state.maskFile?neutralName(state.maskFile.name):t('noMask');
-    const sourceSizeAvailable=!!state.meta&&[state.meta.width,state.meta.height].every(n=>Number.isInteger(n)&&n>=16&&n<=2048);
-    $('SizeSource').disabled=locked||!sourceSizeAvailable;$('SizeSource').title=sourceSizeAvailable?'':t('sourceSizeUnavailable');$('SizeDefault').setAttribute('aria-pressed',String(state.sizePreset==='default'));$('Size750').setAttribute('aria-pressed',String(state.sizePreset==='750'));$('SizeSource').setAttribute('aria-pressed',String(state.sizePreset==='source'));root.querySelector('.vap-size-presets').setAttribute('aria-label',t('sizePresets'));
-    $('AlphaHalf').setAttribute('aria-pressed',String(state.alphaScale===.5));$('AlphaFull').setAttribute('aria-pressed',String(state.alphaScale===1));$('AlphaHint').textContent=t(state.alphaScale===.5?'alphaHalfHint':'alphaFullHint');
     for(const [id,value] of [['Original','original'],['Transparent','transparent'],['Alpha','alpha']])$('View'+id).setAttribute('aria-pressed',String(state.view===value));
     for(const [id,value] of previewBackgrounds)$('Bg'+id).setAttribute('aria-pressed',String(state.background===value));
     $('BgRoom').title=t('roomPreviewHint');
@@ -333,21 +343,20 @@
     if(ready){$('FileName').textContent=neutralName(state.file.name).replace(/\.sequence$/i,'');$('FileMeta').textContent=`${state.meta.width} × ${state.meta.height} px · ${sequence?state.file.frameCount+' '+t('frames')+' · ':''}${state.meta.duration.toFixed(2)} s · ${(state.file.size/1e6).toFixed(2)} MB · ${t(state.meta.hasAudio?'audioYes':'audioNo')}${state.meta.inferredVapConfig?' · '+t('packedAlpha'):''}`}
     $('Time').textContent=`${sourceTime().toFixed(2)} / ${(state.meta?.duration||0).toFixed(2)} s`;
     $('Timeline').max=String(state.meta?.duration||0);$('Timeline').value=String(Math.min(sourceTime(),state.meta?.duration||0));
-    const validSize=['Width','Height'].every(id=>{const n=Number($(id).value);return Number.isInteger(n)&&n>=16&&n<=2048});
-    for(const id of ['Width','Height'])$(id).setAttribute('aria-invalid',String(!validSize));$('SizeError').hidden=validSize;
     $('Convert').disabled=locked||!ready||!valid||state.pickingColor;$('Convert').textContent=t(state.converting?'converting':state.result?'convertAgain':'convert');$('Convert').setAttribute('aria-busy',String(state.converting));
     $('Convert').classList.toggle('vap-primary',!state.result);$('Convert').classList.toggle('vap-secondary',!!state.result);
     $('Cancel').hidden=!state.loading&&!state.converting;$('Cancel').disabled=state.packing;
     $('ProgressRow').hidden=!state.loading&&!state.converting;$('Phase').textContent=t(state.loading?'reading':state.phase);$('Percent').textContent=Math.round(state.progress*100)+'%';$('Progress').value=state.progress;
     $('Notice').hidden=!state.notice;$('Notice').textContent=state.notice?t(state.notice):'';$('Notice').dataset.tone=state.errorTone;
     $('PreviewError').hidden=!state.previewError;$('PreviewError').textContent=t('previewFailed');
-    $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareResultLabel').hidden=!state.result;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(Number($('Width').value)/Number($('Height').value)||720/1560));syncOutputPlaceholder();
-    for(const id of ['DownloadMp4','DownloadJson','DownloadZip'])$(id).disabled=locked||!state.result;
+    $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareResultLabel').hidden=!state.result;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(outputWidth/outputHeight));syncOutputPlaceholder();
+    for(const id of ['DownloadMp4','DownloadJson','DownloadZip','DownloadPreview'])$(id).disabled=locked||!state.result;
     $('ResultPlay').hidden=!state.result;$('ResultPlay').disabled=locked||!state.result||state.playerState!=='ready';$('DownloadMp4').title=t('vapPlaybackNotice');
+    $('DownloadPreview').hidden=state.result?.config?.info?.isVapx!==1;$('DownloadPreview').title=t('previewCopyHint');
     $('ResourceBundleHint').hidden=state.result?.config?.info?.isVapx!==1;$('ResourceBundleHint').textContent=t('resourceBundleHint');
     if(state.result){
       const {blob,config,report}=state.result,info=config.info;const seconds=Number(report.timings?.wallMs)/1000;
-      $('ResultMeta').textContent=`${info.w} × ${info.h} px · ${info.fps} FPS · Alpha ${state.alphaScale.toFixed(1)}${config.funToolkit?.rgbAlphaMode==='premultiplied'?' · '+t('rgbFeatherApplied'):''}${report.resourceCount?' · '+t(report.resourceMode==='dynamic'?'dynamicResources':'bakedResources')+' '+report.resourceCount:''}\n${(blob.size/1e6).toFixed(2)} MB · ${t(report.audioKept?'audioKept':state.meta.hasAudio?'audioMuted':'audioNone')}${report.audioKept&&Number.isFinite(report.audioGain)&&report.audioGain!==1?` · ${t('volume')} ${Math.round(report.audioGain*100)}%`:''}${Number.isFinite(seconds)?` · ${seconds.toFixed(2)} s`:''}`;
+      $('ResultMeta').textContent=`${info.videoW} × ${info.videoH} px · ${info.fps} FPS · Alpha ${outputAlphaScale.toFixed(1)}${config.funToolkit?.rgbAlphaMode==='premultiplied'?' · '+t('rgbFeatherApplied'):''}${report.resourceCount?' · '+t(report.resourceMode==='dynamic'?'dynamicResources':'bakedResources')+' '+report.resourceCount:''}\n${(blob.size/1e6).toFixed(2)} MB · ${t(report.audioKept?'audioKept':state.meta.hasAudio?'audioMuted':'audioNone')}${report.audioKept&&Number.isFinite(report.audioGain)&&report.audioGain!==1?` · ${t('volume')} ${Math.round(report.audioGain*100)}%`:''}${Number.isFinite(seconds)?` · ${seconds.toFixed(2)} s`:''}`;
       $('BudgetNotice').textContent=t(report.budgetExceeded?'overBudget':'withinBudget');
       $('BudgetNotice').hidden=!report.budgetExceeded;
     }
@@ -488,7 +497,7 @@
       const engine=await getEngine();
       let sourceVapConfig=null;
       if(file instanceof Blob){
-        const protocol=await import('./vap-protocol.mjs?v=20261111-packed-alpha');
+        const protocol=await import('./vap-protocol.mjs?v=20261111-standard-pack1');
         try{sourceVapConfig=await protocol.readSourceVapConfig(file)}catch(error){throw Object.assign(error,{uiKey:'errorVapSource'})}
       }
       let meta={...browserMeta,...await engine.inspectVideo(file,{detectSource:!sourceVapConfig,sourceVapConfig})};
@@ -508,8 +517,6 @@
       state.detectedBackground=state.sourceKind==='chroma_mp4'&&validScreenBackground(detected.background)?detected.background.slice():null;
       state.adaptiveChroma=state.sourceKind==='chroma_mp4'&&detected.backgroundVariation===true;
       $('Screen').value='auto';$('Method').value='auto';
-      applySourceDefaults();
-      if(state.sizePreset==='source'&&(Number($('Width').value)!==meta.width||Number($('Height').value)!==meta.height))state.sizePreset='custom';
       state.view=sourceVapConfig||state.verticalMask.enabled||state.giftFade.enabled?'transparent':'original';if(state.verticalMask.enabled)$('VerticalMask').open=true;
       sourceNonce++;autoplaySource={nonce:sourceNonce,file};state.sourceFrameReady=false;state.previewReady=false;cancelSourceFrameWait();sync();
       video.src=state.sourceUrl;video.muted=true;video.load();waitForSourceFrame();$('DownloadReceipt').hidden=true;
@@ -529,8 +536,6 @@
       commitSourceEffects(false);state.keyColor=null;state.file=sequence;state.meta=meta;state.inputMode='sequence';state.sourceUrl=null;state.sequenceTime=0;state.sourceVapConfig=null;state.sourceKind='plain_mp4';state.detectedMethod='opaque';state.detectedScreen='auto';state.detectedBackground=null;state.adaptiveChroma=false;applyBudget();state.revision++;state.previewError=false;state.notice=null;
       resourceEditor?.setSource(null);$('Screen').value='auto';$('Method').value='auto';video.pause();video.removeAttribute('src');video.load();video.muted=true;
       autoplaySource={nonce:sourceNonce,file:sequence};state.view='transparent';state.sourceFrameReady=true;state.previewReady=false;$('DownloadReceipt').hidden=true;
-      applySourceDefaults();
-      if(state.sizePreset==='source'){if([sequence.width,sequence.height].every(n=>n>=16&&n<=2048)){$('Width').value=String(sequence.width);$('Height').value=String(sequence.height);state.outputRatio=sequence.width/sequence.height}else state.sizePreset='custom'}
       if(old)URL.revokeObjectURL(old);
     }catch(error){if(version===loadVersion){root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':'sequenceError';state.errorTone=job.signal.aborted?'info':'error'}}
     finally{if(sequenceLoadController===job)sequenceLoadController=null;if(version===loadVersion){state.loading=false;sync();requestPreview()}}
@@ -579,6 +584,13 @@
     try{
       const {blob,config}=state.result;
       if(kind==='mp4')triggerDownload(blob,filename()+'.mp4');
+      else if(kind==='preview'){
+        if(config.info.isVapx!==1)return;
+        state.packing=true;sync();
+        const {makeVapPreviewCopy}=await import('./vap-protocol.mjs?v=20261111-standard-pack1');
+        const bytes=makeVapPreviewCopy(new Uint8Array(await blob.arrayBuffer()));
+        triggerDownload(new Blob([bytes],{type:'video/mp4'}),filename()+'_17AE.mp4');
+      }
       else if(kind==='json')triggerDownload(new Blob([JSON.stringify(config,null,2)],{type:'application/json'}),'vapc.json');
       else{
         state.packing=true;sync();const Zip=await loadZip();const zip=new Zip();zip.file(filename()+'.mp4',blob);zip.file('vapc.json',JSON.stringify(config));
@@ -633,34 +645,6 @@
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.pickingColor){event.preventDefault();cancelColorPick()}});
   $('Target').addEventListener('change',()=>{if(busy())return;const amount=Number($('Target').value);if(Number.isFinite(amount)&&amount>=.1&&amount<=3){requestedTargetBytes=Math.round(amount*1e6);applyBudget()}invalidate()});
   for(const id of ['Tolerance','Softness','Spill'])$(id).addEventListener('input',invalidate);
-  for(const [id,other] of [['Width','Height'],['Height','Width']])$(id).addEventListener('input',()=>{
-    if(busy())return;const value=Number($(id).value);manualOutputSize=true;state.sizePreset='custom';if(Number.isInteger(value)&&value>=16&&value<=2048){const ratio=state.outputRatio;$(other).value=String(Math.round(id==='Width'?value/ratio:value*ratio))}updateAutomaticAlpha();invalidate();
-  });
-  function validOutputSize(width,height){return [width,height].every(n=>Number.isInteger(n)&&n>=16&&n<=2048)}
-  function setOutputSize(width,height,preset){
-    state.outputRatio=width/height;state.sizePreset=preset;$('Width').value=String(width);$('Height').value=String(height);
-  }
-  function updateAutomaticAlpha(){
-    if(manualAlphaScale)return;
-    // Two full-size planes and the 8 px gap must fit the 4096 px packed width.
-    state.alphaScale=state.meta?.inferredVapConfig&&Number($('Width').value)<=2040?1:.5;
-  }
-  function applySourceDefaults(){
-    const {width,height,inferredVapConfig}=state.meta;
-    if(!manualOutputSize){
-      if(inferredVapConfig&&validOutputSize(width,height))setOutputSize(width,height,'source');
-      else setOutputSize(720,1560,'default');
-    }
-    updateAutomaticAlpha();
-  }
-  function chooseSize(width,height,preset){
-    if(busy()||!validOutputSize(width,height))return;
-    const same=Number($('Width').value)===width&&Number($('Height').value)===height;
-    manualOutputSize=true;setOutputSize(width,height,preset);updateAutomaticAlpha();
-    if(same)sync();else invalidate();
-  }
-  $('SizeDefault').addEventListener('click',()=>chooseSize(720,1560,'default'));$('Size750').addEventListener('click',()=>chooseSize(750,1624,'750'));$('SizeSource').addEventListener('click',()=>{if(state.meta)chooseSize(state.meta.width,state.meta.height,'source')});
-  for(const [id,scale] of [['AlphaHalf',.5],['AlphaFull',1]])$(id).addEventListener('click',()=>{if(busy())return;manualAlphaScale=true;state.alphaScale=scale;invalidate()});
   for(const [id,view] of [['ViewOriginal','original'],['ViewTransparent','transparent'],['ViewAlpha','alpha']])$(id).addEventListener('click',()=>{if(busy())return;state.view=view;state.previewError=false;sync();requestPreview()});
   for(const [id,bg] of previewBackgrounds)$('Bg'+id).addEventListener('click',()=>{if(busy())return;state.background=bg;sync()});
   $('Play').addEventListener('click',togglePlay);$('Mute').addEventListener('click',async()=>{video.muted=!video.muted;try{if(!video.muted)await preparePreviewAudio()}catch(error){video.muted=true;showNotice('previewAudioError')}sync()});
@@ -689,11 +673,11 @@
   });
   stage.addEventListener('pointermove',event=>{if(!videoDrag||event.pointerId!==videoDrag.id)return;setVideoOffsetY(videoDrag.offset+(event.clientY-videoDrag.y)/videoDrag.height);event.preventDefault()});
   stage.addEventListener('pointerup',endVideoDrag);stage.addEventListener('pointercancel',endVideoDrag);stage.addEventListener('lostpointercapture',endVideoDrag);
-  stage.addEventListener('keydown',event=>{if(state.pickingColor)return;if(busy()||!state.file||![stage,canvas,video].includes(event.target)||event.altKey||event.ctrlKey||event.metaKey)return;if(event.key==='Escape'){endVideoDrag();return}if(!['ArrowUp','ArrowDown'].includes(event.key))return;const step=(event.shiftKey?10:1)/Number($('Height').value);setVideoOffsetY(state.videoOffsetY+(event.key==='ArrowUp'?-step:step));event.preventDefault();event.stopPropagation?.()});
+  stage.addEventListener('keydown',event=>{if(state.pickingColor)return;if(busy()||!state.file||![stage,canvas,video].includes(event.target)||event.altKey||event.ctrlKey||event.metaKey)return;if(event.key==='Escape'){endVideoDrag();return}if(!['ArrowUp','ArrowDown'].includes(event.key))return;const step=(event.shiftKey?10:1)/outputHeight;setVideoOffsetY(state.videoOffsetY+(event.key==='ArrowUp'?-step:step));event.preventDefault();event.stopPropagation?.()});
   $('VerticalMask').addEventListener('toggle',()=>{syncMaskControls();if($('VerticalMask').open&&state.verticalMask.enabled)requestPreview()});
   if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(positionMaskOverlay);observer.observe(canvas);observer.observe(stage)}else window.addEventListener('resize',positionMaskOverlay);
   $('Convert').addEventListener('click',convert);$('Cancel').addEventListener('click',cancel);
-  for(const [id,kind] of [['DownloadMp4','mp4'],['DownloadJson','json'],['DownloadZip','zip']])$(id).addEventListener('click',()=>download(kind));
+  for(const [id,kind] of [['DownloadMp4','mp4'],['DownloadJson','json'],['DownloadZip','zip'],['DownloadPreview','preview']])$(id).addEventListener('click',()=>download(kind));
   $('Help').addEventListener('click',()=>$('HelpDialog').showModal());$('HelpClose').addEventListener('click',()=>$('HelpDialog').close());$('HelpDialog').addEventListener('click',event=>{if(event.target===$('HelpDialog')){const r=$('HelpDialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('HelpDialog').close()}});
   document.addEventListener('dragover',event=>{if(state.active&&Array.from(event.dataTransfer?.types||[]).includes('Files')){event.preventDefault();stage.classList.add('is-dragging')}});
   document.addEventListener('dragleave',event=>{if(!event.relatedTarget)stage.classList.remove('is-dragging')});

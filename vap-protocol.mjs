@@ -8,6 +8,8 @@
 
 const utf8Encoder = new TextEncoder();
 const utf8Decoder = new TextDecoder('utf-8', { fatal: true });
+export const VAP_STANDARD = Object.freeze({width:720,height:1560,alphaScale:.5,fps:24,videoW:1088,videoH:1568});
+export const isStandardVapCodec = codec => typeof codec === 'string' && /^avc1\.42[0-9a-f]{2}28$/i.test(codec);
 const REQUIRED_INFO_FIELDS = [
   'v', 'f', 'w', 'h', 'fps', 'videoW', 'videoH',
   'aFrame', 'rgbFrame', 'isVapx', 'orien',
@@ -208,6 +210,17 @@ export function extractVapcBox(mp4Bytes) {
   const config = JSON.parse(utf8Decoder.decode(payload));
   validateVapc(config);
   return config;
+}
+
+/** Generate a base VAP for players that only support RGB and alpha playback. */
+export function makeVapPreviewCopy(mp4Bytes) {
+  const config = extractVapcBox(mp4Bytes);
+  const finalBox = parseMp4TopLevelBoxes(mp4Bytes).at(-1);
+  // Toolkit exports append vapc after the media. Keep all MP4 offsets intact.
+  if (finalBox.type !== 'vapc') throw new Error('expected a final vapc box');
+  return appendVapcBox(mp4Bytes.subarray(0, finalBox.offset), {
+    info: {...config.info, isVapx: 0},
+  });
 }
 
 /** Inspect only MP4 atom headers and the bounded vapc payload, not video bytes. */

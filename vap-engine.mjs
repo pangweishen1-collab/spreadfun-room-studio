@@ -1,12 +1,13 @@
 import {createNativeVapPlanes} from './vap-native-planes.mjs?v=20261102-native-gpu3';
 import {createQualitySampler,evaluateQualitySamples} from './vap-quality.mjs?v=20261101-smart-ultra3';
-import {computeVapLayout, makeVapc, appendVapcBox, extractVapcBox, validateVapc} from './vap-protocol.mjs?v=20261111-packed-alpha';
+import {VAP_STANDARD, isStandardVapCodec, computeVapLayout, makeVapc, appendVapcBox, extractVapcBox, validateVapc} from './vap-protocol.mjs?v=20261111-fixed-pack';
+export {VAP_STANDARD};
 import {detectPackedAlpha, detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261111-preserve3';
 import {inspectImageSequence, sequenceMetadata, decodeSequenceFrame} from './vap-sequence.mjs?v=20261029-sequence-speed1';
 export {inspectImageSequence, sequenceMetadata, decodeSequenceFrame};
-import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261102-release174';
+import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261111-fixed-pack';
 import {normalizeGiftFade, giftFadeOpacity, applyGiftFade} from './vap-gift-fade.mjs?v=20261029-gift-fade1';
-import {copyPackedVideo} from './vap-copy-packets.mjs?v=20261111-preserve3';
+import {copyPackedVideo} from './vap-copy-packets.mjs?v=20261111-fixed-pack';
 
 export const LIMITS = Object.freeze({fileBytes:200*1024*1024,outputBytes:3000000,durationSeconds:120,sourceMaxSide:4096,outputMinSide:16,outputMaxSide:2048,fps:60,packedMaxSide:4096});
 export class VapError extends Error {
@@ -55,8 +56,22 @@ export function outputBudget(requestedBytes=LIMITS.outputBytes,metadata={},sourc
   return Math.min(requestedBytes,short?defaultOutputBytes:LIMITS.outputBytes);
 }
 
+function outputOptions(options){
+  if(options.fixedStandard!==true)return options;
+  const {width,height,alphaScale,fps}=VAP_STANDARD;
+  return {...options,width,height,alphaScale,fps,orientation:'horizontal',gap:8};
+}
+
+function outputLayout(options){
+  const base=computeVapLayout(options);
+  return options.resourceMode==='dynamic'
+    ? computeResourceLayout(base,options.resources||[],{sourceVapConfig:options.sourceVapConfig,fixedStandard:options.fixedStandard})
+    : base;
+}
+
 export function normalizeOptions(options={},metadata={}){
-  const o={sourceKind:'plain_mp4',matteMethod:'black_luma',screenColor:'auto',alphaScale:.5,width:720,height:1560,fps:24,targetBytes:defaultOutputBytes,quality:'balanced',optimizeSize:false,rgbAlphaMode:'straight',keepAudio:true,audioGain:1,confirmedOpaque:false,lightRecovery:false,adaptiveChroma:false,videoOffsetY:0,...options};
+  const o=outputOptions({sourceKind:'plain_mp4',matteMethod:'black_luma',screenColor:'auto',alphaScale:.5,width:720,height:1560,fps:24,targetBytes:defaultOutputBytes,quality:'balanced',optimizeSize:false,rgbAlphaMode:'straight',keepAudio:true,audioGain:1,confirmedOpaque:false,lightRecovery:false,adaptiveChroma:false,videoOffsetY:0,...options});
+  if(o.fixedStandard!==undefined&&typeof o.fixedStandard!=='boolean')throw new VapError('invalid','输出规格设置无效。');
   if(typeof o.optimizeSize!=='boolean')throw new VapError('invalid','体积优化设置无效。');
   if(!finite(o.videoOffsetY)||o.videoOffsetY< -1||o.videoOffsetY>1)throw new VapError('invalid','视频位置须在画布高度的 -100%–100% 内。');
   try{o.giftFade=normalizeGiftFade(o.giftFade===undefined&&o.sourceVapConfig?{enabled:false}:o.giftFade)}catch(error){throw new VapError('invalid',error.message,error)}
@@ -101,7 +116,7 @@ export function normalizeOptions(options={},metadata={}){
   catch(error){throw new VapError('invalid',error.message,error)}
   // Tencent's native mix shader accumulates premultiplied resource colors.
   if(o.resources.length&&o.resourceMode==='dynamic')o.rgbAlphaMode='premultiplied';
-  const layout=o.resourceMode==='dynamic'?computeResourceLayout(computeVapLayout(o),o.resources,{sourceVapConfig:o.sourceVapConfig}):computeVapLayout(o);
+  const layout=outputLayout(o);
   if(Math.max(layout.videoW,layout.videoH)>4096)throw new VapError('limits','打包后的视频尺寸过大，请降低输出尺寸。');
   if(metadata.duration&&(!finite(metadata.duration)||metadata.duration>120))throw new VapError('limits','视频最长支持 120 秒，请先截取所需片段。');
   return o;
@@ -120,7 +135,8 @@ export function avcCodec(width,height,fps,bitrate,profile='baseline'){
 }
 
 export function planEncoding(options,metadata){
-  const layout=options.resourceMode==='dynamic'?computeResourceLayout(computeVapLayout(options),options.resources||[],{sourceVapConfig:options.sourceVapConfig}):computeVapLayout(options),audioRate=options.keepAudio&&options.audioGain!==0&&metadata.hasAudio?(options.audioGain!==1?128000:metadata.audioBitrate||80000):0;
+  options=outputOptions(options);
+  const layout=outputLayout(options),audioRate=options.keepAudio&&options.audioGain!==0&&metadata.hasAudio?(options.audioGain!==1?128000:metadata.audioBitrate||80000):0;
   const duration=effectiveVideoDuration(metadata,options.sourceVapConfig);
   let resourceConfigBytes=0;
   if(options.resources?.length&&options.resourceMode==='dynamic'){
@@ -139,10 +155,12 @@ export function planEncoding(options,metadata){
   let bitrate=options.quality==='ultra'?Math.max(preferred,Math.round(pixels*.25)):
     options.quality==='quality'?Math.max(preferred,Math.round(pixels*.15)):
     options.quality==='size'?Math.max(150000,Math.min(preferred,budget)):Math.max(floor,Math.min(preferred,budget));
-  bitrate=Math.min(options.quality==='ultra'?32000000:24000000,bitrate);
+  // AVC Baseline Level 4.0 permits at most 20 Mbps. Preserve that level on short clips too.
+  const maxBitrate=options.fixedStandard?20000000:options.quality==='ultra'?32000000:24000000;
+  bitrate=Math.min(maxBitrate,bitrate);
   const qualityBudgetLimited=bitrate>budget;
   bitrate=Math.max(32000,Math.min(bitrate,budget));
-  return {layout,bitrate,byteLimit,audioRate,resourceConfigBytes,budgetBitrate:budget,qualityBudgetLimited,maxBitrate:options.quality==='ultra'?32000000:24000000,codec:avcCodec(layout.videoW,layout.videoH,options.fps,bitrate)};
+  return {layout,bitrate,byteLimit,audioRate,resourceConfigBytes,budgetBitrate:budget,qualityBudgetLimited,maxBitrate,fixedStandard:options.fixedStandard===true,codec:avcCodec(layout.videoW,layout.videoH,options.fps,bitrate)};
 }
 
 function canvas(width,height,{readback=true}={}){
@@ -270,13 +288,13 @@ export async function inspectVideo(file,{detectSource=false,sourceVapConfig,vide
 }
 
 export async function probeSupport(options={}){
-  const o=normalizeOptions(options),layout=o.resourceMode==='dynamic'?computeResourceLayout(computeVapLayout(o),o.resources,{sourceVapConfig:o.sourceVapConfig}):computeVapLayout(o);
+  const o=normalizeOptions(options),layout=outputLayout(o);
   const result={secureContext:globalThis.isSecureContext===true,webCodecsEncode:typeof VideoEncoder==='function',webCodecsDecode:typeof VideoDecoder==='function',canEncodeAvc:false,canEncodeAac:false,webGpu:!!globalThis.navigator?.gpu,webGl2:false,limits:LIMITS};
   try{const c=typeof OffscreenCanvas==='function'?new OffscreenCanvas(1,1):document.createElement('canvas');result.webGl2=!!c.getContext('webgl2');}catch(ignored){}
   if(result.webCodecsEncode)try{
     const M=await media();
     [result.canEncodeAvc,result.canEncodeAac]=await Promise.all([
-      (async()=>{for(const profile of ['high','main','baseline'])if(await M.canEncodeVideo('avc',{width:layout.videoW,height:layout.videoH,frameRate:o.fps,...videoEncodingSettings(M,{codec:avcCodec(layout.videoW,layout.videoH,o.fps,2000000,profile),bitrate:2000000})}))return true;return false})(),
+      (async()=>{for(const profile of avcProfiles(o.fixedStandard))if(await M.canEncodeVideo('avc',{width:layout.videoW,height:layout.videoH,frameRate:o.fps,...videoEncodingSettings(M,{codec:avcCodec(layout.videoW,layout.videoH,o.fps,2000000,profile),bitrate:2000000})}))return true;return false})(),
       M.canEncodeAudio('aac',{numberOfChannels:2,sampleRate:48000,quality:new M.Quality({bitrate:80000})})
     ]);
   }catch(ignored){}
@@ -300,6 +318,20 @@ export function splitPlanes(rgba,width,height,rgb,alpha,rgbAlphaMode='straight')
   return {rgb,alpha};
 }
 
+const avcProfiles = fixedStandard => fixedStandard ? ['baseline'] : ['high','main','baseline'];
+
+async function verifyStandardTrack(track){
+  if(!track)throw new VapError('encode','成品没有符合固定规格的视频轨。');
+  const [config,width,height,codedWidth,codedHeight]=await Promise.all([
+    track.getDecoderConfig(),track.getDisplayWidth(),track.getDisplayHeight(),track.getCodedWidth(),track.getCodedHeight(),
+  ]);
+  if(!isStandardVapCodec(config?.codec)||width!==VAP_STANDARD.videoW||height!==VAP_STANDARD.videoH||
+    codedWidth!==width||codedHeight!==height){
+    throw new VapError('encode','编码器未输出 1088 × 1568 的 H.264 Baseline 视频，请使用最新版 Chrome／Edge 重试。');
+  }
+  return config.codec;
+}
+
 async function encodingProbe(M,plan,fps,signal){
   cancelled(signal);const surface=canvas(plan.layout.videoW,plan.layout.videoH);
   surface.ctx.fillStyle='#000';surface.ctx.fillRect(0,0,surface.canvas.width,surface.canvas.height);
@@ -309,7 +341,9 @@ async function encodingProbe(M,plan,fps,signal){
   try{
     await output.start();for(let i=0;i<3;i++){cancelled(signal);await source.add(i/fps,1/fps,{keyFrame:i===0})}source.close();await output.finalize();
     input=new M.Input({source:new M.BufferSource(target.buffer),formats:[M.MP4]});
-    const track=await input.getPrimaryVideoTrack(),decoded=track?await new M.CanvasSink(track,{poolSize:1}).getCanvas(0):null;
+    const track=await input.getPrimaryVideoTrack();
+    if(plan.fixedStandard)await verifyStandardTrack(track);
+    const decoded=track?await new M.CanvasSink(track,{poolSize:1}).getCanvas(0):null;
     if(!decoded||decoded.canvas.width!==plan.layout.videoW||decoded.canvas.height!==plan.layout.videoH)throw new Error('Encoded probe could not be decoded');
   }catch(error){await output.cancel().catch(()=>{});if(error instanceof VapError)throw error;throw new VapError('encode','H.264 编码探针未通过，请降低尺寸或使用最新版 Chrome／Edge。',error)}
   finally{input?.dispose();surface.canvas.width=surface.canvas.height=1;}
@@ -317,7 +351,7 @@ async function encodingProbe(M,plan,fps,signal){
 
 async function selectEncodingPlan(M,plan,fps,signal){
   let lastError;
-  for(const profile of ['high','main','baseline']){
+  for(const profile of avcProfiles(plan.fixedStandard)){
     cancelled(signal);
     const candidate={...plan,codec:avcCodec(plan.layout.videoW,plan.layout.videoH,fps,plan.bitrate,profile),profile};
     try{
@@ -325,7 +359,10 @@ async function selectEncodingPlan(M,plan,fps,signal){
       await encodingProbe(M,candidate,fps,signal);return candidate;
     }catch(error){if(signal?.aborted||error?.code==='cancelled')throw error;lastError=error}
   }
-  throw new VapError('unsupported','当前浏览器无法可靠编码此 H.264 尺寸与码率，请降低参数后重试。',lastError);
+  const message=plan.fixedStandard
+    ? '当前浏览器无法可靠编码固定规格的 H.264 Baseline，请使用最新版 Chrome／Edge 重试。'
+    : '当前浏览器无法可靠编码此 H.264 尺寸与码率，请降低参数后重试。';
+  throw new VapError('unsupported',message,lastError);
 }
 
 // The source already carries alpha. Canvas source-in extracts that alpha as a
@@ -585,6 +622,11 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
     const failure=results.find(result=>result.status==='rejected');if(failure)throw failed||failure.reason;cancelled(signal);
     progress({phase:'packaging',progress:totalPasses===1?.97:.05+.90*pass/totalPasses,frame:frameCount,totalFrames:frameCount,pass});
     let t=clock();await output.finalize();times.muxMs=clock()-t;
+    if(o.fixedStandard){
+      const verification=new M.Input({source:new M.BufferSource(target.buffer),formats:[M.MP4]});
+      try{actualCodec=await verifyStandardTrack(await verification.getPrimaryVideoTrack());}
+      finally{verification.dispose();}
+    }
     const config=makeVapc({width:o.width,height:o.height,fps:o.fps,frames:frameCount,alphaScale:o.alphaScale,packedLayout:plan.layout});
     config.funToolkit={exportRevision:'rgb-feather-v1',rgbAlphaMode:o.rgbAlphaMode,verticalMask:{...o.verticalMask},videoOffsetY:o.videoOffsetY,giftFade:{...o.giftFade}};
     if(o.adaptiveChroma&&o.matteMethod==='chroma_key')config.funToolkit.adaptiveChroma=true;
@@ -599,6 +641,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
 }
 
 export async function convertVideo(file,options={}, {signal,onProgress=()=>{},onPreview}={}){
+  options=outputOptions(options);
   const started=clock();cancelled(signal);let last=0;
   const progress=event=>{const next=Math.max(last,Math.min(1,event.progress));last=next;onProgress({...event,progress:next})};
   progress({phase:'loading',progress:0});const sequence=file?.kind==='image_sequence',info=sequence?sequenceMetadata(file,options.fps??24):await inspectVideo(file,{sourceVapConfig:options.sourceVapConfig});cancelled(signal);const analysisMs=clock()-started;
@@ -648,6 +691,7 @@ export async function convertVideo(file,options={}, {signal,onProgress=()=>{},on
   if(layout.legacyDimensionWarning)warnings.push('legacy-size');
   if(['black_luma','white_luma'].includes(o.matteMethod))warnings.push('luma-may-remove-subject');if(o.matteMethod==='opaque'&&!sequence&&!o.sourceVapConfig)warnings.push('opaque');if(o.matteMethod==='ai_foreground')warnings.push('ai-person-only');if(selected.audioMode==='transcoded')warnings.push('audio-transcoded');if(o.quality==='size'&&!copied)warnings.push('size-priority-loss');
   const report={valid:true,version:2,transparentRGB:copied?'source':'black',rgbAlphaMode:o.rgbAlphaMode,giftFade:{...o.giftFade},resourceMode:o.resourceMode,resourceCount:o.resources.length,sourceVap:!!o.sourceVapConfig,inputKind:sequence?'image_sequence':'mp4',quality:o.quality,optimizeSize:o.optimizeSize,qualityCheck,adaptiveChroma:o.adaptiveChroma&&o.matteMethod==='chroma_key',lightRecovery:o.lightRecovery&&o.matteMethod==='chroma_key',qualityBudgetLimited:!copied&&plan.qualityBudgetLimited,frames:selected.frames,fps:o.fps,width:o.width,height:o.height,packedWidth:layout.videoW,packedHeight:layout.videoH,alphaScale:o.alphaScale,bytes:selected.blob.size,targetBytes:o.targetBytes,maxBytes:LIMITS.outputBytes,budgetExceeded:false,durationSeconds:effectiveVideoDuration(info,o.sourceVapConfig),audioKept:selected.audioMode==='copied'||selected.audioMode==='transcoded',audioCodec:info.hasAudio&&o.keepAudio&&o.audioGain>0?'aac':null,audioMode:selected.audioMode,audioGain:o.audioGain,bitrate:selected.bitrate,codec:selected.actualCodec,requestedCodec:selected.requestedCodec,codecProfile:({64:'high','4d':'main',42:'baseline'}[selected.actualCodec?.slice(5,7)]||'unknown'),qualityPasses,attempts,processingPath:selected.processingPath,nativeGpuFallback:selected.nativeGpuFallback,matteWorkerCount:selected.matteWorkerCount,sequenceDecodeSlots:selected.sequenceDecodeSlots,nativeOpaqueFallback:selected.nativeOpaqueFallback,timings:{...timings,analysisMs,probeMs,qualityCheckMs,wallMs:clock()-started},timingNotes:{decodeMs:'Wait for the next decoded frame; sequence prefetch overlaps future decoding with current drawing/encoding, so this is stall time rather than aggregate decode work.',packMs:'Elapsed Canvas calls/submission, not a GPU timer.',matteMs:'CPU processing elapsed, or main-thread readback plus ordered worker wait; workerMs is parallel aggregate work and is not additive wall time. Null for native paths without preview processing.',previewMs:'Null when no preview callback was called; callback elapsed only.'},warnings};
+  if(layout.resourceMaskScale!==undefined)report.resourceMaskScale=layout.resourceMaskScale;
   progress({phase:'packaging',progress:1,frame:selected.frames,totalFrames:selected.frames});
   return {blob:selected.blob,config:selected.config,report};
 }

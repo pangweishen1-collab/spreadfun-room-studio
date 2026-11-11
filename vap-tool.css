@@ -100,7 +100,6 @@
 #vapTool .vap-disclosure summary{display:flex;align-items:center;gap:12px;list-style:none;min-height:var(--tool-disclosure-height,44px);color:var(--tool-heading);font-size:14px;line-height:20px;font-weight:500;cursor:pointer}
 #vapTool .vap-disclosure summary::-webkit-details-marker{display:none}
 #vapTool #vapAlphaPanel{margin-top:var(--tool-disclosure-gap,4px);padding-top:0;border-top:0}
-#vapTool #vapAlphaPanel .vap-alpha-options{padding-top:8px}
 #vapTool .vap-disclosure-title{flex:1;min-width:0;overflow-wrap:anywhere}
 #vapTool .vap-disclosure-meta{display:inline-flex;align-items:center;gap:8px;flex-shrink:0}
 #vapTool .vap-disclosure-chevron{display:block;width:16px;height:16px;flex:none;pointer-events:none;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;color:var(--tool-muted);transform-origin:center;transition:transform 160ms ease}
@@ -115,9 +114,9 @@
 #vapTool .vap-volume input{min-height:44px;margin:0;display:block}
 #vapTool .vap-privacy{display:flex;justify-content:center;align-items:center;gap:7px;margin:20px 0 0;padding-top:20px;border-top:1px solid var(--tool-divider,#f0f1f4);font-size:11px;line-height:18px;color:var(--tool-muted);text-align:center}
 #vapTool .vap-privacy i{width:5px;height:5px;background:#6aa78d;border-radius:50%;flex-shrink:0}
-#vapTool .vap-dimensions{display:grid;grid-template-columns:minmax(0,1fr) 12px minmax(0,1fr);align-items:end;gap:10px}
-#vapTool .vap-dimensions>span{padding-bottom:12px;color:#9aa3b1;text-align:center}
-#vapTool .vap-dimensions label,#vapTool .vap-two-fields label{display:grid;gap:8px;min-width:0;color:var(--tool-muted)}
+#vapTool .vap-packed-size{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--tool-muted);font-size:12px;line-height:20px}
+#vapTool .vap-packed-size strong{color:var(--tool-heading);font-weight:600;font-variant-numeric:tabular-nums}
+#vapTool .vap-two-fields label{display:grid;gap:8px;min-width:0;color:var(--tool-muted)}
 #vapTool .vap-size-presets,#vapTool .vap-volume-presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
 #vapTool .vap-size-presets{grid-template-columns:repeat(3,minmax(0,1fr))}
 #vapTool .vap-size-presets button,#vapTool .vap-volume-presets button{min-height:36px;padding:6px 8px;border:1px solid var(--line);border-radius:9px;background:#fff;color:var(--tool-muted);font:inherit;font-size:12px;line-height:20px;cursor:pointer}
@@ -150,7 +149,7 @@
 #vapTool .vap-success-heading strong{font-weight:600}
 #vapTool #vapResultMeta{margin:10px 0 0;color:var(--tool-heading);font-size:12px;line-height:20px;font-variant-numeric:tabular-nums}
 #vapTool .vap-downloads{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:14px}
-#vapTool #vapDownloadMp4{grid-column:1/-1}
+#vapTool #vapDownloadMp4,#vapTool #vapDownloadPreview{grid-column:1/-1}
 #vapTool .vap-budget-status{margin:8px 0 0;color:#8a4b00;font-size:12px;line-height:20px}
 #vapTool .vap-result-preview{display:contents}
 #vapTool .vap-result-frame{position:relative;overflow:hidden;border:1px solid var(--tool-blue-line);border-radius:16px;isolation:isolate}
