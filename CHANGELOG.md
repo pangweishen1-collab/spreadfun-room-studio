@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.18.9 - 2026-11-11
+
+### Avatar frames
+
+- Move the 14-seat room preview and its ZIP and review-image downloads to Avatar frames. Keep the existing avatar frame production tools together under Production.
+- Drop or paste static PNG or WebP frames onto seats. Frames sit above the avatars at 1.56× their diameter in both the preview and the review image.
+
 ## 1.18.8 - 2026-11-11
 
 ### VAP converter
