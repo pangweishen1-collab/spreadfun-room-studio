@@ -43,7 +43,7 @@ const sandbox={document,language:'zh',location:{hash:'#gift-previews'},Image:Moc
   window:{FunWebP:{getMode:()=>compressionMode},Hub:{record(...args){assert.equal(args[0],'gift');assert.ok(['generated','download'].includes(args[1]));stats.push(args)}},addEventListener(name,handler){windowListeners.set(name,handler)},GiftBackground:{remove(image,options){mattingCalls.push({image,options});return mattingRun(image,options)}},FunToolkitUI:{setState(tool,value){assert.equal(tool,'gift-preview');feedback.push({...value})},reveal(node){reveals.push(node);if(node===get('#giftPreviewReceipt'))committedBlobs.add(urls.get(node.children[1].href))}}}
 };
 let source=fs.readFileSync(path.join(__dirname,'../gift-preview.js'),'utf8');
-const marker='window.GiftPreviewTool={activate,syncLanguage};';assert.ok(source.includes(marker),'test injection point must match the public API');
+const marker='window.GiftPreviewTool={activate,syncLanguage,batchWebpNames};';assert.ok(source.includes(marker),'test injection point must match the public API');
 source=source.replace(marker,marker+'window.test={state,loadFiles,chooseMode,changeSize,center,download,removeBackground,setBackground,pointerDown,pointerMove,stopDrag,align,zoomWheel,syncContextPreview,get history(){return history},commitEdit,historyStep,setTool,rotate};');
 vm.createContext(sandbox);
 for(const module of ['gift-preview-history.js','gift-preview-render.js'])vm.runInContext(fs.readFileSync(path.join(__dirname,'..',module),'utf8'),sandbox);
@@ -339,7 +339,10 @@ async function cachedDownload(){const before=encodes.length,count=downloads.leng
   sandbox.JSZip=class{file(name){batchEntries.push(name)}async generateAsync(){return new Blob(['batch'],{type:'application/zip'})}};
   const batchStart=encodes.length,batchStats=stats.length;
   await get('#giftBatchDownload').fire('click');
-  assert.deepEqual(batchEntries,[first.name.replace(/\.webp$/,'-gift-preview-240x240.webp'),first.name.replace(/\.webp$/,'-gift-preview-240x240 (2).webp')]);
+  assert.deepEqual(batchEntries,[first.name,first.name.replace(/\.webp$/,' (2).webp')]);
+  assert.deepEqual(Array.from(sandbox.window.GiftPreviewTool.batchWebpNames([
+    '金龙.png','金龙.jpg','金龙 (2).WebP','Sky.JPEG','sky.webp','cafe\u0301.png','café.webp','a/b.png','image.v1'
+  ])),['金龙.webp','金龙 (3).webp','金龙 (2).webp','Sky.webp','sky (2).webp','cafe\u0301.webp','café (2).webp','a_b.webp','image.v1.webp']);
   assert.deepEqual(encodes.slice(batchStart).map(({width,height})=>[width,height]),[[240,240],[240,240]]);
   assert.deepEqual(stats.slice(batchStats),[['gift','generated',2],['gift','download']]);
   await rows[1].children[0].fire('click');assert.equal(api.state.settings.brightness,83);assert.equal(api.state.baseMask,null);assert.equal(api.state.side,240);

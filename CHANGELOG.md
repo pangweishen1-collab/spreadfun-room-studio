@@ -1,5 +1,12 @@
 # 更新记录
 
+## 1.18.14 - 2026-11-11
+
+- Preserve the original picture when an imported VAP already meets the output requirements and fits the size limit. Audio adjustments can be made separately. VAPs that need re-encoding use the selected budget and preserve matching color and alpha plane dimensions.
+- Estimate the MP4 size before converting. The default size limit is 2 MB and can be adjusted; VAP output stays at a fixed 24 FPS.
+- Show upload progress for files that take at least one second to process. Fast imports complete without a progress overlay.
+- Keep source filenames in batch Preview Image and Device Preview WebP exports, adding a suffix when names collide.
+
 ## 1.18.13 - 2026-11-11
 
 - Rename Gift images to Preview images and add Device preview alongside the existing Production workspace.

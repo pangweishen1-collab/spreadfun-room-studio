@@ -235,6 +235,7 @@
     if(state.loading||state.exporting)return;
     const selected=Array.from(files);if(!selected.length)return;
     const previous=currentJob(),previousIndex=state.jobs.indexOf(previous);pause();state.loading=true;state.batchProgress=null;setNotice(null);syncControls();
+    const progress=window.UploadProgress?.begin(selected.length);
     const additions=[];let firstError=null,mounted=null;
     try{
       ensurePlayers();
@@ -244,7 +245,7 @@
         additions.push(job);if(!replace)state.jobs.push(job);renderBatchList();syncControls();
         try{await validateFile(file);job.video=await parseFile(file);validateVideo(job.video);}
         catch(error){job.video=null;job.error=strings.en[error.message]?error.message:'loadError';firstError||=job.error;}
-        finally{job.loading=false;}
+        finally{job.loading=false;progress?.advance();}
         renderBatchList();syncControls();
       }
       for(const candidate of additions.filter(job=>job.video&&!job.error)){
@@ -260,7 +261,7 @@
       else showEmptyAvatar();
       if(firstError)setNotice(firstError);
     }catch(error){setNotice(strings.en[error.message]?error.message:'loadError');}
-    finally{state.loading=false;renderBatchList();syncLanguage();if(mounted&&avatarPreviewVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches)togglePlayback();}
+    finally{progress?.finish();state.loading=false;renderBatchList();syncLanguage();if(mounted&&avatarPreviewVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches)togglePlayback();}
   }
   function changeDimension(changed){
     const value=Number(changed.value),valid=changed.value.trim()!==''&&Number.isInteger(value)&&value>=16&&value<=2048;

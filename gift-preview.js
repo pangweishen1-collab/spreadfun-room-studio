@@ -209,6 +209,7 @@
     const modeChosen=state.modeChosen&&(!!replaced||!activeJob);
     const uploadHadFocus=document.activeElement===$('#giftPreviewUpload')||document.activeElement===stage;
     clearMattingProgress();prepareEdit();state.loading=true;state.notice=null;batchStatus=null;syncControls();
+    const progress=window.UploadProgress?.begin(selected.length);
     const token=++loadToken;let loaded=false,failed=0,problem;
     try{
       for(const file of selected){
@@ -218,10 +219,12 @@
           if(replaced||!activeJob){showJob(job,image);loaded=true}
           if(replaced)jobs.splice(jobs.indexOf(replaced),1,job);else jobs.push(job);
         }catch(error){failed++;problem=copy.en[error.message]?error.message:'loadError'}
+        finally{progress?.advance()}
       }
       if(failed===selected.length){state.notice=problem;if(state.image)try{render()}catch(ignored){}}
       else if(failed)batchStatus={phase:'import',failed};
     }finally{
+      progress?.finish();
       if(token===loadToken){
         state.loading=false;renderJobList();syncControls();
         if(loaded){
@@ -317,9 +320,25 @@
     state.settings.offsetX=Math.max(-1,Math.min(1,drag.offsetX+(event.clientX-drag.x)/box.width));
     state.settings.offsetY=Math.max(-1,Math.min(1,drag.offsetY+(event.clientY-drag.y)/box.height));changed();event.preventDefault();
   }
+  function safeStem(name,extension){
+    return name.replace(extension,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'gift';
+  }
   function webpName(file,side){
-    const base=file.name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'gift';
-    return base+'-gift-preview-'+side+'x'+side+'.webp';
+    return safeStem(file.name,/\.[^.]+$/)+'-gift-preview-'+side+'x'+side+'.webp';
+  }
+  function batchWebpNames(sourceNames){
+    const stems=sourceNames.map(name=>safeStem(name,/\.(?:png|jpe?g|webp)$/i));
+    const key=name=>name.normalize('NFC').toLowerCase();
+    const reserved=new Set(stems.map(key)),used=new Set();
+    return stems.map(stem=>{
+      let name=stem;
+      if(used.has(key(name))){
+        let suffix=2;
+        do {name=stem+' ('+(suffix++)+')'} while(reserved.has(key(name))||used.has(key(name)));
+      }
+      used.add(key(name));
+      return name+'.webp';
+    });
   }
   async function encodeImage(image,settings,side,mode){
     await new Promise(resolve=>requestAnimationFrame(resolve));
@@ -334,32 +353,31 @@
   async function downloadBatch(){
     if(busy()||jobs.length<2||!state.valid)return;
     prepareEdit();
-    const side=state.side,mode=webpMode(),names=new Set();
+    const side=state.side,mode=webpMode(),names=batchWebpNames(jobs.map(job=>job.file.name));
+    let packed=0;
     const progress={phase:'export',done:0,total:jobs.length,failed:0};
     state.exporting=true;state.notice=null;batchStatus=progress;syncControls();
     let url;
     try{
       const zip=new JSZip();
-      for(const job of jobs){
+      for(const [index,job] of jobs.entries()){
         if(mode!==webpMode())return;
         try{
           const edits=job.history.current(),image=job===activeJob?state.image:await readSource(job.file);
           const blob=await encodeImage(image,{...edits.settings,mode:edits.mode,baseMask:edits.baseMask,strokes:edits.strokes},side,mode);
           if(mode!==webpMode())return;
-          const base=webpName(job.file,side);let name=base,suffix=2;
-          while(names.has(name.toLowerCase())){name=base.replace(/\.webp$/,' ('+suffix+').webp');suffix++}
           const bytes=new Uint8Array(await blob.arrayBuffer());
-          zip.file(name,bytes);names.add(name.toLowerCase());
+          zip.file(names[index],bytes);packed++;
         }catch(error){progress.failed++}
         progress.done++;syncBatchControls();
       }
-      if(!names.size){state.notice='batchExport';return}
+      if(!packed){state.notice='batchExport';return}
       const blob=await zip.generateAsync({type:'blob',compression:'STORE'});
       if(mode!==webpMode())return;
       url=URL.createObjectURL(blob);
       const link=document.createElement('a');link.href=url;link.download='gift-previews-'+side+'x'+side+'.zip';link.hidden=true;document.body.append(link);
       try{link.click()}catch(error){throw new Error('downloadError')}finally{link.remove()}
-      window.Hub?.record('gift','generated',names.size);window.Hub?.record('gift','download');
+      window.Hub?.record('gift','generated',packed);window.Hub?.record('gift','download');
     }catch(error){state.notice=error.message==='downloadError'?'downloadError':'exportError'}
     finally{
       if(url){const downloadUrl=url;setTimeout(()=>URL.revokeObjectURL(downloadUrl),60000)}
@@ -496,5 +514,5 @@
   window.addEventListener('hashchange',()=>{if(!active()){clearMattingProgress();prepareEdit();hoverPoint=null;syncControls()}stage.classList.remove('drag')});
   window.addEventListener('blur',()=>{prepareEdit();hoverPoint=null;syncCursor()});
   window.addEventListener('pagehide',event=>{clearMattingProgress();prepareEdit();if(!event.persisted){loadToken++;if(renderRequest)cancelAnimationFrame(renderRequest);if(state.download)URL.revokeObjectURL(state.download.url)}});
-  window.GiftPreviewTool={activate,syncLanguage};syncLanguage();
+  window.GiftPreviewTool={activate,syncLanguage,batchWebpNames};syncLanguage();
 })();

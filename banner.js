@@ -227,6 +227,7 @@
     const file=selected[0];
     if(!/\.(png|jpe?g|webp)$/i.test(file.name)||!/^image\/(png|jpeg|webp)$/.test(file.type)){setNotice('typeError');return}
     if(file.size>30*1024*1024){setNotice('sizeError');return}
+    const progress=window.UploadProgress?.begin();
     state.busy=true;state.phase='loading';state.busyMessage='importing';setNotice(null);syncControls();let sourceUrl;
     try{
       sourceUrl=URL.createObjectURL(file);
@@ -238,7 +239,7 @@
       const fresh=await createOutputs(image,file,state.project);commitOutputs(image,file,state.project,fresh);
     }catch(error){
       if(error.message!=='modeChanged')setNotice(copy.en[error.message]?error.message:'exportError');
-    }finally{if(sourceUrl)URL.revokeObjectURL(sourceUrl);state.busy=false;state.busyMessage=null;syncControls();if(state.modeRefresh)refreshCompression()}
+    }finally{progress?.finish();if(sourceUrl)URL.revokeObjectURL(sourceUrl);state.busy=false;state.busyMessage=null;syncControls();if(state.modeRefresh)refreshCompression()}
   }
   async function refreshCompression(){
     if(!state.image||state.busy||location.hash!=='#banners')return;

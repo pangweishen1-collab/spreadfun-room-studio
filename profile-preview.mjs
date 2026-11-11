@@ -203,6 +203,7 @@ async function loadFiles(files, {target = null, firstVacant = false} = {}) {
   busy = true;
   notice = {key: 'processing'};
   sync();
+  const progress = window.UploadProgress?.begin(files.length);
   const prepared = [];
   let activeFile;
   try {
@@ -212,7 +213,8 @@ async function loadFiles(files, {target = null, firstVacant = false} = {}) {
       const blob = await prepareProfileArtwork(file, outputSides[mode]);
       const url = URL.createObjectURL(blob);
       const image = artwork(url);
-      prepared.push({element: image, image, url, blob});
+      prepared.push({element: image, image, url, blob, sourceName: file.name});
+      progress?.advance();
     }
     prepared.forEach((asset, index) => {
       const slot = destinations[index];
@@ -226,6 +228,7 @@ async function loadFiles(files, {target = null, firstVacant = false} = {}) {
     const key = ['type', 'size', 'animated'].includes(error?.code) ? error.code : 'invalid';
     notice = {key, value: activeFile.name, tone: 'error'};
   } finally {
+    progress?.finish();
     busy = false;
     sync();
     if (active() && document.activeElement === document.body) trigger.focus({preventScroll: true});
@@ -277,7 +280,8 @@ download.addEventListener('click', async () => {
       downloadBlob(slot.asset.blob, nameFor(slot));
     } else {
       const zip = new window.JSZip();
-      for (const slot of selected) zip.file(nameFor(slot), slot.asset.blob);
+      const names = window.GiftPreviewTool.batchWebpNames(selected.map(slot => slot.asset.sourceName));
+      selected.forEach((slot, index) => zip.file(names[index], slot.asset.blob));
       const blob = await zip.generateAsync({type: 'blob', compression: 'STORE'});
       downloadBlob(blob, `${kind}-${dimensions}-webp.zip`);
     }

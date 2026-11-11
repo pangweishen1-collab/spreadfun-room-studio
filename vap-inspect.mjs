@@ -45,11 +45,13 @@ if(typeof document!=='undefined'){
         const pick=document.createElement('button'),input=document.createElement('input'),name=document.createElement('span');pick.type='button';input.type='file';input.accept='image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp';input.hidden=true;pick.setAttribute('aria-labelledby',label.id);row.pick=pick;name.className='resource-filename';
         pick.addEventListener('click',()=>input.click());input.addEventListener('change',async()=>{
           const candidate=input.files?.[0];input.value='';if(!candidate)return;const token=version;pick.disabled=true;let bitmap;
+          let uploadProgress;
           try{
             if(candidate.size<=0||candidate.size>10*1024*1024||!/^image\/(png|jpeg|webp)$/i.test(candidate.type))throw Error('resourceFile');
+            uploadProgress=window.UploadProgress?.begin();
             bitmap=await createImageBitmap(candidate);if(Math.max(bitmap.width,bitmap.height)>8192||bitmap.width*bitmap.height>32e6)throw Error('resourceFile');
             if(token!==version)return;const next=URL.createObjectURL(candidate),old=resourceImages.get(source.srcTag);resourceImages.set(source.srcTag,next);tags[source.srcTag]=next;if(old)URL.revokeObjectURL(old);name.textContent=candidate.name;phase='resourceReady';
-          }catch{if(token===version)phase='resourceFile'}finally{bitmap?.close();if(token===version){pick.disabled=false;sync()}}
+          }catch{if(token===version)phase='resourceFile'}finally{uploadProgress?.finish();bitmap?.close();if(token===version){pick.disabled=false;sync()}}
         });wrap.append(pick,input,name);
       }
       resourceRows.push(row);$('resourceFields').append(wrap);
@@ -58,6 +60,7 @@ if(typeof document!=='undefined'){
   $('applyResources').addEventListener('click',mountResources);
   async function load(candidate){
     const token=++version;reading=true;phase='loading';sync();
+    const uploadProgress=window.UploadProgress?.begin();
     try{
       const result=await readVapFile(candidate);if(token!==version)return;
       window.VapResultPlayer.getMissingTags(result.config,{});
@@ -67,7 +70,7 @@ if(typeof document!=='undefined'){
       frame.classList.remove('upload-ready','is-dragging');$('empty').hidden=true;$('vapResultPlayer').hidden=false;
       buildResources();mountResources();
     }catch(error){if(token===version)phase=['file','format'].includes(error.message)?error.message:'error'}
-    finally{if(token===version){reading=false;sync()}}
+    finally{uploadProgress?.finish();if(token===version){reading=false;sync()}}
   }
   window.UploadPaste?.register({zone:frame,isActive:()=>true,isBusy:()=>reading,onFiles:files=>{if(files.length===1)void load(files[0]);else{phase='file';sync()}}});
   $('openFile').addEventListener('click',()=>{if(!reading)input.click()});

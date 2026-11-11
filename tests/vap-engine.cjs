@@ -59,31 +59,31 @@ const {pathToFileURL}=require('node:url');
   for(const background of [null,[],[1,2],[1,2,3,4],[-1,0,0],[0,256,0],[NaN,0,0],[1.1,2,3],['1',2,3]])assert.throws(()=>E.normalizeOptions({sourceKind:'chroma_mp4',matteMethod:'chroma_key',background}),error=>error.code==='invalid');
   assert.throws(()=>E.normalizeOptions({sourceKind:'chroma_mp4',matteMethod:'chroma_key',screenColor:'custom'}),error=>error.code==='invalid');
   const info={duration:10,hasAudio:true,audioBitrate:80000};
-  for(const duration of [.1,4.99,5,5+1/24]){
-    assert.equal(E.outputBudget(3500000,{duration,fps:24}),1500000,'short clips and one source endpoint frame use 1.5 MB');
-    assert.equal(E.normalizeOptions({targetBytes:3500000},{duration,fps:24}).targetBytes,1500000);
-    const plan=E.planEncoding(E.normalizeOptions({quality:'ultra'}),{duration,fps:24,hasAudio:true,audioBitrate:128000});assert.equal(plan.byteLimit,1491808,'planning independently honors the shared short-clip cap');
+  assert.equal(E.outputBudget(),2_000_000);
+  for(const duration of [.1,4.99,5,5+1/24,5.05,10,10.05,120]){
+    const metadata={duration,fps:24,hasAudio:true,audioBitrate:128000};
+    const defaults=E.normalizeOptions({},metadata);
+    assert.equal(defaults.targetBytes,2_000_000,'all durations start at 2 MB');
+    assert.equal(E.planEncoding(defaults,metadata).byteLimit,1_991_808,'planning reserves room for the package');
+    for(const targetBytes of [100_000,1_000_000,2_500_000,3_500_000]){
+      assert.equal(E.normalizeOptions({targetBytes},metadata).targetBytes,targetBytes,'a manual limit is independent of the clip duration');
+      assert.equal(E.planEncoding({...defaults,targetBytes},metadata).byteLimit,targetBytes-Math.min(8192,Math.floor(targetBytes*.02)));
+    }
   }
-  for(const metadata of [{duration:5.05,fps:24},{duration:6,fps:1},{duration:5.03,fps:60},{duration:10},{duration:10+1/24,fps:24}])assert.equal(E.outputBudget(3500000,metadata),2500000,'the middle duration tier allows 2.5 MB');
-  for(const metadata of [{duration:10.05,fps:24},{duration:15},{duration:15.05},{duration:120},{},{duration:0}])assert.equal(E.outputBudget(3500000,metadata),3500000,'long or unknown duration allows 3.5 MB');
   const nativeBudgetConfig=makeVapc({width:720,height:1560,fps:24,frames:120,alphaScale:.5}),nativeBudgetInfo={duration:5.08,videoDuration:5,fps:24,width:1088,height:1568,hasAudio:true,audioBitrate:128000};
-  assert.equal(E.outputBudget(3500000,nativeBudgetInfo,nativeBudgetConfig),1500000,'a five-second native video remains short despite its longer AAC tail');
-  assert.equal(E.outputBudget(3500000,{duration:5.08,fps:24},nativeBudgetConfig),1500000,'validated native frame metadata also classifies UI imports without a separate track probe');
-  assert.equal(E.outputBudget(1000000,nativeBudgetInfo,nativeBudgetConfig),1000000,'native duration handling preserves a smaller user limit');
-  assert.equal(E.outputBudget(3500000,{duration:5.08,fps:24}),2500000,'ordinary video without native frame metadata is not reclassified');
-  const nativeEndpointConfig=makeVapc({width:720,height:1560,fps:24,frames:121,alphaScale:.5});assert.equal(E.outputBudget(3500000,{duration:5.09,fps:24.01},nativeEndpointConfig),1500000,'native endpoint tolerance uses the declared frame rate rather than a noisy MP4 estimate');
   const nativeBudgetOptions=E.normalizeOptions({quality:'ultra',sourceVapConfig:nativeBudgetConfig},nativeBudgetInfo),nativeBudgetPlan=E.planEncoding(nativeBudgetOptions,nativeBudgetInfo);
-  assert.equal(nativeBudgetOptions.targetBytes,1500000);assert.equal(nativeBudgetPlan.byteLimit,1491808);
-  assert.equal(nativeBudgetPlan.budgetBitrate,Math.floor(1491808*8/nativeBudgetInfo.duration-128000-40000),'bitrate reserves the whole MP4 audio duration while size policy uses video duration');
-  const longerNativeBudgetConfig=makeVapc({width:720,height:1560,fps:24,frames:123,alphaScale:.5});
-  assert.equal(E.outputBudget(3500000,{...nativeBudgetInfo,duration:5.2,videoDuration:5.125},longerNativeBudgetConfig),2500000,'a genuinely longer native video gets the middle duration budget');
-  for(const field of ['f','fps']){const invalid=structuredClone(nativeBudgetConfig);invalid.info[field]=0;assert.throws(()=>E.normalizeOptions({sourceVapConfig:invalid},nativeBudgetInfo),error=>error.code==='invalid','budget classification must not make invalid native metadata acceptable');}
-  assert.equal(E.outputBudget(1000000,{duration:5,fps:24}),1000000,'a smaller user budget is preserved');
-  assert.equal(E.outputBudget(2000000,{duration:6,fps:24}),2000000);
+  assert.equal(nativeBudgetOptions.targetBytes,2_000_000);assert.equal(nativeBudgetPlan.byteLimit,1_991_808);
+  const nativeStandardPlan=E.planEncoding({...nativeBudgetOptions,fixedStandard:true},nativeBudgetInfo);
+  assert.equal(nativeStandardPlan.codec,'avc1.4d0028');
+  assert.equal(nativeStandardPlan.bitrate,nativeStandardPlan.budgetBitrate);
+  assert(nativeStandardPlan.bitrate>2_000_000,'native re-encoding can use the selected byte budget above the first-encode bitrate');
+  assert.equal(nativeBudgetPlan.budgetBitrate,Math.floor(1_991_808*8/nativeBudgetInfo.duration-128000-40000),'bitrate reserves the whole MP4 audio duration');
+  assert.equal(E.normalizeOptions({...nativeBudgetOptions,targetBytes:3_500_000},nativeBudgetInfo).targetBytes,3_500_000,'native VAP accepts a manual limit');
+  for(const field of ['f','fps']){const invalid=structuredClone(nativeBudgetConfig);invalid.info[field]=0;assert.throws(()=>E.normalizeOptions({sourceVapConfig:invalid},nativeBudgetInfo),error=>error.code==='invalid','native frame metadata is still validated');}
   assert.equal(E.normalizeOptions({width:720,height:1560,fps:24,alphaScale:.5,quality:'ultra'},{duration:5,fps:24}).width,720,'size policy does not alter resolution or FPS');
-  assert.equal(E.normalizeOptions().targetBytes,3500000);assert.equal(E.normalizeOptions({targetBytes:500000000}).targetBytes,3500000,'even API callers cannot raise the 3.5 MB limit');
+  assert.equal(E.normalizeOptions().targetBytes,2_000_000);assert.equal(E.normalizeOptions({targetBytes:500000000}).targetBytes,3500000,'even API callers cannot raise the 3.5 MB limit');
   for(const quality of ['ultra','quality','balanced','size']){
-    const plan=E.planEncoding(E.normalizeOptions({quality}),info);assert.equal(plan.budgetBitrate,1873446);assert(plan.bitrate<=plan.budgetBitrate,'every quality preset respects the audio-aware budget');assert.equal(plan.byteLimit,2491808,'reserve ZIP/config space');
+    const plan=E.planEncoding(E.normalizeOptions({quality}),info);assert.equal(plan.budgetBitrate,1473446);assert(plan.bitrate<=plan.budgetBitrate,'every quality preset respects the audio-aware budget');assert.equal(plan.byteLimit,1991808,'reserve ZIP/config space');
   }
   assert.equal(E.avcCodec(1088,1568,24,2000000),'avc1.420028');assert.equal(E.avcCodec(1456,1568,24,3000000),'avc1.420032');
   assert.equal(E.avcCodec(1088,1568,24,2000000,'high'),'avc1.640028');assert.equal(E.avcCodec(1088,1568,24,2000000,'main'),'avc1.4d0028');
@@ -93,7 +93,7 @@ const {pathToFileURL}=require('node:url');
   const large={width:2048,height:1600,fps:60,targetBytes:500000000},shortInfo={...info,duration:.1};
   for(const quality of ['quality','balanced','size'])assert.equal(E.planEncoding(E.normalizeOptions({...large,quality}),shortInfo).bitrate,24000000);
   const ultraCapped=E.planEncoding(E.normalizeOptions({...large,quality:'ultra'}),shortInfo);assert.equal(ultraCapped.bitrate,32000000);assert.equal(ultraCapped.codec,'avc1.420034');
-  assert.equal(E.planEncoding(E.normalizeOptions({audioGain:0}),info).budgetBitrate,1953446);assert.equal(E.planEncoding(E.normalizeOptions({audioGain:.5}),info).budgetBitrate,1825446);
+  assert.equal(E.planEncoding(E.normalizeOptions({audioGain:0}),info).budgetBitrate,1553446);assert.equal(E.planEncoding(E.normalizeOptions({audioGain:.5}),info).budgetBitrate,1425446);
   const temp=await fs.mkdtemp(path.join(os.tmpdir(),'vap-engine-check-'));
   const installed=[];
   function install(name,value){installed.push([name,Object.getOwnPropertyDescriptor(globalThis,name)]);Object.defineProperty(globalThis,name,{value,writable:true,configurable:true});}
@@ -173,16 +173,22 @@ const {pathToFileURL}=require('node:url');
       export class Input{constructor(o){this.probe=o.source instanceof BufferSource;this.source=o.source}canRead(){return true}getPrimaryVideoTrack(){const probe=this.probe;return {getDecoderConfig:()=>({codec:probe?(S().actualMuxedCodec||S().lastVideoOptions.fullCodecString):S().sourceCodec}),getDisplayWidth:()=>probe?S().lastDimensions[0]:S().displayWidth||2,getDisplayHeight:()=>probe?S().lastDimensions[1]:S().displayHeight||1,getCodedWidth:()=>{if(S().geometryError)throw Error('unknown geometry');return probe?S().lastDimensions[0]:S().codedWidth||2},getCodedHeight:()=>probe?S().lastDimensions[1]:1,getPixelAspectRatio:()=>S().sar||{num:1,den:1},getRotation:()=>S().rotation||0,getFlip:()=>!!S().flip,computeDuration:()=>S().videoDuration??S().duration??2/24,getFirstTimestamp:()=>0,computeFrameRateMetrics:()=>({bestGuessFrameRate:24}),getCodec:()=>probe?'avc':S().sourceCodec||'hevc',canDecode:()=>S().canDecode,hasHighDynamicRange:()=>false,probe}}getPrimaryAudioTrack(){return this.probe?null:{getCodec:()=>S().codec,computePacketStats:()=>({averageBitrate:80000}),getDecoderConfig:()=>({codec:'mp4a.40.2',sampleRate:48000,numberOfChannels:2,description:new Uint8Array([17,144])}),getNumberOfChannels:()=>2,getSampleRate:()=>48000,canDecode:()=>true}}computeDuration(){return S().duration||2/24}dispose(){S().inputDisposals=(S().inputDisposals||0)+1}}
       export const canEncodeVideo=async(codec,options)=>{const query={codec,...options,quality:{...options.quality}};(S().supportQueries||=[]).push(query);return S().supportVideo?S().supportVideo(query):true},canEncodeAudio=async()=>S().canEncodeAudio!==false||S().fallbackRegistered&&S().fallbackCanEncode;
       export class BufferTarget{buffer=null}export class Mp4OutputFormat{}
-      export class Output{constructor(o){this.target=o.target;this.sources=[];this.canceled=false}addVideoTrack(s){s.output=this;this.sources.push(s);this.video=s}addAudioTrack(s){s.output=this;this.sources.push(s)}async start(){}async finalize(){const real=!!this.video.options.onEncoderConfig,official=this.video.options.latencyMode==='realtime',size=Math.max(official?77:24,Math.floor(real&&S().outputSizeForPlan?S().outputSizeForPlan(this.video.options):S().fixedOutputBytes||(S().mockOutputSize?this.video.options.quality.bitrate/20:24)));if(real)(S().finishedPasses||=[]).push({bitrate:this.video.options.quality.bitrate,codec:this.video.options.fullCodecString,bytes:size});const d=new Uint8Array(size),v=new DataView(d.buffer);
+      export class Output{constructor(o){this.target=o.target;this.sources=[];this.canceled=false}addVideoTrack(s){s.output=this;this.sources.push(s);this.video=s}addAudioTrack(s){s.output=this;this.sources.push(s)}async start(){}async finalize(){const real=!!this.video.options.onEncoderConfig,official=this.video.canvas.width===1088&&this.video.canvas.height===1568&&this.video.options.fullCodecString==='avc1.4d0028',size=Math.max(this.video.trialBytes?this.video.trialBytes+96:0,official?77:24,Math.floor(real&&S().outputSizeForPlan?S().outputSizeForPlan(this.video.options):S().fixedOutputBytes||(S().mockOutputSize?this.video.options.quality.bitrate/20:24)));if(real)(S().finishedPasses||=[]).push({bitrate:this.video.options.quality.bitrate,codec:this.video.options.fullCodecString,bytes:size});const d=new Uint8Array(size),v=new DataView(d.buffer);
         const atom=(offset,length,type)=>{v.setUint32(offset,length);for(let j=0;j<4;j++)d[offset+4+j]=type.charCodeAt(j)};
         atom(0,8,'ftyp');
         if(official){
           ['moov','trak','mdia','minf','stbl'].forEach((type,index)=>atom(8+index*8,60-index*8,type));
           atom(48,20,'stco');v.setUint32(60,1);v.setUint32(64,76);atom(68,size-68,'mdat');
         }else{atom(8,8,'moov');atom(16,size-16,'mdat');}this.target.buffer=d.buffer;S().lastDimensions=[this.video.canvas.width,this.video.canvas.height]}async cancel(){this.canceled=true;S().canceled++}}
-      export class CanvasSource{constructor(c,o){this.canvas=c;this.options=o;this.added=0;S().lastVideoOptions=o;S().lastVideoCanvas=c;(S().videoConfigs||=[]).push({...o,quality:{...o.quality},width:c.width,height:c.height,probe:!o.onEncoderConfig})}async add(timestamp,duration){if(this.output.canceled)throw Error('canceled');if(!this.options.onEncoderConfig&&S().failProbeProfile?.(this.options.fullCodecString))throw Error('profile probe failed');this.options.onEncoderConfig?.({codec:this.options.fullCodecString});if(this.options.onEncoderConfig){if(S().failVideo)throw Error('encoder failed');S().frames.push({timestamp,duration,width:this.canvas.width,height:this.canvas.height,pixels:this.canvas.pixels.slice()});}this.added++;await Promise.resolve()}close(){}}
+      export class CanvasSource{constructor(c,o){this.canvas=c;this.options=o;this.added=0;S().lastVideoOptions=o;S().lastVideoCanvas=c;(S().videoConfigs||=[]).push({...o,quality:{...o.quality},width:c.width,height:c.height,probe:!o.onEncoderConfig})}async add(timestamp,duration,{keyFrame=false}={}){if(this.output.canceled)throw Error('canceled');if(!this.options.onEncoderConfig&&S().failProbeProfile?.(this.options.fullCodecString))throw Error('profile probe failed');this.options.onEncoderConfig?.({codec:this.options.fullCodecString});if(this.options.onEncoderConfig){if(S().failVideo)throw Error('encoder failed');S().frames.push({timestamp,duration,width:this.canvas.width,height:this.canvas.height,pixels:this.canvas.pixels.slice()});}
+        if(this.options.onEncodedPacket&&!(S().dropRealtimePacket&&this.options.latencyMode==='realtime'&&this.added===1)&&(keyFrame||!S().dropTrialPacket||this.added%4!==3)){
+          const byteLength=keyFrame?S().trialKeyBytes||200:S().trialDeltaBytes||50;
+          this.trialBytes=(this.trialBytes||0)+byteLength;
+          this.options.onEncodedPacket({timestamp,type:keyFrame?'key':'delta',byteLength});
+        }
+        this.added++;await Promise.resolve()}close(){}}
       export class VideoSampleSink{async getSample(){if(S().failFinalDecode)return null;const [displayWidth,displayHeight]=S().lastDimensions;return {displayWidth,displayHeight,close(){}}}}
-      export class CanvasSink{constructor(track,options={}){if(options.width&&options.height&&!options.fit)throw Error('explicit fit required');this.track=track}getCanvas(timestamp){if(!this.track.probe&&S().sampleFrames){S().sampleRequests.push(timestamp);if(S().sampleError)throw Error('sample decode failed');return S().sampleFrames[S().sampleRequests.length-1]?{canvas:S().sampleFrames[S().sampleRequests.length-1]}:null}return {canvas:new OffscreenCanvas(...S().lastDimensions)}}async *canvasesAtTimestamps(ts){let index=0;for(const timestamp of ts){const canvas=S().decodedCanvas||(S().reuseDecodeCanvas?(this.reused||=new OffscreenCanvas(2,1)):new OffscreenCanvas(2,1));if(!S().decodedCanvas){const tag=S().taggedFrames?++index:200;canvas.pixels.set([tag,40,20,255,tag,40,20,255]);if(S().taggedFrames)(S().decodeTrace||=[]).push({type:'decode',tag});}yield {canvas,timestamp,duration:1/24}}}}
+      export class CanvasSink{constructor(track,options={}){if(options.width&&options.height&&!options.fit)throw Error('explicit fit required');this.track=track}getCanvas(timestamp){if(!this.track.probe&&S().sampleFrames){S().sampleRequests.push(timestamp);if(S().sampleError)throw Error('sample decode failed');return S().sampleFrames[S().sampleRequests.length-1]?{canvas:S().sampleFrames[S().sampleRequests.length-1]}:null}return {canvas:new OffscreenCanvas(...S().lastDimensions)}}async *canvasesAtTimestamps(ts){let index=0;for(const timestamp of ts){S().trialTimestamps?.push(timestamp);const canvas=S().decodedCanvas||(S().reuseDecodeCanvas?(this.reused||=new OffscreenCanvas(2,1)):new OffscreenCanvas(2,1));if(!S().decodedCanvas){const tag=S().taggedFrames?++index:200;canvas.pixels.set([tag,40,20,255,tag,40,20,255]);if(S().taggedFrames)(S().decodeTrace||=[]).push({type:'decode',tag});}yield {canvas,timestamp,duration:1/24}}}}
       export class EncodedPacketSink{async *packets(){if(S().audioPackets){yield* S().audioPackets;return;}yield {timestamp:0,duration:1/48};yield {timestamp:1/48,duration:1/48}}}
       export class EncodedAudioPacketSource{async add(packet,meta){if(this.output.canceled)throw Error('canceled');S().audio.push({packet,meta})}close(){}}
       export class AudioSampleSink{async *samples(){yield {timestamp:1/48000,sampleRate:48000,numberOfChannels:2,numberOfFrames:2,copyTo(destination,options){if(options.format!=='f32'||options.planeIndex!==0)throw Error('interleaved f32 required');destination.set([.25,-.5,.75,-.875]);},close(){S().closedAudio=(S().closedAudio||0)+1}}}}
@@ -231,7 +237,7 @@ const {pathToFileURL}=require('node:url');
     const sequenceFrames=sequenceState.frames,at=(frame,x,y)=>[...frame.pixels.slice((y*frame.width+x)*4,(y*frame.width+x)*4+4)];
     assert.equal(sequenceFrames[1].timestamp,1/12);assert.equal(sequenceFrames[1].duration,1/12);assert.deepEqual(at(sequenceFrames[0],0,0),[0,0,0,255],'opaque black is retained in RGB');assert.deepEqual(at(sequenceFrames[0],24,0),[255,255,255,255],'opaque dark alpha remains255');assert.deepEqual(at(sequenceFrames[0],1,0),[255,255,255,255]);assert.deepEqual(at(sequenceFrames[0],2,0),[0,0,0,255],'hidden RGB cleared');assert.deepEqual(at(sequenceFrames[0],26,0),[0,0,0,255],'transparent pixels remain clear');assert.deepEqual(at(sequenceFrames[0],3,0),[40,20,10,255],'partial RGB premultiplied exactly once');assert.deepEqual(at(sequenceFrames[0],27,0),[128,128,128,255]);assert.deepEqual(at(sequenceFrames[1],3,0),[80,20,10,255],'frame2 is decoded independently');
     sequenceState.frames=[];const sequenceMasked=await engine.convertVideo(sequence,{width:16,height:16,fps:12,alphaScale:1,rgbAlphaMode:'premultiplied',verticalMask:{enabled:true,topStart:0,topEnd:.2,bottomStart:.8,bottomEnd:1}});assert.equal(at(sequenceState.frames[0],27,0)[0],64,'cached mask multiplies native alpha once');assert.equal(sequenceMasked.report.processingPath,'sequence-rgba-canvas');
-    for(const targetBytes of [1000000,1500000,3500000]){const bounded=await engine.convertVideo(sequence,{width:16,height:16,fps:12,rgbAlphaMode:'premultiplied',targetBytes});assert.equal(bounded.report.targetBytes,Math.min(targetBytes,1500000));assert.ok(bounded.blob.size<=Math.min(targetBytes,1500000));}
+    for(const targetBytes of [1_000_000,2_000_000,3_500_000]){const bounded=await engine.convertVideo(sequence,{width:16,height:16,fps:12,rgbAlphaMode:'premultiplied',targetBytes});assert.equal(bounded.report.targetBytes,targetBytes);assert.ok(bounded.blob.size<=targetBytes);}
     const abortSequence=new AbortController();sequenceState.frames=[];await assert.rejects(engine.convertVideo(sequence,{width:16,height:16,fps:12,rgbAlphaMode:'premultiplied'},{signal:abortSequence.signal,onProgress:e=>{if(e.frame===1)abortSequence.abort()}}),error=>error.code==='cancelled');assert.equal(sequenceBitmaps,sequenceCloses,'abort releases the currently yielded bitmap');delete sequenceState.sequenceFast;
     // Sequence PNG decode can finish out of order while one bitmap remains in
     // use by drawing/resources/preview/encoding. Only decoding is prefetched.
@@ -339,7 +345,7 @@ const {pathToFileURL}=require('node:url');
       const durationOptions={width:16,height:16,alphaScale:1,sourceVapConfig:tailConfig,targetBytes:3500000};
       for(const [fps,count] of [[24,121],[12,61],[48,242]]){
         resourceState.frames=[];resourceState.audio=[];const output=await engine.convertVideo(file,{...durationOptions,fps});
-        assert.equal(output.config.info.f,count,'native video resampling uses vapc frame duration, not the longer audio tail');assert.equal(output.report.frames,count);assert.equal(output.config.info.fps,fps);assert.equal(output.report.durationSeconds,movieDuration);assert.equal(output.report.targetBytes,1500000,'the five-second native frame duration sets the cap independently of the longer AAC tail');assert.equal(resourceState.frames.length,count);
+        assert.equal(output.config.info.f,count,'native video resampling uses vapc frame duration, not the longer audio tail');assert.equal(output.report.frames,count);assert.equal(output.config.info.fps,fps);assert.equal(output.report.durationSeconds,movieDuration);assert.equal(output.report.targetBytes,durationOptions.targetBytes,'native timing preserves a manual size limit');assert.equal(resourceState.frames.length,count);
         assert.equal(resourceState.frames.at(-1).timestamp,(count-1)/fps);assert.ok(resourceState.frames.every(frame=>frame.duration===1/fps),'all video samples have the same duration, including the last frame');
         assert.equal(output.report.audioMode,'copied');assert.equal(resourceState.audio.length,tailPackets.length,'every original AAC packet is retained, including the tail');for(let i=0;i<tailPackets.length;i++)assert.equal(resourceState.audio[i].packet,tailPackets[i],'AAC payload, timestamps and durations pass through unchanged');
       }
@@ -420,6 +426,19 @@ const {pathToFileURL}=require('node:url');
     assert.deepEqual(parseMp4TopLevelBoxes(officialBytes).map(box=>box.type),['ftyp','free','moov','vapc','mdat']);
     assert.equal(extractVapcBox(officialBytes).funToolkit,undefined);
     assert.ok(s.supportQueries.every(query=>query.fullCodecString==='avc1.4d0028'&&query.frameRate===24&&query.latencyMode==='realtime'));
+    resetVideoLogs();s.dropRealtimePacket=true;
+    const cadence=await engine.convertVideo(file,{fixedStandard:true,keepAudio:false});
+    assert.equal(cadence.report.attempts,2,'an incomplete fixed-rate encode uses the quality-latency fallback');
+    assert.equal(cadence.report.fps,24);
+    assert.deepEqual(s.supportQueries.map(query=>query.latencyMode),['realtime','quality']);
+    resetVideoLogs();const cadenceProgress=[];
+    const trial=await engine.estimateVideoSize(file,{fixedStandard:true,keepAudio:false},{
+      onProgress:event=>cadenceProgress.push(event.progress)
+    });
+    assert.equal(trial.encodedFrames,trial.durationSeconds*24,'whole-clip trial uses the same cadence fallback');
+    assert(cadenceProgress.every((value,index)=>index===0||value>=cadenceProgress[index-1]));
+    delete s.dropRealtimePacket;
+
     assert.equal(s.videoConfigs.filter(config=>config.probe).length,0,'the fixed profile only encodes the real export');
     s.failFinalDecode=true;
     await assert.rejects(engine.convertVideo(file,{fixedStandard:true,keepAudio:false}),error=>error.code==='encode','an undecodable real first frame cannot be exported');
@@ -443,8 +462,8 @@ const {pathToFileURL}=require('node:url');
     }
     resetVideoLogs();s.outputSizeForPlan=()=>10000;s.supportVideo=()=>s.finishedPasses.length===0;const optionalFailure=await engine.convertVideo(file,{width:16,height:16,quality:'quality',targetBytes:50000,keepAudio:false});assert.equal(s.finishedPasses.length,1);assert.equal(optionalFailure.report.bitrate,s.finishedPasses[0].bitrate,'an unavailable optional higher-bitrate configuration keeps the fitting original');assert.ok(optionalFailure.report.warnings.includes('quality-refinement-skipped'));assert.ok(optionalFailure.blob.size<=50000);delete s.supportVideo;
     resetVideoLogs();const cancelQuality=new AbortController();await assert.rejects(engine.convertVideo(file,{width:16,height:16,quality:'quality',targetBytes:50000,keepAudio:false},{signal:cancelQuality.signal,onProgress:event=>{if(event.reason==='quality'&&event.frame===1)cancelQuality.abort()}}),error=>error.code==='cancelled','cancelling a quality refinement must not return the earlier fitting candidate as success');assert.equal(s.finishedPasses.length,1);
-    for(const targetBytes of [1000000,1500000,3500000]){
-      resetVideoLogs();const effectiveBytes=Math.min(targetBytes,1500000);let pass=0;s.outputSizeForPlan=()=>++pass===1?effectiveBytes*1.1:effectiveBytes*.75;const bounded=await engine.convertVideo(file,{width:16,height:16,fps:24,alphaScale:1,quality:'balanced',targetBytes});assert.ok(bounded.report.attempts>=2&&bounded.report.attempts<=4);assert.equal(bounded.report.targetBytes,effectiveBytes);assert.ok(bounded.blob.size<=effectiveBytes);assert.equal(bounded.report.budgetExceeded,false);assert.equal(bounded.config.info.w,16);assert.equal(bounded.config.info.h,16);assert.equal(bounded.config.info.fps,24);assert.equal(bounded.config.info.aFrame[2],16,'compression retains full-resolution alpha');
+    for(const targetBytes of [1_000_000,2_000_000,3_500_000]){
+      resetVideoLogs();let pass=0;s.outputSizeForPlan=()=>++pass===1?targetBytes*1.1:targetBytes*.75;const bounded=await engine.convertVideo(file,{width:16,height:16,fps:24,alphaScale:1,quality:'balanced',targetBytes});assert.ok(bounded.report.attempts>=2&&bounded.report.attempts<=4);assert.equal(bounded.report.targetBytes,targetBytes);assert.ok(bounded.blob.size<=targetBytes);assert.equal(bounded.report.budgetExceeded,false);assert.equal(bounded.config.info.w,16);assert.equal(bounded.config.info.h,16);assert.equal(bounded.config.info.fps,24);assert.equal(bounded.config.info.aFrame[2],16,'compression retains full-resolution alpha');
     }
     delete s.outputSizeForPlan;
     globalThis.__vapEngineTest.mockOutputSize=true;const retryUpdates=[];
@@ -558,7 +577,33 @@ const {pathToFileURL}=require('node:url');
       assert(!equalRGB(staggeredFrames[24],noGoldFrames[24]),'gold retains the shared entrance at subsequent frames');
       const endObj=staggeredOutput.config.frame.at(-1).obj[0],[endX,endY]=endObj.mFrame;assert.equal(pixel(staggeredFrames.at(-1),endX+8,endY+8)[0],0);assert(equalRGB(staggeredFrames.at(-1),noGoldFrames.at(-1)),'avatar and gold share the final fade without leaking a default portrait');assert.equal(staggeredOutput.config.funToolkit.resourceManifest[0].placeholder,true);
     }finally{badgeFetchBefore?Object.defineProperty(globalThis,'fetch',badgeFetchBefore):delete globalThis.fetch;globalThis.createImageBitmap=badgeDecoderBefore;for(const key of ['duration','sequenceFast','displayWidth','displayHeight','decodedCanvas'])delete fadeState[key];}
+    {
+      const state=globalThis.__vapEngineTest,updates=[];
+      Object.assign(state,{duration:8,codec:'aac',audio:[],trialTimestamps:[],dropTrialPacket:true,
+        audioPackets:[{timestamp:0,duration:4,byteLength:900},{timestamp:4,duration:4,byteLength:700}]});
+      const options={width:16,height:16,fps:24,targetBytes:250000,quality:'size'};
+      const estimate=await engine.estimateVideoSize(file,options,{onProgress:event=>updates.push(event.progress)});
+      const starts=[20,84,148];
+      assert.deepEqual(state.trialTimestamps,starts.flatMap(start=>Array.from({length:24},(_,i)=>(start+i)/24)),
+        'trial decodes three bounded windows at their original source timestamps');
+      assert.equal(estimate.durationSeconds,8);assert.equal(estimate.sampledSeconds,3);assert.equal(estimate.sampleCount,3);
+      assert.equal(estimate.encodedFrames,54,'realtime packet drops do not fail the trial');
+      assert.equal(state.audio.length,0,'trial reads original AAC metadata without encoding or muxing audio');
+      assert(estimate.minBytes<=estimate.estimatedBytes&&estimate.estimatedBytes<=estimate.maxBytes);
+      assert(estimate.maxBytes<=estimate.byteLimit&&estimate.byteLimit<options.targetBytes);
+      assert.equal(updates[0],0);assert.equal(updates.at(-1),1);
+      assert(updates.every((value,index)=>index===0||value>=updates[index-1]),'trial progress is monotonic');
+      Object.assign(state,{trialKeyBytes:5000,trialDeltaBytes:2800});
+      const tight=await engine.estimateVideoSize(file,{...options,targetBytes:190000});
+      assert.equal(tight.compressionLikely,true);assert(tight.maxBytes<=tight.byteLimit);
+      const cancelledTrial=new AbortController();
+      await assert.rejects(engine.estimateVideoSize(file,options,{signal:cancelledTrial.signal,onProgress:event=>{
+        if(event.phase==='encoding')cancelledTrial.abort();
+      }}),error=>error.code==='cancelled');
+      for(const key of ['duration','audioPackets','trialTimestamps','dropTrialPacket','trialKeyBytes','trialDeltaBytes'])delete state[key];
+      console.log('vap-engine: real trial control flow, distributed original timestamps, bounded packet measurement, audio metadata, retry projection and cancellation passed.');
+    }
     globalThis.__vapEngineTest.canDecode=false;await assert.rejects(engine.inspectVideo(file),error=>error.code==='decode');await assert.rejects(engine.inspectVideo(new File([new Uint8Array(128)],'wrong.png')),error=>error.code==='file');
-    console.log('vap-engine: native GPU producer packed-pixel/metadata and preview parity, partial-frame runtime loss same-frame CPU retry, unavailable/startup and baked-mode fallback, cancellation/disposal checks; bounded sequence bitmap prefetch with reverse decode/natural output and packed-pixel parity, current/ready/late exactly-once close, pending abort/return/encode failure, future-corrupt-frame rejection, resource source lifetime and retry isolation; bounded reverse-completing worker pipeline with synchronous poolSize1 capture, original97-frame RGB/Alpha/time/preview order, budget re-encode pixel parity, cancellation/error cleanup/CPU fallbacks and guarded resources/native/sequence paths; High/Main/Baseline support and real-probe fallback at actual bitrate, shared VBR/quality/no-preference configs, retry reselection, high-quality Canvas resampling, one headroom quality boost/highest-bitrate valid selection/fitting-result retention on overshoot or optional encoder failure/cancellation, actual duration-based limits without dimension/FPS/alpha reduction; native dynamic vs fixed resource end-to-end encoded RGB/gray-alpha bytes, timed masks, embedded src/frame JSON, original Vapx animated slots/occlusion masks and no-double-premultiply source repacking; optional three-frame source detection, bounded readback/input cleanup and conservative decoder/readback/missing-frame fallback; default inspection without sampling; protocol fixture roundtrip/box guards; two modes x two alpha scales; duration-tiered cap for every preset/audio-aware budget/recompression and strict actual-size validation/bounded failure, unchanged dimensions/FPS and baseline codec API default; reference-style RGB feather/legacy straight RGB/independent gray alpha packing; frame timing; AAC metadata/copy, explicit mute, audio gain validation/PCM scaling/clipping/timing/cleanup/unsupported encoder, audio transcode; all-preset bounded compression/strict-budget reporting; vertical-mask validation/provider forwarding/alpha packing; native-opaque isolation/constant-alpha/sparse-real-preview/fractional-coverage/AVC-SAR-rotation-geometry fallbacks; cancellation/failure cleanup and monotonic progress passed. Media APIs are synthetic; real encode/playback requires browser acceptance.');
+    console.log('vap-engine: native GPU producer packed-pixel/metadata and preview parity, partial-frame runtime loss same-frame CPU retry, unavailable/startup and baked-mode fallback, cancellation/disposal checks; bounded sequence bitmap prefetch with reverse decode/natural output and packed-pixel parity, current/ready/late exactly-once close, pending abort/return/encode failure, future-corrupt-frame rejection, resource source lifetime and retry isolation; bounded reverse-completing worker pipeline with synchronous poolSize1 capture, original97-frame RGB/Alpha/time/preview order, budget re-encode pixel parity, cancellation/error cleanup/CPU fallbacks and guarded resources/native/sequence paths; High/Main/Baseline support and real-probe fallback at actual bitrate, shared VBR/quality/no-preference configs, retry reselection, high-quality Canvas resampling, one headroom quality boost/highest-bitrate valid selection/fitting-result retention on overshoot or optional encoder failure/cancellation, default and manual size limits without dimension/FPS/alpha reduction; native dynamic vs fixed resource end-to-end encoded RGB/gray-alpha bytes, timed masks, embedded src/frame JSON, original Vapx animated slots/occlusion masks and no-double-premultiply source repacking; optional three-frame source detection, bounded readback/input cleanup and conservative decoder/readback/missing-frame fallback; default inspection without sampling; protocol fixture roundtrip/box guards; two modes x two alpha scales; 2 MB default and duration-independent overrides for every preset/audio-aware budget/recompression and strict actual-size validation/bounded failure, unchanged dimensions/FPS and baseline codec API default; reference-style RGB feather/legacy straight RGB/independent gray alpha packing; frame timing; AAC metadata/copy, explicit mute, audio gain validation/PCM scaling/clipping/timing/cleanup/unsupported encoder, audio transcode; all-preset bounded compression/strict-budget reporting; vertical-mask validation/provider forwarding/alpha packing; native-opaque isolation/constant-alpha/sparse-real-preview/fractional-coverage/AVC-SAR-rotation-geometry fallbacks; cancellation/failure cleanup and monotonic progress passed. Media APIs are synthetic; real encode/playback requires browser acceptance.');
   }finally{for(const [name,descriptor]of installed.reverse()){if(descriptor)Object.defineProperty(globalThis,name,descriptor);else delete globalThis[name]}await fs.rm(temp,{recursive:true,force:true});}
 })().catch(error=>{console.error(error);process.exitCode=1});

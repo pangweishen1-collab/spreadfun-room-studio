@@ -5,8 +5,8 @@
   const $=id=>root.querySelector('#vap'+id),video=$('SourceVideo'),canvas=$('PreviewCanvas'),stage=$('Stage');
   const previewBackgrounds=[['Room','room'],['Checker','checker'],['Black','black'],['White','white']];
   const copy={
-    zh:{title:'MP4 转 VAP 工具',help:'使用说明',helpTitle:'MP4 转 VAP 使用说明',close:'关闭',preview:'效果预览',inputType:'输入类型',plain:'普通 MP4',chroma:'纯色幕布 MP4',method:'去背景方式',blackLuma:'黑底去背景',whiteLuma:'白底去背景',aiPerson:'AI 人像抠像',manualMask:'导入遮罩',opaque:'保留原背景',screenAuto:'自动识别幕色',screenGreen:'绿色',screenBlue:'蓝色',chooseMask:'选择遮罩图片 / 视频',noMask:'尚未选择遮罩',original:'原片',transparent:'透明效果',alphaView:'Alpha 黑白图',checker:'棋盘格',black:'黑',white:'白',blue:'蓝',uploadTitle:'点击、拖入或粘贴 MP4 视频',uploadHint:'200 MB 以内 · 最长 120 秒 · 本机处理',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',upload:'上传 MP4',previewProcessing:'正在生成当前帧预览…',play:'播放',pause:'暂停',soundOff:'静音预览',soundOn:'有声预览',timeline:'视频时间轴',replace:'替换视频',keySettings:'边缘与去溢色',tolerance:'抠像强度',softness:'边缘柔化',spill:'去幕色溢色',resultPreview:'输出效果',compareSource:'当前效果',playResult:'透明播放',resultPreviewHint:'VAP MP4 将 RGB 与黑白 Alpha 拼接存储，普通播放器会同时显示两部分。本页使用原版腾讯 VAP 播放器合成透明效果；手机端 SDK 需另行验证。',privacy:'视频与声音仅在本机处理，不上传至服务器。',output:'调整与导出',dimensions:'输出尺寸',ratioLocked:'输出比例锁定',sourceSize:'原片尺寸',sizePresets:'尺寸快捷项',sourceSizeUnavailable:'原片尺寸不在 16–2048 范围内，请设置输出尺寸',width:'宽度',height:'高度',invalidSize:'宽高需为 16–2048 的整数。',alphaResolution:'Alpha 分辨率',alphaHalfHint:'透明边缘宽高各减半，RGB 保持完整尺寸；不是 50% 透明度。',alphaFullHint:'全分辨率 Alpha，边缘采样更完整，文件可能更大。',fps:'输出帧率 FPS',targetSize:'体积上限 MB',compression:'压缩预设',ultraQuality:'超清优先',qualityFirst:'高清优先',balanced:'智能均衡',sizeFirst:'体积优先',budgetHint:'默认体积上限按时长自动设置。5 秒内 1.5 MB，超过 5 秒至 10 秒 2.5 MB，更长的视频 3.5 MB。也可手动设得更小。MP4 和 ZIP 都按实际体积验收。',advanced:'高级设置',keepAudio:'保留原片声音',codecHint:'默认 H.264 兼容编码；AAC 音轨直接保留，其余音轨在本机转换。',convert:'开始转换 VAP',convertAgain:'重新转换',converting:'正在转换…',cancel:'取消',generated:'VAP v2 已生成',downloadMp4:'下载 VAP 资源',downloadJson:'下载 vapc.json',downloadZip:'下载完整包 · ZIP',helpOne:'直接上传 MP4、同尺寸图片序列或一个 ZIP，自动识别类型；序列按文件名数字排序。',helpTwo:'选择匹配的去背景方式，先检查透明预览和 Alpha 黑白图。AI 人像只适用于人像，黑白底方式可能误删相近颜色。',helpThree:'设置尺寸、Alpha 分辨率和目标体积，再开始转换。0.5 / 1.0 表示 Alpha 平面分辨率，不是整体透明度。',helpFour:'下载 MP4，旧版网页播放器可配合 vapc.json 使用。成品是否适配具体 iOS / Android SDK，仍需目标设备实测。',blackHint:'适合已知纯黑底素材。黑色衣物、暗部和弱光可能被误删，请先检查透明预览。',whiteHint:'适合已知纯白底素材。白色主体、高光和烟雾可能被误删，请先检查透明预览。',aiHint:'AI 仅分割人像，不适合通用礼物、车辆或粒子。首次约下载 14.3 MB 组件与模型；请检查逐帧效果。',maskHint:'使用与原片对应的灰度遮罩：白色保留、黑色透明。支持静态图片或同步 MP4。',opaqueHint:'不执行抠像，完整保留原片画面颜色；可叠加上下透明渐变。',chromaHint:'自动取样实际幕色，支持红、橙、黄、绿、青、蓝、紫等纯色；也可手动改色。普通场景和不确定素材保留原画面，与幕色相近的主体细节请检查 Alpha。',reading:'正在读取视频…',loading:'正在加载本机组件…',decoding:'正在解码与抠像…',encoding:'正在编码视频…',packaging:'正在打包 VAP…',cancelled:'已取消转换，原片与设置已保留。',stale:'设置已更改，请重新转换。',saved:'已发起下载',audioYes:'有音轨',audioNo:'无音轨',audioKept:'保留声音',audioMuted:'无声导出',audioNone:'原片无声音',withinBudget:'实际文件在目标体积内。',overBudget:'为保留画质，实际文件超出软目标。可选择“体积优先”重新转换。',errorFile:'请选择一段可读取的 MP4 视频（200 MB 以内）。',errorLoad:'视频读取失败，请替换视频或重试；已有原片已保留。',errorLimits:'视频最长 120 秒，原片长边不超过 4096；输出宽高需在 16–2048 之间。',errorUnsupported:'此浏览器不能完成本机 H.264 编解码，请使用支持 WebCodecs 的新版浏览器。',errorDecode:'视频解码失败，请更换为可播放的 H.264 MP4 后重试。',errorEncode:'视频编码失败，请尝试降低尺寸后重试。',errorAudio:'声音处理失败。可更换 AAC 音轨视频，或主动取消“保留原片声音”后重试。',errorMatte:'当前去背景方式处理失败，请检查遮罩或改用其他方式后重试。',errorInvalid:'请检查尺寸、目标体积与去背景设置。',errorMask:'请先选择有效的遮罩图片或 MP4。',errorConvert:'转换失败，原片已保留，请检查设置并重试。',errorDownload:'未能发起下载，请重试。',errorZip:'打包组件未能加载，请重试或分别下载 MP4 与 JSON。',previewFailed:'当前帧透明预览失败，请检查去背景方式或遮罩；原片可继续预览。'},
-    en:{title:'MP4 to VAP tool',help:'How to use',helpTitle:'MP4 to VAP guide',close:'Close',preview:'Preview',inputType:'Input type',plain:'Regular MP4',chroma:'Solid-color screen',method:'Background removal',blackLuma:'Black background',whiteLuma:'White background',aiPerson:'AI person segmentation',manualMask:'Import mask',opaque:'Keep background',screenAuto:'Detect screen color',screenGreen:'Green',screenBlue:'Blue',chooseMask:'Choose mask image / video',noMask:'No mask selected',original:'Original',transparent:'Transparent',alphaView:'Alpha matte',checker:'Checkerboard',black:'Black',white:'White',blue:'Blue',uploadTitle:'Click, drop or paste an MP4 video',uploadHint:'Up to 200 MB · 120 seconds · On-device processing',pasteHint:'Paste with ⌘V / Ctrl+V to upload',upload:'Upload MP4',previewProcessing:'Preparing current-frame preview…',play:'Play',pause:'Pause',soundOff:'Preview muted',soundOn:'Preview with audio',timeline:'Video timeline',replace:'Replace video',keySettings:'Edges and despill',tolerance:'Key strength',softness:'Edge softness',spill:'Screen-color despill',resultPreview:'Output',compareSource:'Current effect',playResult:'Play transparent',resultPreviewHint:'VAP MP4 stores RGB and grayscale alpha side by side. Regular video players show both; this page uses the Tencent VAP player to composite transparency. Mobile SDK compatibility requires device testing.',privacy:'Video and audio stay on your device and are never uploaded.',output:'Adjust and export',dimensions:'Output dimensions',ratioLocked:'Output ratio locked',sourceSize:'Source size',sizePresets:'Size presets',sourceSizeUnavailable:'Source dimensions exceed the 16–2048 output range; set output dimensions',width:'Width',height:'Height',invalidSize:'Use whole numbers from 16 to 2048.',alphaResolution:'Alpha resolution',alphaHalfHint:'Half width and height for the alpha plane, with full RGB dimensions. This does not mean 50% opacity.',alphaFullHint:'Full-resolution alpha preserves more edge samples and may increase file size.',fps:'Output frame rate (FPS)',targetSize:'Size limit MB',compression:'Compression preset',ultraQuality:'Ultra quality',qualityFirst:'Quality first',balanced:'Balanced',sizeFirst:'Size first',budgetHint:'The size limit follows clip duration. Up to 5 seconds uses 1.5 MB, over 5 through 10 seconds uses 2.5 MB, and longer clips use 3.5 MB. You can set a smaller limit. Both MP4 and ZIP are checked against it.',advanced:'Advanced settings',keepAudio:'Keep source audio',codecHint:'H.264 for compatibility. AAC is copied; other audio is converted on-device.',convert:'Convert to VAP',convertAgain:'Convert again',converting:'Converting…',cancel:'Cancel',generated:'VAP v2 generated',downloadMp4:'Download VAP asset',downloadJson:'Download vapc.json',downloadZip:'Download bundle · ZIP',helpOne:'Import one MP4, same-size image frames, or one ZIP. The input type is detected automatically; numeric filenames determine frame order.',helpTwo:'Choose the matching background removal method and inspect transparency and alpha. AI is for people only; black / white keying can remove similar foreground colors.',helpThree:'Set dimensions, alpha resolution and target size, then convert. Alpha 0.5 / 1.0 controls plane resolution, not overall opacity.',helpFour:'Download the MP4. Older web players can use vapc.json. Test the final file on the target iOS / Android SDK.',blackHint:'For a known black background. Dark clothing, shadows and faint lights may be removed; inspect transparency first.',whiteHint:'For a known white background. White subjects, highlights and smoke may be removed; inspect transparency first.',aiHint:'AI segments people only, not general gifts, vehicles or particles. About 14.3 MB of components and model download on first use. Inspect the moving edges.',maskHint:'Use a matching grayscale mask: white keeps the image and black makes it transparent. Static images and synchronized MP4 masks are supported.',opaqueHint:'No background removal. Source frame colors are preserved, with optional top and bottom transparency fades.',chromaHint:'Samples the actual solid screen color automatically, with manual color overrides. Uncertain scenes keep the original frame. Check alpha for foreground details similar to the screen color.',reading:'Reading video…',loading:'Loading local components…',decoding:'Decoding and matting…',encoding:'Encoding video…',packaging:'Packaging VAP…',cancelled:'Conversion cancelled. Your source and settings are preserved.',stale:'Settings changed. Convert again to update the result.',saved:'Download requested',audioYes:'Audio track',audioNo:'No audio',audioKept:'Audio kept',audioMuted:'Muted output',audioNone:'Source has no audio',withinBudget:'The actual file is within the target size.',overBudget:'The file exceeds the soft target to preserve quality. Choose “Size first” to retry.',errorFile:'Choose a readable MP4 video under 200 MB.',errorLoad:'Could not read this video. Replace it or retry; your previous source is preserved.',errorLimits:'Use up to 120 seconds and a source long edge up to 4096. Output dimensions must be 16–2048.',errorUnsupported:'This browser cannot encode and decode local H.264. Use a current browser with WebCodecs support.',errorDecode:'Video decoding failed. Try a playable H.264 MP4.',errorEncode:'Encoding failed. Try smaller dimensions.',errorAudio:'Audio processing failed. Try AAC audio, or explicitly turn off “Keep source audio”.',errorMatte:'Background removal failed. Check the mask or try another method.',errorInvalid:'Check dimensions, target size and removal settings.',errorMask:'Choose a valid mask image or MP4 first.',errorConvert:'Conversion failed. Your source is preserved. Check settings and retry.',errorDownload:'Could not start the download. Please retry.',errorZip:'Could not load ZIP packaging. Retry or download MP4 and JSON separately.',previewFailed:'Current-frame matting failed. Check the method or mask; the original preview is still available.'}
+    zh:{title:'MP4 转 VAP 工具',help:'使用说明',helpTitle:'MP4 转 VAP 使用说明',close:'关闭',preview:'效果预览',inputType:'输入类型',plain:'普通 MP4',chroma:'纯色幕布 MP4',method:'去背景方式',blackLuma:'黑底去背景',whiteLuma:'白底去背景',aiPerson:'AI 人像抠像',manualMask:'导入遮罩',opaque:'保留原背景',screenAuto:'自动识别幕色',screenGreen:'绿色',screenBlue:'蓝色',chooseMask:'选择遮罩图片 / 视频',noMask:'尚未选择遮罩',original:'原片',transparent:'透明效果',alphaView:'Alpha 黑白图',checker:'棋盘格',black:'黑',white:'白',blue:'蓝',uploadTitle:'点击、拖入或粘贴 MP4 视频',uploadHint:'200 MB 以内 · 最长 120 秒 · 本机处理',pasteHint:'支持复制粘贴，按 ⌘V / Ctrl+V 上传',upload:'上传 MP4',previewProcessing:'正在生成当前帧预览…',play:'播放',pause:'暂停',soundOff:'静音预览',soundOn:'有声预览',timeline:'视频时间轴',replace:'替换视频',keySettings:'边缘与去溢色',tolerance:'抠像强度',softness:'边缘柔化',spill:'去幕色溢色',resultPreview:'输出效果',compareSource:'当前效果',playResult:'透明播放',resultPreviewHint:'VAP MP4 将 RGB 与黑白 Alpha 拼接存储，普通播放器会同时显示两部分。本页使用原版腾讯 VAP 播放器合成透明效果；手机端 SDK 需另行验证。',privacy:'视频与声音仅在本机处理，不上传至服务器。',output:'调整与导出',dimensions:'输出尺寸',ratioLocked:'输出比例锁定',sourceSize:'原片尺寸',sizePresets:'尺寸快捷项',sourceSizeUnavailable:'原片尺寸不在 16–2048 范围内，请设置输出尺寸',width:'宽度',height:'高度',invalidSize:'宽高需为 16–2048 的整数。',alphaResolution:'Alpha 分辨率',alphaHalfHint:'透明边缘宽高各减半，RGB 保持完整尺寸；不是 50% 透明度。',alphaFullHint:'全分辨率 Alpha，边缘采样更完整，文件可能更大。',fps:'输出帧率 FPS',targetSize:'体积上限 MB',compression:'压缩预设',ultraQuality:'超清优先',qualityFirst:'高清优先',balanced:'智能均衡',sizeFirst:'体积优先',budgetHint:'体积上限默认 2 MB，可手动设置。预估使用当前设置试编码，显示 MP4 的大致范围。MP4 和 ZIP 都按成品的实际体积检查上限。',advanced:'高级设置',keepAudio:'保留原片声音',codecHint:'默认 H.264 兼容编码；AAC 音轨直接保留，其余音轨在本机转换。',convert:'开始转换 VAP',convertAgain:'重新转换',converting:'正在转换…',cancel:'取消',generated:'VAP v2 已生成',downloadMp4:'下载 VAP 资源',downloadJson:'下载 vapc.json',downloadZip:'下载完整包 · ZIP',helpOne:'直接上传 MP4、同尺寸图片序列或一个 ZIP，自动识别类型；序列按文件名数字排序。',helpTwo:'选择匹配的去背景方式，先检查透明预览和 Alpha 黑白图。AI 人像只适用于人像，黑白底方式可能误删相近颜色。',helpThree:'设置尺寸、Alpha 分辨率和目标体积，再开始转换。0.5 / 1.0 表示 Alpha 平面分辨率，不是整体透明度。',helpFour:'下载 MP4，旧版网页播放器可配合 vapc.json 使用。成品是否适配具体 iOS / Android SDK，仍需目标设备实测。',blackHint:'适合已知纯黑底素材。黑色衣物、暗部和弱光可能被误删，请先检查透明预览。',whiteHint:'适合已知纯白底素材。白色主体、高光和烟雾可能被误删，请先检查透明预览。',aiHint:'AI 仅分割人像，不适合通用礼物、车辆或粒子。首次约下载 14.3 MB 组件与模型；请检查逐帧效果。',maskHint:'使用与原片对应的灰度遮罩：白色保留、黑色透明。支持静态图片或同步 MP4。',opaqueHint:'不执行抠像，完整保留原片画面颜色；可叠加上下透明渐变。',chromaHint:'自动取样实际幕色，支持红、橙、黄、绿、青、蓝、紫等纯色；也可手动改色。普通场景和不确定素材保留原画面，与幕色相近的主体细节请检查 Alpha。',reading:'正在读取视频…',loading:'正在加载本机组件…',decoding:'正在解码与抠像…',encoding:'正在编码视频…',packaging:'正在打包 VAP…',cancelled:'已取消转换，原片与设置已保留。',stale:'设置已更改，请重新转换。',saved:'已发起下载',audioYes:'有音轨',audioNo:'无音轨',audioKept:'保留声音',audioMuted:'无声导出',audioNone:'原片无声音',withinBudget:'实际文件在目标体积内。',overBudget:'为保留画质，实际文件超出软目标。可选择“体积优先”重新转换。',errorFile:'请选择一段可读取的 MP4 视频（200 MB 以内）。',errorLoad:'视频读取失败，请替换视频或重试；已有原片已保留。',errorLimits:'视频最长 120 秒，原片长边不超过 4096；输出宽高需在 16–2048 之间。',errorUnsupported:'此浏览器不能完成本机 H.264 编解码，请使用支持 WebCodecs 的新版浏览器。',errorDecode:'视频解码失败，请更换为可播放的 H.264 MP4 后重试。',errorEncode:'视频编码失败，请尝试降低尺寸后重试。',errorAudio:'声音处理失败。可更换 AAC 音轨视频，或主动取消“保留原片声音”后重试。',errorMatte:'当前去背景方式处理失败，请检查遮罩或改用其他方式后重试。',errorInvalid:'请检查尺寸、目标体积与去背景设置。',errorMask:'请先选择有效的遮罩图片或 MP4。',errorConvert:'转换失败，原片已保留，请检查设置并重试。',errorDownload:'未能发起下载，请重试。',errorZip:'打包组件未能加载，请重试或分别下载 MP4 与 JSON。',previewFailed:'当前帧透明预览失败，请检查去背景方式或遮罩；原片可继续预览。'},
+    en:{title:'MP4 to VAP tool',help:'How to use',helpTitle:'MP4 to VAP guide',close:'Close',preview:'Preview',inputType:'Input type',plain:'Regular MP4',chroma:'Solid-color screen',method:'Background removal',blackLuma:'Black background',whiteLuma:'White background',aiPerson:'AI person segmentation',manualMask:'Import mask',opaque:'Keep background',screenAuto:'Detect screen color',screenGreen:'Green',screenBlue:'Blue',chooseMask:'Choose mask image / video',noMask:'No mask selected',original:'Original',transparent:'Transparent',alphaView:'Alpha matte',checker:'Checkerboard',black:'Black',white:'White',blue:'Blue',uploadTitle:'Click, drop or paste an MP4 video',uploadHint:'Up to 200 MB · 120 seconds · On-device processing',pasteHint:'Paste with ⌘V / Ctrl+V to upload',upload:'Upload MP4',previewProcessing:'Preparing current-frame preview…',play:'Play',pause:'Pause',soundOff:'Preview muted',soundOn:'Preview with audio',timeline:'Video timeline',replace:'Replace video',keySettings:'Edges and despill',tolerance:'Key strength',softness:'Edge softness',spill:'Screen-color despill',resultPreview:'Output',compareSource:'Current effect',playResult:'Play transparent',resultPreviewHint:'VAP MP4 stores RGB and grayscale alpha side by side. Regular video players show both; this page uses the Tencent VAP player to composite transparency. Mobile SDK compatibility requires device testing.',privacy:'Video and audio stay on your device and are never uploaded.',output:'Adjust and export',dimensions:'Output dimensions',ratioLocked:'Output ratio locked',sourceSize:'Source size',sizePresets:'Size presets',sourceSizeUnavailable:'Source dimensions exceed the 16–2048 output range; set output dimensions',width:'Width',height:'Height',invalidSize:'Use whole numbers from 16 to 2048.',alphaResolution:'Alpha resolution',alphaHalfHint:'Half width and height for the alpha plane, with full RGB dimensions. This does not mean 50% opacity.',alphaFullHint:'Full-resolution alpha preserves more edge samples and may increase file size.',fps:'Output frame rate (FPS)',targetSize:'Size limit MB',compression:'Compression preset',ultraQuality:'Ultra quality',qualityFirst:'Quality first',balanced:'Balanced',sizeFirst:'Size first',budgetHint:'The default size limit is 2 MB and can be adjusted. A trial encode with the current settings gives an approximate MP4 size range. The limit is checked against the actual MP4 and ZIP sizes.',advanced:'Advanced settings',keepAudio:'Keep source audio',codecHint:'H.264 for compatibility. AAC is copied; other audio is converted on-device.',convert:'Convert to VAP',convertAgain:'Convert again',converting:'Converting…',cancel:'Cancel',generated:'VAP v2 generated',downloadMp4:'Download VAP asset',downloadJson:'Download vapc.json',downloadZip:'Download bundle · ZIP',helpOne:'Import one MP4, same-size image frames, or one ZIP. The input type is detected automatically; numeric filenames determine frame order.',helpTwo:'Choose the matching background removal method and inspect transparency and alpha. AI is for people only; black / white keying can remove similar foreground colors.',helpThree:'Set dimensions, alpha resolution and target size, then convert. Alpha 0.5 / 1.0 controls plane resolution, not overall opacity.',helpFour:'Download the MP4. Older web players can use vapc.json. Test the final file on the target iOS / Android SDK.',blackHint:'For a known black background. Dark clothing, shadows and faint lights may be removed; inspect transparency first.',whiteHint:'For a known white background. White subjects, highlights and smoke may be removed; inspect transparency first.',aiHint:'AI segments people only, not general gifts, vehicles or particles. About 14.3 MB of components and model download on first use. Inspect the moving edges.',maskHint:'Use a matching grayscale mask: white keeps the image and black makes it transparent. Static images and synchronized MP4 masks are supported.',opaqueHint:'No background removal. Source frame colors are preserved, with optional top and bottom transparency fades.',chromaHint:'Samples the actual solid screen color automatically, with manual color overrides. Uncertain scenes keep the original frame. Check alpha for foreground details similar to the screen color.',reading:'Reading video…',loading:'Loading local components…',decoding:'Decoding and matting…',encoding:'Encoding video…',packaging:'Packaging VAP…',cancelled:'Conversion cancelled. Your source and settings are preserved.',stale:'Settings changed. Convert again to update the result.',saved:'Download requested',audioYes:'Audio track',audioNo:'No audio',audioKept:'Audio kept',audioMuted:'Muted output',audioNone:'Source has no audio',withinBudget:'The actual file is within the target size.',overBudget:'The file exceeds the soft target to preserve quality. Choose “Size first” to retry.',errorFile:'Choose a readable MP4 video under 200 MB.',errorLoad:'Could not read this video. Replace it or retry; your previous source is preserved.',errorLimits:'Use up to 120 seconds and a source long edge up to 4096. Output dimensions must be 16–2048.',errorUnsupported:'This browser cannot encode and decode local H.264. Use a current browser with WebCodecs support.',errorDecode:'Video decoding failed. Try a playable H.264 MP4.',errorEncode:'Encoding failed. Try smaller dimensions.',errorAudio:'Audio processing failed. Try AAC audio, or explicitly turn off “Keep source audio”.',errorMatte:'Background removal failed. Check the mask or try another method.',errorInvalid:'Check dimensions, target size and removal settings.',errorMask:'Choose a valid mask image or MP4 first.',errorConvert:'Conversion failed. Your source is preserved. Check settings and retry.',errorDownload:'Could not start the download. Please retry.',errorZip:'Could not load ZIP packaging. Retry or download MP4 and JSON separately.',previewFailed:'Current-frame matting failed. Check the method or mask; the original preview is still available.'}
   };
   Object.assign(copy.zh,{verticalMask:'上下透明渐变',enableVerticalMask:'启用上下透明渐变',verticalMaskHint:'拖动画面中的四条辅助线，或输入百分比。上、下边缘平滑过渡到透明，中间画面保留；辅助线不写入成品。',maskTopStart:'上方全透明至',maskTopEnd:'上方渐变结束',maskBottomStart:'下方渐变开始',maskBottomEnd:'下方全透明自',maskShortTopStart:'上透明',maskShortTopEnd:'上保留',maskShortBottomStart:'下保留',maskShortBottomEnd:'下透明',maskOrderError:'请按从上到下排列四个边界，两段渐变都需保留宽度。',maskLiveHint:'遮罩调整实时生效，预览与导出使用当前参数；若已生成成品，修改后需重新转换。',maskLive:'实时生效',maskInvalid:'请检查参数',maskOff:'未启用',maskGuides:'上下渐变辅助线',keepFrameMask:'保留画面 + 透明遮罩',frameMaskHint:'保留画面颜色，实时按上下渐变调整透明度；转换时直接使用当前设置。'});
   Object.assign(copy.en,{verticalMask:'Top and bottom transparency',enableVerticalMask:'Enable vertical transparency fade',verticalMaskHint:'Drag the four guides or enter percentages. The top and bottom fade smoothly to transparent while the middle stays visible. Guides are not exported.',maskTopStart:'Top fully transparent until',maskTopEnd:'Top fade ends',maskBottomStart:'Bottom fade starts',maskBottomEnd:'Bottom fully transparent from',maskShortTopStart:'Top clear',maskShortTopEnd:'Top visible',maskShortBottomStart:'Bottom visible',maskShortBottomEnd:'Bottom clear',maskOrderError:'Keep the four boundaries in top-to-bottom order, with nonzero width for both fades.',maskLiveHint:'Mask edits take effect immediately in preview and export settings. After changing a generated result, convert again to update the file.',maskLive:'Live',maskInvalid:'Check values',maskOff:'Off',maskGuides:'Vertical fade guides',keepFrameMask:'Keep frame + transparency mask',frameMaskHint:'Preserves frame colors and adjusts alpha using the current vertical fade. Edits take effect immediately; convert with the current settings.'});
@@ -71,43 +71,47 @@
   }
   let lang=typeof language!=='undefined'&&language==='en'?'en':'zh';
   const t=key=>(copy[lang]||copy.zh)[key]||key;
-  const state={active:false,file:null,meta:null,sourceUrl:null,inputMode:'video',sequenceTime:0,videoOffsetY:0,maskFile:null,sourceKind:'plain_mp4',detectedMethod:'opaque',detectedScreen:'auto',detectedBackground:null,adaptiveChroma:false,view:'original',background:'room',loading:false,converting:false,packing:false,playing:false,revision:0,result:null,notice:null,errorTone:'error',progress:0,phase:'loading',previewError:false};
+  const state={active:false,file:null,meta:null,sourceUrl:null,inputMode:'video',sequenceTime:0,videoOffsetY:0,maskFile:null,sourceKind:'plain_mp4',detectedMethod:'opaque',detectedScreen:'auto',detectedBackground:null,adaptiveChroma:false,view:'original',background:'room',loading:false,estimating:false,estimate:null,converting:false,packing:false,playing:false,revision:0,result:null,notice:null,errorTone:'error',progress:0,phase:'loading',previewError:false};
   state.verticalMask=savedMask();state.giftFade={enabled:true,fadeIn:1,fadeOut:1};state.playerState='empty';state.sourceFrameReady=false;state.previewReady=false;
   let ordinaryEffects=null,colorPickView=null;
   state.keyColor=null;state.pickingColor=false;
   const colorProbe=document.createElement('canvas');
-  const emptyOutputBytes=1500000,maxOutputBytes=3500000;
+  const defaultOutputBytes=2_000_000,maxOutputBytes=3_500_000;
   const outputWidth=720,outputHeight=1560,outputFps=24,outputAlphaScale=.5;
   Object.assign(copy.zh,{
-    packedSize:'打包尺寸',
-    helpThree:'打包尺寸固定为 1088 × 1568，画面为 720 × 1560，Alpha 分辨率为 0.5。可调整目标体积。',
+    packedSize:'打包尺寸', sourceVideoRetained:'已保留原始画面',
+    estimateSize:'预估体积', estimatingSize:'正在试编码…', estimateLabel:'预计 MP4：',
+    estimateFailed:'无法预估体积，请重试。', errorCadence:'未能保持固定 24 FPS，请适当提高体积上限后重试。',
+    helpThree:'打包尺寸固定为 1088 × 1568，画面为 720 × 1560，Alpha 分辨率为 0.5。体积上限默认 2 MB，可手动设置。',
     helpFour:'下载 VAP 可保留头像和文字标签。点击「查看 VAP 成品」检查播放效果。',
     codecHint:'采用官方 VAP 工具的 H.264 Main 4.0 封装规格。原音量 AAC 直接保留，调整音量时在本机重新编码声音。'
   });
   Object.assign(copy.en,{
-    packedSize:'Packed size',
-    helpThree:'The packed size is fixed at 1088 × 1568, with a 720 × 1560 display area and 0.5 alpha resolution. You can change the file size limit.',
+    packedSize:'Packed size', sourceVideoRetained:'Original video preserved',
+    estimateSize:'Estimate size', estimatingSize:'Encoding samples…', estimateLabel:'Estimated MP4: ',
+    estimateFailed:'Could not estimate the file size. Try again.', errorCadence:'Could not keep a fixed 24 FPS. Increase the size limit and try again.',
+    helpThree:'The packed size is fixed at 1088 × 1568, with a 720 × 1560 display area and 0.5 alpha resolution. The default file size limit is 2 MB and can be adjusted.',
     helpFour:'Download the VAP to keep avatar and text tags. Open the VAP checker to verify playback.',
     codecHint:'Uses the official VAP tool’s H.264 Main 4.0 output format. AAC at source volume is copied. Volume adjustments re-encode audio on-device.'
   });
   copy.zh.packedAlpha='已识别 Alpha 通道';
   copy.en.packedAlpha='Alpha channel detected';
-  $('Quality').value='ultra';$('Method').value='auto';$('Target').value=String(emptyOutputBytes/1e6);$('Volume').value='60';$('VerticalMask').open=true;
-  let sequenceLoadController=null,sequenceStarted=0;
+  $('Quality').value='ultra';$('Method').value='auto';$('Target').value=String(defaultOutputBytes/1e6);$('Target').max=String(maxOutputBytes/1e6);$('Volume').value='60';$('VerticalMask').open=true;
+  let sequenceLoadController=null,sequenceStarted=0,sourceUploadProgress=null;
   const isSequence=()=>state.file?.kind==='image_sequence';
   Object.assign(copy.zh,{lightRecovery:'光效透明修复',lightRecoveryHint:'适合光圈、粒子等半透明特效；同色实体材质可关闭。'});
   Object.assign(copy.en,{lightRecovery:'Recover transparent glow',lightRecoveryHint:'For translucent light and particles. Turn off for solid materials sharing the screen color.'});
   const activeMethod=()=>isSequence()||state.sourceVapConfig?'opaque':$('Method').value==='auto'?state.detectedMethod:$('Method').value;
   const sourceTime=()=>isSequence()?state.sequenceTime:video.currentTime||0;
   function seekSource(time){const next=Math.max(0,Math.min(state.meta?.duration||0,time));if(isSequence()){state.sequenceTime=next;sync();requestPreview()}else video.currentTime=next}
-  let enginePromise=null,engineApi=null,requestedTargetBytes=null,loadVersion=0,controller=null,animation=0,previewVersion=0,previewProcessor=null,previewJob=null,previewQueued=false,lastPreviewTime=-1,maskDrag=null,videoDrag=null;
+  let enginePromise=null,requestedTargetBytes=defaultOutputBytes,loadVersion=0,controller=null,animation=0,previewVersion=0,previewProcessor=null,previewJob=null,previewQueued=false,lastPreviewTime=-1,maskDrag=null,videoDrag=null;
   const sourceFrame=document.createElement('canvas');
   let resourceModulePromise=null,resourcePreview=null,resourcePreviewRevision=-1;
   let giftFadeModulePromise=null;
   const getGiftFadeModule=()=>giftFadeModulePromise||(giftFadeModulePromise=import('./vap-gift-fade.mjs?v=20261029-gift-fade1').catch(error=>{giftFadeModulePromise=null;throw error}));
   const getResourceModule=()=>resourceModulePromise||(resourceModulePromise=import('./vap-resources.mjs?v=20261111-official-pack').catch(error=>{resourceModulePromise=null;throw error}));
   const resourceEditor=window.VapResourceEditor?.create({root,stage,canvas,onChange(event={}){
-    if(state.loading||state.converting||state.packing)return;
+    if(state.loading||state.estimating||state.converting||state.packing)return;
     if(event.reason==='interaction-start'){pause();return}
     if(event.reason==='focus-resource'){pause();state.view='transparent';sync();requestPreview();stage.scrollIntoView?.({block:'center',behavior:'instant'});return}
     if(event.reason==='seek-resource'){
@@ -122,20 +126,16 @@
   }});
   let previewAudioContext=null,previewGain=null,playbackVersion=0;
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[],autoplaySource=null;
-  const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
+  const busy=()=>state.loading||state.estimating||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261111-vap-faster').then(engine=>{engineApi=engine;return engine}).catch(error=>{enginePromise=null;throw error}));
-  function budgetCap(){return engineApi?.outputBudget(maxOutputBytes,state.meta||{},state.sourceVapConfig)??maxOutputBytes}
-  function applyBudget(){
-    const cap=budgetCap();$('Target').max=String(cap/1e6);
-    $('Target').value=String(Math.min(requestedTargetBytes??(state.meta?cap:emptyOutputBytes),cap)/1e6);
-  }
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261111-native-quality').catch(error=>{enginePromise=null;throw error}));
+  function applyBudget(){$('Target').value=String(requestedTargetBytes/1e6)}
   function errorKey(error,fallback='errorConvert'){
     if(error?.code==='audio'&&error.audioStage){
       if(state.meta?.audioCodec==='aac')return 'errorAudioOriginal';
       return error.audioStage==='decode'?'errorAudioDecode':'errorAudioEncode';
     }
-    const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',budget:'errorBudget',cancelled:'cancelled'};
+    const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode',cadence:'errorCadence',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',budget:'errorBudget',cancelled:'cancelled'};
     return codes[error?.code]||fallback;
   }
   function options({preview=false}={}){
@@ -154,7 +154,7 @@
     const customColor=matteMethod==='chroma_key'&&$('Screen').value==='custom';
     if(customColor&&!validScreenBackground(state.keyColor))throw Object.assign(new Error('screen color required'),{code:'invalid'});
     const background=customColor?state.keyColor:matteMethod==='chroma_key'&&$('Screen').value==='auto'&&state.sourceKind==='chroma_mp4'?state.detectedBackground:null;
-    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,rgbAlphaMode:'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(background?{background:background.slice()}:{}),adaptiveChroma:matteMethod==='chroma_key'&&state.adaptiveChroma&&($('Screen').value==='auto'||customColor),fixedStandard:true,alphaScale:outputAlphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:engineApi?.outputBudget(Math.round(target*1e6),state.meta||{},state.sourceVapConfig)??Math.round(target*1e6),quality:'ultra',optimizeSize:true,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
+    return {...resourceOptions,sourceVapConfig:state.sourceVapConfig||undefined,rgbAlphaMode:'premultiplied',sourceKind,matteMethod,screenColor:$('Screen').value,...(background?{background:background.slice()}:{}),adaptiveChroma:matteMethod==='chroma_key'&&state.adaptiveChroma&&($('Screen').value==='auto'||customColor),fixedStandard:true,alphaScale:outputAlphaScale,width,height,fps,videoOffsetY:state.videoOffsetY,targetBytes:Math.round(target*1e6),quality:'ultra',optimizeSize:true,keepAudio:$('KeepAudio').checked,audioGain,confirmedOpaque:matteMethod==='opaque',verticalMask:{...verticalMask},giftFade:{...giftFade},maskFile:state.maskFile,keyTolerance:Number($('Tolerance').value),edgeSoftness:Number($('Softness').value),spill:Number($('Spill').value),lightRecovery:matteMethod==='chroma_key'&&$('LightRecovery').checked};
   }
   function stopColorPick(restore=true){
     if(!state.pickingColor)return;
@@ -296,7 +296,7 @@
     resourceEditor?.setContext({ready,busy:locked,width:outputWidth,height:outputHeight,duration:state.meta?.duration||0,fps:outputFps,time:sourceTime(),view:state.view,language:lang});
     // A native avatar slot may start loading its default portrait during context sync.
     locked=busy();const valid=validOptions();if(locked)endVideoDrag();
-    root.dataset.state=state.loading?'loading':state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'idle';
+    root.dataset.state=state.loading?'loading':state.estimating||state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'idle';
     root.setAttribute('aria-busy',String(locked));stage.setAttribute('aria-busy',String(locked));stage.classList.toggle('has-file',ready);stage.classList.toggle('upload-ready',!ready);
     for(const id of ['Upload','Replace','Input','SequenceInput','InputVideo','InputSequence','Budget1','Budget2','Budget3','Method','Screen','MaskPick','MaskInput','Target','Quality','KeepAudio','Tolerance','Softness','Spill','LightRecovery'])$(id).disabled=locked;
     for(const id of ['Play','Mute','Timeline','ViewOriginal','ViewTransparent','ViewAlpha'])$(id).disabled=locked||!ready||state.pickingColor;
@@ -305,7 +305,6 @@
     $('SourceVideo').hidden=sequence||!ready||(state.view!=='original'&&state.previewReady);$('PreviewCanvas').hidden=!ready||(!sequence&&state.view==='original')||!state.previewReady;
     $('InputVideo').setAttribute('aria-pressed',String(!sequenceInput));$('InputSequence').setAttribute('aria-pressed',String(sequenceInput));$('InputModes').setAttribute('aria-label',t('inputModes'));$('InputModes').hidden=true;$('DetectedType').hidden=true;
     root.querySelector('[data-vap-i18n="uploadTitle"]').textContent=t('uploadTitle');root.querySelector('[data-vap-i18n="uploadHint"]').textContent=t('uploadHint');$('Upload').textContent=t('upload');$('Replace').textContent=t('replace');
-    const cap=budgetCap();$('Target').max=String(cap/1e6);for(const amount of [1,2,3])$('Budget'+amount).disabled=locked||amount*1e6>cap;
     $('BudgetPresets').setAttribute('aria-label',t('budgetPresets'));$('BudgetPresets').hidden=true;for(const amount of [1,2,3])$('Budget'+amount).setAttribute('aria-pressed',String(Number($('Target').value)===amount));
     $('Mute').hidden=true;
 
@@ -342,8 +341,11 @@
     $('Timeline').max=String(state.meta?.duration||0);$('Timeline').value=String(Math.min(sourceTime(),state.meta?.duration||0));
     $('Convert').disabled=locked||!ready||!valid||state.pickingColor;$('Convert').textContent=t(state.converting?'converting':state.result?'convertAgain':'convert');$('Convert').setAttribute('aria-busy',String(state.converting));
     $('Convert').classList.toggle('vap-primary',!state.result);$('Convert').classList.toggle('vap-secondary',!!state.result);
-    $('Cancel').hidden=!state.loading&&!state.converting;$('Cancel').disabled=state.packing;
-    $('ProgressRow').hidden=!state.loading&&!state.converting;$('Phase').textContent=t(state.loading?'reading':state.phase);$('Percent').textContent=Math.round(state.progress*100)+'%';$('Progress').value=state.progress;
+    $('EstimateSize').disabled=$('Convert').disabled;
+    $('EstimateSize').setAttribute('aria-busy',String(state.estimating));
+    syncSizeEstimate(valid);
+    $('Cancel').hidden=!state.loading&&!state.estimating&&!state.converting;$('Cancel').disabled=state.packing;
+    $('ProgressRow').hidden=!state.estimating&&!state.converting;$('Phase').textContent=t(state.phase);$('Percent').textContent=Math.round(state.progress*100)+'%';$('Progress').value=state.progress;
     $('Notice').hidden=!state.notice;$('Notice').textContent=state.notice?t(state.notice):'';$('Notice').dataset.tone=state.errorTone;
     $('PreviewError').hidden=!state.previewError;$('PreviewError').textContent=t('previewFailed');
     $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareResultLabel').hidden=!state.result;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(outputWidth/outputHeight));syncOutputPlaceholder();
@@ -351,14 +353,16 @@
     $('ResultPlay').hidden=!state.result;$('ResultPlay').disabled=locked||!state.result||state.playerState!=='ready';$('DownloadMp4').title=t('vapPlaybackNotice');
     if(state.result){
       const {blob,config,report}=state.result,info=config.info;const seconds=Number(report.timings?.wallMs)/1000;
-      $('ResultMeta').textContent=`${info.videoW} × ${info.videoH} px · ${info.fps} FPS · Alpha ${outputAlphaScale.toFixed(1)}${config.funToolkit?.rgbAlphaMode==='premultiplied'?' · '+t('rgbFeatherApplied'):''}${report.resourceCount?' · '+t(report.resourceMode==='dynamic'?'dynamicResources':'bakedResources')+' '+report.resourceCount:''}\n${(blob.size/1e6).toFixed(2)} MB · ${t(report.audioKept?'audioKept':state.meta.hasAudio?'audioMuted':'audioNone')}${report.audioKept&&Number.isFinite(report.audioGain)&&report.audioGain!==1?` · ${t('volume')} ${Math.round(report.audioGain*100)}%`:''}${Number.isFinite(seconds)?` · ${seconds.toFixed(2)} s`:''}`;
+      const pictureNote=report.processingPath==='native-vap-copy'?t('sourceVideoRetained'):
+        config.funToolkit?.rgbAlphaMode==='premultiplied'?t('rgbFeatherApplied'):'';
+      $('ResultMeta').textContent=`${info.videoW} × ${info.videoH} px · ${info.fps} FPS · Alpha ${outputAlphaScale.toFixed(1)}${pictureNote?' · '+pictureNote:''}${report.resourceCount?' · '+t(report.resourceMode==='dynamic'?'dynamicResources':'bakedResources')+' '+report.resourceCount:''}\n${(blob.size/1e6).toFixed(2)} MB · ${t(report.audioKept?'audioKept':state.meta.hasAudio?'audioMuted':'audioNone')}${report.audioKept&&Number.isFinite(report.audioGain)&&report.audioGain!==1?` · ${t('volume')} ${Math.round(report.audioGain*100)}%`:''}${Number.isFinite(seconds)?` · ${seconds.toFixed(2)} s`:''}`;
       $('BudgetNotice').textContent=t(report.budgetExceeded?'overBudget':'withinBudget');
       $('BudgetNotice').hidden=!report.budgetExceeded;
     }
     for(const [id,field] of [['Tolerance','keyTolerance'],['Softness','edgeSoftness'],['Spill','spill']])$(''+id+'Value').textContent=Math.round(Number($(id).value)*100)+'%';
-    stage.setAttribute('aria-label',t(state.pickingColor?'pickColorHint':ready?'moveVideo':'uploadTitle'));stage.title=state.pickingColor?t('pickColorHint'):ready?t('moveVideo'):'';stage.setAttribute('tabindex',ready?'0':'-1');stage.dataset.videoOffsetY=String(state.videoOffsetY);$('Progress').setAttribute('aria-label',t('converting'));root.querySelector('.vap-view-modes').setAttribute('aria-label',t('preview'));root.querySelector('.vap-view-background').setAttribute('aria-label',t('previewBackground'));$('Screen').setAttribute('aria-label',t('chroma'));$('Timeline').setAttribute('aria-label',t('timeline'));canvas.setAttribute('aria-label',t(state.view==='alpha'?'alphaView':'transparent'));
+    stage.setAttribute('aria-label',t(state.pickingColor?'pickColorHint':ready?'moveVideo':'uploadTitle'));stage.title=state.pickingColor?t('pickColorHint'):ready?t('moveVideo'):'';stage.setAttribute('tabindex',ready?'0':'-1');stage.dataset.videoOffsetY=String(state.videoOffsetY);$('Progress').setAttribute('aria-label',t(state.estimating?'estimatingSize':'converting'));root.querySelector('.vap-view-modes').setAttribute('aria-label',t('preview'));root.querySelector('.vap-view-background').setAttribute('aria-label',t('previewBackground'));$('Screen').setAttribute('aria-label',t('chroma'));$('Timeline').setAttribute('aria-label',t('timeline'));canvas.setAttribute('aria-label',t(state.view==='alpha'?'alphaView':'transparent'));
     syncMaskControls();syncGiftFadeControls();
-    window.FunToolkitUI?.setState('vap',{phase:state.loading?'loading':state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'empty',message:state.loading?t('reading'):t(state.phase)});
+    window.FunToolkitUI?.setState('vap',{phase:state.loading?'loading':state.estimating||state.converting||state.packing?'processing':state.notice&&state.errorTone==='error'?'error':state.result?'success':ready?'ready':'empty',message:state.loading?t('reading'):t(state.phase)});
     startUploadedPlayback();
   }
   function startUploadedPlayback(){
@@ -406,7 +410,7 @@
     firstFramePaint.push(requestAnimationFrame(()=>{if(!currentSource(nonce,url))return;firstFramePaint.push(requestAnimationFrame(()=>acceptSourceFrame(nonce,url)))}));
   }
   function requestPreview(){
-    if(!state.file||!state.sourceFrameReady||(!isSequence()&&(video.readyState<2||state.view==='original'))||state.converting||!state.active||!validVerticalMask(state.verticalMask))return;
+    if(!state.file||!state.sourceFrameReady||(!isSequence()&&(video.readyState<2||state.view==='original'))||state.estimating||state.converting||!state.active||!validVerticalMask(state.verticalMask))return;
     if(previewJob){previewQueued=true;return}
     const version=previewVersion,revision=state.revision,time=sourceTime(),duration=state.meta.duration,sequence=isSequence()?state.file:null,view=state.view;
     let opts;try{opts=options({preview:true})}catch(error){state.previewError=true;sync();return}
@@ -418,7 +422,7 @@
     previewJob=(async()=>{
       if(sequence){
         const engine=await getEngine(),frame=await engine.decodeSequenceFrame(sequence,Math.min(sequence.frameCount-1,Math.floor(time*opts.fps)));
-        try{if(version!==previewVersion||revision!==state.revision||state.converting)return;sourceFrame.width=Math.max(1,Math.round(sourceWidth*sourceScale));sourceFrame.height=Math.max(1,Math.round(sourceHeight*sourceScale));sourceFrame.getContext('2d').drawImage(frame,0,0,sourceFrame.width,sourceFrame.height)}finally{frame.close()}
+        try{if(version!==previewVersion||revision!==state.revision||state.estimating||state.converting)return;sourceFrame.width=Math.max(1,Math.round(sourceWidth*sourceScale));sourceFrame.height=Math.max(1,Math.round(sourceHeight*sourceScale));sourceFrame.getContext('2d').drawImage(frame,0,0,sourceFrame.width,sourceFrame.height)}finally{frame.close()}
         if(view==='original'){if(version===previewVersion&&revision===state.revision)drawPixels(sourceFrame.getContext('2d').getImageData(0,0,sourceFrame.width,sourceFrame.height));return}
       }
       const module=opts.sourceVapConfig||opts.resources.length?await getResourceModule():null;
@@ -435,7 +439,7 @@
         pixels=resourcePreview.apply(pixels,time,{sourceCanvas:sourceFrame,resourceOpacity:dynamic?opacity:1});
       }
       if(!dynamic)pixels=fadeModule.applyGiftFade(pixels,opacity);
-      if(version!==previewVersion||revision!==state.revision||state.converting||!state.file)return;
+      if(version!==previewVersion||revision!==state.revision||state.estimating||state.converting||!state.file)return;
       if(typeof module?.resourceFrame==='function')resourceEditor?.setContext({frameResolver:module.resourceFrame,resourceOpacity:dynamic?opacity:1,fps:opts.fps,time});
       drawPixels(pixels,state.view==='alpha');
     })().catch(error=>{if(version===previewVersion){root.dataset.previewError=String(error?.message||error);state.previewError=!resourceEditor?.hasErrors();sync()}}).finally(()=>{
@@ -486,8 +490,11 @@
     const selection=sourceSelection(files);if(!selection){showNotice('errorFile');return}
     if(selection.mode==='sequence')return loadSequence(selection.files);
     const file=selection.files[0];
-    const version=++loadVersion;pause();state.loading=true;state.notice=null;state.progress=0;sync();let url=URL.createObjectURL(file);
+    const version=++loadVersion;pause();state.loading=true;state.notice=null;state.progress=0;sync();
+    const uploadProgress=sourceUploadProgress=window.UploadProgress?.begin();
+    let url;
     try{
+      url=URL.createObjectURL(file);
       const browserMeta=await readMetadata(url);
       const engine=await getEngine();
       let sourceVapConfig=null;
@@ -517,14 +524,20 @@
       video.src=state.sourceUrl;video.muted=true;video.load();waitForSourceFrame();$('DownloadReceipt').hidden=true;
       if(old)URL.revokeObjectURL(old);
     }catch(error){if(version===loadVersion){root.dataset.lastError=String(error?.message||error);state.notice=error.uiKey||errorKey(error,'errorLoad');state.errorTone='error'}}
-    finally{if(url)URL.revokeObjectURL(url);if(version===loadVersion){state.loading=false;sync();if(state.file){window.FunToolkitUI?.reveal(stage);if(video.readyState>=2)sourceDataLoaded()}}}
+    finally{
+      uploadProgress?.finish();if(sourceUploadProgress===uploadProgress)sourceUploadProgress=null;
+      if(url)URL.revokeObjectURL(url);if(version===loadVersion){state.loading=false;sync();if(state.file){window.FunToolkitUI?.reveal(stage);if(video.readyState>=2)sourceDataLoaded()}}
+    }
   }
   async function loadSequence(files){
     if(busy())return;const selected=Array.from(files||[]);if(!selected.length)return;
     const started=Date.now(),version=++loadVersion,job=new AbortController();sequenceLoadController=job;pause();state.loading=true;state.notice=null;state.progress=0;sync();
+    const uploadProgress=sourceUploadProgress=window.UploadProgress?.begin();
     try{
       const engine=await getEngine(),Zip=selected.some(file=>/\.zip$/i.test(file.name||''))?await loadZip():undefined;
-      const sequence=await engine.inspectImageSequence(selected,{fps:outputFps,signal:job.signal,Zip,onProgress:event=>{if(version===loadVersion){state.progress=Math.max(state.progress,Math.min(.95,(Number(event.progress)||0)*.95));sync()}}});
+      const sequence=await engine.inspectImageSequence(selected,{fps:outputFps,signal:job.signal,Zip,onProgress:event=>{
+        if(version===loadVersion&&!job.signal.aborted)uploadProgress?.setProgress(event.progress*.95);
+      }});
       const meta=engine.sequenceMetadata(sequence,outputFps);
       if(version!==loadVersion||job.signal.aborted)return;
       root.dataset.sequenceImportMs=String(Date.now()-started);const old=state.sourceUrl;cleanupProcessor();releaseResult();cancelSourceFrameWait();sourceNonce++;
@@ -533,7 +546,49 @@
       autoplaySource={nonce:sourceNonce,file:sequence};state.view='transparent';state.sourceFrameReady=true;state.previewReady=false;$('DownloadReceipt').hidden=true;
       if(old)URL.revokeObjectURL(old);
     }catch(error){if(version===loadVersion){root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':'sequenceError';state.errorTone=job.signal.aborted?'info':'error'}}
-    finally{if(sequenceLoadController===job)sequenceLoadController=null;if(version===loadVersion){state.loading=false;sync();requestPreview()}}
+    finally{
+      uploadProgress?.finish();if(sourceUploadProgress===uploadProgress)sourceUploadProgress=null;
+      if(sequenceLoadController===job)sequenceLoadController=null;if(version===loadVersion){state.loading=false;sync();requestPreview()}
+    }
+  }
+  function syncSizeEstimate(valid){
+    const label=$('SizeEstimate'),estimate=state.estimate;
+    const targetBytes=Math.round(Number($('Target').value)*1e6);
+    const visible=valid&&!state.estimating&&estimate?.revision===state.revision&&estimate.targetBytes===targetBytes;
+    label.hidden=!visible;
+    for(const key of ['minBytes','maxBytes','estimatedBytes','sampledSeconds','sampleCount']){
+      if(!visible){if(key in label.dataset)delete label.dataset[key]}
+      else if(label.dataset[key]!==String(estimate[key]))label.dataset[key]=String(estimate[key]);
+    }
+    const text=visible?t('estimateLabel')+
+      (Math.floor(estimate.minBytes/10000)/100).toFixed(2)+'–'+
+      (Math.ceil(estimate.maxBytes/10000)/100).toFixed(2)+' MB':'';
+    if(label.textContent!==text)label.textContent=text;
+  }
+  async function estimateSize(){
+    if(busy()||!state.file||state.pickingColor)return;
+    if(resourceEditor?.finishEditing?.()===false){showNotice('resourceInvalid');return}
+    let opts;try{opts=options()}catch(error){showNotice(error.uiKey||errorKey(error));return}
+    pause();cleanupProcessor();state.estimating=true;state.notice=null;state.progress=0;state.phase='estimatingSize';
+    const revision=state.revision,file=state.file,job=new AbortController();controller=job;sync();
+    let lastProgressSync=0;
+    try{
+      const engine=await getEngine();
+      const estimate=await engine.estimateVideoSize(file,opts,{signal:job.signal,onProgress:event=>{
+        if(controller!==job||job.signal.aborted)return;
+        state.progress=Math.max(state.progress,Math.min(1,Number(event.progress)||0));
+        const now=Date.now();if(state.progress>=1||now-lastProgressSync>=100){lastProgressSync=now;sync()}
+      }});
+      if(job.signal.aborted||revision!==state.revision||controller!==job)return;
+      state.estimate={...estimate,revision,targetBytes:opts.targetBytes};
+    }catch(error){
+      if(controller===job){
+        root.dataset.lastError=String(error?.message||error);
+        state.notice=job.signal.aborted?'cancelled':errorKey(error,'estimateFailed');state.errorTone=job.signal.aborted?'info':'error';
+      }
+    }finally{
+      if(controller===job){controller=null;state.estimating=false;sync();requestPreview()}
+    }
   }
   async function convert(){
     if(busy()||!state.file||state.pickingColor)return;
@@ -564,7 +619,10 @@
     finally{resultResources?.dispose();if(controller===job){controller=null;state.converting=false;sync();requestPreview()}}
   }
   function cancel(){
-    if(state.loading){sequenceLoadController?.abort();loadVersion++;state.loading=false;state.notice='cancelled';state.errorTone='info';sync()}
+    if(state.loading){
+      sourceUploadProgress?.finish();sourceUploadProgress=null;
+      sequenceLoadController?.abort();loadVersion++;state.loading=false;state.notice='cancelled';state.errorTone='info';sync()
+    }
     if(controller)controller.abort();
   }
   function filename(){const stem=neutralName(state.file?.name||'video').replace(/\.(mp4|zip|sequence)$/i,'').replace(/[<>:"/\\|?*\x00-\x1f]/g,'_').trim().slice(0,100)||'video';return stem+'_vap'}
@@ -608,7 +666,7 @@
     return zipPromise;
   }
   function setActive(active){
-    state.active=!!active;if(!state.active){stopColorPick();endMaskDrag();endVideoDrag();pause();cleanupProcessor();if(state.converting)cancel()}else{sync();requestPreview()}
+    state.active=!!active;if(!state.active){stopColorPick();endMaskDrag();endVideoDrag();pause();cleanupProcessor();if(state.estimating||state.converting)cancel()}else{sync();requestPreview()}
     document.dispatchEvent(new CustomEvent('vap:active',{detail:{active:state.active}}));
   }
   function setLanguage(value){
@@ -637,6 +695,7 @@
   $('PickColor').addEventListener('click',startColorPick);
   $('ResetColor').addEventListener('click',()=>{if(busy())return;stopColorPick(false);state.keyColor=null;$('Method').value='auto';$('Screen').value='auto';state.view='transparent';invalidate()});
   document.addEventListener('keydown',event=>{if(event.key==='Escape'&&state.pickingColor){event.preventDefault();cancelColorPick()}});
+  $('Target').addEventListener('input',()=>syncSizeEstimate(validOptions()));
   $('Target').addEventListener('change',()=>{if(busy())return;const amount=Number($('Target').value);if(Number.isFinite(amount)&&amount>=.1&&amount<=maxOutputBytes/1e6){requestedTargetBytes=Math.round(amount*1e6);applyBudget()}invalidate()});
   for(const id of ['Tolerance','Softness','Spill'])$(id).addEventListener('input',invalidate);
   for(const [id,view] of [['ViewOriginal','original'],['ViewTransparent','transparent'],['ViewAlpha','alpha']])$(id).addEventListener('click',()=>{if(busy())return;state.view=view;state.previewError=false;sync();requestPreview()});
@@ -670,6 +729,7 @@
   stage.addEventListener('keydown',event=>{if(state.pickingColor)return;if(busy()||!state.file||![stage,canvas,video].includes(event.target)||event.altKey||event.ctrlKey||event.metaKey)return;if(event.key==='Escape'){endVideoDrag();return}if(!['ArrowUp','ArrowDown'].includes(event.key))return;const step=(event.shiftKey?10:1)/outputHeight;setVideoOffsetY(state.videoOffsetY+(event.key==='ArrowUp'?-step:step));event.preventDefault();event.stopPropagation?.()});
   $('VerticalMask').addEventListener('toggle',()=>{syncMaskControls();if($('VerticalMask').open&&state.verticalMask.enabled)requestPreview()});
   if(typeof ResizeObserver==='function'){const observer=new ResizeObserver(positionMaskOverlay);observer.observe(canvas);observer.observe(stage)}else window.addEventListener('resize',positionMaskOverlay);
+  $('EstimateSize').addEventListener('click',estimateSize);
   $('Convert').addEventListener('click',convert);$('Cancel').addEventListener('click',cancel);
   for(const [id,kind] of [['DownloadMp4','mp4'],['DownloadJson','json'],['DownloadZip','zip']])$(id).addEventListener('click',()=>download(kind));
   $('Help').addEventListener('click',()=>$('HelpDialog').showModal());$('HelpClose').addEventListener('click',()=>$('HelpDialog').close());$('HelpDialog').addEventListener('click',event=>{if(event.target===$('HelpDialog')){const r=$('HelpDialog').getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)$('HelpDialog').close()}});

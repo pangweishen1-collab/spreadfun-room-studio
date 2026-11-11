@@ -457,17 +457,23 @@ async function importFiles(files, target = null) {
   pause();state.busy = 'load';report('reading');sync();
   let loaded = false, failed = files.length !== mp4.length;
   const count = Math.min(destinations.length, mp4.length);
-  for (let i = 0; i < count; i++) {
-    const index = destinations[i], slot = state.slots[index];
-    loadingSlot = slot;
-    syncEditors();
-    try {
-      const clip = await loadClip(mp4[i], index);
-      disposeClip(slot.clip); slot.clip = clip; loaded = true;
-      state.count = Math.max(state.count, index + 1);
-    } catch (error) {failed = true;}
+  const uploadProgress = count ? window.UploadProgress?.begin(count) : null;
+  try {
+    for (let i = 0; i < count; i++) {
+      const index = destinations[i], slot = state.slots[index];
+      loadingSlot = slot;
+      syncEditors();
+      try {
+        const clip = await loadClip(mp4[i], index);
+        disposeClip(slot.clip); slot.clip = clip; loaded = true;
+        state.count = Math.max(state.count, index + 1);
+      } catch (error) {failed = true;}
+      finally {uploadProgress?.advance();}
+    }
+  } finally {
+    uploadProgress?.finish();
+    loadingSlot = null; state.busy = '';
   }
-  loadingSlot = null; state.busy = '';
   if (loaded) {
     discardResult(); renderSlots();
     if (state.count !== initialCount) updateLayout();
@@ -693,6 +699,7 @@ async function changeBackground(target, choice, file) {
   const isCurrent = () => !inTemplate || target === templateDraft && $('TemplateDialog').open;
   const status = (key, tone) => {if (isCurrent()) (inTemplate ? templateStatus : report)(key, tone);};
   state.busy = 'background';sync();status();
+  const uploadProgress = file ? window.UploadProgress?.begin() : null;
   let image;
   try {
     let id = choice.startsWith('cloud:') ? choice.slice(6) : null;
@@ -726,6 +733,7 @@ async function changeBackground(target, choice, file) {
     const known = ['background_exists', 'background_limit', 'invalid_background', 'rate_limited', 'backgroundSize'];
     status(known.includes(error.message) ? error.message : cloud ? 'backgroundStorage' : 'backgroundError', 'error');
   } finally {
+    uploadProgress?.finish();
     image?.close();
     state.busy = '';sync();
     if (inTemplate && isCurrent()) syncBackgroundChoice(target);
@@ -773,13 +781,16 @@ async function saveTemplate(event) {
   if (!name) {templateStatus('nameMissing');$('TemplateName').focus();return;}
   const draft = templateDraft;
   state.busy = 'template';sync();templateStatus();
-  let image;
+  let image, uploadProgress;
   try {
     const settings = state.engine.normalizeReviewTemplate({
       background: draft.background, backgroundFile: draft.backgroundFile, slots: draft.slots.slice(0, draft.count).map(slot => slot.settings),
     });
     const {backgroundId} = draft;
-    if (settings.backgroundFile && !backgroundId) settings.backgroundFile = await compressTemplateBackground(settings.backgroundFile);
+    if (settings.backgroundFile && !backgroundId) {
+      uploadProgress = window.UploadProgress?.begin();
+      settings.backgroundFile = await compressTemplateBackground(settings.backgroundFile);
+    }
     image = await readBackground(settings.background, settings.backgroundFile);
     const {background, slots} = settings;
     const receipt = await reviewRequest(templateApi, {
@@ -794,7 +805,7 @@ async function saveTemplate(event) {
   } catch (error) {
     const known = ['template_exists', 'template_limit', 'rate_limited', 'invalid_template', 'backgroundSize', 'background_missing'];
     templateStatus(known.includes(error.message) ? error.message : 'cloudError');
-  } finally {image?.close();state.busy = '';sync();draw();}
+  } finally {uploadProgress?.finish();image?.close();state.busy = '';sync();draw();}
 }
 async function applyTemplate() {
   if (busy()) return;

@@ -246,6 +246,7 @@ async function loadFiles(files, targetSeat, trigger) {
   busy = true;
   notice = {key: 'processing'};
   sync();
+  const progress = window.UploadProgress?.begin(assignments.length);
   let activeAssignment;
   try {
     // Validate and process the whole batch before updating the assigned seats.
@@ -253,8 +254,12 @@ async function loadFiles(files, targetSeat, trigger) {
     for (const assignment of assignments) {
       activeAssignment = assignment;
       const {file, type, animated, index} = assignment;
-      const asset = await prepareAsset(file, type, animated);
-      prepared.push({asset, type, index});
+      try {
+        const asset = await prepareAsset(file, type, animated);
+        prepared.push({asset, type, index});
+      } finally {
+        progress?.advance();
+      }
     }
     for (const {asset, type, index} of prepared) replaceSeat(index, asset, type);
     if (prepared.every(({asset}) => asset.animation)) mode = 'frame';
@@ -267,6 +272,7 @@ async function loadFiles(files, targetSeat, trigger) {
     else if (type === 'frame' && reason === 'type') reason = 'frameType';
     notice = {key: 'invalid', name: file.name, reason, tone: 'error'};
   } finally {
+    progress?.finish();
     busy = false;
     sync();
     syncPlayback();

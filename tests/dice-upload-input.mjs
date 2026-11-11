@@ -385,7 +385,7 @@ const checks=[];
   // Execute the actual controller functions without booting its DOM/event shell.
   const source=await readFile(new URL('../dice/preview-app.js',import.meta.url),'utf8');
   const fields=Object.fromEntries(['dice-name','sound-enabled','preview-mode','preview-point','purple-variant'].map(id=>[id,{value:'',checked:true}]));
-  const calls=[],renderCalls=[],revoked=[],forgotten=[],audioChanges=[],six=Array.from({length:6},(_,i)=>Object.freeze({name:`sz_${i+1}.png`,sha256:`original-${i+1}`}));
+  const calls=[],renderCalls=[],revoked=[],forgotten=[],audioChanges=[],progressEvents=[],six=Array.from({length:6},(_,i)=>Object.freeze({name:`sz_${i+1}.png`,sha256:`original-${i+1}`}));
   let app,serial=0,importFailure=null,settingsFailure=null,loadFailure=null,patchFailure=null,patchAccepted=true;
   const runtimeKind=grade=>grade==='purple'?'purple-gyro':'six-face';
   const fixtureSession=(grade='purple',composition='faces')=>({id:`old-${grade}-${composition}`,revision:1,name:'旧骰子',grade,previewGrade:grade,purpleVariant:'05',mode:'all',point:1,composition,resolvedComposition:composition==='faces'?'faces':'digits',soundEnabled:true,
@@ -394,6 +394,7 @@ const checks=[];
   const context={document:{getElementById:id=>{assert.ok(fields[id],`unexpected controller DOM access: ${id}`);return fields[id];}},
     URL:{createObjectURL:()=>`blob:controller-${++serial}`,revokeObjectURL:value=>revoked.push(value)},VIDEO_SPEC:{profile:'test'},t:key=>key,diceFilePath,
     DEFAULT_PURPLE_VARIANT:'02',forgetLocalPreview:id=>forgotten.push(id),
+    UploadProgress:{begin(total){assert.equal(total,undefined);progressEvents.push('begin');return {finish:()=>progressEvents.push('finish')};}},
     DiceAudio:class {ready=true;setEnabled(value){audioChanges.push(value);}async load(){}async unlock(){}stop(){}},
     localApi:async(path,options)=>{
       const body=typeof options.body==='string'?JSON.parse(options.body):options.body;calls.push({path,body});
@@ -430,6 +431,18 @@ const checks=[];
   app.reset();await app.importFiles([six[0]]);assert.equal(app.state().currentError.key,'chooseUploadGrade');assert.equal(app.state().pending.size,0);assert.equal(calls.length,beforeExplicit);
   assert.throws(()=>app.selectUploadGrade('invalid'),error=>error.key==='chooseUploadGrade');assert.equal(app.state().uploadGrade,null);
   checks.push('actual_controller_requires_explicit_source_selection_before_first_import_without_committing_an_animation_grade');
+
+  for(const sourceGrade of ['green','purple']){
+    app.reset();app.selectUploadGrade(sourceGrade);progressEvents.length=0;
+    importFailure=sourceGrade==='purple'?Error('import rejected'):null;
+    const importing=app.importFiles(six);
+    assert.deepEqual(progressEvents,['begin']);
+    await importing;
+    assert.deepEqual(progressEvents,['begin','finish']);
+    assert.equal(app.state().currentError,importFailure);
+  }
+  importFailure=null;
+  checks.push('actual_controller_finishes_indeterminate_upload_progress_on_success_and_failure');
 
   for(const nextGrade of ['green','purple']){
     app.reset();app.selectUploadGrade(nextGrade);assert.equal(app.state().grade,'green','Selecting a card changes only the upload target until a preview successfully loads');

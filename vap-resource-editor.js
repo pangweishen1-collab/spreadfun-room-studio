@@ -251,6 +251,7 @@
       if(!defaultResource&&(!(file instanceof Blob)||!file.size||file.size>MAX_IMAGE_BYTES||!['image/png','image/jpeg','image/webp'].includes(file.type))){notice='invalidImage';updateError();return;}
       if(defaultResource)delete r.defaultAvatarError;
       loading=true;notice='loading';const token=++version,id=r.id;syncDisabled();updateError();emit('loading');let url,changed=false;
+      const uploadProgress=defaultResource?null:window.UploadProgress?.begin();
       try{
         if(defaultResource)file=await defaultAvatarFile();
         if(disposed||token!==version||!resources.includes(r))return;
@@ -267,7 +268,10 @@
           notice=defaultResource?'defaultAvatarError':'invalidImage';
         }
       }
-      finally{if(!disposed&&token===version){loading=false;if(!defaultResource&&resources.includes(r))selectedId=id;if(notice==='loading')notice='';syncList();syncFields();syncOverlay();emit(changed?(defaultResource?'default-image':'image'):'image-error');ensureDefaultAvatars();focusPendingMotion();}}
+      finally{
+        uploadProgress?.finish();
+        if(!disposed&&token===version){loading=false;if(!defaultResource&&resources.includes(r))selectedId=id;if(notice==='loading')notice='';syncList();syncFields();syncOverlay();emit(changed?(defaultResource?'default-image':'image'):'image-error');ensureDefaultAvatars();focusPendingMotion();}
+      }
     }
     function updateField(id,key,read){listen($(id),'input',()=>{const r=selected();if(!r||context.busy||loading)return;const value=read($(id).value,r);r[key]=value;notice='';syncFields();syncOverlay();if(key==='tag'||key==='text')syncList();emit('edit');});}
     for(const [id,key] of [['Tag','tag'],['Text','text'],['Fit','fit'],['Color','color']])updateField(id,key,value=>value);

@@ -18,6 +18,8 @@
   <script src="/dice/assets/fun-toolkit/focus-modality.js" defer></script>
   <script src="/dice/assets/fun-toolkit/feedback-motion.js" defer></script>
   <script src="/dice/assets/fun-toolkit/upload-paste.js" defer></script>
+  <link rel="stylesheet" href="../upload-progress.css?v=20261111-upload-progress">
+  <script src="../upload-progress.js?v=20261111-upload-progress" defer></script>
   <script src="/dice/vendor/spine-webgl.js" defer></script>
 </head>
 <body class="ft-ui">
@@ -85,6 +87,6 @@
   <dialog id="help-dialog" class="help-dialog ft-motion-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title" data-i18n="help">使用说明</h2><button id="close-help" class="button secondary" type="button" data-i18n="close">关闭</button></div><ol class="help-list"><li data-i18n="helpUpload">两种等级均上传大骰子.png（兼容 icon.png）和 sz_1.png～sz_6.png 六张完整点数图。支持选择文件、拖入文件或文件夹，以及粘贴；大图可单独更换。</li><li data-i18n="helpSettings">选择骰子等级并填写名称，预览固定为六面同步投掷。</li><li data-i18n="helpComposition">两种等级自动补齐隐藏锚点及基础音效，也可上传 anchor.png、dice_roll.mp3、sound_ui_dice6.mp3 覆盖。</li><li data-i18n="helpDownload">预览每2秒循环，视频共6秒。资源包包含同名SKEL、图集、PNG、res原图和sound音频；MP4单独下载。</li></ol><p class="dialog-note" data-i18n="helpPreserve">导入失败会保留上一份可用预览。选择新一套素材会创建新的预览会话。</p></dialog>
   <dialog id="author-dialog" class="help-dialog ft-motion-dialog" aria-labelledby="author-title"><div class="dialog-heading"><h2 id="author-title" data-i18n="author">联系作者</h2><button id="close-author" class="button secondary" type="button" data-i18n="close">关闭</button></div><div class="author-profile"><img src="/dice/assets/fun-toolkit/assets/author-profile.webp" width="72" height="72" alt=""><div><strong>庞伟深</strong><p data-i18n="authorDescription">Fun Toolkit UI 规范作者与维护人</p></div></div><p class="dialog-note" data-i18n="resourceNote">本工具复用 Fun Toolkit 的页面、表单与反馈资源。</p><a class="button secondary" href="https://fun-toolkit.pangweishen1.workers.dev/#home" target="_blank" rel="noopener" data-i18n="moreTools">更多工具</a></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script type="module" src="/dice/preview-app.js?v=20261110-dice-balanced-size"></script>
+  <script type="module" src="/dice/preview-app.js?v=20261111-upload-progress"></script>
 </body>
 </html>

@@ -17,6 +17,7 @@ let sourceLoads=0;get('#vapSourceVideo').load=()=>{sourceLoads++;videoFrameCallb
 const presentFrame=id=>{const callback=videoFrameCallbacks.get(id);assert.equal(typeof callback,'function');videoFrameCallbacks.delete(id);callback(0,{})};
 const templateMarkup=fs.readFileSync(path.join(__dirname,'../vap-tool.html'),'utf8');
 assert.match(templateMarkup, /<input id="vapFps"[^>]*value="24"[^>]*\breadonly>/);
+assert.match(templateMarkup, /<input id="vapTarget"[^>]*min="0\.1"[^>]*max="3\.5"[^>]*value="2"/);
 get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<details\b[^>]*id="vapVerticalMask"[^>]*>/)?.[0]||'');
 const document={hidden:false,activeElement:null,body:element('body'),head:element('head'),querySelector:selector=>get(selector),addEventListener(k,f){documentListeners.set(k,f)},dispatchEvent(event){events.push(event);return true},createElement(tag){
   const node=element(tag);
@@ -57,7 +58,7 @@ sandbox.window.__resourceModule={resourceFrame(resource,{width,height}){return {
 },unpackVapFrame(source,{width,height}){return {data:new Uint8ClampedArray(width*height*4),width,height}}};
 let source=fs.readFileSync(path.join(__dirname,'../vap-tool.js'),'utf8');
 source=source.replace(/const \{nativeVapConfig\}=await import\([^\n]+\);/,'const {nativeVapConfig}=window.__vapProtocol;');
-const engineImport=source.match(/^  const getEngine=.*$/m);assert.ok(engineImport,'engine loader must be stubbed before controller tests');source=source.replace(engineImport[0],'  const getEngine=()=>Promise.resolve(window.__engine).then(module=>(engineApi=module));');
+const engineImport=source.match(/^  const getEngine=.*$/m);assert.ok(engineImport,'engine loader must be stubbed before controller tests');source=source.replace(engineImport[0],'  const getEngine=()=>Promise.resolve(window.__engine);');
 const resourceImport=source.match(/^  const getResourceModule=.*$/m);assert.ok(resourceImport);source=source.replace(resourceImport[0],'  const getResourceModule=()=>Promise.resolve(window.__resourceModule);');
 const fadeImport=source.match(/^  const getGiftFadeModule=.*$/m);assert.ok(fadeImport);source=source.replace(fadeImport[0],'  const getGiftFadeModule=()=>Promise.resolve(window.__giftFadeModule);');
 source=source.replace(/const protocol=await import\('\.\/vap-protocol\.mjs\?v=[^']+'\);/,'const protocol={readSourceVapConfig:async file=>file.vapConfig||null};');
@@ -72,7 +73,6 @@ const playerState=state=>documentListeners.get('vap:player-state')({detail:{stat
 const assertBackground=background=>{assert.equal(get('#vapStage').dataset.background,background);assert.equal(get('#vapResultFrame').dataset.background,background)};
 function result(){return {blob:new Blob(['packed-vap'],{type:'video/mp4'}),config:{info:{v:2,w:720,h:1560,videoW:1088,videoH:1568,fps:24,f:48},funToolkit:{rgbAlphaMode:'premultiplied'}},report:{valid:true,bytes:10,budgetExceeded:false,audioKept:true,timings:{wallMs:1200}}}}
 (async()=>{
-  engine.outputBudget=(await import('../vap-engine.mjs')).outputBudget;
   sandbox.window.__vapProtocol=await import('../vap-protocol.mjs');
   sandbox.window.__giftFadeModule=await import('../vap-gift-fade.mjs');
   assert.deepEqual(JSON.parse(JSON.stringify(api.options().giftFade)),{enabled:true,fadeIn:1,fadeOut:1},'gift fade defaults to one second at each end');assert.equal(get('#vapGiftFadeEnabled').checked,true);assert.equal(get('#vapGiftFadeIn').value,'1');assert.equal(get('#vapGiftFadeOut').value,'1');assert.equal(get('#vapGiftFadeEnabled').disabled,true,'fade settings wait for a source');
@@ -139,10 +139,10 @@ function result(){return {blob:new Blob(['packed-vap'],{type:'video/mp4'}),confi
   get('#vapMethod').value='ai_foreground';get('#vapMethod').fire('change');assert.equal(get('#vapKeySettings').hidden,true,'person segmentation does not expose chroma/luma refinements');get('#vapMethod').value='manual_mask';get('#vapMethod').fire('change');assert.equal(get('#vapKeySettings').hidden,true,'imported masks do not expose chroma/luma refinements');assert.equal(get('#vapConvert').disabled,true);assert.throws(api.options,/mask required/);get('#vapMaskInput').fire('change',{target:{files:[file({name:'mask.mp4'})],value:''}});assert.equal(api.options().maskFile.name,'mask.mp4');
   get('#vapMethod').value='white_luma';get('#vapMethod').fire('change');assert.equal(get('#vapKeySettings').hidden,false,'white keying retains its effective controls');await api.loadFiles([file({detected:{sourceKind:'chroma_mp4',screenColor:'green',confidence:.99}})]);original=api.state.file;assert.equal(api.state.sourceKind,'chroma_mp4','an actual detected green-screen upload selects chroma processing');assert.equal(get('#vapScreen').value,'auto');assert.equal(get('#vapMethodWrap').hidden,false,'colored screens retain the advanced manual fallback');assert.ok(get('#vapDetectedType').textContent.length>0,'the detected input type is visible');assert.equal(get('#vapKeySettings').hidden,false,'chroma keying exposes refinements');assert.equal(api.options().keyTolerance,.32);assert.equal(api.options().matteMethod,'chroma_key');assert.equal(api.options().confirmedOpaque,false,'green/blue screen routes to actual keying');assert.equal(get('#vapScreenWrap').hidden,false);assert.equal(api.options().alphaScale,.5);
   conversion=async(f,o,c)=>{assert.equal(get('#vapResultPreview').hidden,!api.state.result,'encoding reveals no placeholder unless an older committed result still exists');assert.equal(get('#vapResultPlaceholder').hidden,false);assert.equal(get('#vapOutputSpinner').hidden,false);assert.equal(get('#vapResultFrame').getAttribute('aria-busy'),'true');assert.match(get('#vapOutputEmptyTitle').textContent,/^(正在生成输出效果|Generating output)$/);c.onProgress({phase:'encoding',progress:.4});return result()};await api.convert();assert.equal(api.state.result.report.valid,true);assert.equal(root.dataset.state,'success');assert.equal(events.filter(e=>e.type==='vap:result').length,2);assert.equal(get('#vapResult').hidden,false);assert.equal(get('#vapResultPreview').hidden,false,'successful conversion reveals the output comparison');assert.equal(get('#vapComparison').classList.contains('has-result'),true);
-  assert.equal(get('#vapTarget').value,'1.5');assert.equal(get('#vapTarget').max,'1.5');assert.equal(api.options().targetBytes,1500000);
-  get('#vapTarget').value='3.6';assert.throws(api.options,/invalid export fields/);get('#vapTarget').value='3.5';
+  assert.equal(get('#vapTarget').value,'2');assert.equal(get('#vapTarget').max,'3.5');assert.equal(api.options().targetBytes,2000000);
+  get('#vapTarget').value='3.6';assert.throws(api.options,/invalid export fields/);get('#vapTarget').value='2';
   assert.equal(get('#vapBudgetNotice').hidden,true,'a valid result is inside the hard limit');const normalConversion=conversion,withinLimitResult=api.state.result;
-  conversion=async()=>{const r=result();r.blob=new Blob([new Uint8Array(3000001)],{type:'video/mp4'});return r};await api.convert();assert.equal(api.state.result,withinLimitResult,'an oversized engine result never replaces a valid file');assert.equal(api.state.notice,'errorBudget');assert.match(get('#vapNotice').textContent,/体积上限/);
+  conversion=async()=>{const r=result();r.blob=new Blob([new Uint8Array(2000001)],{type:'video/mp4'});return r};await api.convert();assert.equal(api.state.result,withinLimitResult,'an oversized engine result never replaces a valid file');assert.equal(api.state.notice,'errorBudget');assert.match(get('#vapNotice').textContent,/体积上限/);
   // High-throughput clips must retain exact state without refreshing all controls on each frame.
   {const savedDate=sandbox.Date,savedSetState=sandbox.window.FunToolkitUI.setState;let now=1000,refreshes=0;sandbox.Date={now:()=>now};sandbox.window.FunToolkitUI.setState=()=>{refreshes++};
     try{conversion=async(f,o,c)=>{const start=refreshes;c.onProgress({phase:'encoding',progress:.1});assert.equal(refreshes,start+1);
@@ -157,7 +157,7 @@ function result(){return {blob:new Blob(['packed-vap'],{type:'video/mp4'}),confi
   playerState('loading');assert.equal(get('#vapResultPlaceholder').hidden,false);assert.equal(get('#vapOutputSpinner').hidden,false);assert.equal(get('#vapOutputEmptyTitle').textContent,'正在加载成品预览…');assert.equal(get('#vapResultPlay').disabled,true);playerState('ready');assert.equal(get('#vapResultPlaceholder').hidden,true);assert.equal(get('#vapOutputSpinner').hidden,true);assert.equal(get('#vapResultFrame').getAttribute('aria-busy'),'false');assert.equal(get('#vapResultPlay').disabled,false);const committedResult=api.state.result,committedRevision=api.state.revision;playerState('unknown');assert.equal(api.state.playerState,'ready');playerState('error');assert.equal(api.state.result,committedResult);assert.equal(get('#vapResultPlaceholder').hidden,false);assert.equal(get('#vapOutputEmptyTitle').textContent,'成品预览暂时无法播放');assert.match(get('#vapOutputArt').src,/empty-error\.svg$/);assert.equal(get('#vapDownloadMp4').disabled,false);assert.equal(get('#vapResultPlay').disabled,true);playerState('ready');
   inspectFailure=true;const failedReplacement=api.loadFiles([file({name:'failed-with-output.mp4'})]);assert.equal(get('#vapResultPreview').hidden,false,'a replacement keeps the existing output visible while reading');assert.equal(get('#vapComparison').classList.contains('has-source'),true);await failedReplacement;inspectFailure=false;assert.equal(api.state.result,committedResult,'failed replacement preserves the previous valid output');assert.equal(get('#vapResultPreview').hidden,false);assert.equal(get('#vapComparison').classList.contains('has-source'),true);
   const beforeDownloadsStats=stats.length;await api.download('mp4');assert.match(get('#vapDownloadReceipt').textContent,/普通视频播放器.*RGB.*Alpha/,'the downloaded VAP resource explains how to view transparency');assert.match(get('#vapDownloadMp4').title,/透明播放/);await api.download('json');assert.equal(downloads.length,2);assert.equal(downloads[0].name,'clip_vap.mp4');assert.equal(downloads[1].name,'vapc.json');assert.deepEqual(stats.slice(beforeDownloadsStats),[['vap','download'],['vap','download']]);const beforeNativeBlock=stats.length;downloadFail=true;await api.download('mp4');downloadFail=false;assert.equal(stats.length,beforeNativeBlock,'a rejected native download reports no event');assert.equal(api.state.result,committedResult);
-  sandbox.window.JSZip=class{file(){}async generateAsync(){return new Blob([new Uint8Array(1500001)])}};
+  sandbox.window.JSZip=class{file(){}async generateAsync(){return new Blob([new Uint8Array(2000001)])}};
   await api.download('zip');assert.equal(downloads.length,2,'a ZIP over the committed short-video limit never starts a download');assert.equal(api.state.notice,'errorBudget');assert.equal(api.state.result,committedResult,'a ZIP size rejection preserves the playable MP4');assert.equal(stats.length,beforeNativeBlock,'rejected ZIP packaging reports no generated or download event');
   sandbox.window.JSZip=class{file(){}async generateAsync(){return new Blob(['zip'])}};await api.download('zip');assert.equal(downloads.length,3,'an in-budget ZIP remains downloadable');assert.equal(api.state.notice,null,'a successful retry clears the previous size error');
   sandbox.window.VapTool.setLanguage('en');assert.equal(get('#vapResult').hidden,false);assert.equal(get('#vapConvert').textContent,'Convert again');assert.equal(api.state.file,original,'language keeps source');
@@ -338,7 +338,7 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     sandbox.Date=Date;sandbox.requestAnimationFrame=savedRaf;sandbox.cancelAnimationFrame=savedCancelRaf;
     const sequenceResult=(source,opts,bytes=100)=>{const r=result();r.blob=new Blob([new Uint8Array(bytes)],{type:'video/mp4'});Object.assign(r.config.info,{w:opts.width,h:opts.height,fps:opts.fps,f:source.frameCount});Object.assign(r.report,{targetBytes:opts.targetBytes,audioKept:false});return r};
     for(const amount of [1,2,3]){
-      const effective=Math.min(amount,1.5)*1e6;click('Budget'+amount);assert.equal(restored.options().targetBytes,effective);for(const option of [1,2,3])assert.equal(get('#vapBudget'+option).getAttribute('aria-pressed'),String(option*1e6===effective));
+      const effective=amount*1e6;click('Budget'+amount);assert.equal(restored.options().targetBytes,effective);for(const option of [1,2,3])assert.equal(get('#vapBudget'+option).getAttribute('aria-pressed'),String(option===amount));
       conversion=async(source,opts)=>{assert.equal(source,sequence);assert.equal(opts.matteMethod,'opaque');assert.equal(opts.targetBytes,effective);return sequenceResult(source,opts)};await restored.convert();assert.ok(restored.state.result);assert.equal(restored.state.result.report.targetBytes,effective);
       const committed=restored.state.result,revision=restored.state.revision;click('Budget'+amount);assert.equal(restored.state.result,committed,'clicking the selected budget preserves an existing file');assert.equal(restored.state.revision,revision);
     }
@@ -352,9 +352,22 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     get('#vapTarget').value='1';
     sequenceDecodeFailure=true;get('#vapTimeline').value='.2';get('#vapTimeline').fire('input');await flush();assert.equal(restored.state.previewError,true);assert.equal(restored.state.result,validSmall,'preview decode failure preserves the validated download');sequenceDecodeFailure=false;
     const sourceBeforeFailure=restored.state.file;await restored.loadSequence([file({name:'broken.png',type:'image/png',bad:true})]);assert.equal(restored.state.file,sourceBeforeFailure);assert.equal(restored.state.result,validSmall);assert.equal(restored.state.notice,'sequenceError','a failed sequence import preserves the committed source and output');
+    const uploadJobs=[];
+    sandbox.window.UploadProgress={begin(){
+      const job={finished:false,progress:[],setProgress(value){assert.equal(this.finished,false);this.progress.push(value)},finish(){this.finished=true}};
+      uploadJobs.push(job);return job;
+    }};
     let finishOldImport;sequenceImportOverride=async()=>new Promise(resolve=>{finishOldImport=resolve});const pending=restored.loadSequence([frames[0]]);await flush();const pendingSignal=sequenceInspections.at(-1).options.signal;assert.equal(restored.state.loading,true);assert.equal(get('#vapInputVideo').disabled,true);assert.equal(get('#vapBudget1').disabled,true);assert.equal(restored.state.file,sourceBeforeFailure);assert.equal(restored.state.result,validSmall);
+    assert.equal(get('#vapProgressRow').hidden,true,'the conversion row does not flash at the start of an import');
+    const sequenceProgress=sequenceInspections.at(-1).options.onProgress;
+    sequenceProgress({progress:.5});
+    assert.deepEqual(uploadJobs[0].progress,[.475]);
     restored.cancel();assert.equal(pendingSignal.aborted,true);assert.equal(restored.state.loading,false);assert.equal(restored.state.notice,'cancelled');assert.equal(restored.state.file,sourceBeforeFailure);assert.equal(restored.state.result,validSmall);
+    assert.equal(uploadJobs[0].finished,true,'cancelling clears upload progress before the parser settles');
+    sequenceProgress({progress:1});
     sequenceImportOverride=null;const zip=file({name:'frames.zip',type:'application/zip',frames:frames.slice(0,12)});await restored.loadFiles([zip]);await flush();const latest=restored.state.file;assert.equal(latest.name,'frames.zip','ZIP files automatically dispatch to image-sequence input');assert.equal(latest.frameCount,12);assert.equal(sequenceInspections.at(-1).options.Zip,sandbox.window.JSZip);finishOldImport({...sequence,name:'obsolete-import'});await pending;assert.equal(restored.state.file,latest,'a cancelled late import cannot replace a newer sequence');assert.equal(restored.state.loading,false);
+    assert.equal(uploadJobs.length,2);assert.equal(uploadJobs[1].finished,true,'successful ZIP import clears its own progress');
+    delete sandbox.window.UploadProgress;
     resourceState.resources=[{id:'sequence-caption',tag:'name',type:'text',text:'Sequence title',x:.1,y:.5,width:.8,height:.1,start:0,end:null,opacity:1,fontSize:36,color:'#ffffff'}];resourceState.callback({reason:'add'});await flush();
     conversion=async(source,opts)=>{assert.equal(source,latest);assert.equal(opts.resources[0].text,'Sequence title');assert.equal(opts.resourceMode,'dynamic');return sequenceResult(source,opts)};await restored.convert();assert.equal(restored.state.result.tags.name,'Sequence title');assert.equal(resourceState.renderers.at(-1).options.duration,12/24,'sequence export resources use the fixed FPS-derived duration');assert.equal(resourceState.renderers.at(-1).options.fps,24,'resource motion uses the fixed output FPS');
     resourceState.resources=[];
@@ -539,32 +552,39 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     vm.runInContext(source,sandbox);assert.equal(sandbox.window.test.state.verticalMask.enabled,false,'page reload still reads the ordinary preference, not native switch edits');
   }
   console.log('vap-tool: native extra fades default off, transparent view and switch state, explicit opt-in, native replacement reset, ordinary MP4/sequence preference restoration, storage separation and failed/cancelled import atomicity passed.');
-  // The UI consumes the same duration-aware policy as the real encoder.
+  // The selected limit is independent of input format and duration.
   {
     vm.runInContext(source,sandbox);const budget=sandbox.window.test,normalBudgetConversion=conversion;
-    assert.equal(get('#vapTarget').value,'1.5');assert.equal(get('#vapTarget').max,'3.5','unknown duration offers the global cap');
-    for(const [duration,fps,mb] of [[5,24,1.5],[5+1/24,24,1.5],[5+2/24,24,2.5],[5.5,1,2.5],[5+1/60,60,1.5],[5+2/60,60,2.5],[10,24,2.5],[10+1/24,24,2.5],[10.05,24,3.5],[15,24,3.5],[16,24,3.5]]){
-      await budget.loadFiles([file({name:'budget-'+duration+'.mp4',duration,fps})]);await flush();assert.equal(Number(get('#vapTarget').value),mb,'source duration sets the default');assert.equal(Number(get('#vapTarget').max),mb);assert.equal(budget.options().targetBytes,mb*1e6);
+    const target=get('#vapTarget');
+    const assertBudget=bytes=>{assert.equal(Number(target.value),bytes/1e6);assert.equal(target.max,'3.5');assert.equal(budget.options().targetBytes,bytes)};
+    const selectBudget=value=>{target.value=value;target.fire('change')};
+    assertBudget(2000000);
+    for(const duration of [2,5,5.1,10,12,120]){
+      await budget.loadFiles([file({name:'budget-'+duration+'.mp4',duration})]);await flush();assertBudget(2000000);
     }
-    const {makeVapc:makeBudgetVapc}=await import('../vap-protocol.mjs'),nativeShortBudgetConfig=makeBudgetVapc({width:720,height:1560,fps:24,frames:120,alphaScale:.5}),nativeLongBudgetConfig=makeBudgetVapc({width:720,height:1560,fps:24,frames:123,alphaScale:.5});
-    const nativeBudgetFile=(name,duration,vapConfig)=>Object.assign(new Blob(['valid native budget source'],{type:'video/mp4'}),{name,width:1088,height:1568,duration,fps:24,vapConfig});
-    await budget.loadFiles([nativeBudgetFile('five-second-native-aac-tail.mp4',5.08,nativeShortBudgetConfig)]);await flush();assert.equal(budget.state.sourceVapConfig,nativeShortBudgetConfig);assert.equal(get('#vapTarget').value,'1.5','native frame duration keeps the visible default short despite an AAC tail');assert.equal(get('#vapTarget').max,'1.5');assert.equal(budget.options().targetBytes,1500000,'UI options agree with the encoder native-duration policy');
-    await budget.loadFiles([nativeBudgetFile('longer-native-aac-tail.mp4',5.2,nativeLongBudgetConfig)]);await flush();assert.equal(get('#vapTarget').value,'2.5');assert.equal(get('#vapTarget').max,'2.5');assert.equal(budget.options().targetBytes,2500000);
-    await budget.loadFiles([file({name:'ordinary-five-point-zero-eight.mp4',duration:5.08,fps:24})]);await flush();assert.equal(budget.state.sourceVapConfig,null);assert.equal(get('#vapTarget').value,'2.5');assert.equal(get('#vapTarget').max,'2.5','an ordinary video cannot inherit a previous native short duration');
-    const budgetBeforeFailure=get('#vapTarget').value;inspectFailure=true;await budget.loadFiles([file({name:'budget-failure.mp4',duration:2})]);inspectFailure=false;assert.equal(get('#vapTarget').value,budgetBeforeFailure,'failed replacement retains prior budget');
-    const oldDetector=sandbox.window.__detectSource;let finishBudgetDetection;sandbox.window.__detectSource=async()=>new Promise(resolve=>{finishBudgetDetection=resolve});const pendingBudget=budget.loadFiles([file({name:'budget-cancel.mp4',duration:2})]);await flush();budget.cancel();finishBudgetDetection({sourceKind:'plain_mp4',screenColor:'auto',confidence:0});await pendingBudget;sandbox.window.__detectSource=oldDetector;assert.equal(get('#vapTarget').value,budgetBeforeFailure,'cancelled replacement cannot change committed budget');
-    await budget.loadFiles([file({duration:5+1/24})]);await flush();assert.equal(budget.options().targetBytes,1500000);
-    conversion=async()=>result();await budget.convert();const validShort=budget.state.result,statsBeforeShortFailure=stats.length;
-    conversion=async()=>{const candidate=result();candidate.blob=new Blob([new Uint8Array(1500001)],{type:'video/mp4'});return candidate};await budget.convert();assert.equal(budget.state.result,validShort,'a short output above 1.5 MB is rejected');assert.equal(budget.state.notice,'errorBudget');assert.equal(stats.length,statsBeforeShortFailure);
-    get('#vapTarget').value='1';get('#vapTarget').fire('change');await budget.loadFiles([file({duration:12})]);await flush();assert.equal(budget.options().targetBytes,1000000,'a smaller explicit limit survives a longer replacement');assert.equal(get('#vapTarget').max,'3.5');await budget.loadFiles([file({duration:4})]);await flush();assert.equal(budget.options().targetBytes,1000000,'a smaller explicit limit survives a short replacement');assert.equal(get('#vapTarget').max,'1.5');
-    get('#vapTarget').value='3';get('#vapTarget').fire('change');assert.equal(get('#vapTarget').value,'1.5','the visible control is clamped to the short-source cap');assert.equal(budget.options().targetBytes,1500000);assert.equal(get('#vapBudget2').disabled,true);assert.equal(get('#vapBudget3').disabled,true);click('Budget3');assert.equal(budget.options().targetBytes,1500000,'hidden preset dispatch cannot bypass the cap');
-    const sequenceFrames=Array.from({length:120},(_,n)=>file({name:String(n)+'.png',type:'image/png'}));get('#vapFps').value='24';await budget.loadSequence(sequenceFrames);await flush();assert.equal(budget.state.meta.duration,5);assert.equal(budget.options().targetBytes,1500000);
-    const longerSequenceFrames=Array.from({length:240},(_,n)=>file({name:String(n)+'.png',type:'image/png'}));
-    await budget.loadSequence(longerSequenceFrames);await flush();assert.equal(budget.state.meta.duration,10);assert.equal(get('#vapTarget').value,'2.5','sequences also enforce the duration cap');assert.equal(get('#vapTarget').max,'2.5');
-    get('#vapTarget').value='1';get('#vapTarget').fire('change');await budget.loadSequence(sequenceFrames);await flush();assert.equal(budget.options().targetBytes,1000000,'replacing the sequence preserves a smaller manual target');assert.equal(get('#vapTarget').max,'1.5');
+    const {makeVapc:makeBudgetVapc}=await import('../vap-protocol.mjs');
+    const nativeBudgetConfig=makeBudgetVapc({width:720,height:1560,fps:24,frames:120,alphaScale:.5});
+    const nativeBudgetFile=Object.assign(new Blob(['valid native budget source'],{type:'video/mp4'}),{name:'native-aac-tail.mp4',width:1088,height:1568,duration:5.08,fps:24,vapConfig:nativeBudgetConfig});
+    await budget.loadFiles([nativeBudgetFile]);await flush();assert.equal(budget.state.sourceVapConfig,nativeBudgetConfig);assertBudget(2000000);
+    const sequenceFrames=Array.from({length:120},(_,n)=>file({name:String(n)+'.png',type:'image/png'}));
+    await budget.loadSequence(sequenceFrames);await flush();assert.equal(budget.state.meta.duration,5);assertBudget(2000000);
+    selectBudget('3.2');
+    await budget.loadFiles([file({duration:2})]);await flush();assertBudget(3200000);
+    conversion=async(_source,options)=>{assert.equal(options.targetBytes,3200000);return result()};
+    await budget.convert();assert.equal(budget.state.result.targetBytes,3200000);
+    const validShort=budget.state.result,statsBeforeShortFailure=stats.length;
+    conversion=async()=>{const candidate=result();candidate.blob=new Blob([new Uint8Array(3200001)],{type:'video/mp4'});return candidate};await budget.convert();assert.equal(budget.state.result,validShort,'a short output above the selected limit is rejected');assert.equal(budget.state.notice,'errorBudget');assert.equal(stats.length,statsBeforeShortFailure);
+    selectBudget('0.8');
+    await budget.loadFiles([file({duration:12})]);await flush();assertBudget(800000);
+    inspectFailure=true;await budget.loadFiles([file({name:'budget-failure.mp4',duration:2})]);inspectFailure=false;assertBudget(800000);
+    const oldDetector=sandbox.window.__detectSource;let finishBudgetDetection;sandbox.window.__detectSource=async()=>new Promise(resolve=>{finishBudgetDetection=resolve});const pendingBudget=budget.loadFiles([file({name:'budget-cancel.mp4',duration:2})]);await flush();budget.cancel();finishBudgetDetection({sourceKind:'plain_mp4',screenColor:'auto',confidence:0});await pendingBudget;sandbox.window.__detectSource=oldDetector;assertBudget(800000);
+    for(const invalid of ['', '0.09', '3.6']){
+      selectBudget(invalid);assert.throws(budget.options,/invalid export fields/);assert.equal(get('#vapConvert').disabled,true);
+    }
+    await budget.loadSequence(sequenceFrames);await flush();assertBudget(800000);
     conversion=normalBudgetConversion;sandbox.window.VapTool.setActive(false);
   }
-  console.log('vap-tool: shared duration-tiered budget, source-frame tolerance, automatic defaults, manual smaller-target retention, fixed sequence timing, hidden-preset caps, failure/cancel atomicity and actual short-output rejection passed.');
+  console.log('vap-tool: fixed 2 MB default, editable limits across durations and source types, replacement retention, invalid-input guards and oversized-result rejection passed.');
   // A video-local color picker reads raw source pixels, not the processed matte,
   // resource layers, or the preview background, and commits one shared route.
   {
@@ -625,6 +645,50 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     await importer.loadFiles([packed]);assert.deepEqual(geometry(),[720,1560,.5],'paired-plane imports use the fixed output profile');
     await importer.loadFiles([file()]);assert.deepEqual(geometry(),[720,1560,.5],'ordinary video uses the same output profile');
   }
+  {
+    vm.runInContext(source,sandbox);
+    const estimator=sandbox.window.test,label=get('#vapSizeEstimate');
+    assert.equal(get('#vapEstimateSize').disabled,true);
+    await estimator.loadFiles([file({name:'estimate.mp4'})]);
+    const sample={minBytes:175000,maxBytes:248500,estimatedBytes:210000,sampledSeconds:1.5,sampleCount:3};
+    const conversionsBefore=convertCalls,statsBefore=stats.length;
+    let finishEstimate;
+    engine.estimateVideoSize=async(source,opts,{signal,onProgress})=>{
+      assert.equal(source,estimator.state.file);assert.equal(opts.targetBytes,2000000);
+      assert.equal(opts.fps,24);assert.equal(opts.audioGain,.6);assert.equal(signal.aborted,false);
+      onProgress({progress:.5});
+      return new Promise(resolve=>{finishEstimate=resolve});
+    };
+    const pending=click('EstimateSize');await flush();
+    assert.equal(get('#vapEstimateSize').disabled,true);assert.equal(get('#vapConvert').disabled,true);
+    assert.equal(get('#vapCancel').hidden,false);assert.equal(get('#vapProgressRow').hidden,false);
+    assert.equal(get('#vapProgress').value,.5);assert.equal(label.hidden,true);
+    finishEstimate(sample);await pending;
+    assert.equal(label.hidden,false);assert.match(label.textContent,/0\.17–0\.25 MB/);
+    assert.equal(label.dataset.estimatedBytes,'210000');assert.equal(label.dataset.sampleCount,'3');
+    assert.equal(convertCalls,conversionsBefore);assert.equal(stats.length,statsBefore);
+    assert.equal(get('#vapProgressRow').hidden,true);
+    sandbox.window.VapTool.setLanguage('en');assert.match(label.textContent,/Estimated MP4/);
+    get('#vapTarget').value='1.8';get('#vapTarget').fire('input');
+    assert.equal(label.hidden,true,'a change in the uncommitted input already hides the old estimate');
+    get('#vapTarget').fire('change');
+    engine.estimateVideoSize=async(source,opts)=>{assert.equal(opts.targetBytes,1800000);return sample};
+    await click('EstimateSize');assert.equal(label.hidden,false);
+    const previousConversion=conversion;conversion=async()=>result();
+    await estimator.convert();const existing=estimator.state.result;
+    await click('EstimateSize');assert.equal(estimator.state.result,existing,'an estimate leaves a completed export intact');
+    await estimator.loadFiles([file({name:'new-estimate.mp4'})]);assert.equal(label.hidden,true);
+    let cancelledSignal;
+    engine.estimateVideoSize=async(source,opts,{signal})=>{
+      cancelledSignal=signal;
+      return new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(new Error('abort')),{once:true}));
+    };
+    const cancelled=click('EstimateSize');await flush();estimator.cancel();await cancelled;
+    assert.equal(cancelledSignal.aborted,true);assert.equal(label.hidden,true);
+    assert.equal(get('#vapProgressRow').hidden,true);assert.equal(get('#vapConvert').disabled,false);
+    conversion=previousConversion;delete engine.estimateVideoSize;
+  }
+  console.log('vap-tool: estimate progress and cancellation, same options, stale-input hiding and no output/stat side effects passed.');
   assert.equal(stats.filter(x=>x[1]==='generated').length,events.filter(x=>x.type==='vap:result').length,'only validated and committed MP4 results count, never previews, cancelled or invalid results');assert.equal(stats.filter(x=>x[1]==='download').length,downloads.length,'MP4, JSON and ZIP actions count once; packaging never counts as generation');
   assert.equal(rememberedExports.length,events.filter(x=>x.type==='vap:result').length,'only an accepted export is registered for safe native re-import; failed/cancelled/stale candidates never become identity');assert.equal(rememberedExports.at(-1),events.filter(x=>x.type==='vap:result').at(-1).detail.config,'the exact committed config is registered rather than guessed from tags');
   assert.match(templateMarkup,/<div[^>]*id="vapInputModes"[^>]*hidden/);assert.match(templateMarkup,/<span[^>]*id="vapDetectedType"[^>]*hidden/);assert.match(templateMarkup,/<div[^>]*id="vapBudgetPresets"[^>]*hidden/);assert.match(templateMarkup,/class="vap-packed-size".*1088 × 1568 px/);assert.match(templateMarkup,/<button id="vapPlay" class="vap-canvas-play"[^>]*aria-label="播放"[^>]*><\/button>/);assert.match(templateMarkup,/<div class="vap-result-frame"[^>]*>[\s\S]*?<button id="vapResultPlay" class="vap-canvas-play"/);assert.match(css,/\.vap-canvas-play\{[^}]*right:12px;bottom:12px[^}]*width:44px;height:44px/);assert.match(css,/\.vap-canvas-play\[aria-pressed=true\]::before/);assert.equal(fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').includes(templateMarkup.trim()),true,'canonical VAP fragment stays synchronized');
@@ -633,5 +697,5 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
   assert.match(templateMarkup,/<div[^>]*id="vapInputModes"[^>]*hidden/);assert.match(templateMarkup,/<span[^>]*id="vapDetectedType"[^>]*hidden/);assert.match(templateMarkup,/<div[^>]*id="vapBudgetPresets"[^>]*hidden/);assert.match(templateMarkup,/class="vap-packed-size".*1088 × 1568 px/);assert.match(templateMarkup,/<button id="vapPlay" class="vap-canvas-play"[^>]*aria-label="播放"[^>]*><\/button>/);assert.match(templateMarkup,/<div class="vap-result-frame"[^>]*>[\s\S]*?<button id="vapResultPlay" class="vap-canvas-play"/);assert.match(css,/\.vap-canvas-play\{[^}]*right:12px;bottom:12px[^}]*width:44px;height:44px/);assert.match(css,/\.vap-canvas-play\[aria-pressed=true\]::before/);assert.equal(fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').includes(templateMarkup.trim()),true,'canonical VAP fragment stays synchronized');
   console.log('vap-tool: opt-in chroma-only light recovery default/template/bilingual labels, preview/export parity, processor rebuild/result invalidation, loading/encoding locks, and luma/native VAP/sequence bypass passed.');
   assert.match(templateMarkup,/<div[^>]*id="vapInputModes"[^>]*hidden/);assert.match(templateMarkup,/<span[^>]*id="vapDetectedType"[^>]*hidden/);assert.match(templateMarkup,/<div[^>]*id="vapBudgetPresets"[^>]*hidden/);assert.match(templateMarkup,/class="vap-packed-size".*1088 × 1568 px/);assert.match(templateMarkup,/<button id="vapPlay" class="vap-canvas-play"[^>]*aria-label="播放"[^>]*><\/button>/);assert.match(templateMarkup,/<div class="vap-result-frame"[^>]*>[\s\S]*?<button id="vapResultPlay" class="vap-canvas-play"/);assert.match(css,/\.vap-canvas-play\{[^}]*right:12px;bottom:12px[^}]*width:44px;height:44px/);assert.match(css,/\.vap-canvas-play\[aria-pressed=true\]::before/);assert.equal(fs.readFileSync(path.join(__dirname,'../index.html'),'utf8').includes(templateMarkup.trim()),true,'canonical VAP fragment stays synchronized');
-  console.log('vap-tool: automatic MP4/frame/ZIP dispatch from either picker, MIME-only normalization and safe extension/MIME guards, same-file retry, mixed-batch rejection before inspection, atomic opposite-type commit/failure/cancel retention; image-sequence multi-file/ZIP/picker dispatch, first-frame RGBA bitmap release, FPS/timeline/playback/resource timing, guarded import cancellation/failure, duration-tiered/custom export and MP4/ZIP download caps; real-result commits, source-preserving failures, busy/cancel, option guards, default keep-frame without confirmation/chroma and keying isolation, strict duration-based defaults/range/oversized-result rejection/valid-result retention and real retry phase; ultra UI options/selection/invalidation/language retention, automatic ordinary/black/white/any-color inspection with advanced manual fallback, atomic classification/cancel-stale-import guards, four lower preview backgrounds and inline native-label fields, alpha/mode routing, fixed 1088x1568 packing/720x1560 canvas/0.5 Alpha, default enabled/open live vertical fades, post-load first-frame subscription/visible source until preview/stale-source rejection/decoded-data two-paint fallback/RVFC race idempotence, immediate upload/replacement previews, manual-disable retention, result-gated output/source-only upload and initial encoding/failure/cancel, invalidation hiding, valid-result-preserving re-encode and failed replacement, loading/ready/player-error states, contextual refinement controls and help-only explanations, synchronized preview backgrounds without output invalidation, mobile 60%/original 100% presets and no-op retention/custom selection, volume export/native-preview/WebAudio amplification/mute/audio-off/no-audio/lifecycle and delayed-resume route-exit race gates, persistent valid mask preferences/replacement and reload retention/corruption and blocked-storage fallback; live vertical-mask preview/export/invalid-field/no-op/provider-reuse/stale-frame/drag/keyboard/busy gates, downloads, resource defaults/native slot offsets/dynamic-only tags/legacy-mode overrides/ZIP asset reserves/loading locks/failure preservation, language/preview retention and neutral filenames passed (mock media; browser codec evidence separate).');
+  console.log('vap-tool: automatic MP4/frame/ZIP dispatch from either picker, MIME-only normalization and safe extension/MIME guards, same-file retry, mixed-batch rejection before inspection, atomic opposite-type commit/failure/cancel retention; image-sequence multi-file/ZIP/picker dispatch, first-frame RGBA bitmap release, FPS/timeline/playback/resource timing, guarded import cancellation/failure, fixed-default/custom export and MP4/ZIP download caps; real-result commits, source-preserving failures, busy/cancel, option guards, default keep-frame without confirmation/chroma and keying isolation, strict default/manual range/oversized-result rejection/valid-result retention and real retry phase; ultra UI options/selection/invalidation/language retention, automatic ordinary/black/white/any-color inspection with advanced manual fallback, atomic classification/cancel-stale-import guards, four lower preview backgrounds and inline native-label fields, alpha/mode routing, fixed 1088x1568 packing/720x1560 canvas/0.5 Alpha, default enabled/open live vertical fades, post-load first-frame subscription/visible source until preview/stale-source rejection/decoded-data two-paint fallback/RVFC race idempotence, immediate upload/replacement previews, manual-disable retention, result-gated output/source-only upload and initial encoding/failure/cancel, invalidation hiding, valid-result-preserving re-encode and failed replacement, loading/ready/player-error states, contextual refinement controls and help-only explanations, synchronized preview backgrounds without output invalidation, mobile 60%/original 100% presets and no-op retention/custom selection, volume export/native-preview/WebAudio amplification/mute/audio-off/no-audio/lifecycle and delayed-resume route-exit race gates, persistent valid mask preferences/replacement and reload retention/corruption and blocked-storage fallback; live vertical-mask preview/export/invalid-field/no-op/provider-reuse/stale-frame/drag/keyboard/busy gates, downloads, resource defaults/native slot offsets/dynamic-only tags/legacy-mode overrides/ZIP asset reserves/loading locks/failure preservation, language/preview retention and neutral filenames passed (mock media; browser codec evidence separate).');
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -186,6 +186,13 @@ async function run(key, operation) {
   catch (error) { currentError = error; }
   finally { busy = false; activity = null; render(); }
 }
+function runUpload(operation, key = 'readingFiles') {
+  return run(key, async () => {
+    const progress = globalThis.UploadProgress?.begin();
+    try { await operation(); }
+    finally { progress?.finish(); }
+  });
+}
 async function loadSession(next, reusePresentation = false) {
   if (!next?.id || !next.candidate) throw issue('requestFailed');
   audioWarning=''; audio.setEnabled(next.soundEnabled !== false);
@@ -304,7 +311,7 @@ function bindUploads() {
     primaryButtons:[$('choose-preview-files'),$('choose-preview-purple-files')], replacementButtons:[$('choose-files'),$('choose-purple-files')], input:$('res-file-input'),
     folderInput:$('res-folder-input'),
     onTarget:(event) => selectUploadGrade(event?.target?.closest?.('[data-upload-grade]')?.dataset.uploadGrade || document.activeElement?.closest?.('[data-upload-grade]')?.dataset.uploadGrade || uploadGrade || session?.grade),
-    onDirectory:provider => run('readingFiles',async()=>{
+    onDirectory:provider => runUpload(async()=>{
       const files=await provider();
       if (!files.length) throw issue('folderEmpty');
       await stageFiles(files);
@@ -318,7 +325,7 @@ function importFiles(value) {
   if (files.length && !uploadGrade) {
     try { selectUploadGrade(session?.grade); } catch(error) { return run(null,()=>{throw error;}); }
   }
-  if (files.length) { void audio.unlock().catch(()=>{}); return run('readingFiles', () => stageFiles(files)); }
+  if (files.length) { void audio.unlock().catch(()=>{}); return runUpload(() => stageFiles(files)); }
 }
 function selectUploadGrade(nextGrade) {
   if (!['green','purple'].includes(nextGrade)) throw issue('chooseUploadGrade');
@@ -390,7 +397,7 @@ $('purple-variant').addEventListener('change', () => run('updatingSettings', sav
 document.querySelectorAll('[data-preview-grade]').forEach(button => button.addEventListener('click', () => { if (!busy && previewGrade!==button.dataset.previewGrade) return run(null,()=>switchBackground(button.dataset.previewGrade)); }));
 $('apply-settings').addEventListener('click', () => run('updatingSettings', saveSettings));
 $('asset-details').addEventListener('toggle', renderAssets);
-$('import-preview').addEventListener('click', () => run('buildingPreview', importPending));
+$('import-preview').addEventListener('click', () => runUpload(importPending, 'buildingPreview'));
 $('clear-pending').addEventListener('click', () => { if (busy) return; releasePending(); if (session) fillSettings(session); currentError=null; notice=null; toast('replacementCancelled'); render(); });
 $('reload-preview').addEventListener('click', () => run('loadingPreview', async () => { if (session) await loadSession(await api('/api/preview/' + session.id)); }));
 $('game-canvas').addEventListener('click', () => { if (!busy && previewReady && !pending.size && !settingsDirty()) { void audio.unlock().catch(()=>{}); renderer.play(); } });

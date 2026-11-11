@@ -131,6 +131,9 @@
 #vapTool fieldset.vap-separator legend{float:left;width:100%;margin-bottom:10px}
 #vapTool fieldset.vap-separator legend+.vap-segments{clear:both}
 #vapTool .vap-two-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#vapTool .vap-size-estimate{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin-top:12px}
+#vapTool .vap-size-estimate .vap-button{min-height:44px}
+#vapTool #vapSizeEstimate{margin:0;line-height:20px;font-size:13px;color:var(--tool-muted);font-variant-numeric:tabular-nums}
 #vapTool .vap-field-error{font-size:12px;line-height:20px;color:#b42318;margin:8px 0 0}
 #vapTool .vap-notice{font-size:12px;line-height:20px;padding:12px;border-radius:10px;background:#fff4ef;color:#9b3823;overflow-wrap:anywhere;margin:14px 0 0}
 #vapTool .vap-notice[data-tone=info]{background:#f0f6ff;color:#2861a0}

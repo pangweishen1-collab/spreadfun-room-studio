@@ -304,6 +304,7 @@ async function loadImageFiles(files,add=false){
   if(!/\.(png|jpe?g|webp)$/i.test(file.name||'')&&!/^image\/(png|jpeg|webp)$/i.test(file.type||'')){notice('imageType');return}
   if(file.size>20*1024*1024){notice('imageSizeError');return}
   const resume=state.playing;pause();state.imageLoading=true;notice();sync();let decoded,committed=false;
+  const progress=window.UploadProgress?.begin();
   try{
     decoded=await createImageBitmap(file);const w=decoded.width,h=decoded.height;
     if(!Number.isInteger(w)||!Number.isInteger(h)||w<1||h<1||w>8192||h>8192||w*h>32000000)throw Error('imageDimensions');
@@ -324,7 +325,7 @@ async function loadImageFiles(files,add=false){
     selectImage(image);renderAssets();committed=true;
     if(state.result)notice('changed','success');
   }catch(error){notice(['imageDimensions'].includes(error.message)?error.message:'imageLoadError')}
-  finally{decoded?.close?.();state.imageLoading=false;if(committed&&resume&&active()&&!document.hidden&&stageVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches){state.playing=true;player.stepToFrame(state.frame,true)}sync()}
+  finally{progress?.finish();decoded?.close?.();state.imageLoading=false;if(committed&&resume&&active()&&!document.hidden&&stageVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches){state.playing=true;player.stepToFrame(state.frame,true)}sync()}
 }
 function importFiles(files){const list=Array.from(files||[]),file=list[0];if(!file)return;if(/\.(png|jpe?g|webp)$/i.test(file.name||'')||/^image\/(png|jpeg|webp)$/i.test(file.type||''))return loadImageFiles(list);return loadFiles(list)}
 const visibleAssets=()=>state.sourceAssets.filter(asset=>!state.removedImages.has(asset.key)).concat(state.images);
@@ -442,6 +443,7 @@ async function loadFiles(files){
   if(busy())return;const file=Array.from(files||[])[0];if(!file)return;
   if(!/\.svga$/i.test(file.name)){notice('fileType');return}if(file.size>50*1024*1024){notice('fileSize');return}
   pause();state.loading=true;++state.renderId;notice();sync();
+  const progress=window.UploadProgress?.begin();
   const previous=state.video,previousWidth=state.source?.info.width;let imported=false;
   try{
     const bytes=new Uint8Array(await file.arrayBuffer()),source=await readSvga(bytes,{JSZip:window.JSZip});
@@ -462,7 +464,7 @@ async function loadFiles(files){
     root.dataset.customSource=file.name;root.dataset.customFormat=source.format;
     imported=true;
   }catch(error){if(player&&previous){player.setVideoItem(previous);await waitForRenderer(player).catch(()=>{});player.stepToFrame(state.frame,false)}notice(error.message==='fontError'?'fontError':'loadError')}
-  finally{state.loading=false;if(imported&&active()&&!document.hidden&&stageVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches){state.playing=true;player.stepToFrame(state.frame,true)}sync();layout()}
+  finally{progress?.finish();state.loading=false;if(imported&&active()&&!document.hidden&&stageVisible&&!matchMedia('(prefers-reduced-motion: reduce)').matches){state.playing=true;player.stepToFrame(state.frame,true)}sync();layout()}
 }
 const toPng=canvas=>new Promise((resolve,reject)=>canvas.toBlob(blob=>blob?resolve(blob):reject(Error('exportError')),'image/png'));
 async function firstFrame(bytes,name,compression){
