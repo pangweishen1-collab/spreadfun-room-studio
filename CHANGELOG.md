@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.18.5 - 2026-11-11
+
+### VAP converter and room review
+
+- Recognize side-by-side color and alpha planes in compatible MP4s without VAP metadata, and display the composited transparent video in both workflows.
+
 ## 1.18.4 - 2026-11-11
 
 ### Gift image background removal
