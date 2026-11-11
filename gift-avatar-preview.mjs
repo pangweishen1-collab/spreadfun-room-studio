@@ -237,6 +237,7 @@ download.addEventListener('click', async () => {
   } finally {
     busy = false;
     sync();
+    if (document.activeElement === document.body && !preview.hidden) download.focus({preventScroll: true});
   }
 });
 

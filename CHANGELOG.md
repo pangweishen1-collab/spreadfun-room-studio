@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.18.7 - 2026-11-11
+
+### Gift images
+
+- Split the gift image workspace into Preview and Production tabs.
+- Replace up to 14 avatars individually or in bulk on the room preview, and download them as a ZIP of 240 × 240 static WebP files.
+- Export the room with its current avatars and frames as a 720 × 1560 lossless WebP for review.
+
 ## 1.18.6 - 2026-11-11
 
 ### VAP converter
