@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.19.0 - 2026-11-11
+
+- Add a token workspace with Rose and Anubis examples, a looping board preview, a six-second review video and Spine runtime asset export.
+- Replace purple token trails by color or across all four colors. Accept pasted PNGs and named artwork for each of the two trail stages.
+
 ## 1.18.15 - 2026-11-11
 
 - Split Preview Images into Create Preview, Vehicles / Medals, and Gift Preview. Each tab has its own icon.
