@@ -1,6 +1,7 @@
-const FPS = 24;
-const FRAME_COUNT = 6 * FPS;
-// AVC level 3.2 accommodates the native 720 × 1560 room at 24 fps.
+const FPS = 30;
+const DURATION = 6;
+const FRAME_COUNT = DURATION * FPS;
+// AVC level 3.2 accommodates 4,410 macroblocks per frame at 30 FPS.
 const ENCODINGS = [
   {codec: 'avc', fullCodecString: 'avc1.640020'},
   {codec: 'avc', fullCodecString: 'avc1.4d0020'},
@@ -10,7 +11,7 @@ const ENCODINGS = [
 ];
 
 async function openEncoder(M, canvas, signal) {
-  const options = {quality: new M.Quality({bitrate: 4_000_000}), bitrateMode: 'variable', latencyMode: 'quality'};
+  const options = {quality: new M.Quality({bitrate: 8_000_000}), bitrateMode: 'variable', latencyMode: 'quality'};
   const dimensions = {width: canvas.width, height: canvas.height, frameRate: FPS};
   for (const {codec, fullCodecString} of ENCODINGS) {
     signal?.throwIfAborted();
@@ -41,6 +42,8 @@ async function validateVideo(M, buffer, extension, signal) {
   try {
     const track = await input.getPrimaryVideoTrack();
     if (!track) throw new Error('Missing room review video track');
+    const [width, height] = await Promise.all([track.getDisplayWidth(), track.getDisplayHeight()]);
+    if (width !== 720 || height !== 1560) throw new Error('Unexpected encoded room review dimensions');
     const timestamps = [];
     const tolerance = extension === 'mp4' ? .0001 : .001;
     for await (const packet of new M.EncodedPacketSink(track).packets()) {
@@ -52,10 +55,10 @@ async function validateVideo(M, buffer, extension, signal) {
     }
     timestamps.sort((a, b) => a - b);
     if (timestamps.length !== FRAME_COUNT || timestamps.some((timestamp, index) => Math.abs(timestamp - index / FPS) > tolerance)) {
-      throw new Error('Room review must contain all 144 frames at 24 fps');
+      throw new Error(`Room review must contain all ${FRAME_COUNT} frames at ${FPS} FPS`);
     }
     const duration = await track.computeDuration();
-    if (Math.abs(duration - 6) > tolerance) throw new Error('Room review video duration must be six seconds');
+    if (Math.abs(duration - DURATION) > tolerance) throw new Error('Room review video duration must be six seconds');
   } finally {
     input.dispose();
   }

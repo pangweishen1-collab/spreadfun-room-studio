@@ -14,15 +14,19 @@ const assert=require('node:assert/strict');
   const events=[],canvases=[],uniforms=new Map();let behavior={};
   function fakeGl(canvas){
     const gl={},keys=['MAX_TEXTURE_SIZE','MAX_RENDERBUFFER_SIZE','MAX_VIEWPORT_DIMS','FRAGMENT_SHADER','HIGH_FLOAT','VERTEX_SHADER','COMPILE_STATUS','LINK_STATUS','ARRAY_BUFFER','STATIC_DRAW','FLOAT','BLEND','DITHER','DEPTH_TEST','SCISSOR_TEST','UNPACK_ALIGNMENT','UNPACK_FLIP_Y_WEBGL','UNPACK_PREMULTIPLY_ALPHA_WEBGL','UNPACK_COLORSPACE_CONVERSION_WEBGL','TEXTURE_2D','TEXTURE_MIN_FILTER','TEXTURE_MAG_FILTER','NEAREST','TEXTURE_WRAP_S','TEXTURE_WRAP_T','CLAMP_TO_EDGE','RGBA','UNSIGNED_BYTE','LUMINANCE','TRIANGLE_STRIP'];
-    keys.forEach((k,i)=>gl[k]=i+1);gl.TEXTURE0=100;gl.NONE=gl.NO_ERROR=0;
+    keys.forEach((k,i)=>gl[k]=i+1);gl.TEXTURE0=100;gl.RENDERER=0x9246;gl.NONE=gl.NO_ERROR=0;
     gl.drawingBufferWidth=canvas.width;gl.drawingBufferHeight=canvas.height;
-    gl.getParameter=k=>k===gl.MAX_VIEWPORT_DIMS?[behavior.limit||4096,behavior.limit||4096]:behavior.limit||4096;
+    gl.getParameter=k=>k===gl.RENDERER?'ANGLE (Google, SwiftShader Device)':k===gl.MAX_VIEWPORT_DIMS?[behavior.limit||4096,behavior.limit||4096]:behavior.limit||4096;
     gl.getShaderPrecisionFormat=()=>({precision:behavior.precision??23});
     for(const method of ['createShader','createProgram','createBuffer','createTexture'])gl[method]=()=>({type:method,id:events.length});
     gl.getShaderParameter=()=>behavior.compile!==false;gl.getProgramParameter=()=>behavior.link!==false;gl.getAttribLocation=()=>0;gl.getUniformLocation=(_,name)=>name;
     for(const method of ['uniform1i','uniform1f','uniform2f'])gl[method]=(name,...values)=>uniforms.set(name,values);
     gl.getError=()=>behavior.error||0;gl.isContextLost=()=>!!behavior.lost;
-    gl.getExtension=name=>name==='WEBGL_lose_context'?{loseContext:()=>events.push({method:'loseContext'})}:null;
+    gl.getExtension=name=>{
+      if(name==='WEBGL_lose_context')return {loseContext:()=>events.push({method:'loseContext'})};
+      if(name==='WEBGL_debug_renderer_info'&&behavior.software)return {UNMASKED_RENDERER_WEBGL:gl.RENDERER};
+      return null;
+    };
     for(const method of ['deleteTexture','deleteBuffer','deleteProgram','deleteShader','shaderSource','compileShader','attachShader','linkProgram','useProgram','bindBuffer','bufferData','enableVertexAttribArray','vertexAttribPointer','disable','viewport','pixelStorei','activeTexture','bindTexture','texParameteri','texImage2D','drawArrays'])gl[method]=(...args)=>events.push({method,args});
     gl.texSubImage2D=(...args)=>{if(behavior.uploadError)throw Error('upload failed');events.push({method:'texSubImage2D',args});};
     return gl;
@@ -45,13 +49,14 @@ const assert=require('node:assert/strict');
     for(const change of [{width:0},{width:2049},{height:1.2},{videoOffsetY:2},{rgbAlphaMode:'other'},{sourceVapConfig:{}},{verticalMask:{enabled:true,topStart:.5,topEnd:.2,bottomStart:.8,bottomEnd:1}}]){
       reset();assert.equal(createNativeVapPlanes({...options,...change}),null);assert.equal(canvases.length,0);
     }
-    for(const unsupported of [{unsupported:true},{precision:16},{limit:8},{compile:false},{link:false},{error:1280}]){
+    for(const unsupported of [{unsupported:true},{software:true},{precision:16},{limit:8},{compile:false},{link:false},{error:1280}]){
       reset(unsupported);assert.equal(createNativeVapPlanes(options),null);assert(canvases.every(c=>c.width===1&&c.height===1),'failed initialization releases every partially allocated canvas');
       assert(canvases.every(c=>c.listeners.size===0));
     }
     reset();const renderer=createNativeVapPlanes(options);assert(renderer);
     assert.deepEqual(canvases.map(c=>[c.width,c.height]),[[8,12],[8,12],[16,12]]);
     assert(canvases.slice(0,2).every(c=>c.calls[0].options.willReadFrequently===true),'source resampling retains the established CPU Canvas backing');
+    assert.equal(canvases[2].calls[0].options.failIfMajorPerformanceCaveat,true,'software WebGL is eligible for the CPU fallback');
     assert.equal(uniforms.get('sourcePremultiplied')[0],1);assert.equal(uniforms.get('outputPremultiplied')[0],1);
     const lut=events.find(e=>e.method==='texImage2D'&&e.args.at(-1) instanceof Uint8Array).args.at(-1);assert.equal(lut.length,256*12);
     for(let y=0;y<12;y++)for(let a=0;a<256;a++){

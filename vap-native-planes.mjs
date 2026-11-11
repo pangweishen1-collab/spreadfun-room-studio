@@ -75,8 +75,13 @@ export function createNativeVapPlanes({width,height,sourceVapConfig,verticalMask
   }
   try{
     rgb=surface();alpha=surface();target=canvas(width*2,height);
-    gl=target.getContext('webgl',{alpha:false,premultipliedAlpha:false,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:true});
+    gl=target.getContext('webgl',{alpha:false,premultipliedAlpha:false,antialias:false,depth:false,stencil:false,preserveDrawingBuffer:true,failIfMajorPerformanceCaveat:true});
     if(!gl)throw new Error('Native VAP WebGL unavailable');
+    // Explicit software WebGL can ignore the context's performance hint.
+    const debugInfo=gl.getExtension('WEBGL_debug_renderer_info');
+    if(debugInfo&&/\b(?:swiftshader|llvmpipe|softpipe|lavapipe|software rasterizer|microsoft basic render driver)\b/i.test(gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL))){
+      throw new Error('Native VAP uses the CPU path for software WebGL');
+    }
     target.addEventListener?.('webglcontextlost',onLost);
     const textureSide=gl.getParameter(gl.MAX_TEXTURE_SIZE),renderSide=gl.getParameter(gl.MAX_RENDERBUFFER_SIZE),viewport=gl.getParameter(gl.MAX_VIEWPORT_DIMS),precision=gl.getShaderPrecisionFormat(gl.FRAGMENT_SHADER,gl.HIGH_FLOAT);
     if(!precision||precision.precision<23||Math.max(width*2,height)>Math.min(textureSide,renderSide)||viewport[0]<width*2||viewport[1]<height||gl.drawingBufferWidth!==width*2||gl.drawingBufferHeight!==height)throw new Error('Native VAP WebGL limits');

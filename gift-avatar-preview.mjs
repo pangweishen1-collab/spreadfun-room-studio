@@ -583,7 +583,7 @@ reviewDownload.addEventListener('click', async () => {
     });
     const filename = `gift-room-review-${base.width}x${base.height}`;
     if (video) {
-      const {encodeAvatarReviewVideo} = await import('./gift-avatar-review-video.mjs?v=20261111-seat-review1');
+      const {encodeAvatarReviewVideo} = await import('./gift-avatar-review-video.mjs?v=20261111-seat-review-hd30');
       output = document.createElement('canvas');
       output.width = base.width;
       output.height = base.height;

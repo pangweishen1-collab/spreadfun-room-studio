@@ -1,4 +1,4 @@
-import {avcCodec, inspectVideo} from './vap-engine.mjs?v=20261111-official-pack';
+import {avcCodec, inspectVideo} from './vap-engine.mjs?v=20261111-vap-faster';
 import {applyVerticalMask, keyPixels, normalizeVerticalMask} from './vap-matte.mjs?v=20261110-luma-cache';
 import {readSourceVapConfig} from './vap-protocol.mjs?v=20261111-official-pack';
 import {createVapUnpacker} from './vap-resources.mjs?v=20261111-official-pack';
