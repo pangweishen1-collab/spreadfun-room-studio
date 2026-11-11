@@ -59,7 +59,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="upload-progress.css?v=20261111-upload-progress">
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
   <link rel="stylesheet" href="gift-preview.css?v=20261111-gift-batch">
-  <link rel="stylesheet" href="profile-preview.css?v=20261111-profile3">
+  <link rel="stylesheet" href="profile-preview.css?v=20261111-profile-icons">
   <link rel="stylesheet" href="vap-resources.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="vap-tool.css?v=20261111-vap-size-estimate">
   <link rel="stylesheet" href="vap-review.css?v=20261110-review-background-library">
@@ -248,8 +248,18 @@ body{min-width:320px}
   </main>
   <main id="giftPreviewTool" class="hidden" data-tool="gift-preview" aria-labelledby="giftPreviewLink">
     <div id="profileTabs" class="avatar-subtabs" role="tablist" aria-labelledby="giftPreviewLink">
-      <button id="profileProductionTab" type="button" role="tab" aria-selected="true" aria-controls="profileProduction" data-profile-text="productionTab">预览图生产</button>
-      <button id="profileDeviceTab" type="button" role="tab" aria-selected="false" aria-controls="profileDevice" tabindex="-1" data-profile-text="deviceTab">实机效果</button>
+      <button id="profileProductionTab" type="button" role="tab" aria-selected="true" aria-controls="profileProduction">
+        <svg class="avatar-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h8m2 4h6m-3-3v6M4 16l5-5 4 4 2-2 5 5"/><circle cx="9" cy="8" r="1"/></svg>
+        <span class="avatar-tab-label" data-profile-text="productionTab">预览图生产</span>
+      </button>
+      <button id="profileDeviceTab" type="button" role="tab" aria-selected="false" aria-controls="profileDevice" tabindex="-1">
+        <svg class="avatar-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m5 11 1.6-5a2 2 0 0 1 1.9-1.4h7A2 2 0 0 1 17.4 6l1.6 5M5 18v1.5m14-1.5v1.5M7.5 14.5h1m7 0h1"/><rect x="3.5" y="10.5" width="17" height="7.5" rx="2"/></svg>
+        <span class="avatar-tab-label" data-profile-text="deviceTab">座驾/勋章预览</span>
+      </button>
+      <button id="profileGiftTab" type="button" role="tab" aria-selected="false" aria-controls="profileGift" tabindex="-1">
+        <svg class="avatar-tab-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3.5" y="8" width="17" height="4" rx="1"/><path d="M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7M12 8v12m0-12H8.5a2.5 2.5 0 0 1 0-5C10.5 3 12 8 12 8Zm0 0h3.5a2.5 2.5 0 0 0 0-5C13.5 3 12 8 12 8Z"/></svg>
+        <span class="avatar-tab-label" data-profile-text="giftTab">礼物预览</span>
+      </button>
     </div>
     <section id="profileProduction" role="tabpanel" aria-labelledby="profileProductionTab">
   <div class="intro tool-intro"><div><h1 id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具</h1></div></div>
@@ -396,12 +406,38 @@ body{min-width:320px}
           <p class="local-privacy"><span class="privacy-dot" aria-hidden="true"></span><span data-profile-text="privacy">图片仅在本地处理。</span></p>
           <input id="profileFiles" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple hidden>
         </aside>
-        <section class="card profile-scene" aria-labelledby="profileDeviceHeading">
-          <h2 id="profileDeviceHeading" data-profile-text="deviceHeading">实机预览</h2>
+        <section class="card profile-scene" aria-labelledby="profileDeviceTab">
           <div class="profile-stage-wrap">
-            <div id="profileStage" class="profile-stage" role="group" aria-labelledby="profileDeviceHeading">
+            <div id="profileStage" class="profile-stage" role="group" aria-labelledby="profileDeviceTab">
               <img class="profile-stage-background" src="assets/profile-preview/profile-main.webp" alt="" width="720" height="1613" loading="lazy" decoding="async" draggable="false">
               <div id="profileSlots" class="profile-slots"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </section>
+    <section id="profileGift" role="tabpanel" aria-labelledby="profileGiftTab" hidden>
+      <div class="profile-workspace">
+        <aside class="card profile-controls" aria-labelledby="giftTrayMaterialsHeading">
+          <div class="profile-card-heading">
+            <h2 id="giftTrayMaterialsHeading" data-profile-text="materialsHeading">展示素材</h2>
+            <p class="profile-count"><span data-profile-text="countLabel">已放置</span> <span id="giftTrayCount">0 / 12</span></p>
+          </div>
+          <p id="giftTrayExportSize">200 × 200 px</p>
+          <button id="giftTrayUpload" class="primary ft-motion-sheen" type="button" data-profile-text="upload">批量上传</button>
+          <div class="profile-download">
+            <button id="giftTrayExport" type="button" aria-describedby="giftTrayExportSize" disabled>下载礼物 WebP · ZIP</button>
+            <button id="giftTrayReviewExport" type="button" data-profile-text="giftReviewExport">下载礼物栏预览图</button>
+          </div>
+          <p id="giftTrayStatus" class="profile-status" role="status" aria-live="polite" aria-atomic="true"></p>
+          <p class="local-privacy"><span class="privacy-dot" aria-hidden="true"></span><span data-profile-text="privacy">图片仅在本地处理。</span></p>
+          <input id="giftTrayFiles" type="file" accept="image/png,image/jpeg,image/webp,.png,.jpg,.jpeg,.webp" multiple hidden>
+        </aside>
+        <section class="card profile-scene" aria-labelledby="profileGiftTab">
+          <div class="profile-stage-wrap">
+            <div id="giftTrayStage" class="profile-stage profile-stage-gift" role="group" aria-labelledby="profileGiftTab">
+              <img class="profile-stage-background" src="assets/profile-preview/gift-tray.webp" alt="" width="720" height="1620" loading="lazy" decoding="async" draggable="false">
+              <div id="giftTraySlots" class="profile-slots profile-slots-gift"></div>
             </div>
           </div>
         </section>
@@ -1033,7 +1069,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
   <script src="gift-background.js?v=20261111-prewarm1"></script>
   <script src="gift-preview.js?v=20261111-upload-progress"></script>
-  <script type="module" src="profile-preview.mjs?v=20261111-upload-progress"></script>
+  <script type="module" src="profile-preview.mjs?v=20261111-gift-tray"></script>
   <script type="module" src="gift-avatar-preview.mjs?v=20261111-upload-progress"></script>
   <script src="vap-player.js?v=20261111-official-pack"></script>
   <script src="vap-resource-editor.js?v=20261111-upload-progress"></script>

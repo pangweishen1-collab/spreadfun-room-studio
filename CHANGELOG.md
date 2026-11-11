@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.18.15 - 2026-11-11
+
+- Split Preview Images into Create Preview, Vehicles / Medals, and Gift Preview. Each tab has its own icon.
+- Preview up to 12 gifts in the gift tray. Replace them individually or in bulk, drag to reorder, and download 200 × 200 WebP images as a ZIP or export the full tray for review.
+
 ## 1.18.14 - 2026-11-11
 
 - Preserve the original picture when an imported VAP already meets the output requirements and fits the size limit. Audio adjustments can be made separately. VAPs that need re-encoding use the selected budget and preserve matching color and alpha plane dimensions.
