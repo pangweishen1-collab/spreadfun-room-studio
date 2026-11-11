@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.18.4 - 2026-11-11
+
+### Gift image background removal
+
+- Prepare the existing background removal model after importing dark-backed artwork on supported browsers, so loading can overlap with editing.
+
 ## 1.18.3 - 2026-11-10
 
 ### VAP converter and room review
