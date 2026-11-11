@@ -1,5 +1,13 @@
 # 更新记录
 
+## 1.18.10 - 2026-11-11
+
+### Avatar frames
+
+- Show three tabs for room preview, avatar frame images, and customization. Match the new room backdrop with 20 seats.
+- Drag frames to empty seats or swap two occupied seats while keeping portraits in place. Dropped SVGA frames play automatically.
+- Export a six-second room review video when the preview includes SVGA. Static rooms can still be exported as lossless WebP.
+
 ## 1.18.9 - 2026-11-11
 
 ### Avatar frames
