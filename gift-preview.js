@@ -14,8 +14,8 @@
   Object.assign(copy.en,{alignment:'Canvas alignment',alignHorizontal:'Horizontal align',alignVertical:'Vertical align',contextTitle:'Live gift panel preview',contextLabel:'Live gift panel preview',live:'Live',sizePresets:'Common sizes',dragHint:'Drag to position, scroll to zoom, double-click to center. Arrow keys to nudge.'});
   Object.assign(copy.zh,{advanced:'高级调整',retouch:'局部修整',toolMove:'移动',toolErase:'擦除',toolRestore:'恢复',brushSize:'笔刷大小',brushHardness:'硬度',brushOpacity:'不透明度',clearErase:'清空擦除',history:'操作历史',undo:'撤销',redo:'重做',transform:'旋转与翻转',rotation:'旋转角度',rotateLeft:'左转 90°',rotateRight:'右转 90°',flipHorizontal:'水平翻转',flipVertical:'垂直翻转',safeArea:'安全区辅助线',safeToggle:'显示安全区与中心线',safeInset:'安全边距',brushHint:'拖动笔刷修整；[ / ] 调整大小，Esc 返回移动，⌘/Ctrl Z 撤销'});
   Object.assign(copy.en,{advanced:'Advanced adjustments',retouch:'Retouch',toolMove:'Move',toolErase:'Erase',toolRestore:'Restore',brushSize:'Brush size',brushHardness:'Hardness',brushOpacity:'Opacity',clearErase:'Clear erasing',history:'Edit history',undo:'Undo',redo:'Redo',transform:'Rotate and flip',rotation:'Rotation',rotateLeft:'Rotate left 90°',rotateRight:'Rotate right 90°',flipHorizontal:'Flip horizontally',flipVertical:'Flip vertically',safeArea:'Safe area guides',safeToggle:'Show safe area and center lines',safeInset:'Safe margin',brushHint:'Drag to retouch. [ / ] size, Esc to move, Cmd/Ctrl Z to undo.'});
-  Object.assign(copy.zh,{removeBackground:'一键抠图',restoreBackground:'还原背景',removing:'正在抠图…',removeProgress:'抠图进度',modelLoading:'正在加载抠图组件',removeError:'抠图失败，请检查网络或稍后重试；原图已保留。',removeHint:'先识别主体，再精修黑底边缘并恢复光效与粒子；首次使用需加载模型，图片仅在本地处理。'});
-  Object.assign(copy.en,{removeBackground:'Remove background',restoreBackground:'Restore background',removing:'Removing background…',removeProgress:'Background removal progress',modelLoading:'Loading background removal',removeError:'Background removal failed. Check your connection and retry. Your original image is preserved.',removeHint:'Detects the subject, refines dark-backed edges and recovers light effects. Models load on first use. Your image stays on this device.'});
+  Object.assign(copy.zh,{removeBackground:'一键抠图',restoreBackground:'还原背景',removing:'正在抠图…',removeProgress:'抠图进度',modelLoading:'正在加载抠图组件',removeError:'抠图失败，请检查网络或稍后重试；原图已保留。',removeHint:'先识别主体，再精修黑底边缘并恢复光效与粒子。图片仅在本地处理。'});
+  Object.assign(copy.en,{removeBackground:'Remove background',restoreBackground:'Restore background',removing:'Removing background…',removeProgress:'Background removal progress',modelLoading:'Loading background removal',removeError:'Background removal failed. Check your connection and retry. Your original image is preserved.',removeHint:'Detects the subject, refines dark-backed edges and recovers light effects. Your image stays on this device.'});
   const state={image:null,file:null,settings:{...defaults},strokes:[],baseMask:null,removing:false,removeProgress:null,tool:'move',brush:{size:20,hardness:70,opacity:100},safe:{enabled:false,inset:10},mode:'feather',modeChosen:false,side:200,valid:true,loading:false,exporting:false,notice:null,background:'black',download:null,revision:0};
   const t=key=>(copy[language]||copy.en)[key]||copy.en[key]||key;
   let renderRequest=0,drag=null,loadToken=0,editGroup=null,wheelTimer=0,hoverPoint=null,mattingTimer=0,mattingPresentation=0,mattingPercent=0,mattingVisible=false;
@@ -156,7 +156,12 @@
       window.GiftPreviewRenderer.render(canvas,image,{...defaults,mode});
       state.image=image;state.file=file;state.mode=mode;state.settings={...defaults};state.strokes=[];state.baseMask=null;state.tool='move';hoverPoint=null;history.reset(snapshot());state.revision++;releaseDownload();syncRanges();loaded=true;
     }catch(error){state.notice=copy.en[error.message]?error.message:'loadError';if(state.image)try{render()}catch(ignored){}}
-    finally{if(url)URL.revokeObjectURL(url);if(token===loadToken){state.loading=false;syncControls();if(loaded){syncContextPreview();window.FunToolkitUI?.reveal(canvas);if(uploadHadFocus)canvas.focus({preventScroll:true})}}}
+    finally{if(url)URL.revokeObjectURL(url);if(token===loadToken){state.loading=false;syncControls();if(loaded){
+      syncContextPreview();window.FunToolkitUI?.reveal(canvas);if(uploadHadFocus)canvas.focus({preventScroll:true});
+      const prewarm=()=>{if(token===loadToken&&!state.removing&&!state.baseMask)window.GiftBackground?.prewarm?.(state.image)};
+      if(typeof requestIdleCallback==='function')requestIdleCallback(prewarm,{timeout:500});
+      else setTimeout(prewarm,0);
+    }}}
   }
   function syncRanges(){
     for(const [name,key] of rangeFields)$('#giftPreview'+name).value=key==='zoom'?Math.round(state.settings[key]*100):state.settings[key];

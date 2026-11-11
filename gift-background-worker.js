@@ -7,14 +7,19 @@ async function loadAI() {
   return aiModulePromise;
 }
 async function loadLucida() {
-  if (!lucidaModulePromise) lucidaModulePromise = import('./gift-lucida-ai.mjs?v=20261109-transfer1').catch(error => { lucidaModulePromise = null; throw error; });
+  if (!lucidaModulePromise) lucidaModulePromise = import('./gift-lucida-ai.mjs?v=20261111-prewarm1').catch(error => { lucidaModulePromise = null; throw error; });
   return lucidaModulePromise;
 }
 
-export async function routeBackground(message, {onProgress = () => {}, loadAI: load = loadAI, loadLucida: loadQuality = loadLucida} = {}) {
+function checkPixels(message) {
   const {width, height, data} = message;
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 2048 || height > 2048
     || !(data instanceof Uint8ClampedArray) || data.length !== width * height * 4) throw new Error('图片像素尺寸无效。');
+}
+
+export async function routeBackground(message, {onProgress = () => {}, loadAI: load = loadAI, loadLucida: loadQuality = loadLucida} = {}) {
+  checkPixels(message);
+  const {width, height, data} = message;
   onProgress('analyzing', 0);
   const background = darkBackground(data, width, height);
   if (!background) {
@@ -43,4 +48,21 @@ async function remove(message) {
     self.postMessage({type: 'error', id: message.id, message: error.message || '本地背景移除失败，请重试。'});
   } finally { running = false; }
 }
-if (typeof self !== 'undefined') self.addEventListener('message', event => { if (event.data?.type === 'remove') remove(event.data); });
+
+async function prewarm(message) {
+  let ready = false;
+  try {
+    checkPixels(message);
+    if (darkBackground(message.data, message.width, message.height)) {
+      // Drop the uploaded pixels before model allocation. Only the session is shared.
+      message.data = null;
+      ready = await (await loadLucida()).prewarm();
+    }
+  } catch (ignored) {}
+  self.postMessage({type: 'prewarm', ready});
+}
+
+if (typeof self !== 'undefined') self.addEventListener('message', event => {
+  if (event.data?.type === 'remove') remove(event.data);
+  if (event.data?.type === 'prewarm') prewarm(event.data);
+});

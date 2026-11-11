@@ -176,7 +176,7 @@ async function tests(){
   const {remove}=sandbox.window.GiftBackground,image={naturalWidth:1200,naturalHeight:800,complete:true};
   assert.equal(workers.length,0,'loading the tool never eagerly loads the worker or model');await assert.rejects(remove({naturalWidth:0,naturalHeight:0}),/载入/);assert.equal(workers.length,0);
   const first=remove(image,{onProgress:event=>progress.push(event)}),also=[];
-  assert.equal(workers.length,1);assert.equal(String(workers[0].url),'http://127.0.0.1:8792/gift-background-worker.js?v=20261109-transfer1');assert.equal(workers[0].options.type,'module');assert.equal(progress[0].phase,'analyzing');
+  assert.equal(workers.length,1);assert.equal(String(workers[0].url),'http://127.0.0.1:8792/gift-background-worker.js?v=20261111-prewarm1');assert.equal(workers[0].options.type,'module');assert.equal(progress[0].phase,'analyzing');
   assert.equal(remove(image,{onProgress:event=>also.push(event)}),first,'repeated calls for the same source share the active job');
   await assert.rejects(remove({...image}),/处理中/,'a different source cannot race the current job');
   const worker=workers[0],message=worker.messages[0].message;

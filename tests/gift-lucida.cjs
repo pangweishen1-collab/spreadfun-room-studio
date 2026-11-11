@@ -17,6 +17,7 @@ const {gzipSync} = require('node:zlib');
     }
     await fs.writeFile(path.join(temporary, 'package.json'), '{"type":"module"}');
     await fs.writeFile(path.join(temporary, 'gift-lucida-runtime.mjs'), `
+      export const getGpuAdapter = async () => globalThis.__lucidaTest.gpu ? {} : null;
       export const getExecutionProviders = async () => globalThis.__lucidaTest.gpu ? [{name:'webgpu'},'wasm'] : ['synthetic-test-provider'];
       export const ort = {
         Tensor: class {
@@ -83,6 +84,8 @@ const {gzipSync} = require('node:zlib');
     };
     globalThis.__lucidaTest = {creates: 0, runs: 0, inputsDisposed: 0, outputsDisposed: 0};
     const source = {data: new Uint8ClampedArray([20, 5, 1, 255]), width: 1, height: 1};
+    assert.equal(await ai.prewarm(), false, 'no GPU means no speculative model download');
+    assert.equal(chunkFetches, 0);
     await assert.rejects(ai.remove(source), /synthetic create failure/);
     assert.equal(cacheDeletes, 1); assert.equal(chunkFetches, 2);
     const progress = [], native = await ai.remove(source, (phase, value) => progress.push({phase, value}));
@@ -174,7 +177,7 @@ const {gzipSync} = require('node:zlib');
     // A gated, uneven seven-block fixture proves the real loader starts only
     // three transfers, assembles out of order at manifest offsets and advances
     // by completed bytes. No ORT/network/model inference is involved.
-    state.gpu=false;state.badShape=false;
+    state.gpu=true;state.badShape=false;
     const pieces=[1,3,2,4,2,1,3].map((length,index)=>Uint8Array.from({length},(_,byte)=>index*10+byte));
     const parallelPayload=Buffer.concat(pieces),parallelManifest={...fixture,bytes:parallelPayload.length,sha256:hash(parallelPayload),
       chunks:pieces.map((bytes,index)=>({file:'parallel-'+index+'.bin',bytes:bytes.length,sha256:hash(bytes)}))};
@@ -201,20 +204,27 @@ const {gzipSync} = require('node:zlib');
     const until=async condition=>{for(let count=0;count<1000&&!condition();count++)await new Promise(setImmediate);assert.ok(condition(),'gated download reached the expected state')};
     globalThis.fetch=gatedFetch;
     const parallelAI=await import(pathToFileURL(path.join(temporary,'gift-lucida-ai.mjs'))+'?bounded-download');
-    const loading=[],parallelRun=parallelAI.remove(source,(phase,value)=>{if(phase==='loading')loading.push(value)});
+    const runsBeforePrewarm=state.runs;
+    const warmed=parallelAI.prewarm();
     await until(()=>pending.size===3);assert.deepEqual(started,[0,1,2]);
+    assert.equal(state.runs,runsBeforePrewarm,'prewarming loads the session without inferring');
     const completionOrder=[2,0,1,5,3,4,6];
-    for(let count=0;count<completionOrder.length;count++){
+    pending.get(2)(pieces[2]);await until(()=>pending.has(3));
+    const loading=[],parallelRun=parallelAI.remove(source,(phase,value)=>{if(phase==='loading')loading.push(value)});
+    assert.deepEqual(loading,[.85*pieces[2].length/parallelPayload.length],'a click during prewarming receives the current loading progress');
+    for(let count=1;count<completionOrder.length;count++){
       const index=completionOrder[count];await until(()=>pending.has(index));pending.get(index)(pieces[index]);
       await until(()=>loading.filter(value=>value>0&&value<=.85).length===count+1);
     }
     await parallelRun;
+    assert.equal(await warmed,true);assert.equal(state.runs,runsBeforePrewarm+1);
     assert.equal(peak,3);assert.equal(started.length,pieces.length);assert.equal(inFlight,0);
     assert.deepEqual(state.model,Array.from(parallelPayload),'out-of-order blocks assemble the exact SHA-checked model');
     let completedBytes=0;
     assert.deepEqual(loading.filter(value=>value>0&&value<=.85),completionOrder.map(index=>.85*(completedBytes+=pieces[index].length)/parallelPayload.length));
     assert.ok(loading.every((value,index)=>!index||value>=loading[index-1]),'loading progress is monotonic');
     await parallelAI.release();
+    state.gpu=false;
 
     // Rejecting a block aborts peers and settles the queue before retry. Already
     // verified cache entries survive and are not fetched again on that retry.

@@ -1,4 +1,4 @@
-import {ort, getExecutionProviders} from './gift-lucida-runtime.mjs?v=20261109-transfer1';
+import {ort, getExecutionProviders, getGpuAdapter} from './gift-lucida-runtime.mjs?v=20261111-prewarm1';
 import {resizeMatteInput, resizeMatteAlpha} from './gift-matte-resample.mjs';
 import {checksum, fetchVerifiedChunk} from './gift-lucida-download.mjs';
 
@@ -8,7 +8,8 @@ const WEIGHTS_SHA = '2f1aa6913426537d4b93dd5f7138ae5c6664e99abda98c95f3d5b910128
 const MEAN = [.485, .456, .406], STD = [.229, .224, .225];
 const assetBase = new URL('./assets/lucida/', import.meta.url);
 const shaPattern = /^[a-f0-9]{64}$/;
-let sessionPromise = null;
+let sessionPromise = null, loadingProgress = null, warmup = null;
+const loadingListeners = new Set();
 
 export function preprocess(rgba, width = SIDE, height = SIDE) {
   if (!(rgba instanceof Uint8ClampedArray) || !Number.isInteger(width) || !Number.isInteger(height)
@@ -122,14 +123,36 @@ async function loadModel(progress) {
 }
 
 async function getSession(progress) {
-  if (!sessionPromise) sessionPromise = loadModel(progress).catch(error => { sessionPromise = null; throw error; });
-  return sessionPromise;
+  if (!sessionPromise) sessionPromise = loadModel((phase, value) => {
+    loadingProgress = value;
+    for (const listener of loadingListeners) listener(phase, value);
+  }).finally(() => { loadingProgress = null; }).catch(error => { sessionPromise = null; throw error; });
+  if (progress && loadingProgress !== null) {
+    loadingListeners.add(progress);
+    progress('loading', loadingProgress);
+  }
+  try { return await sessionPromise; }
+  finally { loadingListeners.delete(progress); }
+}
+
+export async function prewarm() {
+  if (!await getGpuAdapter()) return false;
+  if (sessionPromise) { await sessionPromise; return true; }
+  warmup = getSession();
+  try { await warmup; }
+  finally { warmup = null; }
+  return true;
 }
 
 export async function remove(message, progress = () => {}) {
   // Validate and resize before downloading a model for invalid source pixels.
   const rgba = resizeMatteInput(message.data, message.width, message.height, SIDE);
-  const session = await getSession(progress);
+  const joinedWarmup = warmup !== null;
+  const session = await getSession(progress).catch(error => {
+    if (!joinedWarmup) throw error;
+    // A failed speculative load must not consume the user's first attempt.
+    return getSession(progress);
+  });
   progress('processing', 0);
   const input = new ort.Tensor('float32', preprocess(rgba), [1, 3, SIDE, SIDE]);
   let outputs;

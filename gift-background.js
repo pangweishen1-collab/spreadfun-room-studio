@@ -1,9 +1,10 @@
-/* Optional on-device matting. The worker and model are loaded only after remove() is called. */
+/* Optional on-device matting with background preparation for dark-backed artwork. */
 (() => {
   'use strict';
   const base=new URL('.',document.currentScript?.src||location.href);
   const MAX_SIDE=2048;
   let worker=null,active=null,cached=null,serial=0;
+  let prewarming=false,qualityReady=false;
   function copyMask(mask){
     return {...mask,data:mask.data.slice(),...(mask.foreground?{foreground:mask.foreground.slice(),background:mask.background.slice()}: {})};
   }
@@ -31,14 +32,18 @@
   }
   function dispose(message='背景移除已取消，请重试。'){
     if(worker){worker.terminate();worker=null}
-    cached=null;finish(new Error(message));
+    prewarming=false;qualityReady=false;cached=null;finish(new Error(message));
   }
   function getWorker(){
     if(worker)return worker;
     if(typeof Worker==='undefined')throw new Error('此浏览器不支持本地抠图，请使用较新的浏览器。');
-    worker=new Worker(new URL('gift-background-worker.js?v=20261109-transfer1',base),{type:'module',name:'gift-background'});
+    worker=new Worker(new URL('gift-background-worker.js?v=20261111-prewarm1',base),{type:'module',name:'gift-background'});
     worker.addEventListener('message',event=>{
-      const message=event.data;if(!active||message.id!==active.id)return;
+      const message=event.data;
+      if(message.type==='prewarm'){
+        prewarming=false;qualityReady=qualityReady||message.ready===true;return;
+      }
+      if(!active||message.id!==active.id)return;
       if(message.type==='progress')noteProgress(active,{phase:message.phase,progress:message.progress});
       else if(message.type==='result'){
         const {width,height,data,recoverBlack,method,foreground,background}=message;
@@ -47,12 +52,33 @@
           ||!((method==='dark-matte'&&recoverBlack)||(method==='ai'&&!recoverBlack)
             ||(method==='quality-matte'&&!recoverBlack&&foreground instanceof Uint8ClampedArray&&foreground.length===width*height*4
               &&Array.isArray(background)&&background.length===3&&background.every(value=>Number.isFinite(value)&&value>=0&&value<=255)))){finish(new Error('抠图结果无效，请重试。'));return}
+        if(method==='quality-matte')qualityReady=true;
         finish(null,{width,height,data,recoverBlack,method,...(method==='quality-matte'?{foreground,background}: {})});
       }else if(message.type==='error')finish(new Error(message.message||'背景移除失败，请重试。'));
     });
     worker.addEventListener('error',()=>dispose('抠图组件未能加载，请检查网络后重试。'));
     worker.addEventListener('messageerror',()=>dispose('抠图结果无法读取，请重试。'));
     return worker;
+  }
+  function readPixels(image){
+    const scale=Math.min(1,MAX_SIDE/Math.max(image.naturalWidth,image.naturalHeight));
+    const width=Math.max(1,Math.round(image.naturalWidth*scale)),height=Math.max(1,Math.round(image.naturalHeight*scale));
+    const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
+    try{
+      const context=canvas.getContext('2d',{willReadFrequently:true});if(!context)throw new Error('此浏览器无法读取图片像素。');
+      context.imageSmoothingEnabled=true;context.imageSmoothingQuality='high';context.drawImage(image,0,0,width,height);
+      return {width,height,data:context.getImageData(0,0,width,height).data};
+    }finally{canvas.width=canvas.height=1}
+  }
+  function prewarm(image){
+    const browser=window.navigator,connection=browser?.connection;
+    if(active||prewarming||qualityReady||document.hidden||!browser?.gpu||connection?.saveData
+      ||['slow-2g','2g','3g'].includes(connection?.effectiveType))return;
+    try{
+      const pixels=readPixels(image);
+      getWorker().postMessage({type:'prewarm',...pixels},[pixels.data.buffer]);
+      prewarming=true;
+    }catch(ignored){}
   }
   function remove(image,{onProgress}={}){
     const source=image?.currentSrc||image?.src||'';
@@ -68,23 +94,18 @@
       if(typeof onProgress==='function')try{onProgress({phase:'processing',progress:1})}catch(ignored){}
       return Promise.resolve({...copyMask(cached.mask),cacheHit:true});
     }
-    const scale=Math.min(1,MAX_SIDE/Math.max(image.naturalWidth,image.naturalHeight));
-    const width=Math.max(1,Math.round(image.naturalWidth*scale)),height=Math.max(1,Math.round(image.naturalHeight*scale));
     let pixels,target;
     try{
-      target=getWorker();const canvas=document.createElement('canvas');canvas.width=width;canvas.height=height;
-      const context=canvas.getContext('2d',{willReadFrequently:true});if(!context)throw new Error('此浏览器无法读取图片像素。');
-      context.imageSmoothingEnabled=true;context.imageSmoothingQuality='high';context.drawImage(image,0,0,width,height);
-      pixels=context.getImageData(0,0,width,height).data;canvas.width=canvas.height=1;
+      target=getWorker();pixels=readPixels(image);
     }catch(error){return Promise.reject(new Error(error.message||'图片无法读取，请重试。'))}
     let resolve,reject;const promise=new Promise((yes,no)=>{resolve=yes;reject=no});
     const job={id:++serial,image,source,width:image.naturalWidth,height:image.naturalHeight,promise,resolve,reject,phase:0,progress:0,listeners:new Set(typeof onProgress==='function'?[onProgress]:[])};
     active=job;armTimeout(job);
     report(job,{phase:'analyzing',progress:0});
-    try{target.postMessage({type:'remove',id:job.id,width,height,data:pixels},[pixels.buffer])}
+    try{target.postMessage({type:'remove',id:job.id,...pixels},[pixels.data.buffer])}
     catch(error){finish(new Error('无法启动本地抠图，请重试。'))}
     return promise;
   }
   window.addEventListener('pagehide',()=>dispose());
-  window.GiftBackground={remove};
+  window.GiftBackground={remove,prewarm};
 })();

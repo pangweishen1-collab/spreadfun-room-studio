@@ -3,7 +3,7 @@ import {checksum, fetchVerifiedChunk} from './gift-lucida-download.mjs';
 const base = new URL('./vendor/ort-lucida/', import.meta.url);
 const GPU_WASM_SHA = '39f9f0894d478800487ed9f7dbe92618498db320cf55c8e3d89adff8dce658da';
 const GPU_WASM_BYTES = 26781914;
-let runtimePromise = null, providers = null;
+let runtimePromise = null, adapterPromise = null, providers = null;
 export let ort;
 
 export function threadCount(scope = globalThis) {
@@ -37,13 +37,20 @@ async function gpuWasm() {
   return binary;
 }
 
+export async function getGpuAdapter() {
+  if (!globalThis.isSecureContext || !globalThis.navigator?.gpu) return null;
+  if (!adapterPromise) adapterPromise = (async () => {
+    try { return await navigator.gpu.requestAdapter({powerPreference: 'high-performance'}); }
+    catch (ignored) { return null; }
+  })();
+  const adapter = await adapterPromise;
+  if (!adapter) adapterPromise = null;
+  return adapter;
+}
+
 async function initialize() {
-  let adapter = null;
-  // An unavailable GPU selects the existing WASM runtime. Download/initialization
-  // errors are retryable and are not silently presented as GPU acceleration.
-  if (globalThis.isSecureContext && globalThis.navigator?.gpu) {
-    try { adapter = await navigator.gpu.requestAdapter({powerPreference: 'high-performance'}); } catch (ignored) {}
-  }
+  // An unavailable GPU selects the existing WASM runtime.
+  const adapter = await getGpuAdapter();
   ort = await import(new URL(adapter ? 'ort.webgpu.min.mjs' : 'ort.wasm.min.mjs', base));
   ort.env.wasm.numThreads = threadCount();
   ort.env.wasm.proxy = false;
@@ -60,6 +67,6 @@ async function initialize() {
 }
 
 export async function getExecutionProviders() {
-  if (!runtimePromise) runtimePromise = initialize().catch(error => { runtimePromise = null; providers = null; ort = undefined; throw error; });
+  if (!runtimePromise) runtimePromise = initialize().catch(error => { runtimePromise = null; adapterPromise = null; providers = null; ort = undefined; throw error; });
   return runtimePromise;
 }
