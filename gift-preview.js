@@ -158,7 +158,7 @@
     }catch(error){state.notice=copy.en[error.message]?error.message:'loadError';if(state.image)try{render()}catch(ignored){}}
     finally{if(url)URL.revokeObjectURL(url);if(token===loadToken){state.loading=false;syncControls();if(loaded){
       syncContextPreview();window.FunToolkitUI?.reveal(canvas);if(uploadHadFocus)canvas.focus({preventScroll:true});
-      const prewarm=()=>{if(token===loadToken&&!state.removing&&!state.baseMask)window.GiftBackground?.prewarm?.(state.image)};
+      const prewarm=()=>{if(active()&&token===loadToken&&!state.removing&&!state.baseMask)window.GiftBackground?.prewarm?.(state.image)};
       if(typeof requestIdleCallback==='function')requestIdleCallback(prewarm,{timeout:500});
       else setTimeout(prewarm,0);
     }}}

@@ -4,7 +4,7 @@
   const base=new URL('.',document.currentScript?.src||location.href);
   const MAX_SIDE=2048;
   let worker=null,active=null,cached=null,serial=0;
-  let prewarming=false,qualityReady=false;
+  let warmingImage=null,qualityReady=false;
   function copyMask(mask){
     return {...mask,data:mask.data.slice(),...(mask.foreground?{foreground:mask.foreground.slice(),background:mask.background.slice()}: {})};
   }
@@ -32,16 +32,18 @@
   }
   function dispose(message='背景移除已取消，请重试。'){
     if(worker){worker.terminate();worker=null}
-    prewarming=false;qualityReady=false;cached=null;finish(new Error(message));
+    warmingImage=null;qualityReady=false;cached=null;finish(new Error(message));
   }
   function getWorker(){
     if(worker)return worker;
     if(typeof Worker==='undefined')throw new Error('此浏览器不支持本地抠图，请使用较新的浏览器。');
-    worker=new Worker(new URL('gift-background-worker.js?v=20261111-prewarm1',base),{type:'module',name:'gift-background'});
-    worker.addEventListener('message',event=>{
+    const target=new Worker(new URL('gift-background-worker.js?v=20261111-prewarm1',base),{type:'module',name:'gift-background'});
+    worker=target;
+    target.addEventListener('message',event=>{
+      if(worker!==target)return;
       const message=event.data;
       if(message.type==='prewarm'){
-        prewarming=false;qualityReady=qualityReady||message.ready===true;return;
+        warmingImage=null;qualityReady=qualityReady||message.ready===true;return;
       }
       if(!active||message.id!==active.id)return;
       if(message.type==='progress')noteProgress(active,{phase:message.phase,progress:message.progress});
@@ -56,9 +58,9 @@
         finish(null,{width,height,data,recoverBlack,method,...(method==='quality-matte'?{foreground,background}: {})});
       }else if(message.type==='error')finish(new Error(message.message||'背景移除失败，请重试。'));
     });
-    worker.addEventListener('error',()=>dispose('抠图组件未能加载，请检查网络后重试。'));
-    worker.addEventListener('messageerror',()=>dispose('抠图结果无法读取，请重试。'));
-    return worker;
+    target.addEventListener('error',()=>{if(worker===target)dispose('抠图组件未能加载，请检查网络后重试。')});
+    target.addEventListener('messageerror',()=>{if(worker===target)dispose('抠图结果无法读取，请重试。')});
+    return target;
   }
   function readPixels(image){
     const scale=Math.min(1,MAX_SIDE/Math.max(image.naturalWidth,image.naturalHeight));
@@ -71,13 +73,15 @@
     }finally{canvas.width=canvas.height=1}
   }
   function prewarm(image){
+    if(active)return;
+    if(warmingImage&&warmingImage!==image)dispose();
     const browser=window.navigator,connection=browser?.connection;
-    if(active||prewarming||qualityReady||document.hidden||!browser?.gpu||connection?.saveData
+    if(warmingImage||qualityReady||document.hidden||!browser?.gpu||browser.deviceMemory<=4||connection?.saveData
       ||['slow-2g','2g','3g'].includes(connection?.effectiveType))return;
     try{
       const pixels=readPixels(image);
       getWorker().postMessage({type:'prewarm',...pixels},[pixels.data.buffer]);
-      prewarming=true;
+      warmingImage=image;
     }catch(ignored){}
   }
   function remove(image,{onProgress}={}){
@@ -88,6 +92,8 @@
       return active.promise;
     }
     if(!Number.isInteger(image?.naturalWidth)||!Number.isInteger(image.naturalHeight)||image.naturalWidth<1||image.naturalHeight<1||image.complete===false)return Promise.reject(new Error('请先载入一张可读取的图片。'));
+    // A replaced source must not leave a speculative download competing with the requested model.
+    if(warmingImage&&warmingImage!==image)dispose();
     // One completed source only: restoring/reapplying its background need not
     // infer again. Copies keep brush/history callers from corrupting the cache.
     if(cached?.image===image&&cached.source===source&&cached.width===image.naturalWidth&&cached.height===image.naturalHeight){

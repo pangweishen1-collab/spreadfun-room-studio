@@ -270,6 +270,20 @@ async function tests(){
   recoveryWorker.emit({type:'result',id:recoveryId,width:1,height:1,data:Uint8ClampedArray.of(123),recoverBlack:false,method:'ai'});
   await recovery;const recoveryCalls=recoveryWorker.messages.length;
   assert.equal((await remove(image)).cacheHit,true);assert.equal(recoveryWorker.messages.length,recoveryCalls,'completed-result caching still works after timeout recovery');
+  const {prewarm}=sandbox.window.GiftBackground;
+  sandbox.window.navigator={gpu:{},deviceMemory:4};
+  prewarm(image);
+  assert.equal(recoveryWorker.messages.length,recoveryCalls,'known low-memory devices skip the speculative load');
+  sandbox.window.navigator.deviceMemory=8;
+  prewarm(image);prewarm(image);
+  assert.equal(recoveryWorker.messages.length,recoveryCalls+1,'only one prewarm can run for the same image');
+  assert.equal(recoveryWorker.messages.at(-1).message.type,'prewarm');
+  const replacement=remove({...image}),replacementWorker=workers.at(-1),replacementId=replacementWorker.messages.at(-1).message.id;
+  assert.equal(recoveryWorker.terminated,true,'replacing an image cancels the old speculative download');
+  recoveryWorker.emit({type:'prewarm',ready:true});
+  recoveryWorker.listeners.get('error')();
+  replacementWorker.emit({type:'result',id:replacementId,width:1,height:1,data:Uint8ClampedArray.of(123),recoverBlack:false,method:'ai'});
+  assert.equal((await replacement).method,'ai','late messages cannot cancel the replacement job');
   console.log('gift-background: native Lucida float prior to uniform composition, retained shadows/weak lights/particles, lazy nonblack route, import/inference retry, worker busy/foreground protocol, official asset hashes/licenses, advancing-download inactivity watchdog, stalled-inference timeout/retry and completed-result cache passed');
 }
 tests().catch(error=>{console.error(error);process.exitCode=1});
