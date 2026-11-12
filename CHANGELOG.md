@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.19.1 - 2026-11-12
+
+- Keep the smaller original still WebP in Gift Images, Banner and Room Backgrounds when its size, pixels and transparency match the rendered result.
+- Prefer exact lossless WebP when its size is within 15% of the high-quality encode. Edited images still export from the rendered canvas.
+
 ## 1.19.0 - 2026-11-11
 
 - Add a token workspace with Rose and Anubis examples, a looping board preview, a six-second review video and Spine runtime asset export.
