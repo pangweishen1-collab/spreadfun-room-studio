@@ -9,7 +9,7 @@ export class CanvasSpineRenderer {
  texture(region,color){
   let base=this.base.get(region.name);
   if(!base){
-   const rotated = region.degrees === 90;
+   const rotated = Math.abs(region.degrees % 180) === 90;
    const width = rotated ? region.height : region.width;
    const height = rotated ? region.width : region.height;
    base=document.createElement('canvas');

@@ -2,7 +2,7 @@ import {diceFilePath, readDropFiles} from '../dice/upload-input.mjs';
 import {makeTokenZip, prepareToken, tokenFileKey, tokenPackageName, TOKEN_TRAIL_KEYS} from './engine.mjs?v=20261111-token4';
 import {
   createTokenRenderer, recordTokenVideo, TOKEN_ROUND_SECONDS
-} from './renderer.mjs?v=20261111-token5';
+} from './renderer.mjs?v=20261112-atlas-rotation';
 
 const copy = {
   zh: {

@@ -1,4 +1,4 @@
-import {CanvasSpineRenderer} from '../dice/six-face/canvas-spine.mjs';
+import {CanvasSpineRenderer} from '../dice/six-face/canvas-spine.mjs?v=20261112-atlas-rotation';
 
 const WIDTH = 720;
 const HEIGHT = 1600;
@@ -79,15 +79,6 @@ function loadSound(file) {
     }));
   }
   return sounds.get(file);
-}
-
-class TokenCanvasRenderer extends CanvasSpineRenderer {
-  texture(region, color) {
-    // Rotated atlas regions use the physical crop dimensions. UVs in the rig
-    // already describe their rotation, so the source pixels stay in atlas order.
-    const crop = region.degrees % 180 === 0 ? region : {...region, width: region.height, height: region.width};
-    return super.texture(crop, color);
-  }
 }
 
 export function tokenHopPose(color, time, duration) {
@@ -204,7 +195,7 @@ export async function createTokenRenderer(canvas, token) {
       gl.clear(gl.COLOR_BUFFER_BIT);
       scene.begin();
     } else {
-      software ||= new TokenCanvasRenderer(atlas, texture, {width: WIDTH, height: HEIGHT});
+      software ||= new CanvasSpineRenderer(atlas, texture, {width: WIDTH, height: HEIGHT});
     }
     const active = animation.duration > 0 && pieces.find(piece => piece.home.color === color && piece.active);
     for (const piece of pieces) if (piece !== active) drawPiece(piece);

@@ -1,4 +1,4 @@
-import {CanvasSpineRenderer} from '../six-face/canvas-spine.mjs';
+import {CanvasSpineRenderer} from '../six-face/canvas-spine.mjs?v=20261112-atlas-rotation';
 import {prepareFaces} from '../six-face/prepare-faces.mjs';
 import {buildSpineJson} from '../six-face/spine-builder.mjs';
 

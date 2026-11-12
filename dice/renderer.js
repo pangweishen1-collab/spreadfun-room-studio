@@ -1,5 +1,5 @@
 import { VIDEO_AVC_CODECS, VIDEO_ROUND_SECONDS, VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
-import { CanvasSpineRenderer } from './six-face/canvas-spine.mjs';
+import { CanvasSpineRenderer } from './six-face/canvas-spine.mjs?v=20261112-atlas-rotation';
 import { removeOuterStroke } from './six-face/outer-stroke.mjs';
 import { PLAN02_FIRST_NUMBERED_FRAME } from './purple-reference/presentation.mjs';
 
