@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.19.3 - 2026-11-12
+
+- Use the sea turtle reference for green dice previews and Spine export. Export a 200 × 200 Spine 4.2.43 rig at 30 FPS with one 430 × 424 atlas.
+- Use supplied `1.png` and `2.png` for the rolling angles, or generate them from the six dice faces. Package the original face PNGs and referenced sound files with the animation.
+
 ## 1.19.2 - 2026-11-12
 
 - Show avatar text presets directly and label the image layer section “Add elements”.
