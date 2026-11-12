@@ -8,7 +8,19 @@ export class CanvasSpineRenderer {
  }
  texture(region,color){
   let base=this.base.get(region.name);
-  if(!base){base=document.createElement('canvas');base.width=region.width;base.height=region.height;const c=base.getContext('2d');if(!c)throw Error('兼容贴图画布不可用');c.drawImage(this.image,region.x,region.y,region.width,region.height,0,0,region.width,region.height);this.base.set(region.name,base);}
+  if(!base){
+   const rotated = region.degrees === 90;
+   const width = rotated ? region.height : region.width;
+   const height = rotated ? region.width : region.height;
+   base=document.createElement('canvas');
+   base.width=width;
+   base.height=height;
+   const context=base.getContext('2d');
+   if(!context)throw Error('兼容贴图画布不可用');
+   // Keep the packed orientation. The Spine UVs already include rotation.
+   context.drawImage(this.image,region.x,region.y,width,height,0,0,width,height);
+   this.base.set(region.name,base);
+  }
   const rgb=[color.r,color.g,color.b].map(v=>Math.round(Math.max(0,Math.min(1,v))*31));
   if(rgb.every(v=>v===31))return base;
   const key=region.name+':'+rgb.join(',');if(this.tints.has(key))return this.tints.get(key);

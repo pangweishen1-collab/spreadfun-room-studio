@@ -26,7 +26,9 @@ function greenPreviewIcon(image) {
 
 const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
 const referenceCandidate = candidate => candidate?.kind === 'purple-reference';
-const generatedCandidate = candidate => candidate?.kind === 'six-face' || candidate?.kind === 'purple-gyro' || referenceCandidate(candidate);
+const greenReferenceCandidate = candidate => candidate?.kind === 'green-reference';
+const binaryCandidate = candidate => referenceCandidate(candidate) || greenReferenceCandidate(candidate);
+const generatedCandidate = candidate => candidate?.kind === 'six-face' || candidate?.kind === 'purple-gyro' || binaryCandidate(candidate);
 const readAsset = (url, type, message) => fetch(url).then(response => {
   if (!response.ok) throw new Error(message);
   return response[type]();
@@ -189,7 +191,7 @@ export class GameRenderer {
     try {
       let atlas, texture;
       if (generatedCandidate(candidate)) {
-        const reference = referenceCandidate(candidate);
+        const reference = binaryCandidate(candidate);
         const useBitmap = reference && typeof createImageBitmap === 'function';
         const [text, imageSource, binary] = await Promise.all([
           readAsset(candidate.atlas, 'text', '图集读取失败'),
@@ -220,7 +222,7 @@ export class GameRenderer {
           : new spine.SkeletonJson(loader).readSkeletonData(candidate.json);
         software = new CanvasSpineRenderer(atlas, texture, {width:720,height:1600});
       } else {
-        if (!this.context || this.gpuLost) throw new Error('紫色动画需要 WebGL，请刷新或使用最新版 Chrome');
+        if (!this.context || this.gpuLost) throw new Error('Spine 预览需要 WebGL，请刷新或使用最新版 Chrome');
         assets = new spine.AssetManager(this.context);
         assets.loadBinary(candidate.skel);
         assets.loadTextureAtlas(candidate.atlas, undefined, undefined, candidate.atlasPage ? {[candidate.atlasPage]:candidate.texture} : undefined);
@@ -238,7 +240,7 @@ export class GameRenderer {
       const gridLimits = referenceCandidate(candidate) && candidate.purpleVariant === '02' ? plan02GridLimits(data, sizeScale) : null;
       const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons,gridLimits:this.gridLimits,sizeScale:this.sizeScale};
       Object.assign(this, {assets, software, candidate, background,
-        icon:icon && candidate.kind === 'six-face' ? greenPreviewIcon(icon) : icon, data,
+        icon:icon && (candidate.kind === 'six-face' || greenReferenceCandidate(candidate)) ? greenPreviewIcon(icon) : icon, data,
         skeletons:Array.from({length:6}, () => new spine.Skeleton(data)),gridLimits,sizeScale});
       try { this.draw(); }
       catch (error) { Object.assign(this, previous); throw error; }
@@ -392,7 +394,7 @@ export class GameRenderer {
     const reference = referenceCandidate(this.candidate);
     // Spine attachment keys are Float32 in the package. Match their precision
     // before sampling so a boundary frame uses the same image in preview.
-    const animationTime = reference ? Math.fround(time) : time;
+    const animationTime = binaryCandidate(this.candidate) ? Math.fround(time) : time;
     const plan02 = all && reference && this.candidate.purpleVariant === '02';
     const gridX = plan02 ? PLAN02_GRID_X : GRID_X;
     const sharedPose = plan02 && animationTime < PLAN02_SHARED_UNTIL;
@@ -413,7 +415,7 @@ export class GameRenderer {
       skeleton.y = centerY;
       if (reference) {
         skeleton.scaleX = skeleton.scaleY = all ? REFERENCE_GRID_SCALE : 1.5 * PURPLE_REFERENCE_PRESENTATION_SCALE;
-      } else if (generatedCandidate(this.candidate)) {
+      } else if (generatedCandidate(this.candidate) && !greenReferenceCandidate(this.candidate)) {
         const {crop,sourceSize,cropOffset} = this.candidate.geometry;
         const ratio = Math.max(crop[2],crop[3])/sourceSize;
         const size = (all ? 172 : 300) * Math.min(1,.655/ratio) * presentationGain;

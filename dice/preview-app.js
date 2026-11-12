@@ -2,9 +2,9 @@ import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
 import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { DiceAudio } from './audio.mjs';
-import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261110-dice-balanced-size';
-import { GameRenderer } from '/dice/renderer.js?v=20261110-dice-balanced-size';
-import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261110-dice-balanced-size';
+import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261112-green-reference';
+import { GameRenderer } from '/dice/renderer.js?v=20261112-green-reference';
+import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261112-green-reference';
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
@@ -364,7 +364,7 @@ async function stageGreen(files) {
   if(chosen.length===6)releasePending(false);
   const selected=new Set(chosen.map(([,file])=>file));
   const extras=usable.filter(f=>!selected.has(f) && (/^(?:icon|大骰子|sz_?0|anchor)\.png$|^(?:dice_roll|sound_ui_dice6)\.mp3$/.test(normalizedName(f))
-    ||uploadGrade==='purple'&&/^[12]\.png$/.test(normalizedName(f))));
+    ||/^[12]\.png$/.test(normalizedName(f))));
   const newExtraNames = new Set(extras.map(normalizedName));
   pendingExtras = [...pendingExtras.filter(file => !newExtraNames.has(normalizedName(file))), ...extras];
   for(const [slot,file]of chosen) {
