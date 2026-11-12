@@ -24,7 +24,7 @@
       "game": "游戏 Banner",
       "privacy": "文件仅在本地处理，不会上传至服务器。",
       "output": "输出文件",
-      "compression": "高清压缩 WebP · 小体积优先",
+      "compression": "高清压缩 WebP · 清晰度优先",
       "smallSource": "原图较小，放大后可能变模糊。建议上传至少 {width} × {height} px 的原图。",
       "encoderError": "WebP 编码组件未能加载，请刷新后重试。",
       "empty": "上传图片后自动生成",
@@ -69,7 +69,7 @@
       "game": "Game banner",
       "privacy": "Processed locally. Your files never leave this device.",
       "output": "Output files",
-      "compression": "High-quality WebP · Smaller files",
+      "compression": "High-quality WebP · Clarity first",
       "smallSource": "This image needs enlarging and may look soft. Use an original image of at least {width} × {height} px.",
       "encoderError": "Could not load the WebP encoder. Refresh and try again.",
       "empty": "Upload an image to create banners",
@@ -173,7 +173,7 @@
   function syncLanguage(){
     document.querySelectorAll('[data-banner-i18n]').forEach(el=>el.textContent=t(el.dataset.bannerI18n));
     $('#bannerProjectCatalog').querySelectorAll('[data-project]').forEach(button=>{const project=projects.find(item=>item.id===button.dataset.project);button.setAttribute('aria-label',`${t('select')} ${project.name}`)});
-    const compression=document.querySelector('[data-banner-i18n="compression"]');if(compression)compression.textContent=webpMode()==='lossless'?(language==='zh'?'严格无损 WebP · 像素完全保留':'Exact lossless WebP · Pixels preserved'):(language==='zh'?'高清压缩 WebP · 小体积优先':'High-quality WebP · Smaller files');
+    const compression=document.querySelector('[data-banner-i18n="compression"]');if(compression)compression.textContent=webpMode()==='lossless'?(language==='zh'?'严格无损 WebP · 像素完全保留':'Exact lossless WebP · Pixels preserved'):t('compression');
     const spec=state.project.outputs[0],ratio=state.project.id==='hapi-ludo'?'3.3':String(spec.width/spec.height);
     for(const key of ['helpDescription','helpPrompt'])document.querySelector(`[data-banner-i18n="${key}"]`).textContent=t(key).replace('{ratio}',ratio);
     $('#bannerRoomTitle').textContent=outputTitle('room');$('#bannerRoomSize').textContent=`${spec.width} × ${spec.height} px`;
@@ -194,7 +194,8 @@
     const fresh=[],base=file.name.replace(/\.[^.]+$/,'').replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||'banner';
     try{
       for(const render of drawBanners(image,template,project)){
-        const blob=await canvasToWebP(render.canvas,{mode});
+        const original=render.kind==='room'&&image.naturalWidth===render.width&&image.naturalHeight===render.height?file:undefined;
+        const blob=await canvasToWebP(render.canvas,{mode,original});
         if(mode!==webpMode())throw new Error('modeChanged');
         fresh.push({...render,mode,blob,url:URL.createObjectURL(blob),name:`${base}-${project.id}-${render.kind}-banner-${render.width}x${render.height}.webp`});
       }

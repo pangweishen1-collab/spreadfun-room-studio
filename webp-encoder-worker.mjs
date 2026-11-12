@@ -1,4 +1,4 @@
-import {prepareLosslessWebP,encodeWebP} from './webp-encode.mjs?v=20261030-webp2';
+import {prepareLosslessWebP,encodeWebP} from './webp-encode.mjs?v=20261112-webp-clarity';
 
 self.onmessage=async({data:message})=>{
   const {id,type,width,height,pixels,mode}=message;

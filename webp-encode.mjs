@@ -10,6 +10,7 @@ export function prepareLosslessWebP(){
 // never fidelity. Keep the smallest measured result instead of assuming that
 // a larger quality number always produces fewer bytes for every image.
 const searches=[{quality:0,method:1},{quality:75,method:6},{quality:100,method:4}];
+const highLosslessSizeRatio=1.15;
 export async function encodeWebP(data,width,height,{mode='high'}={}){
   if(!Number.isInteger(width)||!Number.isInteger(height)||width<1||height<1||width>16383||height>16383||width*height>40000000||!ArrayBuffer.isView(data)||data.BYTES_PER_ELEMENT!==1||data.length!==width*height*4)throw new Error('exportError');
   if(!['high','lossless'].includes(mode))throw new Error('exportError');
@@ -32,6 +33,7 @@ export async function encodeWebP(data,width,height,{mode='high'}={}){
   if(exact.byteLength<=65536){refine();return exact;}
   const high=encode({quality:94,method:3,lossless:0,use_sharp_yuv:1});
   if(exact.byteLength<=high.byteLength*1.5)refine();
-  return exact.byteLength<=high.byteLength*1.05?exact:high;
+  // Keep all detail when the space cost over Q94 is modest.
+  return exact.byteLength<=high.byteLength*highLosslessSizeRatio?exact:high;
 }
 export function encodeLosslessWebP(data,width,height){return encodeWebP(data,width,height,{mode:'lossless'});}

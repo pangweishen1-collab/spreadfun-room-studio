@@ -955,7 +955,7 @@ body{min-width:320px}
       if(previous.x===next.x&&previous.y===next.y){closeCropEditor();return}
       exportBusy=true;setRoomFeedback("processing");closeCropEditor();showDownloadNotice('busy');refreshDownloadControls();
       try{
-        const blob=await exportCanvas(job.image,width,height,next,mode),index=generatedOutputs.findIndex(file=>file.job===job&&file.width===width);
+        const blob=await exportCanvas(job.image,width,height,next,mode,job.background),index=generatedOutputs.findIndex(file=>file.job===job&&file.width===width);
         if(index<0)throw new Error('Output missing');
         job.crops[size]=next;(job.outputCache||={})[size]={image:job.image,x:next.x,y:next.y,mode,blob};clearDownloads();generatedOutputs[index]={...generatedOutputs[index],blob,mode,downloadUrl:null};renderOutputList();
         if(size==='large')await renderBatchPreviews();
@@ -967,10 +967,11 @@ body{min-width:320px}
     document.querySelector('#cropX').oninput=updateCropPreview;document.querySelector('#cropY').oninput=updateCropPreview;
     document.querySelector('#cropModal').addEventListener('click',event=>{if(event.target.id==='cropModal'){const r=event.target.getBoundingClientRect();if(event.clientX<r.left||event.clientX>r.right||event.clientY<r.top||event.clientY>r.bottom)closeCropEditor()}});
     document.querySelectorAll('.download').forEach(b=>b.onclick=()=>download(b.dataset.size));
-    async function exportCanvas(image,width,height,setting={x:.5,y:.5},mode=roomWebPMode()){
+    async function exportCanvas(image,width,height,setting={x:.5,y:.5},mode=roomWebPMode(),file){
       const out=document.createElement('canvas');out.width=width;out.height=height;
       const x=out.getContext('2d');x.imageSmoothingEnabled=true;x.imageSmoothingQuality='high';drawCrop(x,image,width,height,setting.x,setting.y);
-      try{return await canvasToWebP(out,{mode})}finally{out.width=out.height=1}
+      const original=image.naturalWidth===width&&image.naturalHeight===height?file:undefined;
+      try{return await canvasToWebP(out,{mode,original})}finally{out.width=out.height=1}
     }
     function outputNames(index){const base=`Bg${String(index+1).padStart(2,'0')}`;return [`${base}.webp`,`${base}- preview.webp`]}
     function refreshJobs(){document.querySelector('#jobList').innerHTML=batchJobs.map((j,index)=>`<div class="job"><i></i><span>${outputNames(index).join('<br>')}</span><em>${ui(j.status||'待生成',j.status==='已完成'?'Completed':j.status==='生成中'?'Generating':'Pending')}</em></div>`).join('')}
@@ -997,7 +998,7 @@ body{min-width:320px}
               let blob;
               if(cached&&cached.image===job.image&&cached.x===setting.x&&cached.y===setting.y&&cached.mode===mode){blob=cached.blob}
               else{
-                const encodeStart=roomNow();blob=await exportCanvas(job.image,w,h,setting,mode);encodeWaitMs+=roomNow()-encodeStart;
+                const encodeStart=roomNow();blob=await exportCanvas(job.image,w,h,setting,mode,job.background);encodeWaitMs+=roomNow()-encodeStart;
                 (job.outputCache||={})[size]={image:job.image,x:setting.x,y:setting.y,mode,blob};
               }
               files.push({name:names[outputIndex],blob,width:w,height:h,mode,job});
@@ -1163,17 +1164,17 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   </script>
   <script src="vendor/jszip-3.10.1.min.js"></script>
   <script src="vendor/svga-2.3.2.min.js?v=20261110-svga-assets"></script>
-  <script src="banner-webp.js?v=20261030-webp2"></script>
+  <script src="banner-webp.js?v=20261112-webp-clarity"></script>
   <script src="webp-settings.js?v=20261030-webp2"></script>
   <script src="project-selector.js?v=20261026-projects1"></script>
-  <script src="banner.js?v=20261111-upload-progress"></script>
+  <script src="banner.js?v=20261112-webp-clarity"></script>
   <script src="hub.js?v=20261103-footer1"></script>
   <script src="market-icon-png.js?v=20261024-resources-nav1"></script>
   <script src="resource-library.js?v=20261030-webp2"></script>
   <script src="gift-preview-render.js?v=20261025-quality1"></script>
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
   <script src="gift-background.js?v=20261111-prewarm1"></script>
-  <script src="gift-preview.js?v=20261111-upload-progress"></script>
+  <script src="gift-preview.js?v=20261112-webp-clarity"></script>
   <script type="module" src="profile-preview.mjs?v=20261111-gift-tray"></script>
   <script type="module" src="gift-avatar-preview.mjs?v=20261111-upload-progress"></script>
   <script src="vap-player.js?v=20261111-official-pack"></script>

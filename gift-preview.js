@@ -340,12 +340,13 @@
       return name+'.webp';
     });
   }
-  async function encodeImage(image,settings,side,mode){
+  async function encodeImage(image,settings,side,mode,file){
     await new Promise(resolve=>requestAnimationFrame(resolve));
     const output=document.createElement('canvas');output.width=output.height=side;
     try{
       window.GiftPreviewRenderer.render(output,image,settings);
-      const blob=await canvasToWebP(output,{mode});
+      const original=image.naturalWidth===side&&image.naturalHeight===side?file:undefined;
+      const blob=await canvasToWebP(output,{mode,original});
       if(!blob||blob.type!=='image/webp')throw new Error('exportError');
       return blob;
     }finally{output.width=output.height=1}
@@ -364,7 +365,7 @@
         if(mode!==webpMode())return;
         try{
           const edits=job.history.current(),image=job===activeJob?state.image:await readSource(job.file);
-          const blob=await encodeImage(image,{...edits.settings,mode:edits.mode,baseMask:edits.baseMask,strokes:edits.strokes},side,mode);
+          const blob=await encodeImage(image,{...edits.settings,mode:edits.mode,baseMask:edits.baseMask,strokes:edits.strokes},side,mode,job.file);
           if(mode!==webpMode())return;
           const bytes=new Uint8Array(await blob.arrayBuffer());
           zip.file(names[index],bytes);packed++;
@@ -415,7 +416,7 @@
     const mode=webpMode(),key=state.revision+':'+state.side+':'+mode;
     try{
       const cached=state.download?.key===key;let blob=cached?state.download.blob:null;
-      if(!blob)blob=await encodeImage(state.image,renderSettings(),state.side,mode);
+      if(!blob)blob=await encodeImage(state.image,renderSettings(),state.side,mode,state.file);
       if(mode!==webpMode())return;
       const name=webpName(state.file,state.side);
       freshUrl=URL.createObjectURL(blob);const link=document.createElement('a');link.href=freshUrl;link.download=name;link.hidden=true;document.body.append(link);

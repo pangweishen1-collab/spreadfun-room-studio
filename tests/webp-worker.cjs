@@ -52,7 +52,7 @@ function setup(options={}){
     setTimeout(fn,delay){const id=++serial;timers.set(id,{fn,delay});return id;},clearTimeout(id){timers.delete(id);}};
   if(options.hardware!==undefined||options.memory!==undefined)sandbox.navigator={hardwareConcurrency:options.hardware,deviceMemory:options.memory};
   vm.createContext(sandbox);
-  new vm.Script(source+'\nthis.api={prepare:prepareBannerWebP,encode:canvasToWebP,exact:canvasToLosslessWebP,settings:webpSettings,createPool:createWebPPool};',{importModuleDynamically:()=>import(fallback)}).runInContext(sandbox);
+  new vm.Script(source+'\nthis.api={prepare:prepareBannerWebP,encode:canvasToWebP,exact:canvasToLosslessWebP,settings:webpSettings,createPool:createWebPPool,isCleanStillWebP};',{importModuleDynamically:()=>import(fallback)}).runInContext(sandbox);
   return {api:sandbox.api,workers,messages,timers,jobs,completed,events,storage,finish,maxActive:()=>maxActive,get active(){return active;}};
 }
 function canvas(tag=20){
@@ -61,8 +61,22 @@ function canvas(tag=20){
 }
 const bytes=async blob=>Array.from(new Uint8Array(await blob.arrayBuffer()));
 async function waitJobs(state,count){for(let i=0;i<40&&state.jobs.length<count;i++)await flush();assert.ok(state.jobs.length>=count,'expected native encode to start');}
+function riff(...chunks){
+  const payload=Buffer.concat([Buffer.from('WEBP'),...chunks.map(([tag,value])=>{
+    const header=Buffer.from(tag+'\0\0\0\0');header.writeUInt32LE(value.length,4);
+    return Buffer.concat([header,Buffer.from(value),Buffer.alloc(value.length%2)]);
+  })]);
+  const header=Buffer.from('RIFF\0\0\0\0');header.writeUInt32LE(payload.length,4);
+  return Uint8Array.from(Buffer.concat([header,payload])).buffer;
+}
 (async()=>{
   const one=setup(),a=canvas(19),b=canvas(29);
+  const isClean=one.api.isCleanStillWebP,alphaHeader=[0x10,0,0,0,0,0,0,0,0,0];
+  assert.ok(isClean(riff(['VP8L',[47]])));
+  assert.ok(isClean(riff(['VP8X',alphaHeader],['ALPH',[0]],['VP8 ',[0]])));
+  assert.ok(!isClean(riff(['VP8L',[47]],['EXIF',[0]])));
+  assert.ok(!isClean(riff(['VP8X',[0x12,...alphaHeader.slice(1)]],['ANIM',[0]],['ANMF',[0]])));
+  assert.ok(!isClean(riff(['VP8 ',[0]]).slice(0,-1)),'a truncated container cannot be returned as original');
   const result=await Promise.all([one.api.exact(a),one.api.exact(b)]);await flush();
   assert.equal(one.workers.length,1);assert.equal(one.messages.filter(x=>x.type==='prepare').length,1);assert.equal(one.maxActive(),1,'unknown hardware keeps one warmed codec');
   assert.equal(one.timers.size,0);assert.deepEqual(await bytes(result[0]),[19,1,1,1]);assert.equal(result[0].type,'image/webp');assert.equal(a.pixels.byteLength,4,'source canvas pixels are never transferred away');assert.equal(one.api.settings.getPending(),0);

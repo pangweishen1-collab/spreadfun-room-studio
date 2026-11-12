@@ -83,11 +83,19 @@ if(!process.execArgv.includes('--experimental-vm-modules')){
   fs.writeFileSync(path.join(out,'lossless-cases.json'),JSON.stringify(cases));
   // A camera-like texture exercises perceptual coding without any private
   // source image. Alpha is independent of the RGB quality tradeoff.
-  const highCases=[{name:'high-small-detail',raw:'lossless-source.rgba',width:17,height:9,exact:true},{name:'high-textured-photo',raw:'high-textured-photo.rgba',width:384,height:512,maximumRatio:.8,minimumPsnr:35}];
+  const highCases=[{name:'high-small-detail',raw:'lossless-source.rgba',width:17,height:9,exact:true},{name:'high-textured-photo',raw:'high-textured-photo.rgba',width:384,height:512,maximumRatio:.8,minimumPsnr:35},{name:'high-near-lossless-size',raw:'high-near-lossless-size.rgba',width:384,height:384,crossover:true}];
   for(const test of highCases){
     const {width,height}=test;let pixels;
     if(test.exact)pixels=new Uint8ClampedArray(fs.readFileSync(path.join(out,test.raw)));
-    else{
+    else if(test.crossover){
+      pixels=new Uint8ClampedArray(width*height*4);let seed=415525;
+      for(let i=0;i<pixels.length;i+=4){
+        seed=(Math.imul(seed,1664525)+1013904223)>>>0;
+        const shade=(seed>>>25)*2;
+        pixels.set([shade,shade,shade,255],i);
+      }
+      fs.writeFileSync(path.join(out,test.raw),pixels);
+    }else{
       pixels=new Uint8ClampedArray(width*height*4);let seed=0x5f3759df;
       for(let y=0;y<height;y++)for(let x=0;x<width;x++){
         const i=(y*width+x)*4;seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;
@@ -126,7 +134,7 @@ for test in json.loads((p/'high-cases.json').read_text()):
     expected=Image.frombytes('RGBA',(test['width'],test['height']),(p/test['raw']).read_bytes())
     assert im.size==expected.size
     assert im.getchannel('A').tobytes()==expected.getchannel('A').tobytes(), test['name']+' changed alpha'
-    if test.get('exact'): assert im.tobytes()==expected.tobytes(), test['name']+' lost small-image details'
+    if test.get('exact') or test.get('crossover'): assert im.tobytes()==expected.tobytes(), test['name']+' lost detail despite a suitably small lossless candidate'
     psnrs={}
     for color in [(0,0,0,255),(255,255,255,255)]:
         bg=Image.new('RGBA',im.size,color)
