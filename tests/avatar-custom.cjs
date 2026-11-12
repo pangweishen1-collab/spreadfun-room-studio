@@ -40,7 +40,7 @@ function harness() {
   class TestFile extends Blob { constructor(parts,name,options={}) { super(parts,options);this.name=name; } }
   class Element {
     constructor(tag='div') {
-      this.tagName=tag.toUpperCase();this.dataset={};this.style={};this.attributes={};this.classes=new Set();this.handlers=new Map();this.children=[];this.options=[];this.textContent='';this.value='';this.hidden=false;this.disabled=false;this.clientWidth=600;this.clientHeight=520;this.width=300;this.height=150;this.draws=[];this.fills=[];this.strokes=[];this.textOrder=[];this.gradients=[];
+      this.tagName=tag.toUpperCase();this.dataset={};this.style={setProperty(name,value){this[name]=value;}};this.attributes={};this.classes=new Set();this.handlers=new Map();this.children=[];this.options=[];this.textContent='';this.value='';this.hidden=false;this.disabled=false;this.clientWidth=600;this.clientHeight=520;this.width=300;this.height=150;this.draws=[];this.fills=[];this.strokes=[];this.textOrder=[];this.gradients=[];
       this.classList={contains:x=>this.classes.has(x),add:x=>this.classes.add(x),remove:x=>this.classes.delete(x),toggle:(x,on)=>{if(on)this.classes.add(x);else this.classes.delete(x)}};
     }
     setAttribute(key,value) { this.attributes[key]=String(value); }
@@ -174,8 +174,9 @@ function harness() {
   assert.equal(metalApi.state.style,'brightGold');assert.equal(metalApi.state.bitmap.styleKey,'brightGold');assert.equal(metal.get('avatarCustomTextLayer').dataset.textStyle,'brightGold');
   assert.equal(metal.get('style-brightGold').getAttribute('aria-pressed'),'true');assert.equal(metal.get('style-silver').getAttribute('aria-pressed'),'false','preset selection exposes exactly its own pressed state');
   assert.equal(metal.get('avatarCustomText').value,'ROYAL VIP');assert.equal(metal.get('avatarCustomFont').value,'cinzel');assert.equal(metal.get('avatarCustomWeight').value,'800');assert.equal(metal.get('avatarCustomFontSize').value,'36');assert.deepEqual(metalApi.state.position,{x:.42,y:.77},'applying a surface preset preserves typography and placement');
-  assert.ok(metalApi.state.bitmap.canvas.gradients.length>0,'a metallic preset changes the actual PNG renderer, not just its CSS thumbnail');
-  assert.ok(metalApi.state.bitmap.width>beforeMetal.width&&metalApi.state.bitmap.height>beforeMetal.height,'metal depth reserves transparent bounds around the text');
+  assert.equal(metalApi.state.bitmap.canvas.gradients.length,1,'one two-color fill per line');
+  assert.equal(metalApi.state.bitmap.width,beforeMetal.width);
+  assert.equal(metalApi.state.bitmap.height,beforeMetal.height);
   const goldenStops=JSON.stringify(metalApi.state.bitmap.canvas.gradients.map(x=>x.stops));
   metal.get('avatarCustomColorValue').value='#3388CC';metal.get('avatarCustomColorValue').emit('input');await flush();
   assert.equal(metalApi.state.style,'brightGold');assert.equal(metalApi.state.bitmap.color,'#3388CC');assert.notEqual(JSON.stringify(metalApi.state.bitmap.canvas.gradients.map(x=>x.stops)),goldenStops,'editing the base color changes the metallic gradient instead of leaving a disconnected control');
@@ -186,25 +187,23 @@ function harness() {
   assert.equal(metalApi.state.style,'roseGold');assert.equal(metalApi.state.bitmap.styleKey,'roseGold');assert.equal(metal.get('avatarCustomColor').value,retainedColor,'source replacement keeps the user style');
   metal.controls.fontHold=true;metalApi.chooseStyle('brightGold');const lateGold=metal.fontRequests.at(-1);metalApi.chooseStyle('silver');const currentSilver=metal.fontRequests.at(-1);currentSilver.resolve([{}]);await flush();const silverBitmap=metalApi.state.bitmap;lateGold.resolve([{}]);await flush();metal.controls.fontHold=false;
   assert.equal(metalApi.state.bitmap,silverBitmap,'late completion of an old preset cannot overwrite the current effect');assert.equal(silverBitmap.styleKey,'silver');assert.equal(metal.get('avatarCustomTextLayer').dataset.textStyle,'silver');
-  const highlight=metal.get('avatarCustomHighlightValue'),shadow=metal.get('avatarCustomShadow');
+  const highlight=metal.get('avatarCustomHighlightValue');
   assert.equal(metal.get('avatarCustomHighlightField').hidden,false);
   const defaultHighlight=highlight.value;
   highlight.value='FF86CF';highlight.emit('input');await flush();
-  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[1].stops[5],[.52,'rgb(255,134,207)']);
-  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[1].stops[4],silverBitmap.canvas.gradients[1].stops[4],'editing highlight keeps the dark band');
-  shadow.value='#32428d';shadow.emit('input');await flush();
-  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[1].stops[4],[.49,'rgb(50,66,141)']);
-  assert.equal(metal.get('avatarCustomShadowValue').value,'#32428D');
+  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[0].stops,[[0,'#FF86CF'],[1,'#B7C6D7']]);
+  const base=metal.get('avatarCustomColor');
+  base.value='#32428d';base.emit('input');await flush();
+  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[0].stops,[[0,'#FF86CF'],[1,'#32428d']]);
   const previewStops=JSON.stringify(metalApi.state.bitmap.canvas.gradients.map(x=>x.stops));
   metal.controls.webpHold=deferred();const metalExport=metalApi.exportFiles();await flush();metalApi.chooseStyle('plain');assert.equal(metalApi.state.style,'silver','export locks the style snapshot');assert.equal(JSON.stringify(metal.pngEncodes.at(-1).gradients.map(x=>x.stops)),previewStops,'the embedded PNG uses the same reflective gradient as the preview');metal.controls.webpHold.resolve(new Blob(['webp'],{type:'image/webp'}));await metalExport;metal.controls.webpHold=null;
   assert.equal(metal.generated(),2);assert.equal(metal.get('avatarCustomResult').hidden,true,'metal export retains the simplified output flow');
   metalApi.chooseStyle('silver');await flush();
   assert.equal(highlight.value,defaultHighlight,'reapplying the preset resets its gradient');
-  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[1].stops,silverBitmap.canvas.gradients[1].stops);
+  assert.deepEqual(metalApi.state.bitmap.canvas.gradients[0].stops,silverBitmap.canvas.gradients[0].stops);
   const metallicColor=metal.get('avatarCustomColor').value,metallicStroke=metal.get('avatarCustomStrokeWidth').value;
   metalApi.chooseStyle('plain');await flush();assert.equal(metalApi.state.bitmap.styleKey,'plain');assert.equal(metalApi.state.bitmap.canvas.gradients.length,0,'plain mode removes metallic reflections and depth');assert.equal(metal.get('avatarCustomColor').value,metallicColor);assert.equal(metal.get('avatarCustomStrokeWidth').value,metallicStroke,'plain mode keeps editable color and outline values');
   assert.equal(metal.get('avatarCustomHighlightField').hidden,true);
-  assert.equal(metal.get('avatarCustomShadowField').hidden,true);
   metalApi.chooseStyle('unknown');await flush();assert.equal(metalApi.state.style,'plain','unknown preset keys do not change current state');
   for(const reason of ['documentHidden','routeHidden','inactiveTab','offscreen','reducedMotion']){
     const guarded=harness();guarded.api.chooseMode('custom');guarded.controls.readHold=deferred();const pending=guarded.api.loadFiles([guarded.file(reason+'.svga')]);

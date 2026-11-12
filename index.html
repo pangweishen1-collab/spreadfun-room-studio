@@ -53,7 +53,7 @@ body{min-width:320px}
 </style>
   <link rel="stylesheet" href="toolkit.css?v=20261103-dice1-20261103-metaltext1">
   <link rel="stylesheet" href="avatar-fonts.css?v=20261103-metaltext1">
-  <link rel="stylesheet" href="avatar-custom.css?v=20261110-gradient1">
+  <link rel="stylesheet" href="avatar-custom.css?v=20261112-element-presets">
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="upload-progress.css?v=20261111-upload-progress">
@@ -205,7 +205,7 @@ body{min-width:320px}
           <div class="output-title-row"><h2 data-custom-i18n="textSettings">定制文字</h2><span class="badge">SVGA</span></div>
           <fieldset id="avatarCustomFields" disabled>
             <section class="avatar-custom-image-control" aria-labelledby="avatarCustomImageTitle">
-              <h3 id="avatarCustomImageTitle" data-custom-i18n="imageTitle">图片图层</h3>
+              <h3 id="avatarCustomImageTitle" data-custom-i18n="imageTitle">添加元素</h3>
               <button id="avatarCustomImageUpload" class="avatar-custom-secondary avatar-custom-image-upload" type="button" data-custom-i18n="imageUpload">上传图片</button>
               <div id="avatarCustomImageControls" hidden>
                 <div class="avatar-custom-image-file"><img id="avatarCustomImageThumb" alt="" width="40" height="40"><strong id="avatarCustomImageName"></strong><button id="avatarCustomImageRemove" class="avatar-custom-image-remove" type="button" data-custom-i18n="imageRemove">移除</button></div>
@@ -216,20 +216,16 @@ body{min-width:320px}
             <div class="avatar-custom-fields-row avatar-custom-main-row"><div><label for="avatarCustomText" data-custom-i18n="textLabel">文字内容</label><textarea id="avatarCustomText" maxlength="80" rows="1" spellcheck="false" placeholder="YOUR NAME"></textarea></div><div><div class="avatar-custom-font-label"><label for="avatarCustomFont" data-custom-i18n="fontLabel">英文字体</label><a href="https://fonts.google.com/" target="_blank" rel="noopener noreferrer" data-custom-i18n="fontLibrary">字体库 ↗</a></div><select id="avatarCustomFont">
               <option value="inter">Inter</option><option value="montserrat">Montserrat</option><option value="bebas">Bebas Neue</option><option value="oswald">Oswald</option><option value="playfair">Playfair Display</option><option value="cinzel">Cinzel</option><option value="pacifico">Pacifico</option><option value="orbitron">Orbitron</option>
             </select></div></div>
-            <details class="avatar-custom-disclosure" id="avatarCustomStyleDisclosure">
-              <summary><span class="avatar-custom-presets-label" id="avatarCustomStylesLabel" data-custom-i18n="stylePresets">字体样式预设</span><svg viewBox="0 0 16 16" aria-hidden="true"><path d="m5 6 3 3 3-3"/></svg></summary>
-              <div class="avatar-custom-presets" role="group" aria-labelledby="avatarCustomStylesLabel">
+            <div id="avatarCustomStylePresets" class="avatar-custom-presets" role="group" aria-label="双色渐变预设">
               <button type="button" class="avatar-text-preset" data-text-style="plain" aria-pressed="true"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="stylePlain">纯色</span></button>
-              <button type="button" class="avatar-text-preset" data-text-style="brightGold" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleBrightGold">亮金立体</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="brightGold" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleBrightGold">亮金</span></button>
               <button type="button" class="avatar-text-preset" data-text-style="champagne" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleChampagne">香槟金</span></button>
-              <button type="button" class="avatar-text-preset" data-text-style="silver" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleSilver">银色金属</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="silver" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleSilver">银色</span></button>
               <button type="button" class="avatar-text-preset" data-text-style="roseGold" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleRoseGold">玫瑰金</span></button>
-              </div>
-            </details>
+            </div>
             <div class="avatar-custom-palette">
               <div><label id="avatarCustomColorLabel" for="avatarCustomColor">文字颜色</label><div class="avatar-custom-color"><input id="avatarCustomColor" type="color" value="#ffffff"><input id="avatarCustomColorValue" type="text" value="#FFFFFF" maxlength="7" aria-label="文字颜色 HEX" spellcheck="false" autocomplete="off"></div></div>
               <div id="avatarCustomHighlightField" hidden><label for="avatarCustomHighlight" data-custom-i18n="highlightLabel">高光色</label><div class="avatar-custom-color"><input id="avatarCustomHighlight" type="color" value="#ffffff"><input id="avatarCustomHighlightValue" type="text" maxlength="7" aria-label="高光色 HEX" spellcheck="false" autocomplete="off"></div></div>
-              <div id="avatarCustomShadowField" hidden><label for="avatarCustomShadow" data-custom-i18n="shadowLabel">暗部色</label><div class="avatar-custom-color"><input id="avatarCustomShadow" type="color" value="#000000"><input id="avatarCustomShadowValue" type="text" maxlength="7" aria-label="暗部色 HEX" spellcheck="false" autocomplete="off"></div></div>
             </div>
             <div class="avatar-custom-fields-row"><div><label for="avatarCustomFontSize" data-custom-i18n="sizeLabel">文字大小</label><div class="dimension-input"><input id="avatarCustomFontSize" type="number" min="8" max="512" value="30" step="1" inputmode="numeric"><span>px</span></div></div><div><label for="avatarCustomWeight" data-custom-i18n="weightLabel">字重</label><select id="avatarCustomWeight"><option value="400">400</option><option value="500">500</option><option value="600" selected>600</option><option value="700">700</option><option value="800">800</option></select></div></div>
             <div class="avatar-custom-fields-row">
@@ -1184,5 +1180,5 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="toolkit.js?v=20261111-token1"></script>
   <script type="module" src="token/workspace.mjs?v=20261111-token6"></script>
   <script type="module" src="vap-review.js?v=20261111-upload-progress"></script>
-  <script type="module" src="avatar-custom.js?v=20261111-upload-progress"></script>
+  <script type="module" src="avatar-custom.js?v=20261112-element-presets"></script>
 </body></html>

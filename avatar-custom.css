@@ -58,27 +58,13 @@
 .avatar-custom-palette{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr));column-gap:8px}
 .avatar-custom-palette>div{min-width:0}
 .avatar-custom-palette:has(#avatarCustomHighlightField[hidden]){max-width:240px}
-.avatar-custom-presets-label{margin:14px 0 7px;color:var(--tool-muted);font-size:var(--tool-field-label-size);line-height:var(--tool-field-label-line-height)}
-.avatar-custom-disclosure{margin:10px 0 0;min-width:0}
-.avatar-custom-disclosure summary{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:var(--tool-disclosure-height,44px);padding:0;list-style:none;border-radius:4px;cursor:pointer}
-.avatar-custom-disclosure summary::-webkit-details-marker{display:none}
-.avatar-custom-disclosure summary .avatar-custom-presets-label{margin:0}
-.avatar-custom-disclosure summary>svg{flex:0 0 16px;width:16px;height:16px;fill:none;stroke:var(--tool-muted);stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;transition:transform .16s ease}
-.avatar-custom-disclosure[open] summary>svg{transform:rotate(180deg)}
-.avatar-custom-disclosure summary:hover .avatar-custom-presets-label{color:var(--blue)}
-.avatar-custom-disclosure summary:focus-visible{outline:2px solid var(--tool-focus);outline-offset:2px}
-.avatar-custom-disclosure>.avatar-custom-presets{padding-top:6px}
-.avatar-custom-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.avatar-custom-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0 8px}
 .avatar-text-preset{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;min-height:66px;padding:7px 3px;border:1px solid #e1e5ec;border-radius:10px;background:#fff;color:var(--tool-muted);font:inherit;font-size:11px;line-height:16px;cursor:pointer;transition:background-color .16s ease,border-color .16s ease,color .16s ease}
 .avatar-text-preset:hover:not(:disabled){border-color:#a8d0ff;background:var(--tool-blue-soft);color:var(--blue)}
 .avatar-text-preset[aria-pressed="true"]{border-color:#8fc2ff;background:var(--tool-blue-soft);color:var(--blue);box-shadow:inset 0 0 0 1px #cde3ff}
 .avatar-style-sample{display:block;color:#566278;font-family:'FT Cinzel',serif;font-size:23px;line-height:28px;font-weight:800}
-.avatar-text-preset:not([data-text-style="plain"]) .avatar-style-sample{color:transparent;background:var(--metal-swatch);background-clip:text;-webkit-background-clip:text;filter:drop-shadow(.6px 1px .2px var(--metal-depth))}
-.avatar-text-preset[data-text-style="brightGold"]{--metal-swatch:linear-gradient(#fff7c3 4%,#ecc663 24%,#fff5b3 40%,#915013 49%,#e5ae31 63%,#fff3a6 82%,#a56319);--metal-depth:#795014}
-.avatar-text-preset[data-text-style="champagne"]{--metal-swatch:linear-gradient(#fff7e4,#d8bd83 25%,#fff5da 42%,#96754b 50%,#dfca9b 69%,#fff3d4 85%,#ad8d56);--metal-depth:#8b704c}
-.avatar-text-preset[data-text-style="silver"]{--metal-swatch:linear-gradient(#f9fcff,#b1c1d2 26%,#f6faff 42%,#596b82 50%,#b9c9da 68%,#f4faff 86%,#778ba3);--metal-depth:#4c5c70}
-.avatar-text-preset[data-text-style="roseGold"]{--metal-swatch:linear-gradient(#ffe9df,#d79d8b 26%,#ffe4d8 42%,#96514b 50%,#d9927e 68%,#ffe6d8 86%,#a96157);--metal-depth:#864f47}
-@media(prefers-reduced-motion:reduce){.avatar-text-preset,.avatar-custom-disclosure summary>svg{transition:none}}
+.avatar-text-preset:not([data-text-style="plain"]) .avatar-style-sample{color:transparent;background:var(--text-preset-fill,#566278);background-clip:text;-webkit-background-clip:text}
+@media(prefers-reduced-motion:reduce){.avatar-text-preset{transition:none}}
 .avatar-custom-color{display:flex;align-items:center;gap:8px;height:44px;border:1px solid #a5adbc;border-radius:10px;padding:7px 10px;background:#fff;font-size:12px;color:var(--tool-muted);font-variant-numeric:tabular-nums}
 .avatar-custom-color input[type="color"]{width:28px;height:28px;min-width:28px;padding:0;border:0;background:none;cursor:pointer}
 .avatar-custom-color input[type="text"]{width:100%;min-width:0;height:28px;padding:0;border:0;background:none;color:var(--tool-muted);font:inherit;font-size:12px;text-transform:uppercase}

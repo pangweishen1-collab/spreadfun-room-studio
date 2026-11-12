@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.19.2 - 2026-11-12
+
+- Show avatar text presets directly and label the image layer section “Add elements”.
+- Use two editable colors for each gradient preset. The editor preview, embedded SVGA text and first-frame WebP use the same gradient.
+
 ## 1.19.1 - 2026-11-12
 
 - Keep the smaller original still WebP in Gift Images, Banner and Room Backgrounds when its size, pixels and transparency match the rendered result.
