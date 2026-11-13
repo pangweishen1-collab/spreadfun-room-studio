@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.19.4 - 2026-11-13
+
+- Add a medal-only scene to Preview Images. Upload up to four medals and see them in the small slots and 230 px display cards. Replace or reorder them in either view.
+- Download the complete review scene or export 400 × 400 WebP medal images.
+
 ## 1.19.3 - 2026-11-12
 
 - Use the sea turtle reference for green dice previews and Spine export. Export a 200 × 200 Spine 4.2.43 rig at 30 FPS with one 430 × 424 atlas.
