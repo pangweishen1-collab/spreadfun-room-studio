@@ -4,7 +4,8 @@ export const TEXT_STYLES = Object.freeze({
   brightGold: Object.freeze({baseColor: '#E9B83F'}),
   champagne: Object.freeze({baseColor: '#D9BF87'}),
   silver: Object.freeze({baseColor: '#B7C6D7'}),
-  roseGold: Object.freeze({baseColor: '#D79584'})
+  roseGold: Object.freeze({baseColor: '#D79584'}),
+  threeToneGold: Object.freeze({highlightColor: '#FFF3BD', midColor: '#F4C64F', baseColor: '#A96317'})
 });
 
 export function defaultTextHighlight(color) {
@@ -16,13 +17,21 @@ export function defaultTextHighlight(color) {
   return '#' + channels.join('');
 }
 
+export function textGradientStops(styleKey, baseColor, highlightColor, midColor) {
+  const preset = Object.hasOwn(TEXT_STYLES, styleKey) ? TEXT_STYLES[styleKey] : null;
+  if (!preset?.baseColor) return [];
+  const base = baseColor || preset.baseColor;
+  const stops = [[0, highlightColor || preset.highlightColor || defaultTextHighlight(base)]];
+  if (preset.midColor) stops.push([.5, midColor || preset.midColor]);
+  stops.push([1, base]);
+  return stops;
+}
+
 export function drawStyledText(ctx, {
   lines, size, width, padding, font, color, strokeWidth = 0,
-  strokeColor = '#000000', styleKey = 'plain', highlightColor
+  strokeColor = '#000000', styleKey = 'plain', highlightColor, midColor
 }) {
-  const preset = Object.hasOwn(TEXT_STYLES, styleKey) ? TEXT_STYLES[styleKey] : null;
-  const base = color || preset?.baseColor || '#FFFFFF';
-  const topColor = preset?.baseColor ? highlightColor || defaultTextHighlight(base) : null;
+  const stops = textGradientStops(styleKey, color, highlightColor, midColor);
 
   ctx.save();
   ctx.font = font;
@@ -36,14 +45,13 @@ export function drawStyledText(ctx, {
   lines.forEach((line, index) => {
     const x = width / 2;
     const y = padding + size + index * size * 1.3;
-    ctx.fillStyle = base;
-    if (topColor) {
+    ctx.fillStyle = color || '#FFFFFF';
+    if (stops.length) {
       const measured = ctx.measureText(line || ' ');
       const ascent = measured.actualBoundingBoxAscent || size * .8;
       const descent = measured.actualBoundingBoxDescent ?? size * .18;
       const fill = ctx.createLinearGradient(0, y - ascent, 0, y + descent);
-      fill.addColorStop(0, topColor);
-      fill.addColorStop(1, base);
+      for (const [offset, value] of stops) fill.addColorStop(offset, value);
       ctx.fillStyle = fill;
     }
     if (strokeWidth > 0) ctx.strokeText(line, x, y);

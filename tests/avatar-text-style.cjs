@@ -16,6 +16,13 @@ const assert=require('node:assert/strict');
   drawStyledText(custom,{...options,styleKey:'brightGold',color:'#2388EE',highlightColor:'#F97EBB',strokeWidth:0});
   assert.deepEqual(custom.gradients[0].stops,[[0,'#F97EBB'],[1,'#2388EE']]);
   assert.equal(custom.calls.filter(c=>c[0]==='stroke').length,0);
+  const threeTone=make();
+  drawStyledText(threeTone,{...options,styleKey:'threeToneGold',color:undefined});
+  assert.deepEqual(threeTone.gradients.map(gradient=>gradient.stops),
+    Array.from({length:2},()=>[[0,'#FFF3BD'],[.5,'#F4C64F'],[1,'#A96317']]));
+  const edited=make();
+  drawStyledText(edited,{...options,styleKey:'threeToneGold',color:'#69330C',highlightColor:'#FFF0CD',midColor:'#DE9118'});
+  assert.deepEqual(edited.gradients[0].stops,[[0,'#FFF0CD'],[.5,'#DE9118'],[1,'#69330C']]);
   const fallback=make();drawStyledText(fallback,{...options,styleKey:'unknown'});assert.equal(fallback.gradients.length,0);
-  console.log('avatar-text-style: solid fill, four two-stop presets, per-line gradients, editable colors and optional outlines passed.');
+  console.log('avatar-text-style: solid fill, two- and three-stop presets, per-line gradients, editable colors and optional outlines passed.');
 })().catch(error=>{console.error(error);process.exitCode=1});

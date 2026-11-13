@@ -55,7 +55,7 @@
 .avatar-custom-settings select{min-height:44px}
 .avatar-custom-settings .dimension-input{margin-top:0}
 .avatar-custom-fields-row{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.avatar-custom-palette{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr));column-gap:8px}
+.avatar-custom-palette{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,112px),1fr));gap:8px}
 .avatar-custom-palette>div{min-width:0}
 .avatar-custom-palette:has(#avatarCustomHighlightField[hidden]){max-width:240px}
 .avatar-custom-presets{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:16px 0 8px}

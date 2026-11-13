@@ -1,16 +1,17 @@
 import {readSvga,buildCustomizedSvga,listSvgaImages,previewSvgaImages,svgaBitmapCount,svgaRuntimeBytes,SVGA_MAX_RUNTIME_BYTES} from './avatar-custom-engine.mjs?v=20261110-svga-layout';
-import {TEXT_STYLES,defaultTextHighlight,drawStyledText} from './avatar-text-style.mjs?v=20261112-two-color';
+import {TEXT_STYLES,defaultTextHighlight,textGradientStops,drawStyledText} from './avatar-text-style.mjs?v=20261113-three-tone-gold';
 
 /* Image and text PNG sprites are embedded in the animation; the final player needs no fonts. */
 const $=id=>document.getElementById(id);
 const root=$('avatarTool');
 const fonts={inter:['FT Inter',600],montserrat:['FT Montserrat',600],bebas:['FT Bebas Neue',400],oswald:['FT Oswald',600],playfair:['FT Playfair Display',600],cinzel:['FT Cinzel',600],pacifico:['FT Pacifico',400],orbitron:['FT Orbitron',600]};
 const copy={
-  zh:{imageTitle:'添加元素',imageUpload:'上传图片',imageReplace:'替换图片',imageRemove:'移除',imageCenter:'居中图片',imageWidth:'图片宽度',imageLoading:'正在读取图片…',imageDrag:'拖动图片调整位置，方向键微调，右下角缩放',imageResize:'调整图片大小，方向键缩放',imageNeedsSvga:'请先上传头像框 SVGA，再添加图片。',imageType:'请选择 PNG、JPG 或 WebP 图片。',imageSizeError:'请选择 20MB 以内的图片。',imageDimensions:'图片最长边需在 8192px 内，且不超过 3200 万像素。',imageLoadError:'无法读取此图片，请检查文件后重试。',imageWidthError:'请输入有效的图片宽度，保持原始比例。',stylePresets:'双色渐变预设',stylePlain:'纯色',styleBrightGold:'亮金',styleChampagne:'香槟金',styleSilver:'银色',styleRoseGold:'玫瑰金',weightLabel:'字重',strokeLabel:'描边宽度',strokeColorLabel:'描边颜色',strokeError:'描边宽度需在 0–16px 之间。',textTooLarge:'文字过长或字号过大，请减少内容或字号。',fontLibrary:'字体库 ↗',imagesTab:'头像框图片',customTab:'定制头像框',preview:'效果预览',uploadTitle:'点击、拖入或粘贴 SVGA 文件',uploadHint:'保留原动效，添加文字或图片',upload:'上传 SVGA',replace:'替换文件',play:'播放',pause:'暂停',center:'水平居中',textSettings:'定制内容',textLabel:'文字内容',fontLabel:'英文字体',sizeLabel:'文字大小',colorLabel:'文字颜色',svgaLimit:'SVGA · 3MB 内',frameSpec:'首帧 WebP · 240 × 240',export:'导出 SVGA + WebP',exporting:'正在导出…',loading:'正在读取…',empty:'尚未选择文件',ready:'可编辑',fontLoading:'正在载入字体…',fileType:'请选择一个 .svga 文件。',fileSize:'请选择 50MB 以内的 SVGA。',loadError:'无法读取此 SVGA，请检查文件后重试。',exportError:'导出失败，请重试；上次的成品已保留。',fontError:'字体未能载入，请重新选择字体。',textEmpty:'请添加文字或图片。',sizeError:'文字大小需为 8–512 之间的整数。',sizeLimit:'无损压缩后 SVGA 仍超过 3MB，请减少素材或使用较小的源文件。',saved:'已无损打包 SVGA，并生成首帧 WebP。',optimized:'已无损压缩 SVGA，保留原尺寸和全部动画帧。',svgaDownload:'下载 SVGA',frameDownload:'下载首帧 WebP',zipDownload:'下载全部 ZIP',drag:'拖动文字调整位置，方向键微调',changed:'参数已修改，请重新导出。'},
-  en:{imageTitle:'Add elements',imageUpload:'Upload image',imageReplace:'Replace image',imageRemove:'Remove',imageCenter:'Center image',imageWidth:'Image width',imageLoading:'Loading image…',imageDrag:'Drag image to move; arrows to nudge; corner to resize',imageResize:'Resize image; arrow keys adjust size',imageNeedsSvga:'Upload an SVGA first, then add your image.',imageType:'Choose a PNG, JPG or WebP image.',imageSizeError:'Choose an image under 20MB.',imageDimensions:'Use an image up to 8192px per side and 32 megapixels.',imageLoadError:'Could not read the image. Check it and retry.',imageWidthError:'Enter a valid image width; the original ratio is preserved.',stylePresets:'Two-color gradient presets',stylePlain:'Solid',styleBrightGold:'Bright gold',styleChampagne:'Champagne',styleSilver:'Silver',styleRoseGold:'Rose gold',weightLabel:'Weight',strokeLabel:'Outline width',strokeColorLabel:'Outline color',strokeError:'Outline width must be between 0 and 16px.',textTooLarge:'Text is too large. Shorten it or reduce its size.',fontLibrary:'Fonts ↗',imagesTab:'Frame images',customTab:'Custom frames',preview:'Preview',uploadTitle:'Click, drop or paste an SVGA file',uploadHint:'Keep the animation. Add text or an image.',upload:'Upload SVGA',replace:'Replace file',play:'Play',pause:'Pause',center:'Center horizontally',textSettings:'Custom content',textLabel:'Text',fontLabel:'English font',sizeLabel:'Text size',colorLabel:'Text color',svgaLimit:'SVGA · Under 3MB',frameSpec:'First-frame WebP · 240 × 240',export:'Export SVGA + WebP',exporting:'Exporting…',loading:'Loading…',empty:'No file selected',ready:'Ready to edit',fontLoading:'Loading font…',fileType:'Choose one .svga file.',fileSize:'Choose an SVGA under 50MB.',loadError:'Could not read this SVGA. Check the file and retry.',exportError:'Export failed. Retry; the last valid outputs have been kept.',fontError:'This font could not load. Please select it again.',textEmpty:'Add text or an image.',sizeError:'Text size must be a whole number from 8 to 512.',sizeLimit:'Lossless compression still exceeds 3MB. Reduce assets or use a smaller source file.',saved:'SVGA packaged losslessly and first-frame WebP generated.',optimized:'SVGA compressed losslessly; original dimensions and all frames preserved.',svgaDownload:'Download SVGA',frameDownload:'Download first-frame WebP',zipDownload:'Download all ZIP',drag:'Drag text to move; use arrow keys to adjust',changed:'Settings changed. Export again.'}
+  zh:{imageTitle:'添加元素',imageUpload:'上传图片',imageReplace:'替换图片',imageRemove:'移除',imageCenter:'居中图片',imageWidth:'图片宽度',imageLoading:'正在读取图片…',imageDrag:'拖动图片调整位置，方向键微调，右下角缩放',imageResize:'调整图片大小，方向键缩放',imageNeedsSvga:'请先上传头像框 SVGA，再添加图片。',imageType:'请选择 PNG、JPG 或 WebP 图片。',imageSizeError:'请选择 20MB 以内的图片。',imageDimensions:'图片最长边需在 8192px 内，且不超过 3200 万像素。',imageLoadError:'无法读取此图片，请检查文件后重试。',imageWidthError:'请输入有效的图片宽度，保持原始比例。',stylePlain:'纯色',styleBrightGold:'亮金',styleChampagne:'香槟金',styleSilver:'银色',styleRoseGold:'玫瑰金',weightLabel:'字重',strokeLabel:'描边宽度',strokeColorLabel:'描边颜色',strokeError:'描边宽度需在 0–16px 之间。',textTooLarge:'文字过长或字号过大，请减少内容或字号。',fontLibrary:'字体库 ↗',imagesTab:'头像框图片',customTab:'定制头像框',preview:'效果预览',uploadTitle:'点击、拖入或粘贴 SVGA 文件',uploadHint:'保留原动效，添加文字或图片',upload:'上传 SVGA',replace:'替换文件',play:'播放',pause:'暂停',center:'水平居中',textSettings:'定制内容',textLabel:'文字内容',fontLabel:'英文字体',sizeLabel:'文字大小',colorLabel:'文字颜色',svgaLimit:'SVGA · 3MB 内',frameSpec:'首帧 WebP · 240 × 240',export:'导出 SVGA + WebP',exporting:'正在导出…',loading:'正在读取…',empty:'尚未选择文件',ready:'可编辑',fontLoading:'正在载入字体…',fileType:'请选择一个 .svga 文件。',fileSize:'请选择 50MB 以内的 SVGA。',loadError:'无法读取此 SVGA，请检查文件后重试。',exportError:'导出失败，请重试；上次的成品已保留。',fontError:'字体未能载入，请重新选择字体。',textEmpty:'请添加文字或图片。',sizeError:'文字大小需为 8–512 之间的整数。',sizeLimit:'无损压缩后 SVGA 仍超过 3MB，请减少素材或使用较小的源文件。',saved:'已无损打包 SVGA，并生成首帧 WebP。',optimized:'已无损压缩 SVGA，保留原尺寸和全部动画帧。',svgaDownload:'下载 SVGA',frameDownload:'下载首帧 WebP',zipDownload:'下载全部 ZIP',drag:'拖动文字调整位置，方向键微调',changed:'参数已修改，请重新导出。'},
+  en:{imageTitle:'Add elements',imageUpload:'Upload image',imageReplace:'Replace image',imageRemove:'Remove',imageCenter:'Center image',imageWidth:'Image width',imageLoading:'Loading image…',imageDrag:'Drag image to move; arrows to nudge; corner to resize',imageResize:'Resize image; arrow keys adjust size',imageNeedsSvga:'Upload an SVGA first, then add your image.',imageType:'Choose a PNG, JPG or WebP image.',imageSizeError:'Choose an image under 20MB.',imageDimensions:'Use an image up to 8192px per side and 32 megapixels.',imageLoadError:'Could not read the image. Check it and retry.',imageWidthError:'Enter a valid image width; the original ratio is preserved.',stylePlain:'Solid',styleBrightGold:'Bright gold',styleChampagne:'Champagne',styleSilver:'Silver',styleRoseGold:'Rose gold',weightLabel:'Weight',strokeLabel:'Outline width',strokeColorLabel:'Outline color',strokeError:'Outline width must be between 0 and 16px.',textTooLarge:'Text is too large. Shorten it or reduce its size.',fontLibrary:'Fonts ↗',imagesTab:'Frame images',customTab:'Custom frames',preview:'Preview',uploadTitle:'Click, drop or paste an SVGA file',uploadHint:'Keep the animation. Add text or an image.',upload:'Upload SVGA',replace:'Replace file',play:'Play',pause:'Pause',center:'Center horizontally',textSettings:'Custom content',textLabel:'Text',fontLabel:'English font',sizeLabel:'Text size',colorLabel:'Text color',svgaLimit:'SVGA · Under 3MB',frameSpec:'First-frame WebP · 240 × 240',export:'Export SVGA + WebP',exporting:'Exporting…',loading:'Loading…',empty:'No file selected',ready:'Ready to edit',fontLoading:'Loading font…',fileType:'Choose one .svga file.',fileSize:'Choose an SVGA under 50MB.',loadError:'Could not read this SVGA. Check the file and retry.',exportError:'Export failed. Retry; the last valid outputs have been kept.',fontError:'This font could not load. Please select it again.',textEmpty:'Add text or an image.',sizeError:'Text size must be a whole number from 8 to 512.',sizeLimit:'Lossless compression still exceeds 3MB. Reduce assets or use a smaller source file.',saved:'SVGA packaged losslessly and first-frame WebP generated.',optimized:'SVGA compressed losslessly; original dimensions and all frames preserved.',svgaDownload:'Download SVGA',frameDownload:'Download first-frame WebP',zipDownload:'Download all ZIP',drag:'Drag text to move; use arrow keys to adjust',changed:'Settings changed. Export again.'}
 };
 Object.assign(copy.zh,{
-  gradientBaseLabel:'渐变基色',highlightLabel:'高光色',
+  stylePresets:'文字样式预设',styleThreeToneGold:'三色金',
+  gradientBaseLabel:'渐变基色',highlightLabel:'高光色',midLabel:'中间色',
   uploadHint:'提取图片素材，或定制文字和图片',assetsTitle:'SVGA 图片素材',assetAdd:'添加图片',assetDelete:'删除选中',assetsRestore:'恢复已删原图',
   assetDownload:'下载',assetEdit:'定位',assetOriginal:'原始素材',assetAdded:'新增图层',assetWorking:'正在处理素材…',
   assetEmpty:'当前没有图片素材。可以添加图片到头像框。',assetCount:'{total} 张图片 · 已选 {selected} 张',assetError:'素材修改失败，已保留之前的画面。',
@@ -19,7 +20,8 @@ Object.assign(copy.zh,{
   runtimeHint:'按解码后的 RGBA 图片和一张原尺寸画布计算。实际播放器的总内存因平台而异。',overRuntime:'超出上限',unknownRuntime:'无法估算',
 });
 Object.assign(copy.en,{
-  gradientBaseLabel:'Base color',highlightLabel:'Highlight',
+  stylePresets:'Text style presets',styleThreeToneGold:'Tri-tone gold',
+  gradientBaseLabel:'Base color',highlightLabel:'Highlight',midLabel:'Midtone',
   uploadHint:'Extract images or customize the frame with text and images.',assetsTitle:'SVGA image assets',assetAdd:'Add image',assetDelete:'Delete selected',assetsRestore:'Restore original images',
   assetDownload:'Download',assetEdit:'Edit',assetOriginal:'Original asset',assetAdded:'Added layer',assetWorking:'Processing assets…',
   assetEmpty:'No image assets. Add an image to this avatar frame.',assetCount:'{total} images · {selected} selected',assetError:'Could not edit these assets. The previous preview has been kept.',
@@ -29,10 +31,11 @@ Object.assign(copy.en,{
 });
 const state={mode:'preview',style:'plain',source:null,file:null,video:null,loading:false,imageLoading:false,exporting:false,playing:false,position:{x:.5,y:.82},bitmap:null,image:null,result:null,notice:'',noticeKind:'error',renderId:0,frame:0,
   images:[],sourceAssets:[],removedImages:new Set(),assetSelection:new Set(),assetOffsets:new Map(),assetBusy:false,
-  highlightColor:null};
+  highlightColor:null,midColor:null};
 const textColors=[
   ['avatarCustomColor','colorLabel'],
   ['avatarCustomHighlight','highlightLabel','highlightColor'],
+  ['avatarCustomMid','midLabel','midColor'],
   ['avatarCustomStrokeColor','strokeColorLabel'],
 ];
 const MAX_ADDED_IMAGES=7;
@@ -104,6 +107,7 @@ function syncStyles(){
   for(const button of root.querySelectorAll('button[data-text-style]'))button.setAttribute('aria-pressed',String(state.style===button.dataset.textStyle));
   const plain=state.style==='plain', colorLabel=plain?'colorLabel':'gradientBaseLabel';
   $('avatarCustomHighlightField').hidden=plain;
+  $('avatarCustomMidField').hidden=!TEXT_STYLES[state.style].midColor;
   $('avatarCustomColorLabel').textContent=t(colorLabel);
   for(const [id,label] of textColors)$(id+'Value').setAttribute('aria-label',t(id==='avatarCustomColor'?colorLabel:label)+' HEX');
 }
@@ -116,6 +120,7 @@ function chooseStyle(key){
   if(busy()||!state.source||!Object.hasOwn(TEXT_STYLES,key))return;
   state.style=key;const preset=TEXT_STYLES[key];
   state.highlightColor=null;
+  state.midColor=null;
   if(preset.baseColor)$('avatarCustomColor').value=preset.baseColor;
   syncStyles();changed();
 }
@@ -405,7 +410,7 @@ async function editAssets(restore=false){
 }
 async function rasterText(size=Number($('avatarCustomFontSize').value)){
   const raw=$('avatarCustomText').value.replace(/\r/g,''),color=$('avatarCustomColor').value,fontKey=$('avatarCustomFont').value,font=cssFont(size),fontWeight=weight(),strokeWidth=Number($('avatarCustomStrokeWidth').value),strokeColor=$('avatarCustomStrokeColor').value,styleKey=state.style;
-  const {highlightColor}=state;
+  const {highlightColor,midColor}=state;
   if(!raw.trim())return null;
   if(!Number.isInteger(size)||size<8||size>512)throw Error('sizeError');
   if(!validStroke())throw Error('strokeError');
@@ -416,7 +421,7 @@ async function rasterText(size=Number($('avatarCustomFontSize').value)){
   const ratio=Math.min(2,4096/width,4096/height,Math.sqrt(12000000/(width*height))),canvas=document.createElement('canvas');
   canvas.width=Math.max(1,Math.ceil(width*ratio));canvas.height=Math.max(1,Math.ceil(height*ratio));
   const ctx=canvas.getContext('2d');ctx.scale(ratio,ratio);
-  drawStyledText(ctx,{lines,size,width,padding,font,color,strokeWidth,strokeColor,styleKey,highlightColor});return {canvas,width,height,fontKey,color,text:raw,fontWeight,strokeWidth,strokeColor,styleKey};
+  drawStyledText(ctx,{lines,size,width,padding,font,color,strokeWidth,strokeColor,styleKey,highlightColor,midColor});return {canvas,width,height,fontKey,color,text:raw,fontWeight,strokeWidth,strokeColor,styleKey};
 }
 function applyBitmap(bitmap){
   state.bitmap=bitmap;const layer=$('avatarCustomTextLayer');layer.hidden=!bitmap;
@@ -429,7 +434,9 @@ async function renderText(){
 }
 function changed(){
   ++state.renderId;
-  $('avatarCustomHighlight').value=state.highlightColor??defaultTextHighlight($('avatarCustomColor').value);
+  const preset=TEXT_STYLES[state.style];
+  $('avatarCustomHighlight').value=state.highlightColor??preset.highlightColor??defaultTextHighlight($('avatarCustomColor').value);
+  $('avatarCustomMid').value=state.midColor??preset.midColor??'#FFFFFF';
   for(const [id] of textColors)syncHex(id);
   if(state.result)notice('changed','success');else notice();
   if($('avatarCustomText').value.trim()&&!validSize()){notice('sizeError');sync();return}
@@ -518,8 +525,9 @@ avatarModes.forEach(({tab,name}, index)=>{
 for(const id of ['avatarCustomText','avatarCustomFontSize','avatarCustomStrokeWidth'])$(id).addEventListener('input',changed);
 for(const button of root.querySelectorAll('button[data-text-style]')){
   const key=button.dataset.textStyle;
-  const base=TEXT_STYLES[key]?.baseColor;
-  if(base)button.style.setProperty('--text-preset-fill',`linear-gradient(${defaultTextHighlight(base)}, ${base})`);
+  const stops=textGradientStops(key);
+  if(stops.length)button.style.setProperty('--text-preset-fill',
+    `linear-gradient(${stops.map(([offset,color])=>`${color} ${offset*100}%`).join(', ')})`);
   button.addEventListener('click',()=>chooseStyle(key));
 }
 $('avatarCustomWeight').addEventListener('change',changed);
