@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.19.5 - 2026-11-13
+
+- Add a three-color gold text preset with individually editable highlight, midtone, and base colors. The editor, exported SVGA, and first-frame WebP share the same gradient.
+
 ## 1.19.4 - 2026-11-13
 
 - Add a medal-only scene to Preview Images. Upload up to four medals and see them in the small slots and 230 px display cards. Replace or reorder them in either view.
