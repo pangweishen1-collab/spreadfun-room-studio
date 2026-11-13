@@ -1,6 +1,6 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
 import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
-import {generateGreenReferenceRuntime, GREEN_REFERENCE_ROOT, GREEN_REFERENCE_VERSION} from './green-reference/runtime.mjs';
+import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.mjs';
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
@@ -23,9 +23,9 @@ const SOUND_NAMES=['dice_roll','sound_ui_dice6'];
 const DEFAULT_AUDIO=Object.fromEntries(SOUND_NAMES.map(name=>[name,`/dice/assets/audio/${name}.mp3`]));
 const DEFAULT_ANCHOR='/dice/assets/anchor.png';
 const referenceRuntime=runtime=>runtime?.kind==='purple-reference';
-const greenReferenceRuntime=runtime=>runtime?.kind==='green-reference';
-const binaryRuntime=runtime=>referenceRuntime(runtime)||greenReferenceRuntime(runtime);
-const greenRuntime=runtime=>runtime?.kind==='six-face'||greenReferenceRuntime(runtime);
+const compactGreenRuntime=runtime=>runtime?.kind==='six-face'&&runtime.metadata?.packingVersion===GREEN_PACKING_VERSION;
+const binaryRuntime=runtime=>referenceRuntime(runtime)||compactGreenRuntime(runtime);
+const greenRuntime=runtime=>runtime?.kind==='six-face';
 const generatedRuntime=runtime=>greenRuntime(runtime)||runtime?.kind==='purple-gyro'||referenceRuntime(runtime);
 const hasReferenceBinary=runtime=>runtime?.skel instanceof Blob&&runtime.skel.size>0;
 
@@ -317,8 +317,7 @@ export function createLocalPreview(dependencies={}) {
   const storage=dependencies.storage||createSessionStorage();
   const decode=dependencies.decodePNG||decodePNG;
   const render=dependencies.renderRuntime||((files,composition)=>renderRuntime(files,composition,decode));
-  const greenVersion=dependencies.renderSixFace ? SIX_FACE_MOTION_VERSION : GREEN_REFERENCE_VERSION;
-  const greenKind=dependencies.renderSixFace ? 'six-face' : 'green-reference';
+  const renderSix=dependencies.renderSixFace||generateSixFaceRuntime;
   const renderReference=dependencies.renderPurpleReference||generatePurpleReferenceRuntime;
   const usesLegacyGyro=variant=>variant==='05'&&Boolean(dependencies.renderPurpleGyro);
   const hash=dependencies.hash||sha256, uuid=dependencies.uuid||(()=>crypto.randomUUID().replaceAll('-',''));
@@ -327,8 +326,8 @@ export function createLocalPreview(dependencies={}) {
   const urls=new Map();
   const defaultAssets=new Map();
   function url(key,blob) {if(!urls.has(key))urls.set(key,objectURL(blob));return urls.get(key);}
-  const defaultAudioPath=(record,name)=>greenReferenceRuntime(record.runtime)
-    ? GREEN_REFERENCE_ROOT+name+'.mp3' : DEFAULT_AUDIO[name];
+  const defaultAudioPath=(record,name)=>compactGreenRuntime(record.runtime)
+    ? '/dice/assets/green-reference/'+name+'.mp3' : DEFAULT_AUDIO[name];
   function audioURLs(record){return Object.fromEntries(SOUND_NAMES.map(name=>[name,record.audio?.[name]?.blob?
     url(`${record.id}/audio/${name}/${record.audio[name].sha256}`,record.audio[name].blob):defaultAudioPath(record,name)]));}
   async function defaultAsset(path){
@@ -341,12 +340,7 @@ export function createLocalPreview(dependencies={}) {
   async function renderGreen(files,options={}){
     const anchor=files.find(file=>file.slot==='anchor');
     const image=await decode(anchor?.blob||await defaultAsset(DEFAULT_ANCHOR),'anchor.png',{allowEmpty:true});
-    try{
-      const prepared={...options,anchorImage:image.drawable};
-      if(dependencies.renderSixFace)return await dependencies.renderSixFace(files,prepared);
-      const skeleton=await defaultAsset(GREEN_REFERENCE_ROOT+'template.skel');
-      return await generateGreenReferenceRuntime(files,{...prepared,decode,skeleton});
-    }
+    try{return await renderSix(files,{...options,anchorImage:image.drawable});}
     finally{image.close?.();}
   }
   async function renderPurple(files,options={}){
@@ -386,7 +380,7 @@ export function createLocalPreview(dependencies={}) {
     const record=await storage.get(id);
     if(!record)throw new PreviewError('预览会话不存在',404);
     const anchor=record.runtime.metadata?.anchor;
-    const migrateAnchor=generatedRuntime(record.runtime)&&!greenReferenceRuntime(record.runtime)&&!(anchor?.bone==='root'&&anchor.scaleX===6&&anchor.scaleY===6&&anchor.opacity===0);
+    const migrateAnchor=generatedRuntime(record.runtime)&&!(anchor?.bone==='root'&&anchor.scaleX===6&&anchor.scaleY===6&&anchor.opacity===0);
     const variant=settingValue(record,'purpleVariant');
     const legacy=usesLegacyGyro(variant);
     const purpleKind=legacy?'purple-gyro':'purple-reference';
@@ -394,13 +388,14 @@ export function createLocalPreview(dependencies={}) {
     const migrateMotion=record.grade==='purple'
       ?record.runtime.kind!==purpleKind||record.runtime.metadata?.motionVersion!==purpleVersion||
         (referenceRuntime(record.runtime)&&!hasReferenceBinary(record.runtime))
-      :record.runtime.kind!==greenKind||record.runtime.metadata?.motionVersion!==greenVersion||
-        (greenReferenceRuntime(record.runtime)&&!hasReferenceBinary(record.runtime));
+      :!greenRuntime(record.runtime)||record.runtime.metadata?.motionVersion!==SIX_FACE_MOTION_VERSION||
+        (!dependencies.renderSixFace&&(!compactGreenRuntime(record.runtime)||!hasReferenceBinary(record.runtime)));
     if(record.mode==='all' && record.point===1&&!migrateAnchor&&!migrateMotion)return record;
     const migrated={...record,mode:'all',point:1,revision:record.revision+1,candidateId:uuid()};
     if(migrateAnchor||migrateMotion){
       migrated.runtime=await renderNative(migrated);
-      migrated.runtime.warnings=[...new Set([...(record.runtime.warnings||[]),...(migrated.runtime.warnings||[])])];
+      const oldWarnings=record.runtime.kind==='green-reference'?[]:record.runtime.warnings||[];
+      migrated.runtime.warnings=[...new Set([...oldWarnings,...(migrated.runtime.warnings||[])])];
     }
     // Uploaded PNGs and old video Blobs remain stored; binding/profile hides old output.
     await storage.put(migrated,{revision:record.revision,candidateId:record.candidateId});
@@ -414,11 +409,13 @@ export function createLocalPreview(dependencies={}) {
     anchor.hidden=true;
     const generated=generatedRuntime(record.runtime),reference=referenceRuntime(record.runtime),binary=binaryRuntime(record.runtime),png=Object.fromEntries(files.map(f=>[f.slot,f.url]));
     const runtimeKey=generated?(record.runtime.kind+'/'+(record.runtime.metadata?.motionVersion||'legacy')+
+      (compactGreenRuntime(record.runtime)?'/'+GREEN_PACKING_VERSION:'')+
       (record.grade==='purple'?'/'+record.resolvedComposition:'')+
       (reference?'/'+(record.runtime.assetRevision??1):'')):record.resolvedComposition;
     const icon=png['大骰子']||null;png.anchor??=anchor.url;
     const skeleton=binary
-      ?{skel:url(`${record.id}/runtime/${runtimeKey}/skel`,record.runtime.skel)}
+      ?{skel:url(`${record.id}/runtime/${runtimeKey}/skel`,record.runtime.skel),
+        ...(compactGreenRuntime(record.runtime)?{geometry:record.runtime.geometry}:{})}
       :generated?{json:record.runtime.json,geometry:record.runtime.geometry}
         :{skel:dependencies.templateURL||'/dice/assets/template.skel'};
     const candidate={id:record.candidateId,version:record.revision,name:record.name,template:record.grade,previewGrade:settingValue(record,'previewGrade'),
@@ -568,7 +565,7 @@ export function createLocalPreview(dependencies={}) {
     for (const file of record.files) {
       if (file.slot === '大骰子') add('res/icon.png',file.blob);
       else if (!runtimeOnly && file.slot !== 'anchor' &&
-        !(greenReferenceRuntime(record.runtime)&&['1','2'].includes(file.slot))) {
+        !(compactGreenRuntime(record.runtime)&&['1','2'].includes(file.slot))) {
         add('res/'+file.slot+'.png',file.blob);
       }
     }
@@ -590,7 +587,7 @@ export function createLocalPreview(dependencies={}) {
     const isGreen = record.grade === 'green';
     const losslessLevel = isGreen ? 2 : 3;
     const paletteLimit = isGreen ? 256 : 192;
-    const texture = greenReferenceRuntime(record.runtime) ? record.runtime.texture
+    const texture = compactGreenRuntime(record.runtime) ? record.runtime.texture
       : await optimizeAtlasPng(record.runtime.texture, losslessLevel, paletteLimit);
     add(name+'.png',texture);
     for(const sound of SOUND_NAMES)

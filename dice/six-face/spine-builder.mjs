@@ -211,6 +211,44 @@ function layout(width,height) {
   }
   throw Error('骰面纹理无法装入 2048 图集');
 }
+
+function compactGreenLayout(cropW, cropH) {
+  const width = 430, height = 424, padding = 2;
+  const flatScale = Math.min(1, 130 / Math.max(cropW, cropH));
+  const flatW = Math.max(1, Math.round(cropW * flatScale));
+  const flatH = Math.max(1, Math.round(cropH * flatScale));
+  const sheetY = 2 * (flatH + 2 * padding);
+  const rollScale = Math.min(1, 96 / cropW, (Math.floor((height - sheetY) / 2) - 2 * padding) / cropH);
+  const rollW = Math.max(1, Math.round(cropW * rollScale));
+  const rollH = Math.max(1, Math.round(cropH * rollScale));
+  const grid = (prefix, w, h, top) => Array.from({length:6}, (_, index) => ({
+    name: prefix + (index + 1), x: (index % 3) * (w + 2 * padding) + padding,
+    y: top + Math.floor(index / 3) * (h + 2 * padding) + padding, width:w, height:h,
+  }));
+  const flats = grid('flat_', flatW, flatH, 0);
+  const rolls = grid('roll_', rollW, rollH, sheetY);
+  const sheet = {name:'roll_sheet', x:0, y:sheetY, width:3 * (rollW + 2 * padding), height:2 * (rollH + 2 * padding)};
+  const props = [{name:'white',x:326,y:sheetY + 2,width:64,height:16},
+    {name:'anchor',x:394,y:sheetY + 2,width:30,height:30}];
+  return {width,height,padding,flatScale,rollScale,flats,rolls,sheet,
+    regions:[...flats,sheet,...props],tiles:[...flats,...rolls,...props]};
+}
+
+function applyCompactGreenAtlas(json, packing) {
+  Object.assign(json.skeleton, {x:-100,y:-100,width:200,height:200,fps:30,images:'./res/',audio:'./'});
+  for (const event of Object.values(json.events)) event.audio = 'sound/' + event.audio;
+  for (const [index, tile] of packing.rolls.entries()) {
+    const point = index + 1;
+    const mesh = json.skins[0].attachments['face_' + point]['mesh_' + point];
+    const {x,y,width,height} = packing.sheet;
+    mesh.path = packing.sheet.name;
+    // The source has opaque roll tiles and separate transparent landing tiles.
+    // Map only the rolling UVs into their tiles; leave geometry and keys intact.
+    mesh.uvs = mesh.uvs.map((v, i) => i % 2
+      ? (tile.y - y + v * tile.height) / height
+      : (tile.x - x + v * tile.width) / width);
+  }
+}
 function extrude(atlas,image,r) {
   const {x,y,width:w,height:h}=r,source=image.data,data=atlas.data;
   for(let row=0;row<h;row++)data.set(source.subarray(row*w*4,(row+1)*w*4),((y+row)*atlas.width+x)*4);
@@ -222,7 +260,7 @@ function extrude(atlas,image,r) {
   for(const [sx,sy,dx,dy] of [[0,0,x-1,y-1],[w-1,0,x+w,y-1],[0,h-1,x-1,y+h],[w-1,h-1,x+w,y+h]])pixel(sx,sy,dx,dy);
 }
 
-export async function buildSpineAssets(prepared,{name='自定义骰子',signal,anchorImage}={}) {
+export async function buildSpineAssets(prepared,{name='自定义骰子',signal,anchorImage,compactGreen=false}={}) {
   abortIf(signal);
   if(!size(anchorImage).every(value=>value>0))throw Error('缺少有效的 anchor.png');
   const geo=geometry(prepared),[left,top,cropW,cropH]=geo.crop;
@@ -239,23 +277,31 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal,a
   // plus gutters in one <=2048 atlas. Original files and logical geometry stay intact.
   const rasterScale=Math.min(1,508/Math.max(cropW,cropH));
   const width=Math.max(1,Math.round(cropW*rasterScale)),height=Math.max(1,Math.round(cropH*rasterScale));
-  const packing=layout(width,height),images={},owned=[];
+  const packing=compactGreen?compactGreenLayout(cropW,cropH):layout(width,height),images={},owned=[];
   const make=(w,h) => { const result=canvas(w,h); owned.push(result.image); return result; };
   try {
   for (let p=1;p<=6;p++) {
     abortIf(signal);
-    const flat=make(width,height),roll=make(width,height);
-    if (prepared.landingCropped) flat.context.drawImage(prepared.landingImages[p],0,0,width,height);
-    else flat.context.drawImage(prepared.landingImages[p],left,top,cropW,cropH,0,0,width,height);
-    roll.context.drawImage(prepared.textures[p],0,0,width,height);
-    const flatData=flat.context.getImageData(0,0,width,height).data,rollData=roll.context.getImageData(0,0,width,height).data;
+    const flatW=packing.flats?.[p-1].width??width,flatH=packing.flats?.[p-1].height??height;
+    const rollW=packing.rolls?.[p-1].width??width,rollH=packing.rolls?.[p-1].height??height;
+    const flat=make(flatW,flatH),roll=make(rollW,rollH);
+    if (prepared.landingCropped) flat.context.drawImage(prepared.landingImages[p],0,0,flatW,flatH);
+    else flat.context.drawImage(prepared.landingImages[p],left,top,cropW,cropH,0,0,flatW,flatH);
+    roll.context.drawImage(prepared.textures[p],0,0,rollW,rollH);
+    const flatData=flat.context.getImageData(0,0,flatW,flatH).data,rollData=roll.context.getImageData(0,0,rollW,rollH).data;
+    const edgeColors=flatW===rollW&&flatH===rollH?rollData:(() => {
+      const bleed=make(flatW,flatH);
+      bleed.context.drawImage(prepared.textures[p],0,0,flatW,flatH);
+      return bleed.context.getImageData(0,0,flatW,flatH).data;
+    })();
+    for(let at=3;at<rollData.length;at+=4)
+      if(rollData[at]!==255)throw Error('第 '+p+' 面滚动纹理需要完整的不透明边缘颜色');
     for(let at=0;at<flatData.length;at+=4) {
-      if(rollData[at+3]!==255)throw Error('第 '+p+' 面滚动纹理需要完整的不透明边缘颜色');
       // Canvas has already discarded RGB at alpha=0. Restore the matching
       // nearest-body RGB from prepared opaque textures before straight-alpha filtering.
-      if(flatData[at+3]===0)flatData.set(rollData.subarray(at,at+3),at);
+      if(flatData[at+3]===0)flatData.set(edgeColors.subarray(at,at+3),at);
     }
-    images['flat_'+p]={width,height,data:flatData};images['roll_'+p]={width,height,data:rollData};
+    images['flat_'+p]={width:flatW,height:flatH,data:flatData};images['roll_'+p]={width:rollW,height:rollH,data:rollData};
   }
   const shadow=make(256,64); shadow.context.fillStyle='#ffffff';
   shadow.context.beginPath(); shadow.context.ellipse(128,32,128,32,0,0,Math.PI*2); shadow.context.fill();
@@ -266,23 +312,25 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal,a
   const anchor=make(30,30);anchor.context.drawImage(anchorImage,0,0,30,30);
   images.anchor={width:30,height:30,data:anchor.context.getImageData(0,0,30,30).data};
   const page={width:packing.width,height:packing.height,data:new Uint8Array(packing.width*packing.height*4)};
-  for(const region of packing.regions)extrude(page,images[region.name],region);
+  for(const region of packing.tiles||packing.regions)extrude(page,images[region.name],region);
   const atlasPage='dice.png',lines=[atlasPage,`size: ${packing.width},${packing.height}`,'format: RGBA8888',
     'filter: Linear,Linear','repeat: none','pma: false'];
   for (const r of packing.regions) lines.push(r.name,'  rotate: false',`  xy: ${r.x},${r.y}`,`  size: ${r.width},${r.height}`,
     `  orig: ${r.width},${r.height}`,'  offset: 0,0','  index: -1');
   const atlasText=lines.join('\n')+'\n',json=buildSpineJson(prepared);
+  if(compactGreen)applyCompactGreenAtlas(json,packing);
   const encoded=await encodeRgbaPng(page.width,page.height,page.data,{signal}),textureBlob=encoded.blob;
   const metadata={name:String(name).trim().slice(0,120)||'自定义骰子',format:'Spine 4.2 JSON; MeshAttachment + DeformTimeline',
-    spine:'4.2.43',imageSequences:0,staticImages:14,faceMeshes:6,landingMeshes:6,faceMeshVertices:vertexOrder.length,hull,
+    spine:'4.2.43',imageSequences:0,staticImages:packing.regions.length,faceMeshes:6,landingMeshes:6,faceMeshVertices:vertexOrder.length,hull,
     motionVersion:SIX_FACE_MOTION_VERSION,landing:{start:LAND_START,ready:LAND_READY,switch:HANDOFF,overlap:false},
     anchor:{slot:'anchor',bone:'root',attachment:'anchor',image:'images/anchor.png',width:30,height:30,scaleX:6,scaleY:6,opacity:0},
     crop:geo.crop,sourceSize:geo.sourceSize,cropOffset:[...prepared.cropOffset],logicalSize:[geo.faceWidth,geo.faceHeight],
-    logicalOffset:[geo.offsetX,geo.offsetY],rasterScale,atlas:packing,rollEnd:.6,settleEnd:.633333,zoomPeak:ZOOM_PEAK,
+    logicalOffset:[geo.offsetX,geo.offsetY],rasterScale:packing.flatScale??rasterScale,atlas:packing,rollEnd:.6,settleEnd:.633333,zoomPeak:ZOOM_PEAK,
     pngEncoding:encoded.method,transparentRgb:'Flat alpha-zero RGB copied from corresponding opaque rolling texture; raw RGBA atlas with one-pixel extrusion.',
     animations:Object.keys(json.animations),notes:['Derived images are browser-normalized; no byte-for-byte original RGB equivalence is claimed.',
       'Original images are retained separately; .skel game data is written by the browser packager; native .spine still requires the Editor.',
       'Spine 4.2 mesh/deform JSON support is required; Editor and target game acceptance remain separate checks.']};
+  if(compactGreen)return {json,atlasText,textureBlob,atlasPage,metadata};
   const files={'dice.json':new Blob([JSON.stringify(json)],{type:'application/json'}),
     'dice.atlas':new Blob([atlasText],{type:'text/plain'}),'dice.png':textureBlob,
     'build-info.json':new Blob([JSON.stringify(metadata,null,2)],{type:'application/json'})};

@@ -26,8 +26,7 @@ function greenPreviewIcon(image) {
 
 const previewGrade = candidate => (candidate.previewGrade || candidate.template) === 'purple' ? 'purple' : 'green';
 const referenceCandidate = candidate => candidate?.kind === 'purple-reference';
-const greenReferenceCandidate = candidate => candidate?.kind === 'green-reference';
-const binaryCandidate = candidate => referenceCandidate(candidate) || greenReferenceCandidate(candidate);
+const binaryCandidate = candidate => referenceCandidate(candidate) || candidate?.kind === 'six-face' && Boolean(candidate.skel);
 const generatedCandidate = candidate => candidate?.kind === 'six-face' || candidate?.kind === 'purple-gyro' || binaryCandidate(candidate);
 const readAsset = (url, type, message) => fetch(url).then(response => {
   if (!response.ok) throw new Error(message);
@@ -240,7 +239,7 @@ export class GameRenderer {
       const gridLimits = referenceCandidate(candidate) && candidate.purpleVariant === '02' ? plan02GridLimits(data, sizeScale) : null;
       const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons,gridLimits:this.gridLimits,sizeScale:this.sizeScale};
       Object.assign(this, {assets, software, candidate, background,
-        icon:icon && (candidate.kind === 'six-face' || greenReferenceCandidate(candidate)) ? greenPreviewIcon(icon) : icon, data,
+        icon:icon && candidate.kind === 'six-face' ? greenPreviewIcon(icon) : icon, data,
         skeletons:Array.from({length:6}, () => new spine.Skeleton(data)),gridLimits,sizeScale});
       try { this.draw(); }
       catch (error) { Object.assign(this, previous); throw error; }
@@ -415,7 +414,7 @@ export class GameRenderer {
       skeleton.y = centerY;
       if (reference) {
         skeleton.scaleX = skeleton.scaleY = all ? REFERENCE_GRID_SCALE : 1.5 * PURPLE_REFERENCE_PRESENTATION_SCALE;
-      } else if (generatedCandidate(this.candidate) && !greenReferenceCandidate(this.candidate)) {
+      } else if (generatedCandidate(this.candidate)) {
         const {crop,sourceSize,cropOffset} = this.candidate.geometry;
         const ratio = Math.max(crop[2],crop[3])/sourceSize;
         const size = (all ? 172 : 300) * Math.min(1,.655/ratio) * presentationGain;
