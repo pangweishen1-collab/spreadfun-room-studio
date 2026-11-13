@@ -3,8 +3,9 @@ import {bindPreviewSlotDrag} from './preview-slot-drag.mjs?v=20261111-profile1';
 
 const copy = {
   zh: {
-    productionTab: '预览图生产', deviceTab: '座驾/勋章预览', giftTab: '礼物预览',
+    productionTab: '预览图生产', deviceTab: '座驾/勋章预览', medalTab: '勋章预览', giftTab: '礼物预览',
     gift: '礼物', giftReviewExport: '下载礼物栏预览图',
+    medalReviewExport: '下载勋章页预览图', smallMedal: '小图', largeMedal: '大图',
     materialsHeading: '展示素材', medal: '勋章', vehicle: '座驾', upload: '批量上传',
     countLabel: '已放置', privacy: '图片仅在本地处理。', replace: '替换',
     export: kind => `下载${kind} WebP`,
@@ -21,8 +22,9 @@ const copy = {
     size: '图片尺寸或体积过大。', invalid: name => `无法读取「${name}」。`
   },
   en: {
-    productionTab: 'Create preview', deviceTab: 'Vehicles / Medals', giftTab: 'Gift preview',
+    productionTab: 'Create preview', deviceTab: 'Vehicles / Medals', medalTab: 'Medal preview', giftTab: 'Gift preview',
     gift: 'Gifts', giftReviewExport: 'Download gift tray preview',
+    medalReviewExport: 'Download medal page preview', smallMedal: 'Small', largeMedal: 'Large',
     materialsHeading: 'Display assets', medal: 'Medals', vehicle: 'Vehicles', upload: 'Bulk upload',
     countLabel: 'Placed', privacy: 'Images are processed on this device.', replace: 'Replace',
     export: kind => `Download ${kind.toLowerCase()} WebP`,
@@ -46,6 +48,9 @@ const tabs = [...byId('profileTabs').querySelectorAll('[role="tab"]')];
 const panels = tabs.map(tab => byId(tab.getAttribute('aria-controls')));
 const labels = root.querySelectorAll('[data-profile-text]');
 const outputSides = {medal: 400, vehicle: 200, gift: 200};
+const medalPlacements = Array.from({length: 4}, (_, index) => ({kind: 'medal', number: index + 1, asset: null}));
+const defaultMedal = 'assets/profile-preview/medal-default.webp?v=20261111-profile1';
+let medalUploadInProgress = false;
 const stringsForPage = () => copy[document.documentElement.lang.startsWith('zh') ? 'zh' : 'en'];
 
 function artwork(src, lazy = false) {
@@ -73,7 +78,10 @@ function downloadBlob(blob, filename) {
   }
 }
 
-function mountPreview(device, {prefix, screen, card, layout, columns, defaultArtwork, sprite, clipY = screen.height}) {
+function mountPreview(device, {
+  prefix, screen, card, layout, columns, defaultArtwork, sprite,
+  clipY = screen.height, largeMedals
+}) {
   const control = name => byId(prefix + name);
   const modes = Object.fromEntries(['Medal', 'Vehicle'].filter(name => control(name)).map(name => [name.toLowerCase(), control(name)]));
   const upload = control('Upload');
@@ -85,6 +93,7 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
   const status = control('Status');
   const overlay = control('Slots');
   const backdrop = control('Stage').querySelector('.profile-stage-background');
+  const sharedMedals = layout.some(item => item.kind === 'medal');
   let mode = layout[0].kind;
   let busy = false;
   let notice = null;
@@ -92,30 +101,49 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
   let hoveredSlot = null;
   let fileDropTarget = null;
   let spriteImage;
+  const isBusy = () => busy || (sharedMedals && medalUploadInProgress);
   if (sprite) {
     overlay.style.setProperty('--profile-default-sprite', `url("${sprite}")`);
     overlay.style.setProperty('--profile-slot-clip-bottom', `${(screen.height - clipY) / screen.height * 100}%`);
   }
+  const mask = largeMedals && {sourceX: 550, sourceWidth: 10, x: columns[0], y: layout[0].y,
+    width: columns.at(-1) + card.width - columns[0], height: card.height};
+  if (mask) {
+    const patch = document.createElement('div');
+    patch.className = 'profile-medal-row-mask';
+    Object.assign(patch.style, {
+      left: `${mask.x / screen.width * 100}%`,
+      top: `${mask.y / screen.height * 100}%`,
+      width: `${mask.width / screen.width * 100}%`,
+      height: `${mask.height / screen.height * 100}%`,
+      backgroundImage: `url("${backdrop.getAttribute('src')}")`,
+      backgroundSize: `${screen.width / mask.sourceWidth * 100}% ${screen.height / mask.height * 100}%`,
+      backgroundPosition: `${mask.sourceX / (screen.width - mask.sourceWidth) * 100}% ${mask.y / (screen.height - mask.height) * 100}%`
+    });
+    overlay.append(patch);
+  }
 
-  const slots = layout.flatMap(({kind, y}, row) => columns.map((x, column) => {
-    const index = row * columns.length + column;
-    const number = (row - layout.findIndex(item => item.kind === kind)) * columns.length + column + 1;
+  const views = [];
+  function addView(slot, {x, y, width, height, column, row, size}) {
+    const index = views.length;
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'profile-slot';
-    button.dataset.slotIndex = String(index);
-    button.dataset.type = kind;
+    button.dataset.slotIndex = String(largeMedals ? slot.number - 1 : index);
+    button.dataset.viewIndex = String(index);
+    button.dataset.type = slot.kind;
+    if (size) button.dataset.size = size;
     button.style.setProperty('--slot-x', `${x / screen.width * 100}%`);
     button.style.setProperty('--slot-y', `${y / screen.height * 100}%`);
-    button.style.setProperty('--slot-w', `${card.width / screen.width * 100}%`);
-    button.style.setProperty('--slot-h', `${card.height / screen.height * 100}%`);
+    button.style.setProperty('--slot-w', `${width / screen.width * 100}%`);
+    button.style.setProperty('--slot-h', `${height / screen.height * 100}%`);
     let fallback;
     if (sprite) {
       fallback = document.createElement('span');
       fallback.className = 'profile-slot-art profile-slot-fallback';
       fallback.style.backgroundPosition = `${column * 100 / (columns.length - 1)}% ${row * 100 / (layout.length - 1)}%`;
     } else {
-      fallback = artwork(defaultArtwork[kind], true);
+      fallback = artwork(defaultArtwork[slot.kind], true);
     }
     const cue = document.createElement('span');
     cue.className = 'profile-slot-replace';
@@ -123,7 +151,7 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
     button.append(fallback, cue);
     button.addEventListener('click', event => {
       if (slotDrag.consumeClick(event)) return;
-      selectMode(kind);
+      selectMode(slot.kind);
       pickedSlot = index;
       input.multiple = false;
       input.click();
@@ -135,38 +163,53 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
       if (hoveredSlot === index) hoveredSlot = null;
     });
     overlay.append(button);
-    return {kind, number, x, y, column, row, button, fallback, cue, asset: null};
+    views.push({slot, x, y, width, height, column, row, size, button, fallback, cue, element: fallback, shownAsset: null});
+  }
+  const slots = layout.flatMap(({kind, y}, row) => columns.map((x, column) => {
+    const number = (row - layout.findIndex(item => item.kind === kind)) * columns.length + column + 1;
+    const slot = kind === 'medal' ? medalPlacements[number - 1] : {kind, number, asset: null};
+    addView(slot, {x, y, ...card, column, row, size: largeMedals ? 'smallMedal' : null});
+    return slot;
   }));
+  largeMedals?.forEach(({x, y}, index) => addView(slots[index], {x, y, width: 230, height: 230, size: 'largeMedal'}));
 
   const active = () => location.hash === '#gift-previews' && !device.hidden;
 
   function slotAt(node) {
     const button = node?.closest?.('.profile-slot');
-    return button && overlay.contains(button) ? Number(button.dataset.slotIndex) : null;
+    return button && overlay.contains(button) ? Number(button.dataset.viewIndex) : null;
   }
 
   function sync() {
     const strings = stringsForPage();
+    const blocked = isBusy();
     const category = slots.filter(slot => slot.kind === mode);
     const placed = category.filter(slot => slot.asset).length;
     count.textContent = `${placed} / ${category.length}`;
-    upload.disabled = busy;
-    download.disabled = busy || placed === 0;
+    upload.disabled = blocked;
+    download.disabled = blocked || placed === 0;
     download.textContent = strings.export(strings[mode]) + (mode === 'gift' ? ' · ZIP' : '');
-    reviewDownload.disabled = busy;
-    reviewDownload.textContent = mode === 'gift' ? strings.giftReviewExport : strings.reviewExport;
+    reviewDownload.disabled = blocked;
+    reviewDownload.textContent = largeMedals ? strings.medalReviewExport : mode === 'gift' ? strings.giftReviewExport : strings.reviewExport;
     exportSize.textContent = strings.outputSize(outputSides[mode]);
-    overlay.setAttribute('aria-busy', String(busy));
+    overlay.setAttribute('aria-busy', String(blocked));
     for (const [kind, button] of Object.entries(modes)) {
-      button.disabled = busy;
+      button.disabled = blocked;
       button.setAttribute('aria-pressed', String(kind === mode));
     }
-    for (const slot of slots) {
-      const title = strings.seat(strings[slot.kind], slot.number);
-      slot.button.disabled = busy;
-      slot.button.setAttribute('aria-label', title);
-      slot.button.title = title;
-      slot.cue.textContent = strings.replace;
+    for (const view of views) {
+      const {slot, size, button, cue} = view;
+      const title = strings.seat(strings[slot.kind], slot.number) + (size ? ` · ${strings[size]}` : '');
+      button.disabled = blocked;
+      button.setAttribute('aria-label', title);
+      button.title = title;
+      cue.textContent = strings.replace;
+      if (slot.asset !== view.shownAsset) {
+        view.shownAsset = slot.asset;
+        view.element = slot.asset?.image.cloneNode() ?? view.fallback;
+        button.replaceChildren(view.element, cue);
+        button.classList.toggle('has-upload', Boolean(slot.asset));
+      }
     }
     status.dataset.tone = notice?.tone ?? '';
     const message = strings[notice?.key];
@@ -179,26 +222,19 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
     sync();
   }
 
-  function renderSlot(slot) {
-    slot.button.replaceChildren(slot.asset?.element ?? slot.fallback, slot.cue);
-    slot.button.classList.toggle('has-upload', Boolean(slot.asset));
-  }
-
   const slotDrag = bindPreviewSlotDrag({
     overlay,
-    buttons: slots.map(slot => slot.button),
+    buttons: views.map(view => view.button),
     slotAt,
-    assetAt: index => slots[index].asset,
-    isBusy: () => busy,
-    canMove: (from, to) => slots[from].kind === slots[to].kind,
+    assetAt: index => views[index].slot.asset && {element: views[index].element, image: views[index].element},
+    isBusy,
+    canMove: (from, to) => views[from].slot !== views[to].slot && views[from].slot.kind === views[to].slot.kind,
     ghostClass: 'profile-drag-ghost',
     move(from, to) {
-      const source = slots[from], target = slots[to];
+      const source = views[from].slot, target = views[to].slot;
       const other = target.asset;
       target.asset = source.asset;
       source.asset = other;
-      renderSlot(source);
-      renderSlot(target);
       mode = target.kind;
       notice = {key: other ? 'swapped' : 'moved'};
       sync();
@@ -206,21 +242,25 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
   });
 
   async function loadFiles(files, {target = null, firstVacant = false} = {}) {
-    if (busy || !files.length) return;
-    if (target !== null) mode = slots[target].kind;
+    if (isBusy() || !files.length) return;
+    const targetView = target === null ? null : views[target];
+    if (targetView) mode = targetView.slot.kind;
     const category = slots.filter(slot => slot.kind === mode);
     if (files.length > category.length) {
       notice = {key: 'tooMany', value: category.length, tone: 'error'};
       sync();
       return;
     }
-    const destinations = files.length === 1 && target !== null ? [slots[target]]
+    const destinations = files.length === 1 && targetView ? [targetView.slot]
       : files.length === 1 && firstVacant ? [category.find(slot => !slot.asset) ?? category[0]]
       : category;
-    const trigger = target === null ? upload : slots[target].button;
+    const trigger = targetView?.button ?? upload;
+    const loadingMedals = mode === 'medal';
+    if (loadingMedals) medalUploadInProgress = true;
     busy = true;
     notice = {key: 'processing'};
-    sync();
+    if (loadingMedals) previews.forEach(preview => preview.sync());
+    else sync();
     const progress = window.UploadProgress?.begin(files.length);
     const prepared = [];
     let activeFile;
@@ -231,14 +271,13 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
         const blob = await prepareProfileArtwork(file, outputSides[mode]);
         const url = URL.createObjectURL(blob);
         const image = artwork(url);
-        prepared.push({element: image, image, url, blob, sourceName: file.name});
+        prepared.push({image, url, blob, sourceName: file.name});
         progress?.advance();
       }
       prepared.forEach((asset, index) => {
         const slot = destinations[index];
         if (slot.asset) URL.revokeObjectURL(slot.asset.url);
         slot.asset = asset;
-        renderSlot(slot);
       });
       notice = {key: 'loaded', value: prepared.length};
     } catch (error) {
@@ -248,7 +287,9 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
     } finally {
       progress?.finish();
       busy = false;
-      sync();
+      if (loadingMedals) medalUploadInProgress = false;
+      if (loadingMedals) previews.forEach(preview => preview.sync());
+      else sync();
       if (active() && document.activeElement === document.body) trigger.focus({preventScroll: true});
     }
   }
@@ -271,7 +312,7 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
   download.addEventListener('click', async () => {
     const kind = mode;
     const selected = slots.filter(slot => slot.kind === kind && slot.asset);
-    if (busy || !selected.length) return;
+    if (isBusy() || !selected.length) return;
     busy = true;
     const side = outputSides[kind];
     const dimensions = `${side}x${side}`;
@@ -302,7 +343,7 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
   });
 
   reviewDownload.addEventListener('click', async () => {
-    if (busy) return;
+    if (isBusy()) return;
     busy = true;
     notice = {key: 'renderingReview'};
     sync();
@@ -310,40 +351,49 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
     try {
       // Include the entire screen, even rows below the visible page fold.
       if (sprite && !spriteImage) spriteImage = artwork(sprite);
-      const images = slots.map(slot => slot.asset?.image ?? spriteImage ?? slot.fallback);
+      const images = views.map(view => view.slot.asset?.image ?? spriteImage ?? view.fallback);
       for (const image of images) image.loading = 'eager';
       await Promise.all([backdrop.decode(), ...images.map(image => image.decode())]);
       const style = getComputedStyle(overlay);
-      const artWidth = card.width * parseFloat(style.getPropertyValue('--profile-art-width')) / 100;
-      const artHeight = card.height * parseFloat(style.getPropertyValue('--profile-art-height')) / 100;
-      const lift = card.width * parseFloat(style.getPropertyValue('--profile-art-lift')) / 100;
+      const widthRatio = parseFloat(style.getPropertyValue('--profile-art-width')) / 100;
+      const heightRatio = parseFloat(style.getPropertyValue('--profile-art-height')) / 100;
+      const liftRatio = parseFloat(style.getPropertyValue('--profile-art-lift')) / 100;
       const defaultOpacity = slots.some(slot => slot.asset)
         ? parseFloat(style.getPropertyValue('--profile-default-opacity')) : 1;
       canvas.width = screen.width;
       canvas.height = screen.height;
       const context = canvas.getContext('2d');
       context.drawImage(backdrop, 0, 0, screen.width, screen.height);
+      if (mask) {
+        context.drawImage(backdrop, mask.sourceX, mask.y, mask.sourceWidth, mask.height,
+          mask.x, mask.y, mask.width, mask.height);
+      }
       context.imageSmoothingQuality = 'high';
       if (clipY < screen.height) {
         context.beginPath();
         context.rect(0, 0, screen.width, clipY);
         context.clip();
       }
-      slots.forEach((slot, index) => {
+      views.forEach((view, index) => {
+        const {slot, x, y, width: boxWidth, height: boxHeight, column, row} = view;
         const image = images[index];
+        const artWidth = boxWidth * widthRatio;
+        const artHeight = boxHeight * heightRatio;
         context.globalAlpha = slot.asset ? 1 : defaultOpacity;
         if (image === spriteImage) {
-          context.drawImage(image, slot.column * card.width, slot.row * card.height, card.width, card.height,
-            slot.x, slot.y, artWidth, artHeight);
+          context.drawImage(image, column * boxWidth, row * boxHeight, boxWidth, boxHeight,
+            x, y, artWidth, artHeight);
           return;
         }
         const scale = Math.min(artWidth / image.naturalWidth, artHeight / image.naturalHeight);
         const width = image.naturalWidth * scale;
         const height = image.naturalHeight * scale;
-        context.drawImage(image, slot.x + (card.width - width) / 2, slot.y + (card.height - height - lift) / 2, width, height);
+        context.drawImage(image, x + (boxWidth - width) / 2,
+          y + (boxHeight - height - boxWidth * liftRatio) / 2, width, height);
       });
       const blob = await window.canvasToLosslessWebP(canvas);
-      downloadBlob(blob, `${mode === 'gift' ? 'gift-tray' : 'profile'}-review-${screen.width}x${screen.height}.webp`);
+      const scene = largeMedals ? 'medal-page' : mode === 'gift' ? 'gift-tray' : 'profile';
+      downloadBlob(blob, `${scene}-review-${screen.width}x${screen.height}.webp`);
       notice = {key: 'reviewDownloaded'};
       window.Hub?.record('gift', 'generated');
       window.Hub?.record('gift', 'download');
@@ -359,20 +409,20 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
 
   function clearFileDrop() {
     delete device.dataset.dragging;
-    if (fileDropTarget !== null) delete slots[fileDropTarget].button.dataset.dragging;
+    if (fileDropTarget !== null) delete views[fileDropTarget].button.dataset.dragging;
     fileDropTarget = null;
   }
 
   device.addEventListener('dragover', event => {
     if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
     event.preventDefault();
-    event.dataTransfer.dropEffect = busy ? 'none' : 'copy';
-    if (busy) return;
+    event.dataTransfer.dropEffect = isBusy() ? 'none' : 'copy';
+    if (isBusy()) return;
     const target = slotAt(event.target);
     if (target !== fileDropTarget) clearFileDrop();
     device.dataset.dragging = 'true';
     fileDropTarget = target;
-    if (target !== null) slots[target].button.dataset.dragging = 'true';
+    if (target !== null) views[target].button.dataset.dragging = 'true';
   });
   device.addEventListener('dragleave', event => {
     if (!device.contains(event.relatedTarget)) clearFileDrop();
@@ -387,7 +437,7 @@ function mountPreview(device, {prefix, screen, card, layout, columns, defaultArt
   window.UploadPaste?.register({
     zone: device,
     isActive: active,
-    isBusy: () => busy,
+    isBusy,
     onFiles: files => loadFiles(files, {target: slotAt(document.activeElement) ?? hoveredSlot, firstVacant: true})
   });
 
@@ -421,9 +471,21 @@ const previews = [
       {kind: 'vehicle', y: 1089}
     ],
     defaultArtwork: {
-      medal: 'assets/profile-preview/medal-default.webp?v=20261111-profile1',
+      medal: defaultMedal,
       vehicle: 'assets/profile-preview/vehicle-default.webp?v=20261111-profile1'
     }
+  }),
+  mountPreview(byId('profileMedalPage'), {
+    prefix: 'medalPage',
+    screen: {width: 720, height: 1754},
+    card: {width: 112, height: 112},
+    columns: [40, 172, 304, 436],
+    layout: [{kind: 'medal', y: 246}],
+    largeMedals: [
+      {x: 77, y: 790}, {x: 421, y: 790},
+      {x: 77, y: 1180}, {x: 421, y: 1180}
+    ],
+    defaultArtwork: {medal: defaultMedal}
   }),
   mountPreview(byId('profileGift'), {
     prefix: 'giftTray',
@@ -443,7 +505,10 @@ function selectTab(index) {
     tab.tabIndex = selected ? 0 : -1;
     panels[i].hidden = !selected;
   });
-  previews.forEach((preview, i) => { if (i + 1 !== index) preview.deactivate(); });
+  previews.forEach((preview, i) => {
+    if (i + 1 === index) preview.sync();
+    else preview.deactivate();
+  });
   if (index === 0) window.GiftPreviewTool?.activate();
 }
 
