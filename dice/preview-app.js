@@ -2,7 +2,7 @@ import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
 import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { DiceAudio } from './audio.mjs';
-import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261113-green-3d';
+import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261113-green-android';
 import { GameRenderer } from '/dice/renderer.js?v=20261113-green-3d';
 import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261113-green-3d';
 

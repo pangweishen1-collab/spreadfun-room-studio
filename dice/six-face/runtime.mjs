@@ -1,10 +1,10 @@
 import {decodeFaceFiles} from './import-faces.mjs';
 import {prepareFaces} from './prepare-faces.mjs';
-import {buildSpineAssets} from './spine-builder.mjs';
+import {buildSpineAssets} from './spine-builder.mjs?v=20261113-green-android';
 import {writeSpineBinary} from './spine-binary.mjs';
 import {optimizeAtlasPng} from '../atlas-png-optimizer.mjs';
 
-export const GREEN_PACKING_VERSION = '430x424-v1';
+export const GREEN_PACKING_VERSION = '430x424-v2';
 
 // No Canvas/Image instances escape into IndexedDB or the public candidate.
 export async function generateSixFaceRuntime(files,{name,signal,anchorImage}={}) {

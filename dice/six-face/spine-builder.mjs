@@ -91,8 +91,9 @@ function geometry(prepared) {
 }
 
 // Exported separately so the same real Runtime can check JSON without a Canvas.
-export function buildSpineJson(prepared) {
+export function buildSpineJson(prepared, {zoomPeak = ZOOM_PEAK} = {}) {
   const {faceWidth,faceHeight,offsetX,offsetY}=geometry(prepared),bodyBone='daxiao_1';
+  const hasZoom = zoomPeak !== 1;
   const project=(p,m) => {
     const q=transform(m,p),s=3.5/(4-q[2]);
     return [round(q[0]*s*faceWidth),round(q[1]*s*faceHeight)];
@@ -116,10 +117,12 @@ export function buildSpineJson(prepared) {
   const animations={};
   for (let point=1;point<=6;point++) {
     const data={slots:{},bones:{},attachments:{default:{}},drawOrder:[]},bones=data.bones;
-    bones[bodyBone]={scale:[{x:1,y:1},{time:.3,x:ZOOM_PEAK,y:ZOOM_PEAK},{time:LAND_READY,x:1,y:1},{time:HANDOFF,x:1,y:1}]};
-    bones.dice_1={translate:rollTimes.map(t => ({time:t,y:round(Math.sin(Math.min(t/.55,1)*Math.PI)**2*13*(1+(ZOOM_PEAK-1)*(1-Math.abs(2*clamp(t/.6)-1))))}))};
+    if (hasZoom) {
+      bones[bodyBone]={scale:[{x:1,y:1},{time:.3,x:zoomPeak,y:zoomPeak},{time:LAND_READY,x:1,y:1},{time:HANDOFF,x:1,y:1}]};
+      bones.shadow_size={scale:bones[bodyBone].scale};
+    }
+    bones.dice_1={translate:rollTimes.map(t => ({time:t,y:round(Math.sin(Math.min(t/.55,1)*Math.PI)**2*13*(1+(zoomPeak-1)*(1-Math.abs(2*clamp(t/.6)-1))))}))};
     data.slots.shadow={rgba:rgbaTimeline(t => hex(1,.15*smooth(t/.08)*(1-landingBlend(t))))};
-    bones.shadow_size={scale:bones[bodyBone].scale};
     data.slots.result={attachment:[{name:'sz_'+point}],rgba:rgbaTimeline(t => hex(1,1-rollAlpha(t)))};
     const rotations=new Map(times.map(t=>[t,rotation(t,point)]));
     let lastOrder='';
@@ -173,7 +176,7 @@ export function buildSpineJson(prepared) {
     animations['spin_'+point]=data;
     animations['standby_'+point]={slots:{result:{attachment:[{name:'sz_'+point}],rgba:[{color:'ffffffff'}]},
       shadow:{rgba:[{color:'ffffff00'}]},...Object.fromEntries(FACE.map(f => ['face_'+f.point,{attachment:[{name:'mesh_'+f.point}],rgba:[{color:'ffffff00'}]}]))},
-      bones:{[bodyBone]:{scale:[{x:1,y:1}]},dice_1:{translate:[{x:0,y:0}]}}};
+      bones:{...(hasZoom?{[bodyBone]:{scale:[{x:1,y:1}]}}:{}),dice_1:{translate:[{x:0,y:0}]}}};
   }
   return {skeleton:{spine:'4.2.43',x:-150,y:-150,width:300,height:300,images:'./images/',audio:'./audio/'},
     bones:[{name:'root'},{name:'all',parent:'root',scaleX:DICE_SIZE_SCALE,scaleY:DICE_SIZE_SCALE},{name:'dice_1',parent:'all',x:offsetX,y:offsetY},
@@ -235,7 +238,8 @@ function compactGreenLayout(cropW, cropH) {
 }
 
 function applyCompactGreenAtlas(json, packing) {
-  Object.assign(json.skeleton, {x:-100,y:-100,width:200,height:200,fps:30,images:'./res/',audio:'./'});
+  // Android AssetManager does not normalize the leading './' in asset names.
+  Object.assign(json.skeleton, {x:-100,y:-100,width:200,height:200,fps:30,images:'res/',audio:''});
   for (const event of Object.values(json.events)) event.audio = 'sound/' + event.audio;
   for (const [index, tile] of packing.rolls.entries()) {
     const point = index + 1;
@@ -317,7 +321,8 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal,a
     'filter: Linear,Linear','repeat: none','pma: false'];
   for (const r of packing.regions) lines.push(r.name,'  rotate: false',`  xy: ${r.x},${r.y}`,`  size: ${r.width},${r.height}`,
     `  orig: ${r.width},${r.height}`,'  offset: 0,0','  index: -1');
-  const atlasText=lines.join('\n')+'\n',json=buildSpineJson(prepared);
+  const zoomPeak=compactGreen?1:ZOOM_PEAK;
+  const atlasText=lines.join('\n')+'\n',json=buildSpineJson(prepared,{zoomPeak});
   if(compactGreen)applyCompactGreenAtlas(json,packing);
   const encoded=await encodeRgbaPng(page.width,page.height,page.data,{signal}),textureBlob=encoded.blob;
   const metadata={name:String(name).trim().slice(0,120)||'自定义骰子',format:'Spine 4.2 JSON; MeshAttachment + DeformTimeline',
@@ -325,7 +330,7 @@ export async function buildSpineAssets(prepared,{name='自定义骰子',signal,a
     motionVersion:SIX_FACE_MOTION_VERSION,landing:{start:LAND_START,ready:LAND_READY,switch:HANDOFF,overlap:false},
     anchor:{slot:'anchor',bone:'root',attachment:'anchor',image:'images/anchor.png',width:30,height:30,scaleX:6,scaleY:6,opacity:0},
     crop:geo.crop,sourceSize:geo.sourceSize,cropOffset:[...prepared.cropOffset],logicalSize:[geo.faceWidth,geo.faceHeight],
-    logicalOffset:[geo.offsetX,geo.offsetY],rasterScale:packing.flatScale??rasterScale,atlas:packing,rollEnd:.6,settleEnd:.633333,zoomPeak:ZOOM_PEAK,
+    logicalOffset:[geo.offsetX,geo.offsetY],rasterScale:packing.flatScale??rasterScale,atlas:packing,rollEnd:.6,settleEnd:.633333,zoomPeak,
     pngEncoding:encoded.method,transparentRgb:'Flat alpha-zero RGB copied from corresponding opaque rolling texture; raw RGBA atlas with one-pixel extrusion.',
     animations:Object.keys(json.animations),notes:['Derived images are browser-normalized; no byte-for-byte original RGB equivalence is claimed.',
       'Original images are retained separately; .skel game data is written by the browser packager; native .spine still requires the Editor.',

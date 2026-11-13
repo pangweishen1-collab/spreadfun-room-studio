@@ -1,6 +1,6 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
 import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
-import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.mjs';
+import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.mjs?v=20261113-green-android';
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
