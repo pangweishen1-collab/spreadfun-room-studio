@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.19.7 - 2026-11-13
+
+- Restore the six-face 3D roll for green dice and keep its overall scale at 1× throughout. Spine export remains 4.2.43, 200 × 200 at 30 FPS, with one 430 × 424 atlas.
+- Normalize the exported sound paths so Android can read both MP3 files directly.
+
 ## 1.19.6 - 2026-11-13
 
 - Update the Hapi Banner preview and WebP export to 680 × 200 px.
