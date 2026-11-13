@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.19.6 - 2026-11-13
+
+- Update the Hapi Banner preview and WebP export to 680 × 200 px.
+
 ## 1.19.5 - 2026-11-13
 
 - Add a three-color gold text preset with individually editable highlight, midtone, and base colors. The editor, exported SVGA, and first-frame WebP share the same gradient.
