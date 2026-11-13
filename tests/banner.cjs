@@ -90,7 +90,7 @@ function assertPreviewBackground(value){
     const logo=button.children[0].children[0];assert.equal(logo.src,`assets/resources/${button.dataset.project}-256.webp`);assert.equal(logo.alt,'');
   }
   assertSelected('hapi-ludo');assert.match(projectSpecs(),/772\s*×\s*200/);assert.match(projectSpecs(),/684\s*×\s*240/);
-  for(const [id,width] of [['hapi',772],['yari',772],['4fun',680]]){
+  for(const [id,width] of [['hapi',680],['yari',772],['4fun',680]]){
     await projectButton(id).click();assertSelected(id);assert.match(projectSpecs(),new RegExp(`${width}\\s*×\\s*200`));
     assert.equal(api.state.outputs.length,0);assert.equal(encodes.length,0,'selecting a project before upload does not encode');
   }
@@ -196,7 +196,7 @@ function assertPreviewBackground(value){
   // The same decoded source is regenerated to the selected project's actual output contract.
   await api.loadFiles([file('projects.png',1200,600)]);
   const sharedImage=api.state.image,sharedFile=api.state.file;
-  for(const [id,width] of [['hapi',772],['yari',772],['4fun',680]]){
+  for(const [id,width] of [['hapi',680],['yari',772],['4fun',680]]){
     const oldOutputs=Array.from(api.state.outputs),count=recorded('generated'),before=encodes.length;
     await projectButton(id).click();assertSelected(id);
     assert.equal(api.state.image,sharedImage,'switching projects reuses the decoded source');assert.equal(api.state.file,sharedFile);

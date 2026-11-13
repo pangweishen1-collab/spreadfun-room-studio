@@ -96,7 +96,7 @@
   };
   const projects=[
     {id:'hapi-ludo',name:'Hapi Ludo',outputs:[{kind:'room',width:772,height:200},{kind:'game',width:684,height:240}]},
-    {id:'hapi',name:'Hapi',outputs:[{kind:'room',width:772,height:200}]},
+    {id:'hapi',name:'Hapi',outputs:[{kind:'room',width:680,height:200}]},
     {id:'yari',name:'Yari',outputs:[{kind:'room',width:772,height:200}]},
     {id:'4fun',name:'4Fun',outputs:[{kind:'room',width:680,height:200}]}
   ];
