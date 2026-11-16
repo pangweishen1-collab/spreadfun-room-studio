@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.19.8 - 2026-11-16
+
+- Encode H.265 in parallel on supported devices and load the encoder while preparing frames.
+- Recommend CRF 25 after import. Aim for 1.5 MB on clips up to 5 seconds and 2.5 MB on longer clips. H.264 and manual CRF controls are available.
+- Default VAP output uses 720 × 1560 artwork, 1088 × 1568 packing, 24 FPS and 0.5 Alpha. Resources stay replaceable by tag.
+
 ## 1.19.7 - 2026-11-13
 
 - Restore the six-face 3D roll for green dice and keep its overall scale at 1× throughout. Spine export remains 4.2.43, 200 × 200 at 30 FPS, with one 430 × 424 atlas.
