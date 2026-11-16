@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.20.0 - 2026-11-16
+
+- Add four bright, dimensional gold text presets to Custom Avatar Frames. The canvas preview, exported SVGA and first-frame WebP use the selected style.
+- When estimated SVGA playback memory exceeds 3 MB, reduce eligible bitmaps to fit the budget while keeping the canvas size and animation timing.
+
 ## 1.19.8 - 2026-11-16
 
 - Encode H.265 in parallel on supported devices and load the encoder while preparing frames.
