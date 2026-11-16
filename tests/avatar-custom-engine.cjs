@@ -106,6 +106,27 @@ const textPng=png(80,40),placement={textImage:textPng,x:17,y:23,width:40,height:
   assert.ok(heavyImage.length<3000000);
   await assert.rejects(()=>buildCustomizedSvga(model,{layers:[{image:heavyImage,x:0,y:0,width:20,height:20}],enforceRuntimeBudget:true}),
     e=>e.code==='runtimeLimit'&&e.runtimeBytes===3379200,'compressed size and logical placement do not bypass bitmap memory limits');
+  const runtimeTargets=[];
+  const resizeForRuntime=async ({width,height})=>{runtimeTargets.push([width,height]);return png(width,height)};
+  const runtimeOptimized=await buildCustomizedSvga(model,{layers:[{image:heavyImage,x:15,y:18,width:80,height:80}],
+    enforceRuntimeBudget:true,resizeForRuntime,allowLossyOptimization:false});
+  assert.equal(runtimeOptimized.runtimeBefore,3379200);assert.ok(runtimeOptimized.runtimeBytes<=3000000);
+  assert.equal(runtimeOptimized.runtimeResizedImages,1);assert.equal(runtimeTargets.length,1,'only the over-resolution bitmap is resized');
+  const runtimeRecords=decode(runtimeOptimized.bytes);
+  sameOriginalRecords(runtimeRecords,scan(augmentedBody));
+  const resizedSprite=scan(runtimeRecords.filter(r=>r.id===4).at(-1).data);
+  const resizedFrame=scan(last(resizedSprite,2).data),resizedLayout=scan(last(resizedFrame,2).data),resizedMatrix=scan(last(resizedFrame,3).data);
+  near(float(resizedLayout,3)*float(resizedMatrix,1),80);near(float(resizedLayout,4)*float(resizedMatrix,4),80);
+  near(float(resizedMatrix,5),15);near(float(resizedMatrix,6),18);
+  const reopened=await readSvga(runtimeOptimized.bytes);
+  const images=await listSvgaImages(reopened);
+  assert.equal(runtimeOptimized.runtimeBytes,4*(320*320+images.reduce((total,img)=>total+img.width*img.height,0)));
+  assert.equal(images.length,2,'auto-fit keeps every bitmap');
+  const exactFit=await buildCustomizedSvga(model,{layers:[],enforceRuntimeBudget:true,resizeForRuntime});
+  assert.equal(exactFit.runtimeResizedImages,0);assert.equal(runtimeTargets.length,1,'assets already within budget retain their original resolution');
+  const originalHeavy=await buildCustomizedSvga(model,{layers:[{image:heavyImage,x:15,y:18,width:80,height:80}]});
+  const resizedSource=await buildCustomizedSvga(originalHeavy.bytes,{layers:[],enforceRuntimeBudget:true,resizeForRuntime});
+  assert.ok(resizedSource.runtimeBytes<=3000000);assert.equal(resizedSource.runtimeResizedImages,1,'source-only export resizes the baked original bitmap');
   const progress=[];const result=await buildCustomizedSvga(model,placement,{onProgress:x=>progress.push(x)});
   assert.ok(result.bytes.length<3000000);assert.equal(result.mime,'application/octet-stream');assert.equal(result.size,result.bytes.length);assert.equal(result.info.frames,60);assert.equal(progress.at(-1).progress,100);assert.ok(result.lossless.beforeBytes>=result.lossless.afterBytes);assert.equal(result.lossless.bytesSaved,result.lossless.beforeBytes-result.lossless.afterBytes);
   assert.equal(createHash('sha256').update(augmented).digest('hex'),before,'input bytes remain unchanged');
@@ -141,6 +162,12 @@ const textPng=png(80,40),placement={textImage:textPng,x:17,y:23,width:40,height:
   const first=sourceSprites[0],spriteFields=scan(first.data),firstFrame=spriteFields.findIndex(r=>r.id===2);spriteFields[firstFrame]={...spriteFields[firstFrame],raw:msg(2,Buffer.concat([spriteFields[firstFrame].data,str(4,'M0 0L100 0L100 100Z')]))};
   const clipSource=zlib.deflateSync(Buffer.concat(sourceRecords.map(r=>r===first?msg(4,Buffer.concat(spriteFields.map(f=>f.raw))):r.raw)));
   const clipRequests=[];await assert.rejects(()=>buildCustomizedSvga(clipSource,{...placement,maxBytes:1024,optimizeImage:async request=>{clipRequests.push(request);return png(16,16)}}),e=>e.code==='sizeLimit');const clipRequest=clipRequests.find(request=>request.kind==='source');assert.equal(clipRequest.canResize,false);assert.equal(clipRequest.maxWidth,320);
+  const clippedHeavyBody=Buffer.concat(scan(zlib.inflateSync(originalHeavy.bytes)).map(r=>{
+    if(r.id!==4)return r.raw;
+    return msg(4,Buffer.concat(scan(r.data).map(field=>field.id===2?msg(2,Buffer.concat([field.data,str(4,'M0 0L50 50Z')])):field.raw)));
+  }));
+  await assert.rejects(()=>buildCustomizedSvga(zlib.deflateSync(clippedHeavyBody),{enforceRuntimeBudget:true,resizeForRuntime}),e=>e.code==='runtimeLimit',
+    'over-budget clip geometry is never resized in a way that alters its visible path');
   // ZIP 1.0 retains metadata, images, audio and nonstandard root JSON properties.
   const originalZip=await JSZip.loadAsync(originalV1),sourceSpec=JSON.parse(await originalZip.file('movie.spec').async('string'));
   sourceSpec.extra={vendorFuture:7};originalZip.file('movie.spec',JSON.stringify(sourceSpec));originalZip.file('sound.mp3',mp3);const legacyBytes=await originalZip.generateAsync({type:'uint8array',compression:'DEFLATE'});
@@ -167,6 +194,24 @@ const textPng=png(80,40),placement={textImage:textPng,x:17,y:23,width:40,height:
   sourceSpec.images.alias='frame';sourceSpec.sprites.push({...sourceSpec.sprites[0],imageKey:'alias'});originalZip.file('movie.spec',JSON.stringify(sourceSpec));const aliasInput=await originalZip.generateAsync({type:'uint8array',compression:'DEFLATE'});
   const aliasOutput=await buildCustomizedSvga(aliasInput,{...placement,maxBytes:4000,optimizeImage:async()=>png(16,16)},{JSZip});const aliasZip=await JSZip.loadAsync(aliasOutput.bytes),aliasSpec=JSON.parse(await aliasZip.file('movie.spec').async('string'));
   const originalFrame=sourceSpec.sprites[0].frames[0],aliasedFrame=aliasSpec.sprites.find(s=>s.imageKey==='alias').frames[0];near(aliasedFrame.transform.a*16,originalFrame.transform.a*320);
+  sourceSpec.images['alias.matte']='frame';
+  const matteFrames=sourceSpec.sprites[0].frames.map(frame=>({
+    ...frame, transform:{a:0,b:1,c:-1,d:0,tx:27,ty:19}
+  }));
+  sourceSpec.sprites.push({imageKey:'alias.matte',frames:matteFrames});
+  originalZip.file('frame.png',png(640,640));originalZip.file('movie.spec',JSON.stringify(sourceSpec));
+  const heavyAlias=await originalZip.generateAsync({type:'uint8array'});
+  const optimizedAlias=await buildCustomizedSvga(heavyAlias,{enforceRuntimeBudget:true,resizeForRuntime},{JSZip});
+  const optimizedAliasModel=await readSvga(optimizedAlias.bytes,{JSZip});
+  assert.equal(optimizedAlias.runtimeResizedImages,1,'resize the shared PNG only once');
+  assert.ok(optimizedAlias.runtimeBytes<=3000000);assert.deepEqual(optimizedAliasModel.spec.movie,sourceSpec.movie);
+  for(const [index,after] of optimizedAliasModel.spec.sprites.at(-1).frames.entries()){
+    const before=matteFrames[index];
+    assert.equal(after.alpha,before.alpha);assert.equal(after.transform.a,0);assert.equal(after.transform.d,0);
+    near(after.transform.b*after.layout.width,before.transform.b*before.layout.width);
+    near(after.transform.c*after.layout.height,before.transform.c*before.layout.height);
+    near(after.transform.tx,before.transform.tx);near(after.transform.ty,before.transform.ty);
+  }
   await assert.rejects(()=>readSvga(legacyBytes),e=>e.code==='unsupportedBrowser');
   const binaryZip=await JSZip.loadAsync(originalV1);binaryZip.file('movie.binary',Buffer.from([1,2]));await assert.rejects(()=>binaryZip.generateAsync({type:'uint8array'}).then(bytes=>readSvga(bytes,{JSZip})),e=>e.code==='unsupportedLegacyBinary');
   // Added image overlays remain independent transparent PNG sprites below the text.

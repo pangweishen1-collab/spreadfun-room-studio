@@ -23,6 +23,20 @@ const assert=require('node:assert/strict');
   const edited=make();
   drawStyledText(edited,{...options,styleKey:'threeToneGold',color:'#69330C',highlightColor:'#FFF0CD',midColor:'#DE9118'});
   assert.deepEqual(edited.gradients[0].stops,[[0,'#FFF0CD'],[.5,'#DE9118'],[1,'#69330C']]);
+  const reflections=[];
+  for(const key of ['honeyGold','gleamGold','sunGold','reliefGold']){
+    const preset=TEXT_STYLES[key],ctx=make();
+    drawStyledText(ctx,{...options,styleKey:key,color:preset.baseColor,strokeColor:preset.outlineColor,strokeWidth:preset.outlineWidth});
+    assert.equal(ctx.gradients.length,4,'each line has a beveled edge and a reflective face');
+    assert.deepEqual(ctx.gradients[1].stops.map(([offset])=>offset),preset.reflection.map(([offset])=>offset));
+    assert.ok(ctx.calls.some(call=>call[0]==='fill'&&call.at(-1)>50&&call.at(-2)>120),'extrusion extends past the original baseline');
+    assert.ok(ctx.gradients[1].stops.every(([,color])=>Number(color.match(/^rgb\((\d+)/)?.[1])>=197),'gold shades keep a bright red channel');
+    reflections.push(JSON.stringify(ctx.gradients[1].stops));
+    const tinted=make();
+    drawStyledText(tinted,{...options,styleKey:key,color:preset.baseColor,highlightColor:'#FFB27C'});
+    assert.notDeepEqual(tinted.gradients[1].stops,ctx.gradients[1].stops,'custom highlights reach the reflective face');
+  }
+  assert.equal(new Set(reflections).size,4,'all four gold variants have distinct reflections');
   const fallback=make();drawStyledText(fallback,{...options,styleKey:'unknown'});assert.equal(fallback.gradients.length,0);
   console.log('avatar-text-style: solid fill, two- and three-stop presets, per-line gradients, editable colors and optional outlines passed.');
 })().catch(error=>{console.error(error);process.exitCode=1});

@@ -270,9 +270,42 @@ function frameCanResize(frame){
   const clip=last(frame,4);if(clip&&clip.data.length)return false;
   return !frame.some(r=>r.id===5&&r.data.length);
 }
-function canResizeImage(model,key){
-  if(model.format==='zip')return model.spec.sprites.filter(s=>String(s.imageKey).replace('.matte','')===key).every(s=>Array.isArray(s.frames)&&s.frames.every(f=>!f.clipPath&&(!Array.isArray(f.shapes)||f.shapes.length===0)));
-  return model.root.filter(r=>r.id===4).every(r=>{const sprite=records(r.data);if(text(sprite,1).replace('.matte','')!==key)return true;return sprite.filter(r=>r.id===2).every(r=>frameCanResize(records(r.data)))});
+// Inspect each timeline once. Shared ZIP textures use the strictest geometry
+// requirement and the highest visible magnification of all their aliases.
+function inspectBitmapUsage(model,assets,measureSampling){
+  const byKey=new Map(assets.flatMap(asset=>asset.aliases.map(alias=>[alias.key,asset])));
+  const measure=(key,frames,read)=>{
+    const asset=byKey.get(bitmapKey(key))||byKey.get(key);if(!asset)return;
+    if(!Array.isArray(frames)){asset.canResize=false;return}
+    if(key.endsWith('.matte'))asset.matte=true;
+    for(const frame of frames){
+      const {canResize,a,b,c,d,alpha}=read(frame);
+      if(!canResize)asset.canResize=false;
+      if(measureSampling&&alpha>0){
+        const scale=Math.max(Math.hypot(a,b),Math.hypot(c,d));
+        if(Number.isFinite(scale))asset.sampling=Math.max(asset.sampling,scale);else asset.canResize=false;
+      }
+      if(!measureSampling&&!asset.canResize)break;
+    }
+  };
+  if(model.format==='zip'){
+    for(const sprite of model.spec.sprites)measure(String(sprite.imageKey),sprite.frames,frame=>{
+      const canResize=!frame.clipPath&&(!Array.isArray(frame.shapes)||!frame.shapes.length);
+      if(!measureSampling)return {canResize};
+      const t=frame.transform||{};
+      return {canResize,a:Number(t.a??1),b:Number(t.b??0),c:Number(t.c??0),d:Number(t.d??1),alpha:Number(frame.alpha)||0};
+    });
+  }else{
+    for(const record of model.root)if(record.id===4&&record.wire===2){
+      const sprite=records(record.data);
+      measure(text(sprite,1),sprite.filter(field=>field.id===2&&field.wire===2),field=>{
+        const frame=records(field.data),canResize=frameCanResize(frame);
+        if(!measureSampling)return {canResize};
+        const transform=last(frame,3),matrix=transform?records(transform.data):[];
+        return {canResize,a:f32(matrix,1,1),b:f32(matrix,2),c:f32(matrix,3),d:f32(matrix,4,1),alpha:f32(frame,1)};
+      });
+    }
+  }
 }
 function scaleFrame(frame,sx,sy){
   const lr=last(frame,2),tr=last(frame,3),layout=lr?records(lr.data):[],matrix=tr?records(tr.data):[];
@@ -287,7 +320,7 @@ function protobufBytes(model,layers,replacements){
   const imagesByIndex=new Map(model.images.map(i=>[i.index,i]));
   const parts=model.root.map((r,index)=>{
     if(r.id===3){const image=imagesByIndex.get(index),replacement=replacements.get(image.key);if(replacement)return message(3,patch(image.entry,new Map([[2,message(2,replacement.bytes)]])))}
-    if(r.id===4){const rs=records(r.data),replacement=replacements.get(text(rs,1).replace('.matte',''));if(replacement&&(replacement.sx!==1||replacement.sy!==1))return message(4,scaledSprite(r.data,replacement.sx,replacement.sy))}
+    if(r.id===4){const rs=records(r.data),key=text(rs,1),replacement=replacements.get(bitmapKey(key))||replacements.get(key);if(replacement&&(replacement.sx!==1||replacement.sy!==1))return message(4,scaledSprite(r.data,replacement.sx,replacement.sy))}
     return r.raw;
   });
   for(const layer of layers){const placement=effectiveLayer(layer,replacements);parts.push(message(3,join([str(1,layer.key),message(2,placement.bytes)])),message(4,overlaySpriteData(layer.key,placement,model.info.frames)))}
@@ -298,8 +331,14 @@ async function zipBytes(model,layers,replacements,level=9){
   // JSZip instances own mutable file maps, so every build starts from the retained input bytes.
   const zip=await model.JSZip.loadAsync(model.sourceBytes),spec=cloneSpec(model.spec),reserved=new Set(Object.keys(zip.files));
   for(const path of model.removedPaths||[])zip.remove(path);
-  for(const image of model.images){const replacement=replacements.get(image.key);if(!replacement)continue;zip.file(image.path,replacement.bytes);if(replacement.sx===1&&replacement.sy===1)continue;
-    for(const sprite of spec.sprites)if(String(sprite.imageKey).replace('.matte','')===image.key)for(const frame of sprite.frames){
+  for(const image of model.images){
+    const replacement=replacements.get(image.key);
+    if(replacement)zip.file(image.path,replacement.bytes);
+  }
+  for(const sprite of spec.sprites){
+    const key=String(sprite.imageKey),replacement=replacements.get(bitmapKey(key))||replacements.get(key);
+    if(!replacement||(replacement.sx===1&&replacement.sy===1))continue;
+    for(const frame of sprite.frames){
       const matrix=frame.transform||{a:1,b:0,c:0,d:1,tx:0,ty:0},layout=frame.layout||{x:0,y:0,width:0,height:0};
       frame.transform={...matrix,a:(matrix.a??1)*replacement.sx,b:(matrix.b??0)*replacement.sx,c:(matrix.c??0)*replacement.sy,d:(matrix.d??1)*replacement.sy};
       frame.layout={...layout,x:(layout.x??0)/replacement.sx,y:(layout.y??0)/replacement.sy,width:(layout.width??0)/replacement.sx,height:(layout.height??0)/replacement.sy};
@@ -313,11 +352,58 @@ async function zipBytes(model,layers,replacements,level=9){
   return zip.generateAsync({type:'uint8array',compression:'DEFLATE',compressionOptions:{level}});
 }
 async function assetBytes(model,image){return image.bytes||zipEntryBytes(model.zip.file(image.path))}
-async function optimizationAssets(model,layers){
-  const assets=[],seenPaths=new Set();
-  for(const image of model.images){if(model.format==='zip'&&seenPaths.has(image.path))continue;seenPaths.add(image.path);const original=await assetBytes(model,image),dimensions=pngInfo(original);if(dimensions){const aliases=model.format==='zip'?model.images.filter(other=>other.path===image.path):[image];assets.push({key:image.key,aliases,bytes:original,...dimensions,canResize:aliases.every(alias=>canResizeImage(model,alias.key)),kind:'source',priority:1})}}
-  for(const layer of layers)assets.push({key:layer.key,aliases:[layer],bytes:layer.bytes,...layer.png,canResize:true,kind:layer.kind,priority:layer.kind==='image'?0:2});
+async function optimizationAssets(model,layers,measured=[],measureSampling=false){
+  const assets=[],seenPaths=new Set(),sizes=new Map(measured.map(image=>[image.key,image]));
+  for(const image of new Map(model.images.map(image=>[image.key,image])).values()){
+    if(image.path&&seenPaths.has(image.path))continue;
+    if(image.path)seenPaths.add(image.path);
+    const known=sizes.get(image.key),bytes=known?.bytes||await assetBytes(model,image),dimensions=known||pngInfo(bytes);
+    if(dimensions){
+      const aliases=image.path?model.images.filter(other=>other.path===image.path):[image];
+      assets.push({key:image.key,aliases,bytes,width:dimensions.width,height:dimensions.height,type:known?.type||'image/png',
+        canResize:true,kind:'source',priority:1,sampling:0});
+    }
+  }
+  inspectBitmapUsage(model,assets,measureSampling);
+  for(const layer of layers)assets.push({key:layer.key,aliases:[layer],bytes:layer.bytes,...layer.png,type:'image/png',canResize:true,
+    kind:layer.kind,priority:layer.kind==='image'?0:2,sampling:Math.max(layer.width/layer.png.width,layer.height/layer.png.height)});
   return assets.sort((a,b)=>a.priority-b.priority||b.bytes.length-a.bytes.length);
+}
+function runtimeAfterResize(info,bitmaps,replacements){
+  return svgaRuntimeBytes(info,bitmaps.map(bitmap=>replacements.has(bitmap.key)?pngInfo(replacements.get(bitmap.key).bytes):bitmap));
+}
+async function fitRuntimeBudget(model,assets,bitmaps,before,replacements,resizeImage,progress){
+  const limit=SVGA_MAX_RUNTIME_BYTES;
+  const bitmapKeys=new Set(bitmaps.map(bitmap=>bitmap.key));
+  const candidates=assets.filter(asset=>asset.canResize&&asset.aliases.some(alias=>bitmapKeys.has(alias.key)));
+  // Give text and mattes extra sampling headroom for fine edges.
+  for(const asset of candidates){
+    const edgeWeight=asset.kind==='text'?1.5:asset.matte?1.25:1;
+    asset.sampling=Math.max(.04,asset.sampling)*edgeWeight;
+  }
+  const targets=density=>candidates.map(asset=>{
+    const scale=Math.min(1,density*asset.sampling);
+    return {asset,width:Math.max(1,Math.floor(asset.width*scale)),height:Math.max(1,Math.floor(asset.height*scale))};
+  });
+  const estimate=plan=>plan.reduce((total,{asset,width,height})=>total-4*(asset.width*asset.height-width*height)*asset.aliases.filter(alias=>bitmapKeys.has(alias.key)).length,before);
+  const reject=runtimeBytes=>fail('runtimeLimit','The decoded bitmap and canvas budget exceeds 3 MB.',{runtimeBytes,maxBytes:limit});
+  if(estimate(targets(0))>limit)reject(before);
+  let low=0,high=25;
+  for(let step=0;step<28;step++){
+    const mid=(low+high)/2;
+    if(estimate(targets(mid))<=limit)low=mid;else high=mid;
+  }
+  const plan=targets(low).filter(({asset,width,height})=>width!==asset.width||height!==asset.height);
+  for(const [index,{asset,width,height}] of plan.entries()){
+    progress({phase:'runtime',progress:2+Math.floor(8*index/plan.length)});
+    const optimized=await resizeImage({bytes:asset.bytes,type:asset.type,width,height});
+    const bytes=asBytes(optimized),dimensions=pngInfo(bytes);
+    if(!dimensions||dimensions.width!==width||dimensions.height!==height)fail('invalidOptimizedImage','The resized PNG dimensions do not match the runtime plan.');
+    for(const alias of asset.aliases)replacements.set(alias.key,{bytes,sx:asset.width/width,sy:asset.height/height});
+  }
+  const runtimeBytes=runtimeAfterResize(model.info,bitmaps,replacements);
+  if(runtimeBytes===null||runtimeBytes>limit)reject(runtimeBytes);
+  return plan.length;
 }
 async function packProtobuf(body){
   const [nativeResult,denseResult]=await Promise.allSettled([transform(body,'deflate'),compressDeflate(body)]);
@@ -335,6 +421,8 @@ async function packProtobuf(body){
  * imageOffsets maps original bitmap keys to additive logical-pixel translations.
  * Coordinates are logical SVGA pixels, independent of PNG resolution.
  * Every PNG is first repacked without changing decoded RGBA, dimensions or placement.
+ * With enforceRuntimeBudget, resizeForRuntime({bytes,type,width,height}) can
+ * resize only the bitmaps needed to fit the decoded memory budget.
  * The legacy optimizeImage({bytes,key,width,height,maxWidth,maxHeight,pass,canResize}) may
  * return smaller PNG bytes or null. Only called when the complete file is too large.
  * Set allowLossyOptimization:false to prohibit this size-dependent resizing fallback.
@@ -343,28 +431,44 @@ async function packProtobuf(body){
  */
 export async function buildCustomizedSvga(input,options={},runtime={}){
   const source=await readSvga(input,runtime),model=translateImageSprites(withoutImages(source,options.removedImageKeys),options.imageOffsets);
-  const layers=layersOf(model,options,model!==source),replacements=new Map();
+  const autoRuntime=options.enforceRuntimeBudget&&typeof options.resizeForRuntime==='function';
+  const layers=layersOf(model,options,model!==source||autoRuntime),replacements=new Map();
   const maxBytes=options.maxBytes??SVGA_MAX_OUTPUT_BYTES;
   if(!Number.isInteger(maxBytes)||maxBytes<1024||maxBytes>SVGA_MAX_OUTPUT_BYTES)fail('invalidSizeLimit','The SVGA size limit must be between 1 KB and 3 MB.');
-  let runtimeBytes;
+  let runtimeBefore,runtimeBytes,runtimeResizedImages=0;
+  let measured=[],bitmaps=[];
   if(options.enforceRuntimeBudget){
-    const assets=await listSvgaImages(model,runtime.measureImage);
-    runtimeBytes=assets.length===svgaBitmapCount(model)?svgaRuntimeBytes(model.info,[...assets,...layers.map(layer=>layer.png)]):null;
-    if(runtimeBytes===null)fail('unknownRuntimeSize','The decoded memory of an SVGA bitmap could not be measured.');
-    if(runtimeBytes>SVGA_MAX_RUNTIME_BYTES)fail('runtimeLimit','The decoded bitmap and canvas budget exceeds 3 MB.',{runtimeBytes,maxBytes:SVGA_MAX_RUNTIME_BYTES});
+    measured=await listSvgaImages(model,runtime.measureImage);
+    bitmaps=[...measured,...layers.map(layer=>({key:layer.key,...layer.png}))];
+    runtimeBefore=measured.length===svgaBitmapCount(model)?svgaRuntimeBytes(model.info,bitmaps):null;
+    if(runtimeBefore===null)fail('unknownRuntimeSize','The decoded memory of an SVGA bitmap could not be measured.');
+    if(runtimeBefore>SVGA_MAX_RUNTIME_BYTES&&!autoRuntime)fail('runtimeLimit','The decoded bitmap and canvas budget exceeds 3 MB.',{runtimeBytes:runtimeBefore,maxBytes:SVGA_MAX_RUNTIME_BYTES});
   }
   const progress=value=>runtime.onProgress?.(value);
+  const assets=await optimizationAssets(model,layers,measured,autoRuntime&&runtimeBefore>SVGA_MAX_RUNTIME_BYTES);
+  if(autoRuntime&&runtimeBefore>SVGA_MAX_RUNTIME_BYTES){
+    runtimeResizedImages=await fitRuntimeBudget(model,assets,bitmaps,runtimeBefore,replacements,options.resizeForRuntime,progress);
+  }
+  const runtimeReplacements=new Map(replacements);
   progress({phase:'packaging',progress:10});
   const encode=async()=>model.format==='protobuf'?packProtobuf(protobufBytes(model,layers,replacements)):{bytes:await zipBytes(model,layers,replacements),packagingBytesSaved:0};
-  const baseline=await encode(),assets=await optimizationAssets(model,layers);let bytes=baseline.bytes,passes=0;
+  const baseline=await encode();let bytes=baseline.bytes,passes=0;
   const losslessCandidates=new Map();
   for(let index=0;index<assets.length;index++){
     const asset=assets[index];progress({phase:'lossless',progress:12+Math.round(index/Math.max(1,assets.length)*40)});
-    let optimized;try{optimized=asBytes(await optimizePngLossless(new Uint8Array(asset.bytes)))}catch{continue}
-    const dimensions=pngInfo(optimized);if(!dimensions||dimensions.width!==asset.width||dimensions.height!==asset.height||optimized.length>=asset.bytes.length)continue;
-    for(const alias of asset.aliases){const replacement={bytes:optimized,sx:1,sy:1,lossless:true};replacements.set(alias.key,replacement);losslessCandidates.set(alias.key,replacement)}
+    const current=replacements.get(asset.key)||{bytes:asset.bytes,sx:1,sy:1};
+    const size=pngInfo(current.bytes);if(!size)continue;
+    let optimized;try{optimized=asBytes(await optimizePngLossless(new Uint8Array(current.bytes)))}catch{continue}
+    const dimensions=pngInfo(optimized);if(!dimensions||dimensions.width!==size.width||dimensions.height!==size.height||optimized.length>=current.bytes.length)continue;
+    for(const alias of asset.aliases){const replacement={...current,bytes:optimized,lossless:true};replacements.set(alias.key,replacement);losslessCandidates.set(alias.key,replacement)}
   }
-  if(replacements.size){const candidate=await encode();if(candidate.bytes.length<bytes.length)bytes=candidate.bytes;else replacements.clear()}
+  if(losslessCandidates.size){
+    const candidate=await encode();
+    if(candidate.bytes.length<bytes.length)bytes=candidate.bytes;
+    else for(const key of losslessCandidates.keys()){
+      if(runtimeReplacements.has(key))replacements.set(key,runtimeReplacements.get(key));else replacements.delete(key);
+    }
+  }
   const losslessBytes=bytes.length;
   if(bytes.length>maxBytes&&options.allowLossyOptimization!==false&&typeof options.optimizeImage==='function'){
     const scales=[.9,.75,.6];
@@ -379,7 +483,8 @@ export async function buildCustomizedSvga(input,options={},runtime={}){
           if(result==null)continue;
           const optimized=asBytes(result),dimensions=pngInfo(optimized);if(!dimensions)fail('invalidOptimizedImage','Image optimization must return PNG data.');
           if((!asset.canResize&&(dimensions.width!==asset.width||dimensions.height!==asset.height))||dimensions.width>asset.width||dimensions.height>asset.height)continue;
-          const current=replacements.get(asset.key)?.bytes||asset.bytes;if(optimized.length>=current.length)continue;
+          const current=replacements.get(asset.key)?.bytes||asset.bytes,currentSize=pngInfo(current);
+          if(optimized.length>=current.length||(currentSize&&(dimensions.width>currentSize.width||dimensions.height>currentSize.height)))continue;
           // Keep one canonical geometry change relative to the untouched original.
           for(const alias of asset.aliases)replacements.set(alias.key,{bytes:optimized,sx:asset.width/dimensions.width,sy:asset.height/dimensions.height});changed=true;
         }
@@ -389,10 +494,14 @@ export async function buildCustomizedSvga(input,options={},runtime={}){
     }
   }
   if(bytes.length>maxBytes)fail('sizeLimit','The customized SVGA cannot fit within the selected size limit without further source optimization.',{actualBytes:bytes.length,maxBytes});
+  if(options.enforceRuntimeBudget){
+    runtimeBytes=runtimeAfterResize(model.info,bitmaps,replacements);
+    if(runtimeBytes===null||runtimeBytes>SVGA_MAX_RUNTIME_BYTES)fail('runtimeLimit','The decoded bitmap and canvas budget exceeds 3 MB.',{runtimeBytes,maxBytes:SVGA_MAX_RUNTIME_BYTES});
+  }
   progress({phase:'done',progress:100});
   const imageKeys=layers.map(layer=>layer.key),imageKey=layers.find(layer=>layer.kind==='text')?.key||imageKeys[0];
   const losslessAssets=assets.filter(asset=>replacements.get(asset.key)===losslessCandidates.get(asset.key)&&losslessCandidates.has(asset.key));
-  const lossless={optimizedImages:losslessAssets.length,imageBytesSaved:losslessAssets.reduce((sum,asset)=>sum+asset.bytes.length-replacements.get(asset.key).bytes.length,0),packagingBytesSaved:baseline.packagingBytesSaved,bytesSaved:(baseline.nativeBytes??baseline.bytes.length)-losslessBytes,beforeBytes:baseline.nativeBytes??baseline.bytes.length,afterBytes:losslessBytes};
+  const lossless={optimizedImages:losslessAssets.length,imageBytesSaved:losslessAssets.reduce((sum,asset)=>sum+(runtimeReplacements.get(asset.key)?.bytes||asset.bytes).length-replacements.get(asset.key).bytes.length,0),packagingBytesSaved:baseline.packagingBytesSaved,bytesSaved:(baseline.nativeBytes??baseline.bytes.length)-losslessBytes,beforeBytes:baseline.nativeBytes??baseline.bytes.length,afterBytes:losslessBytes};
   lossless.savedBytes=lossless.bytesSaved;lossless.baselineBytes=lossless.beforeBytes;
-  return {bytes,mime:'application/octet-stream',info:{...model.info,imageCount:model.info.imageCount+layers.length},imageKey,imageKeys,optimized:replacements.size>0||lossless.bytesSaved>0,optimizedImages:replacements.size,optimizationPasses:passes,lossless,size:bytes.length,runtimeBytes};
+  return {bytes,mime:'application/octet-stream',info:{...model.info,imageCount:model.info.imageCount+layers.length},imageKey,imageKeys,optimized:replacements.size>0||lossless.bytesSaved>0,optimizedImages:replacements.size,optimizationPasses:passes,lossless,size:bytes.length,runtimeBefore,runtimeBytes,runtimeResizedImages};
 }

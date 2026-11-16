@@ -53,7 +53,7 @@ body{min-width:320px}
 </style>
   <link rel="stylesheet" href="toolkit.css?v=20261103-dice1-20261103-metaltext1">
   <link rel="stylesheet" href="avatar-fonts.css?v=20261103-metaltext1">
-  <link rel="stylesheet" href="avatar-custom.css?v=20261113-three-tone-gold">
+  <link rel="stylesheet" href="avatar-custom.css?v=20261116-avatar-memory-gold">
   <link rel="stylesheet" href="design-system/feedback-motion.css?v=20261023-tool-feedback3">
   <link rel="stylesheet" href="tool-feedback.css?v=20261024-gift1">
   <link rel="stylesheet" href="upload-progress.css?v=20261111-upload-progress">
@@ -223,6 +223,10 @@ body{min-width:320px}
               <button type="button" class="avatar-text-preset" data-text-style="silver" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleSilver">银色</span></button>
               <button type="button" class="avatar-text-preset" data-text-style="roseGold" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleRoseGold">玫瑰金</span></button>
               <button type="button" class="avatar-text-preset" data-text-style="threeToneGold" aria-pressed="false"><span class="avatar-style-sample" aria-hidden="true">Aa</span><span data-custom-i18n="styleThreeToneGold">三色金</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="honeyGold" aria-pressed="false"><canvas class="avatar-style-canvas" data-style-sample="honeyGold" width="128" height="60" aria-hidden="true"></canvas><span data-custom-i18n="styleHoneyGold">蜜光浅金</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="gleamGold" aria-pressed="false"><canvas class="avatar-style-canvas" data-style-sample="gleamGold" width="128" height="60" aria-hidden="true"></canvas><span data-custom-i18n="styleGleamGold">流光亮金</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="sunGold" aria-pressed="false"><canvas class="avatar-style-canvas" data-style-sample="sunGold" width="128" height="60" aria-hidden="true"></canvas><span data-custom-i18n="styleSunGold">日耀金</span></button>
+              <button type="button" class="avatar-text-preset" data-text-style="reliefGold" aria-pressed="false"><canvas class="avatar-style-canvas" data-style-sample="reliefGold" width="128" height="60" aria-hidden="true"></canvas><span data-custom-i18n="styleReliefGold">浮雕亮金</span></button>
             </div>
             <div class="avatar-custom-palette">
               <div><label id="avatarCustomColorLabel" for="avatarCustomColor">文字颜色</label><div class="avatar-custom-color"><input id="avatarCustomColor" type="color" value="#ffffff"><input id="avatarCustomColorValue" type="text" value="#FFFFFF" maxlength="7" aria-label="文字颜色 HEX" spellcheck="false" autocomplete="off"></div></div>
@@ -237,7 +241,7 @@ body{min-width:320px}
             </div>
             <div class="avatar-custom-fields-row"><div><label for="avatarCustomFontSize" data-custom-i18n="sizeLabel">文字大小</label><div class="dimension-input"><input id="avatarCustomFontSize" type="number" min="8" max="512" value="30" step="1" inputmode="numeric"><span>px</span></div></div><div><label for="avatarCustomWeight" data-custom-i18n="weightLabel">字重</label><select id="avatarCustomWeight"><option value="400">400</option><option value="500">500</option><option value="600" selected>600</option><option value="700">700</option><option value="800">800</option></select></div></div>
             <div class="avatar-custom-fields-row">
-              <div><label for="avatarCustomStrokeWidth" data-custom-i18n="strokeLabel">描边宽度</label><div class="dimension-input"><input id="avatarCustomStrokeWidth" type="number" min="0" max="16" value="0" step="0.1" inputmode="decimal"><span>px</span></div></div>
+              <div><label for="avatarCustomStrokeWidth" data-custom-i18n="strokeLabel">描边宽度</label><div class="dimension-input"><input id="avatarCustomStrokeWidth" type="number" min="0" max="16" value="0" step="0.05" inputmode="decimal"><span>px</span></div></div>
               <div><label for="avatarCustomStrokeColor" data-custom-i18n="strokeColorLabel">描边颜色</label><div class="avatar-custom-color"><input id="avatarCustomStrokeColor" type="color" value="#000000"><input id="avatarCustomStrokeColorValue" type="text" value="#000000" maxlength="7" aria-label="描边颜色 HEX" spellcheck="false" autocomplete="off"></div></div>
             </div>
           </fieldset>
@@ -1220,5 +1224,5 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="toolkit.js?v=20261111-token1"></script>
   <script type="module" src="token/workspace.mjs?v=20261112-atlas-rotation"></script>
   <script type="module" src="vap-review.js?v=20261111-upload-progress"></script>
-  <script type="module" src="avatar-custom.js?v=20261113-three-tone-gold"></script>
+  <script type="module" src="avatar-custom.js?v=20261116-avatar-memory-gold"></script>
 </body></html>
