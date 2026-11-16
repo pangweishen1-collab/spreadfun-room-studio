@@ -1,0 +1,26 @@
+FFmpeg.wasm shared-memory core 0.12.10
+
+Distribution: https://registry.npmjs.org/@ffmpeg/core-mt/-/core-mt-0.12.10.tgz
+Package integrity (SHA-512, base64): atyRTOpa58bLCIgd6GXBZAXWyWD3AUoQyzxqjvGhp9MuSzdILtOTI62ffLswBsCnLq15lQ8IETHUpm1oe4V9FQ==
+Corresponding upstream source and build instructions:
+https://github.com/ffmpegwasm/ffmpeg.wasm/tree/v12.15
+https://github.com/ffmpegwasm/ffmpeg.wasm/blob/v12.15/Dockerfile
+
+The Dockerfile specifies FFmpeg n5.1.4, the x264 and x265 forks, the other linked
+libraries, and the Emscripten toolchain. The pinned source tree includes the
+build scripts and WebAssembly patches.
+
+The core is distributed under GPL-2.0-or-later, as stated in the upstream
+@ffmpeg/core-mt package. See COPYING.GPLv2. The ffmpeg.wasm project wrapper uses
+the MIT license included in LICENSE.ffmpeg-wasm.txt.
+
+The original dist/esm/ffmpeg-core.js is shipped unchanged as ffmpeg-core.mjs.
+SHA-256: 270a2e6ff945e173238610669a3f7132df5f9c52698a9bf708cf5c2ab6bda0de
+The original dist/esm/ffmpeg-core.worker.js is shipped unchanged.
+SHA-256: f77898d631dc010b45c29c23cb4379c611a7d7b131bf591d08a656bb729a4ca3
+
+The original dist/esm/ffmpeg-core.wasm is split byte-for-byte into three
+ascending numbered parts to fit the hosting asset size limit. The in-browser
+worker joins these parts before instantiation. Reassemble with:
+cat ffmpeg-core-0.bin ffmpeg-core-1.bin ffmpeg-core-2.bin > ffmpeg-core.wasm
+SHA-256: be2c97605366b78f3f13e21b52e81a55a79e1f29c133b03a68ec187b1a2ec41a
