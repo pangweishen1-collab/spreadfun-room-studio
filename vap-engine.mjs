@@ -3,11 +3,16 @@ import {createQualitySampler,evaluateQualitySamples} from './vap-quality.mjs?v=2
 import {VAP_STANDARD, isStandardVapCodec, computeVapLayout, makeVapc, appendVapcBox, insertVapcBox, extractVapcBox, validateVapc} from './vap-protocol.mjs?v=20261111-official-pack';
 export {VAP_STANDARD};
 import {detectPackedAlpha, detectVideoSource, SCREEN_COLORS} from './vap-source-detection.mjs?v=20261111-preserve3';
-import {inspectImageSequence, sequenceMetadata, decodeSequenceFrame} from './vap-sequence.mjs?v=20261029-sequence-speed1';
+import {inspectImageSequence, sequenceMetadata, decodeSequenceFrame} from './vap-sequence.mjs?v=20261117-sequence-500mb';
 export {inspectImageSequence, sequenceMetadata, decodeSequenceFrame};
 import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261111-official-pack';
 import {normalizeGiftFade, giftFadeOpacity, applyGiftFade} from './vap-gift-fade.mjs?v=20261029-gift-fade1';
 import {copyPackedVideo} from './vap-copy-packets.mjs?v=20261111-native-quality';
+import {loadCrfParts,supportsCrfEncoder} from './vap-crf-assets.mjs?v=20261116-prewarm';
+
+export async function prewarmVapEncoder(){
+  if(supportsCrfEncoder())await loadCrfParts({prewarm:true});
+}
 
 const defaultOutputBytes = 2_000_000;
 const mainLevel4MaxBitrate = 20_000_000;
@@ -628,7 +633,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
     }
     const target=new M.BufferTarget();output=new M.Output({format:new M.Mp4OutputFormat({fastStart:'in-memory'}),target});
     if(o.crf!==undefined){
-      const {createCrfEncoder}=await import('./vap-crf-encoder.mjs?v=20261116-parallel-hevc');
+      const {createCrfEncoder}=await import('./vap-crf-encoder.mjs?v=20261116-prewarm');
       crfEncoder=await createCrfEncoder({codec:o.videoCodec,crf:o.crf,width:plan.layout.videoW,height:plan.layout.videoH,fps:o.fps,frameCount,signal,onProgress:(fraction,attempt)=>{
         progress({phase:'encoding',progress:.60+.35*fraction,frame:frameCount,totalFrames:frameCount,pass:attempt,reason:attempt>1?'recommendation':undefined});
       }});

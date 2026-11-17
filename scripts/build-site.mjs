@@ -12,7 +12,7 @@ entries.push('dice-embed.js','avatar-text-style.mjs','avatar-custom.js','avatar-
 entries.push('gift-lucida-download.mjs');
 entries.push('gift-avatar-preview.mjs','gift-avatar-image.mjs','gift-avatar-svga.mjs','gift-avatar-review-video.mjs');
 entries.push('profile-preview.mjs','profile-preview.css','preview-slot-drag.mjs','upload-progress.js','upload-progress.css');
-entries.push('vap-crf-encoder.mjs','vap-crf-worker.js');
+entries.push('vap-crf-encoder.mjs','vap-crf-worker.js','vap-crf-assets.mjs');
 entries.push('vap-review.css','vap-review.js','vap-review-engine.mjs');
 entries.push('vap-copy-packets.mjs','vap-avc-padding.mjs');
 await rm(target,{recursive:true,force:true});

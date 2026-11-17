@@ -17,12 +17,25 @@ const assert=require('node:assert/strict');
   await assert.rejects(inspectImageSequence(files),e=>['file','limits'].includes(e.code));
  }
  const one=await inspectImageSequence([f1]);assert.equal(one.frameCount,1);await assert.rejects(inspectImageSequence([f1],{fps:0}),e=>e.code==='invalid');assert.throws(()=>sequenceMetadata({...source,frameCount:7201},24),e=>e.code==='file');assert.throws(()=>sequenceMetadata({...source,frameCount:121,frames:Array.from({length:121},()=>source.frames[0])},1),e=>e.code==='limits');
+ const withSize=(file,size)=>Object.defineProperty(file,'size',{value:size});
+ const boundaryFrames=[withSize(png('cap-1.png'),250_000_000),withSize(png('cap-2.png'),250_000_000)];
+ const boundary=await inspectImageSequence(boundaryFrames);
+ assert.equal(boundary.size,500_000_000);
+ const oversizedFrame=withSize(png('cap-3.png'),250_000_001);
+ const isSizeLimit=error=>error.code==='limits'&&error.uiKey==='sequenceSize';
+ await assert.rejects(inspectImageSequence([boundaryFrames[0],oversizedFrame]),isSizeLimit);
+ assert.throws(()=>sequenceMetadata({...boundary,frames:[boundary.frames[0],{name:oversizedFrame.name,file:oversizedFrame}]}),isSizeLimit);
  await assert.rejects(decodeSequenceFrame(source,-1),e=>e.code==='file');const altered={...source,width:31};await assert.rejects(decodeSequenceFrame(altered,0),/宽高/);
  // ZIP preflight checks central directory byte sizes before any decompression.
  function archive(entries){let offset=0;const pieces=[],dirs=[];for(const [name,data,declared=data.length]of entries){const n=new TextEncoder().encode(name),local=new Uint8Array(30+n.length+data.length),v=new DataView(local.buffer);v.setUint32(0,0x04034b50,true);v.setUint16(4,20,true);v.setUint32(18,data.length,true);v.setUint32(22,declared,true);v.setUint16(26,n.length,true);local.set(n,30);local.set(data,30+n.length);pieces.push(local);const dir=new Uint8Array(46+n.length),d=new DataView(dir.buffer);d.setUint32(0,0x02014b50,true);d.setUint16(4,20,true);d.setUint16(6,20,true);d.setUint32(20,data.length,true);d.setUint32(24,declared,true);d.setUint16(28,n.length,true);d.setUint32(42,offset,true);dir.set(n,46);dirs.push(dir);offset+=local.length;}const size=dirs.reduce((s,b)=>s+b.length,0),end=new Uint8Array(22),e=new DataView(end.buffer);e.setUint32(0,0x06054b50,true);e.setUint16(8,entries.length,true);e.setUint16(10,entries.length,true);e.setUint32(12,size,true);e.setUint32(16,offset,true);return new File([...pieces,...dirs,end],'frames.zip')}
  const image=new Uint8Array(await f1.arrayBuffer());const record=data=>({internalStream(){const handlers={};return {on(name,fn){handlers[name]=fn;return this},pause(){this.paused=true},resume(){queueMicrotask(()=>{if(!this.paused)handlers.data(data);if(!this.paused)handlers.end()});return this}}}});let unzipCalls=0;const Zip={async loadAsync(){unzipCalls++;return {files:{'folder/frame10.png':record(image),'folder/frame2.png':record(image),'notes.txt':{async:async()=>{throw Error('must ignore text')}}}}}};
  const zipped=archive([['folder/frame10.png',image],['folder/frame2.png',image],['notes.txt',new TextEncoder().encode('hello')]]),unzipped=await inspectImageSequence([zipped],{Zip});assert.equal(unzipCalls,1);assert.deepEqual(unzipped.frames.map(f=>f.name),['folder/frame2.png','folder/frame10.png']);assert.equal(unzipped.name,'frames.sequence');
- const tooBig=archive([['large.png',image,210*1024*1024]]);await assert.rejects(inspectImageSequence([tooBig],{Zip}),e=>e.code==='limits');assert.equal(unzipCalls,1,'a declared decompression bomb is rejected before unzip');const BombZip={async loadAsync(){return {files:{'small.png':record(new Uint8Array(128))}}}};await assert.rejects(inspectImageSequence([archive([['small.png',image]])],{Zip:BombZip}),e=>e.code==='limits');await assert.rejects(inspectImageSequence([archive([['../bad.png',image]])],{Zip}),e=>e.code==='file');await assert.rejects(inspectImageSequence([zipped]),e=>e.code==='unsupported');
+ const tooBig=archive([['large.png',image,500_000_001]]);
+ const tooBigTogether=archive([['one.png',image,250_000_000],['two.png',image,250_000_001]]);
+ const tooBigCompressed=withSize(archive([['frame.png',image]]),500_000_001);
+ for(const zip of [tooBig,tooBigTogether,tooBigCompressed])await assert.rejects(inspectImageSequence([zip],{Zip}),isSizeLimit);
+ assert.equal(unzipCalls,1,'oversized archives are rejected before unzip');
+ const BombZip={async loadAsync(){return {files:{'small.png':record(new Uint8Array(128))}}}};await assert.rejects(inspectImageSequence([archive([['small.png',image]])],{Zip:BombZip}),e=>e.code==='limits');await assert.rejects(inspectImageSequence([archive([['../bad.png',image]])],{Zip}),e=>e.code==='file');await assert.rejects(inspectImageSequence([zipped]),e=>e.code==='unsupported');
  // Real tiny image bytes make the requested probe size observable without
  // depending on full image decode in this structural test environment.
  class TrackedFile extends File{constructor(parts,name,options){super(parts,name,options);this.reads=[]}slice(start,end,type){const blob=super.slice(start,end,type);this.reads.push({start,end,bytes:blob.size});this.onSlice?.();return blob}}

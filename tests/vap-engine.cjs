@@ -161,7 +161,7 @@ const {pathToFileURL}=require('node:url');
   }
   try{
     install('ImageData',ImageDataMock);install('OffscreenCanvas',CanvasMock);install('VideoEncoder',class{});install('VideoDecoder',class{});install('isSecureContext',true);install('__vapEngineTest',{canDecode:true,frames:[],audio:[],disposed:0,canceled:0,codec:'aac',failVideo:false,sourceCodec:'hevc'});
-    await fs.mkdir(path.join(temp,'vendor/mediabunny'),{recursive:true});for(const name of ['vap-engine.mjs','vap-native-planes.mjs','vap-quality.mjs','vap-protocol.mjs','vap-source-detection.mjs','vap-resources.mjs','vap-sequence.mjs','vap-gift-fade.mjs','vap-chroma-plate.mjs','vap-copy-packets.mjs','vap-avc-padding.mjs'])await fs.copyFile(path.join(root,name),path.join(temp,name));
+    await fs.mkdir(path.join(temp,'vendor/mediabunny'),{recursive:true});for(const name of ['vap-engine.mjs','vap-crf-assets.mjs','vap-native-planes.mjs','vap-quality.mjs','vap-protocol.mjs','vap-source-detection.mjs','vap-resources.mjs','vap-sequence.mjs','vap-gift-fade.mjs','vap-chroma-plate.mjs','vap-copy-packets.mjs','vap-avc-padding.mjs'])await fs.copyFile(path.join(root,name),path.join(temp,name));
     // Test-only hooks live in the disposable module copy, never production.
     await fs.appendFile(path.join(temp,'vap-engine.mjs'),'\nexport {sequenceCanvases as __testSequenceCanvases};\n');
     const resourceFile=path.join(temp,'vap-resources.mjs'),resourceCode=await fs.readFile(resourceFile,'utf8');

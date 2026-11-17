@@ -39,8 +39,8 @@
   Object.assign(copy.en,{title:'VAP converter',helpTitle:'VAP conversion guide',inputVideo:'MP4 video',inputSequence:'Image sequence',inputModes:'Input source',sequenceTitle:'Click, drop or paste image frames',sequenceHint:'PNG / WebP / JPG / ZIP · Numeric filename order · On-device',sequenceUpload:'Upload frames',sequenceReplace:'Replace frames',sequenceType:'Image sequence',frames:'frames',sequenceReading:'Reading image frames…',sequenceHelp:'Select same-size images or one ZIP. Sequences play at 24 FPS. Source alpha is preserved, with optional vertical fades.',sequenceError:'Could not read these frames. Check image format, dimensions, frame count and total size.'});
   Object.assign(copy.zh,{methodAuto:'自动识别（默认）',chromaKey:'纯色幕布抠像',autoMethodHint:'上传后自动识别纯色幕布、纯黑底与纯白底；普通场景或不确定素材保留原画面。可在高级设置中手动调整，并检查透明效果与 Alpha。',helpTwo:'上传后自动识别去背景方式；需要调整时展开高级设置。先检查透明效果和 Alpha，黑白底方式可能影响相近颜色的主体。'});
   Object.assign(copy.en,{methodAuto:'Auto-detect (default)',chromaKey:'Solid-color keying',autoMethodHint:'Detects solid-color screens and pure black or white backgrounds after import. Regular or uncertain scenes keep their original background. Override in Advanced settings and inspect transparency and alpha.',helpTwo:'Background removal is detected after import. Override it in Advanced settings when needed, and inspect transparency and alpha. Black / white keying can affect similar foreground colors.'});
-  Object.assign(copy.zh,{uploadTitle:'点击、拖入或粘贴 MP4 / 序列帧',uploadHint:'MP4 / PNG / WebP / JPG / ZIP · 200 MB 内 · 本机处理',upload:'上传文件',replace:'替换文件',reading:'正在识别并读取文件…',errorFile:'请选择一个 MP4、同尺寸图片序列，或一个序列帧 ZIP；不同类型不能混选。'});
-  Object.assign(copy.en,{uploadTitle:'Click, drop or paste MP4 / image frames',uploadHint:'MP4 / PNG / WebP / JPG / ZIP · Up to 200 MB · On-device',upload:'Upload files',replace:'Replace files',reading:'Detecting and reading files…',errorFile:'Choose one MP4, same-size image frames, or one frame ZIP. Do not mix input types.'});
+  Object.assign(copy.zh,{uploadTitle:'点击、拖入或粘贴 MP4 / 序列帧',uploadHint:'MP4 200 MB 内 · 序列帧（图片或 ZIP）500 MB 内 · 本机处理',upload:'上传文件',replace:'替换文件',reading:'正在识别并读取文件…',errorFile:'请选择一个 MP4、同尺寸图片序列，或一个序列帧 ZIP；不同类型不能混选。',sequenceSize:'序列帧超过 500 MB，请拆分后重新上传。'});
+  Object.assign(copy.en,{uploadTitle:'Click, drop or paste MP4 / image frames',uploadHint:'MP4 up to 200 MB · Image frames or ZIP up to 500 MB · On-device',upload:'Upload files',replace:'Replace files',reading:'Detecting and reading files…',errorFile:'Choose one MP4, same-size image frames, or one frame ZIP. Do not mix input types.',sequenceSize:'The image sequence exceeds 500 MB. Split it and try again.'});
   Object.assign(copy.zh,{
     errorAudioOriginal:'无法重新编码这条 AAC 音轨。可将视频音量切到「原声 100%」，直接保留原音轨后重试。',
     errorAudioDecode:'浏览器无法解码这条音轨。请将音轨转为 AAC 后重新上传，或关闭「保留原片声音」导出。',
@@ -138,7 +138,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[],autoplaySource=null;
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261116-parallel-hevc').catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261117-sequence-500mb').catch(error=>{enginePromise=null;throw error}));
   function recommendedExportBytes(){
     const info=state.sourceVapConfig?.info,declared=info?.f/info?.fps;
     const duration=state.meta.videoDuration??state.meta.duration;
@@ -500,11 +500,12 @@
     const mimeExtensions={'video/mp4':'mp4','image/png':'png','image/jpeg':'jpg','image/webp':'webp','application/zip':'zip','application/x-zip-compressed':'zip'};
     const selected=[],kinds=[];
     for(const [index,file] of Array.from(files||[]).entries()){
-      if(!file||!Number.isFinite(file.size)||file.size<=0||file.size>200*1024**2)return null;
+      if(!file||!Number.isFinite(file.size)||file.size<=0)return null;
       const name=String(file.name||''),extension=name.match(/\.([^./\\]+)$/)?.[1].toLowerCase(),mimeExtension=mimeExtensions[String(file.type||'').toLowerCase()];
       if(extension&&!extensions[extension])return null;
       const kind=extensions[extension||mimeExtension];
       if(!kind||extension&&mimeExtension&&kind!==extensions[mimeExtension])return null;
+      if(kind==='video'&&file.size>200*1024**2)return null;
       if(!extension){
         const stem=name.replace(/[\\/:*?"<>|\x00-\x1f]/g,'_')||`${kind==='frames'?'frame':'source'}-${String(index+1).padStart(3,'0')}`;
         const normalizedName=stem+'.'+mimeExtension;
@@ -558,6 +559,7 @@
       video.src=state.sourceUrl;video.muted=true;video.load();waitForSourceFrame();$('DownloadReceipt').hidden=true;
       if(old)URL.revokeObjectURL(old);
       applyExportRecommendation();
+      void engine.prewarmVapEncoder().catch(()=>{});
     }catch(error){if(version===loadVersion){root.dataset.lastError=String(error?.message||error);state.notice=error.uiKey||errorKey(error,'errorLoad');state.errorTone='error'}}
     finally{
       uploadProgress?.finish();if(sourceUploadProgress===uploadProgress)sourceUploadProgress=null;
@@ -581,7 +583,8 @@
       autoplaySource={nonce:sourceNonce,file:sequence};state.view='transparent';state.sourceFrameReady=true;state.previewReady=false;$('DownloadReceipt').hidden=true;
       if(old)URL.revokeObjectURL(old);
       applyExportRecommendation();
-    }catch(error){if(version===loadVersion){root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':'sequenceError';state.errorTone=job.signal.aborted?'info':'error'}}
+      void engine.prewarmVapEncoder().catch(()=>{});
+    }catch(error){if(version===loadVersion){root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':error?.uiKey||'sequenceError';state.errorTone=job.signal.aborted?'info':'error'}}
     finally{
       uploadProgress?.finish();if(sourceUploadProgress===uploadProgress)sourceUploadProgress=null;
       if(sequenceLoadController===job)sequenceLoadController=null;if(version===loadVersion){state.loading=false;sync();requestPreview()}

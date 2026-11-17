@@ -1,8 +1,9 @@
 // Local image sequences. Compressed frames are retained; decoded bitmaps are
 // short-lived and owned by the caller, never cached for the whole animation.
-const MAX_BYTES=200*1024*1024,MAX_FRAMES=7200;
+const MAX_BYTES=500_000_000,MAX_FRAMES=7200;
 const extensions=/\.(png|webp|jpe?g)$/i;
 const fail=(code,message)=>Object.assign(new Error(message),{code});
+const sizeLimit=()=>Object.assign(fail('limits','序列帧超过 500 MB。'),{uiKey:'sequenceSize'});
 const abort=signal=>{if(signal?.aborted)throw fail('cancelled','转换已取消。');};
 const ignored=name=>/(^|\/)(__MACOSX|\.[^/]*)(\/|$)/.test(name)||/(^|\/)Thumbs\.db$/i.test(name);
 const natural=new Intl.Collator('en',{numeric:true,sensitivity:'base'});
@@ -43,29 +44,37 @@ function zipDirectory(bytes){
     const name=new TextDecoder().decode(bytes.subarray(p+46,p+46+length)).replace(/\\/g,'/');
     if(extensions.test(name)&&!ignored(name)){
       if(flags&1||![0,8].includes(method))throw fail('file','不支持加密或特殊压缩格式的 ZIP。');
-      if(unpacked===0xffffffff||unpacked<8||unpacked>MAX_BYTES)throw fail('limits','ZIP 中的图片体积无效。');
+      if(unpacked===0xffffffff||unpacked<8)throw fail('limits','ZIP 中的图片体积无效。');
       if(name.split('/').includes('..')||name.startsWith('/'))throw fail('file','ZIP 中存在无效路径。');
-      total+=unpacked;names.push({name,bytes:unpacked});if(total>MAX_BYTES||names.length>MAX_FRAMES)throw fail('limits','序列帧合计不能超过 200 MiB 或 7200 帧。');
+      total+=unpacked;if(total>MAX_BYTES)throw sizeLimit();
+      names.push({name,bytes:unpacked});if(names.length>MAX_FRAMES)throw fail('limits','序列帧不能超过 7200 帧。');
     }
     p=next;
   }
   if(p!==e)throw fail('file','ZIP 目录长度无效。');
   return names;
 }
-async function inflateFrame(record,limit,signal){
+async function inflateFrame(record,{name,bytes},signal){
   if(typeof record.internalStream!=='function')throw fail('unsupported','ZIP 组件不支持有界解压，请刷新后重试。');
   return new Promise((resolve,reject)=>{
     const chunks=[];let length=0,settled=false;const stream=record.internalStream('uint8array');
-    const finish=error=>{if(settled)return;settled=true;signal?.removeEventListener('abort',cancel);if(error){stream.pause();chunks.length=0;reject(error);}else{const data=new Uint8Array(length);let offset=0;for(const chunk of chunks){data.set(chunk,offset);offset+=chunk.length;}resolve(data);}};
+    const finish=error=>{
+      if(settled)return;
+      settled=true;signal?.removeEventListener('abort',cancel);
+      if(error){stream.pause();chunks.length=0;reject(error);return;}
+      if(length!==bytes){reject(fail('file','ZIP 中的图片长度无效。'));return;}
+      try{resolve(new Blob(chunks,{type:imageType(name)}));}catch(error){reject(error);}
+    };
     const cancel=()=>finish(fail('cancelled','转换已取消。'));signal?.addEventListener('abort',cancel,{once:true});
-    stream.on('data',chunk=>{if(settled)return;length+=chunk.length;if(length>limit){finish(fail('limits','ZIP 实际解压体积超过声明大小。'));return;}chunks.push(chunk);}).on('error',()=>finish(fail('file','ZIP 图片解压失败。'))).on('end',()=>finish());
+    stream.on('data',chunk=>{if(settled)return;length+=chunk.length;if(length>bytes){finish(fail('limits','ZIP 实际解压体积超过声明大小。'));return;}chunks.push(chunk);}).on('error',()=>finish(fail('file','ZIP 图片解压失败。'))).on('end',()=>finish());
     if(signal?.aborted)cancel();else stream.resume();
   });
 }
 export function sequenceMetadata(source,fps=24){
   fpsCheck(fps);
   if(!source||source.kind!=='image_sequence'||!Array.isArray(source.frames)||source.frameCount!==source.frames.length||source.frameCount<1||source.frameCount>MAX_FRAMES)throw fail('file','序列帧输入无效，请重新选择。');
-  if(source.frames.some(frame=>!(frame.file instanceof Blob)||frame.file.size<8||!extensions.test(frame.name||''))||source.frames.reduce((sum,frame)=>sum+frame.file.size,0)>MAX_BYTES)throw fail('limits','序列帧文件或合计体积无效。');
+  if(source.frames.some(frame=>!(frame.file instanceof Blob)||frame.file.size<8||!extensions.test(frame.name||'')))throw fail('limits','序列帧文件无效。');
+  if(source.frames.reduce((sum,frame)=>sum+frame.file.size,0)>MAX_BYTES)throw sizeLimit();
   sizeCheck(source.width,source.height);const duration=source.frameCount/fps;if(duration>120)throw fail('limits','当前序列帧按所选帧率超过 120 秒，请提高帧率或减少帧数。');
   return {width:source.width,height:source.height,frameCount:source.frameCount,duration,fps,hasAudio:false,audioCodec:null,audioBitrate:0,codec:'image_sequence',nativeOpaqueSource:false};
 }
@@ -79,23 +88,27 @@ export async function inspectImageSequence(files,{fps=24,signal,Zip,onProgress=(
   fpsCheck(fps);abort(signal);files=Array.from(files||[]);if(!files.length)throw fail('file','请选择序列帧图片或一个 ZIP。');
   let frames=[],name='sequence',size=0,fromZip=false;
   if(files.length===1&&/\.zip$/i.test(files[0].name||'')){
-    fromZip=true;const file=files[0];if(!(file instanceof Blob)||file.size<22||file.size>MAX_BYTES)throw fail('limits','ZIP 不能超过 200 MiB。');
+    fromZip=true;const file=files[0];if(!(file instanceof Blob)||file.size<22)throw fail('file','请选择完整的序列帧 ZIP。');
+    if(file.size>MAX_BYTES)throw sizeLimit();
     if(typeof Zip?.loadAsync!=='function')throw fail('unsupported','ZIP 组件未能加载，请重试。');
-    const entries=zipDirectory(new Uint8Array(await file.arrayBuffer()));abort(signal);
+    // Share one archive buffer between the directory check and JSZip.
+    const archive=new Uint8Array(await file.arrayBuffer());abort(signal);
+    const entries=zipDirectory(archive);
     if(!entries.length)throw fail('file','ZIP 中没有 PNG、WebP 或 JPG 序列帧。');
-    const zip=await Zip.loadAsync(file,{createFolders:false});abort(signal);name=file.name.replace(/\.zip$/i,'');
+    const zip=await Zip.loadAsync(archive,{createFolders:false});abort(signal);name=file.name.replace(/\.zip$/i,'');
     for(let i=0;i<entries.length;i++){
       const entry=entries[i],record=zip.files[entry.name];if(!record||record.dir)throw fail('file','ZIP 中的序列帧目录不一致。');
-      const data=await inflateFrame(record,entry.bytes,signal);abort(signal);if(data.length!==entry.bytes)throw fail('file','ZIP 中的图片长度无效。');
-      size+=data.length;if(size>MAX_BYTES)throw fail('limits','解压后的序列帧不能超过 200 MiB。');
-      frames.push({name:entry.name,file:new Blob([data],{type:imageType(entry.name)})});onProgress({phase:'loading',progress:.5*(i+1)/entries.length});
+      const frame=await inflateFrame(record,entry,signal);abort(signal);
+      size+=frame.size;if(size>MAX_BYTES)throw sizeLimit();
+      frames.push({name:entry.name,file:frame});onProgress({phase:'loading',progress:.5*(i+1)/entries.length});
     }
   }else{
     if(files.some(file=>!(file instanceof Blob)||!extensions.test(file.name||'')||file.size<8))throw fail('file','序列帧仅支持 PNG、WebP、JPG 图片；ZIP 请单独上传。');
     frames=files.filter(file=>!ignored(file.webkitRelativePath||file.name)).map(file=>({name:file.webkitRelativePath||file.name,file}));
     size=frames.reduce((sum,frame)=>sum+frame.file.size,0);name=(frames[0]?.name.split('/').slice(-2,-1)[0]||frames[0]?.name.replace(/\.[^.]+$/,'')||'sequence');
   }
-  if(!frames.length||frames.length>MAX_FRAMES||size>MAX_BYTES)throw fail('limits','序列帧合计不能超过 200 MiB 或 7200 帧。');
+  if(size>MAX_BYTES)throw sizeLimit();
+  if(!frames.length||frames.length>MAX_FRAMES)throw fail('limits','序列帧不能超过 7200 帧。');
   frames.sort((a,b)=>natural.compare(a.name,b.name)||a.name.localeCompare(b.name));
   const seen=new Set();let dimensions;
   for(let i=0;i<frames.length;i++){

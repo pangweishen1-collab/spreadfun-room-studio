@@ -1,14 +1,11 @@
+import {loadCrfParts} from './vap-crf-assets.mjs?v=20261116-prewarm';
+
 const vendor = new URL('./vendor/vap-crf/', import.meta.url);
 let job;
 
 async function loadCore() {
   const coreURL = new URL('ffmpeg-core.mjs', vendor).href;
-  const partsPromise = Promise.all([0, 1, 2].map(async index => {
-    const response = await fetch(new URL(`ffmpeg-core-${index}.bin`, vendor));
-    if (!response.ok) throw new Error('CRF 编码器文件下载失败。');
-    return response.blob();
-  }));
-  const [{default: createFFmpegCore}, parts] = await Promise.all([import(coreURL), partsPromise]);
+  const [{default: createFFmpegCore}, parts] = await Promise.all([import(coreURL), loadCrfParts()]);
   const wasmBinary = new Uint8Array(await new Blob(parts).arrayBuffer());
   const workerURL = new URL('ffmpeg-core.worker.js', vendor).href;
   // The upstream loader reads the worker URL from this fragment. The wasm

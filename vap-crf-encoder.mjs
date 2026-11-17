@@ -1,3 +1,5 @@
+import {supportsCrfEncoder} from './vap-crf-assets.mjs?v=20261116-prewarm';
+
 function crfError(code, message, cause) {
   return Object.assign(new Error(message, {cause}), {code});
 }
@@ -33,8 +35,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
   }
   const cancelled = () => crfError('cancelled', '转换已取消。');
   if (signal?.aborted) throw cancelled();
-  if (!globalThis.isSecureContext || !globalThis.crossOriginIsolated || !navigator.storage?.getDirectory ||
-      typeof VideoFrame !== 'function' || typeof Worker !== 'function') {
+  if (!supportsCrfEncoder()) {
     throw crfError('unsupported', '当前浏览器无法使用本地 CRF 编码，请使用支持本地文件存储的 Chrome 或 Edge。');
   }
 
@@ -79,7 +80,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
     const folder = await root.getDirectoryHandle(name, {create: true});
     const file = await folder.getFileHandle('packed.i420', {create: true});
     if (signal?.aborted) throw cancelled();
-    worker = new Worker(new URL('./vap-crf-worker.js?v=20261116-parallel-hevc', import.meta.url), {type: 'module'});
+    worker = new Worker(new URL('./vap-crf-worker.js?v=20261116-prewarm', import.meta.url), {type: 'module'});
     worker.onmessage = ({data}) => {
       if (data.progress !== undefined) {
         onProgress?.((encodeAttempt - 1 + data.progress) / totalAttempts, encodeAttempt);

@@ -32,7 +32,9 @@ class AudioContextMock{
   async close(){this.closes++;this.state='closed'}
 }
 const inspectionRequests=[];
+let prewarmCalls=0,prewarmFailure=false;
 const engine={async inspectVideo(file,options={}){inspectionRequests.push({file,options});if(inspectFailure)throw Error('probe failed');const meta={width:file.width||320,height:file.height||240,duration:file.duration||2,videoDuration:file.videoDuration,fps:file.fps||24,hasAudio:file.hasAudio!==false};if(options.detectSource){meta.sourceDetection=await sandbox.window.__detectSource(file);if(file.inferredVapConfig)meta.inferredVapConfig=file.inferredVapConfig}return meta},async convertVideo(file,options,callbacks){convertCalls++;return conversion(file,options,callbacks)}};
+engine.prewarmVapEncoder=async()=>{prewarmCalls++;if(prewarmFailure)throw Error('encoder preload failed')};
 engine.inspectImageSequence=async(files,options={})=>{
   sequenceInspections.push({files:Array.from(files),options});
   if(sequenceImportOverride)return sequenceImportOverride(files,options);
@@ -571,11 +573,18 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     assert.equal(settings.options().crf,28);
     assert.equal(settings.options().recommendedBytes,undefined);
     assert.equal(get('#vapCrfRecommendation').hidden,true);
+    const prewarmBeforeUpload=prewarmCalls;
     inspectFailure=true;
     await settings.loadFiles([file({name:'failed.mp4'})]);inspectFailure=false;
+    assert.equal(prewarmCalls,prewarmBeforeUpload,'a failed import does not start encoder downloads');
     assert.equal(settings.options().crf,28,'failed import does not apply the recommendation');
     assert.equal(get('#vapCrfRecommendation').hidden,true);
+    prewarmFailure=true;
     await settings.loadFiles([file({name:'export-settings.mp4',duration:5.03,videoDuration:5+1e-8})]);await flush();
+    prewarmFailure=false;
+    assert.equal(prewarmCalls,prewarmBeforeUpload+1);
+    assert.equal(settings.state.notice,null,'a background download failure does not invalidate the imported source');
+    assert.equal(get('#vapConvert').disabled,false);
     assert.equal(settings.options().crf,25);
     assert.equal(get('#vapCrfRecommendation').hidden,false);
     assert.equal(get('#vapCrfRecommendation').textContent,'高清推荐 · 建议 1.5 MB 内');
@@ -654,7 +663,9 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     assert.equal(get('#vapCrfRecommendation').hidden,true);
     vm.runInContext(source,sandbox);
     const sequenceSettings=sandbox.window.test;
+    const prewarmBeforeSequence=prewarmCalls;
     await sequenceSettings.loadSequence([file({name:'001.png',type:'image/png'})]);await flush();
+    assert.equal(prewarmCalls,prewarmBeforeSequence+1,'accepted image sequences also start prewarming');
     assert.equal(sequenceSettings.options().crf,25,'first successful sequence gets the same recommendation');
     assert.equal(sequenceSettings.options().recommendedBytes,1_500_000);
     assert.equal(get('#vapCrfRecommendation').hidden,false);
