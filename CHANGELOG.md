@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.20.2 - 2026-11-17
+
+- Show encoder download progress when conversion starts before the components are ready. Conversion continues automatically when the download finishes. Cached components go straight to conversion.
+- Retain the current source on a download error and retry the missing components on the next conversion.
+
 ## 1.20.1 - 2026-11-17
 
 - Accept image sequences up to 500 MB. The limit applies to loose images in total, the ZIP file, and the total expanded image size.
