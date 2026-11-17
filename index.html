@@ -59,7 +59,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="upload-progress.css?v=20261111-upload-progress">
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
   <link rel="stylesheet" href="gift-preview.css?v=20261111-gift-batch">
-  <link rel="stylesheet" href="profile-preview.css?v=20261117-project-cards">
+  <link rel="stylesheet" href="profile-preview.css?v=20261117-pending-projects">
   <link rel="stylesheet" href="token/workspace.css?v=20261111-token6">
   <link rel="stylesheet" href="vap-resources.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="vap-tool.css?v=20261116-crf">
@@ -277,6 +277,10 @@ body{min-width:320px}
     <div id="profileProjectBar" class="profile-project-bar" hidden>
       <h2 id="profileProjectsTitle" data-profile-text="projects">选择项目</h2>
       <div id="profileProjectCatalog" class="profile-project-catalog project-selector-horizontal" role="group" aria-labelledby="profileProjectsTitle"></div>
+    </div>
+    <div id="profileProjectPending" class="card profile-project-pending" role="status" hidden>
+      <strong id="profilePendingName"></strong>
+      <span data-profile-text="pendingTemplate">模板待提供</span>
     </div>
     <section id="profileProduction" role="tabpanel" aria-labelledby="profileProductionTab">
   <div class="intro tool-intro"><div><h1 id="giftPreviewTitle" data-gift-i18n="title">礼物&amp;座驾预览图生产工具</h1></div></div>
@@ -1219,7 +1223,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="gift-preview-history.js?v=20261024-matting1"></script>
   <script src="gift-background.js?v=20261111-prewarm1"></script>
   <script src="gift-preview.js?v=20261112-webp-clarity"></script>
-  <script type="module" src="profile-preview.mjs?v=20261117-project-cards"></script>
+  <script type="module" src="profile-preview.mjs?v=20261117-pending-projects"></script>
   <script type="module" src="gift-avatar-preview.mjs?v=20261111-upload-progress"></script>
   <script src="vap-player.js?v=20261111-official-pack"></script>
   <script src="vap-resource-editor.js?v=20261111-upload-progress"></script>

@@ -5,6 +5,7 @@ const copy = {
   zh: {
     productionTab: '预览图生产', deviceTab: '座驾/勋章预览', medalTab: '勋章预览', giftTab: '礼物预览',
     projects: '选择项目', select: '选择',
+    pendingTemplate: '模板待提供',
     gift: '礼物', giftReviewExport: '下载礼物栏预览图',
     medalReviewExport: '下载勋章页预览图', smallMedal: '小图', largeMedal: '大图',
     materialsHeading: '展示素材', medal: '勋章', vehicle: '座驾', upload: '批量上传',
@@ -25,6 +26,7 @@ const copy = {
   en: {
     productionTab: 'Create preview', deviceTab: 'Vehicles / Medals', medalTab: 'Medal preview', giftTab: 'Gift preview',
     projects: 'Choose a project', select: 'Select',
+    pendingTemplate: 'Template pending',
     gift: 'Gifts', giftReviewExport: 'Download gift tray preview',
     medalReviewExport: 'Download medal page preview', smallMedal: 'Small', largeMedal: 'Large',
     materialsHeading: 'Display assets', medal: 'Medals', vehicle: 'Vehicles', upload: 'Bulk upload',
@@ -52,10 +54,20 @@ const labels = root.querySelectorAll('[data-profile-text]');
 const outputSides = {medal: 400, vehicle: 200, gift: 200};
 const projectBar = byId('profileProjectBar');
 const projectCatalog = byId('profileProjectCatalog');
-const projects = [{id: 'hapi-ludo', name: 'Hapi Ludo'}, {id: 'hapi', name: 'Hapi'}];
-const placements = Object.fromEntries(projects.map(({id}) => [id, new Map()]));
+const pendingNotice = byId('profileProjectPending');
+const pendingName = byId('profilePendingName');
+const workspaces = root.querySelectorAll('.profile-workspace');
+const projects = [
+  {id: 'hapi-ludo', name: 'Hapi Ludo'},
+  {id: 'hapi', name: 'Hapi'},
+  {id: 'yari', name: 'Yari', pending: true},
+  {id: '4fun', name: '4Fun', pending: true}
+];
+const placements = Object.fromEntries(projects.filter(project => !project.pending).map(({id}) => [id, new Map()]));
 const defaultMedal = 'assets/profile-preview/medal-default.webp?v=20261111-profile1';
 let medalUploadInProgress = false;
+let currentProject;
+let activeTab = 0;
 const stringsForPage = () => copy[document.documentElement.lang.startsWith('zh') ? 'zh' : 'en'];
 
 function artwork(src, lazy = false) {
@@ -155,7 +167,7 @@ function mountPreview(device, prefix, scenes) {
     views.push({slot, x, y, width, height, column, row, size, button, fallback, cue, element: fallback, shownAsset: null});
   }
 
-  const active = () => location.hash === '#gift-previews' && !device.hidden;
+  const active = () => location.hash === '#gift-previews' && !device.hidden && !currentProject?.pending;
 
   function slotAt(node) {
     const button = node?.closest?.('.profile-slot');
@@ -164,7 +176,7 @@ function mountPreview(device, prefix, scenes) {
 
   function sync() {
     const strings = stringsForPage();
-    const blocked = isBusy();
+    const blocked = isBusy() || Boolean(currentProject.pending);
     const category = slots.filter(slot => slot.kind === mode);
     const placed = category.filter(slot => slot.asset).length;
     count.textContent = `${placed} / ${category.length}`;
@@ -225,7 +237,7 @@ function mountPreview(device, prefix, scenes) {
   });
 
   async function loadFiles(files, {target = null, firstVacant = false} = {}) {
-    if (isBusy() || !files.length) return;
+    if (currentProject.pending || isBusy() || !files.length) return;
     const targetView = target === null ? null : views[target];
     if (targetView) mode = targetView.slot.kind;
     const category = slots.filter(slot => slot.kind === mode);
@@ -402,8 +414,9 @@ function mountPreview(device, prefix, scenes) {
   device.addEventListener('dragover', event => {
     if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
     event.preventDefault();
-    event.dataTransfer.dropEffect = isBusy() ? 'none' : 'copy';
-    if (isBusy()) return;
+    const canDrop = active() && !isBusy();
+    event.dataTransfer.dropEffect = canDrop ? 'copy' : 'none';
+    if (!canDrop) return;
     const target = slotAt(event.target);
     if (target !== fileDropTarget) clearFileDrop();
     device.dataset.dragging = 'true';
@@ -573,19 +586,38 @@ const previews = [
   })
 ];
 
-let currentProject;
 function syncProjectCards() {
   const blocked = previews.some(preview => preview.isBusy());
   for (const button of projectCatalog.children) {
     button.disabled = blocked;
-    button.setAttribute('aria-pressed', String(button.dataset.project === currentProject));
+    button.setAttribute('aria-pressed', String(button.dataset.project === currentProject.id));
   }
 }
 
-function selectProject({id}) {
-  if (id === currentProject || previews.some(preview => preview.isBusy())) return;
-  currentProject = id;
-  for (const preview of previews) preview.setProject(id);
+function syncProjectView() {
+  const pending = Boolean(currentProject.pending);
+  for (const workspace of workspaces) workspace.hidden = pending;
+  const showPending = pending && activeTab > 0;
+  if (showPending) {
+    pendingName.textContent = currentProject.name;
+    const panel = panels[activeTab];
+    if (pendingNotice.parentElement !== panel) panel.append(pendingNotice);
+  }
+  pendingNotice.hidden = !showPending;
+}
+
+function selectProject(project) {
+  if (project === currentProject || previews.some(preview => preview.isBusy())) return;
+  currentProject = project;
+  syncProjectView();
+  for (const preview of previews) {
+    if (project.pending) {
+      preview.deactivate();
+      preview.sync();
+    } else {
+      preview.setProject(project.id);
+    }
+  }
 }
 window.ProjectSelector.render(projectCatalog, projects, {onSelect: selectProject, selectedId: projects[0].id});
 selectProject(projects[0]);
@@ -598,6 +630,7 @@ window.addEventListener('pagehide', event => {
 });
 
 function selectTab(index) {
+  activeTab = index;
   tabs.forEach((tab, i) => {
     const selected = i === index;
     tab.setAttribute('aria-selected', String(selected));
@@ -605,8 +638,9 @@ function selectTab(index) {
     panels[i].hidden = !selected;
   });
   projectBar.hidden = index === 0;
+  syncProjectView();
   previews.forEach((preview, i) => {
-    if (i + 1 === index) preview.sync();
+    if (i + 1 === index && !currentProject.pending) preview.sync();
     else preview.deactivate();
   });
   if (index === 0) window.GiftPreviewTool?.activate();

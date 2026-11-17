@@ -12,6 +12,7 @@
 .profile-project-bar {
   max-width:1024px;
   margin:0 auto 20px;
+  container-type:inline-size;
 }
 .profile-project-bar h2 {
   margin:0 0 12px;
@@ -22,8 +23,31 @@
 }
 .profile-project-catalog {
   display:grid;
-  grid-template-columns:repeat(2,minmax(0,158px));
+  grid-template-columns:repeat(4,minmax(0,158px));
   gap:12px;
+}
+@container(max-width:600px) {
+  .profile-project-catalog {
+    grid-template-columns:repeat(2,minmax(0,158px));
+    gap:10px;
+  }
+}
+.profile-project-pending:not([hidden]) {
+  display:grid;
+  place-content:center;
+  gap:6px;
+  min-height:180px;
+  max-width:1024px;
+  margin-inline:auto;
+  padding:24px;
+  border-radius:22px;
+  color:var(--tool-muted);
+  font-size:14px;
+  text-align:center;
+}
+.profile-project-pending strong {
+  color:var(--tool-heading);
+  font-size:18px;
 }
 .profile-workspace {
   display:grid;
@@ -34,6 +58,7 @@
   max-width:1024px;
   margin-inline:auto;
 }
+.profile-workspace[hidden] {display:none}
 .profile-controls,.profile-scene {
   min-width:0;
   padding:24px;
