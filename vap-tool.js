@@ -67,7 +67,7 @@
   }
   let lang=typeof language!=='undefined'&&language==='en'?'en':'zh';
   const t=key=>(copy[lang]||copy.zh)[key]||key;
-  const state={active:false,file:null,meta:null,sourceUrl:null,inputMode:'video',sequenceTime:0,videoOffsetY:0,maskFile:null,sourceKind:'plain_mp4',detectedMethod:'opaque',detectedScreen:'auto',detectedBackground:null,adaptiveChroma:false,view:'original',background:'room',loading:false,converting:false,packing:false,playing:false,revision:0,result:null,notice:null,errorTone:'error',progress:0,phase:'loading',previewError:false};
+  const state={active:false,file:null,meta:null,sourceUrl:null,inputMode:'video',sequenceTime:0,videoOffsetY:0,maskFile:null,sourceKind:'plain_mp4',detectedMethod:'opaque',detectedScreen:'auto',detectedBackground:null,adaptiveChroma:false,view:'original',background:'room',loading:false,converting:false,packing:false,playing:false,revision:0,result:null,notice:null,errorTone:'error',progress:0,phase:'loading',encoderDownload:null,previewError:false};
   state.verticalMask=savedMask();state.giftFade={enabled:true,fadeIn:1,fadeOut:1};state.playerState='empty';state.sourceFrameReady=false;state.previewReady=false;
   let ordinaryEffects=null,colorPickView=null;
   state.keyColor=null;state.pickingColor=false;
@@ -79,6 +79,7 @@
     packedSize:'打包尺寸', sourceVideoRetained:'已保留原始画面',
     crf:'CRF 画质', videoCodec:'视频编码',crfRecommendation:'高清推荐 · 建议 {size} MB 内',
     tuningRecommendation:'正在调整画质…',aboveRecommendation:'本次成品超过建议的 {size} MB，可照常下载。',
+    downloadingEncoder:'正在下载编码组件…',errorEncoderDownload:'编码组件下载失败，请重试转换。',
     crfHint:'请输入 0–51 的整数。数值越低，画质越高，文件通常越大。',
     alphaHalfHint:'Alpha 0.5 的宽高各减半，1.0 保留完整分辨率。',
     errorCadence:'未能保持固定 24 FPS，请重试。',errorInvalid:'请检查 CRF、Alpha 分辨率、视频编码和去背景设置。',
@@ -92,6 +93,7 @@
     packedSize:'Packed size', sourceVideoRetained:'Original video preserved',
     crf:'CRF quality', videoCodec:'Video codec',crfRecommendation:'HD recommendation · Aim for {size} MB or less',
     tuningRecommendation:'Adjusting video quality…',aboveRecommendation:'The export is larger than the suggested {size} MB and is ready to download.',
+    downloadingEncoder:'Downloading encoder…',errorEncoderDownload:'Could not download the encoder. Try converting again.',
     crfHint:'Enter a whole number from 0 to 51. A lower value usually gives higher quality and a larger file.',
     alphaHalfHint:'Alpha 0.5 halves both dimensions. Alpha 1.0 keeps full resolution.',
     errorCadence:'Could not keep a fixed 24 FPS. Try again.',errorInvalid:'Check the CRF, alpha resolution, video codec and background settings.',
@@ -138,7 +140,8 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[],autoplaySource=null;
   const busy=()=>state.loading||state.converting||state.packing||!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261117-sequence-500mb').catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261117-download-progress').catch(error=>{enginePromise=null;throw error}));
+  const displayedPhase=()=>state.encoderDownload===null?state.phase:'downloadingEncoder';
   function recommendedExportBytes(){
     const info=state.sourceVapConfig?.info,declared=info?.f/info?.fps;
     const duration=state.meta.videoDuration??state.meta.duration;
@@ -159,7 +162,7 @@
       if(state.meta?.audioCodec==='aac')return 'errorAudioOriginal';
       return error.audioStage==='decode'?'errorAudioDecode':'errorAudioEncode';
     }
-    const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode',cadence:'errorCadence',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',storage:'errorStorage',cancelled:'cancelled'};
+    const codes={unsupported:'errorUnsupported',file:'errorFile',decode:'errorDecode',encode:'errorEncode','encoder-download':'errorEncoderDownload',cadence:'errorCadence',audio:'errorAudio',matte:'errorMatte',invalid:'errorInvalid',limits:'errorLimits',storage:'errorStorage',cancelled:'cancelled'};
     return codes[error?.code]||fallback;
   }
   function options({preview=false}={}){
@@ -377,7 +380,7 @@
     const recommendationText=recommended?sizeMessage('crfRecommendation',recommendedExportBytes()):'';
     if(recommendation.textContent!==recommendationText)recommendation.textContent=recommendationText;
     $('Cancel').hidden=!state.loading&&!state.converting;$('Cancel').disabled=state.packing;
-    $('ProgressRow').hidden=!state.converting;$('Phase').textContent=t(state.phase);$('Percent').textContent=Math.round(state.progress*100)+'%';$('Progress').value=state.progress;
+    syncTaskProgress();
     $('Notice').hidden=!state.notice;$('Notice').textContent=state.notice?t(state.notice):'';$('Notice').dataset.tone=state.errorTone;
     $('PreviewError').hidden=!state.previewError;$('PreviewError').textContent=t('previewFailed');
     $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareResultLabel').hidden=!state.result;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(outputWidth/outputHeight));syncOutputPlaceholder();
@@ -590,23 +593,41 @@
       if(sequenceLoadController===job)sequenceLoadController=null;if(version===loadVersion){state.loading=false;sync();requestPreview()}
     }
   }
+  function syncTaskProgress(){
+    const phaseText=t(displayedPhase()),shownProgress=state.encoderDownload??state.progress;
+    $('ProgressRow').hidden=!state.converting;
+    if($('Phase').textContent!==phaseText)$('Phase').textContent=phaseText;
+    $('Percent').textContent=Math.round(shownProgress*100)+'%';$('Progress').value=shownProgress;
+  }
   async function convert(){
     if(busy()||!state.file||state.pickingColor)return;
     if(resourceEditor?.finishEditing?.()===false){showNotice('resourceInvalid');return}
     let opts;try{opts=options()}catch(error){showNotice(error.uiKey||errorKey(error));return}
     pause();cleanupProcessor();state.converting=true;state.notice=null;state.progress=0;state.phase='loading';state.previewError=false;$('DownloadReceipt').hidden=true;
     const revision=state.revision,job=new AbortController();controller=job;sync();
-    let resultResources=null,lastProgressSync=0,lastProgressPhase='';
+    let resultResources=null,stopWatching,lastProgressSync=0,lastProgressPhase='';
+    function updateProgress(){
+      const phase=displayedPhase(),now=Date.now();
+      if(phase!==lastProgressPhase||(state.encoderDownload??state.progress)>=1||now<lastProgressSync||now-lastProgressSync>=100){
+        lastProgressSync=now;lastProgressPhase=phase;sync();
+      }
+    }
     try{
+      const engine=await getEngine();
+      if(controller!==job||job.signal.aborted)return;
+      stopWatching=engine.watchVapEncoderDownload(progress=>{
+        if(controller!==job||job.signal.aborted||state.encoderDownload===progress)return;
+        state.encoderDownload=progress;syncTaskProgress();
+      });
       let tags={},resourceFiles=[];
       if(opts.resources.length&&opts.resourceMode==='dynamic'){
         const module=await getResourceModule();resultResources=await module.createResourceRenderer(opts.resources,{width:opts.width,height:opts.height,duration:state.meta.duration,fps:opts.fps,sourceVapConfig:opts.sourceVapConfig,verticalMask:opts.verticalMask,signal:job.signal,includeDefaultAvatars:false});
         [tags,resourceFiles]=await Promise.all([resultResources.getPlayerTags(),resultResources.getPackageFiles()]);
       }
-      const engine=await getEngine();const result=await engine.convertVideo(state.file,opts,{signal:job.signal,onProgress:event=>{
+      const result=await engine.convertVideo(state.file,opts,{signal:job.signal,onProgress:event=>{
         if(controller!==job||job.signal.aborted)return;state.progress=Math.max(state.progress,Math.min(1,Number(event.progress)||0));state.phase=opts.recommendedBytes&&event.reason==='recommendation'?'tuningRecommendation':['loading','decoding','encoding','packaging'].includes(event.phase)?event.phase:'encoding';
         // Keep every progress value, but avoid rewriting the whole workbench for every frame.
-        const now=Date.now();if(state.phase!==lastProgressPhase||state.progress>=1||now<lastProgressSync||now-lastProgressSync>=100){lastProgressSync=now;lastProgressPhase=state.phase;sync();}
+        updateProgress();
       }});
       if(job.signal.aborted||revision!==state.revision||controller!==job)return;
       if(!(result.blob instanceof Blob)||!result.blob.size||!result.config?.info||result.config.info.v!==2||result.report?.valid!==true)throw new Error('invalid final VAP result');
@@ -618,7 +639,7 @@
       resourceEditor?.rememberExport?.(result.config);state.progress=1;state.notice=null;sync();
       window.Hub?.record('vap','generated');document.dispatchEvent(new CustomEvent('vap:result',{detail:state.result}));window.FunToolkitUI?.reveal($('Result'));
     }catch(error){if(controller===job){root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':error.uiKey||errorKey(error);state.errorTone=job.signal.aborted?'info':'error'}}
-    finally{resultResources?.dispose();if(controller===job){controller=null;state.converting=false;sync();requestPreview()}}
+    finally{stopWatching?.();resultResources?.dispose();if(controller===job){controller=null;state.converting=false;state.encoderDownload=null;sync();requestPreview()}}
   }
   function cancel(){
     if(state.loading){

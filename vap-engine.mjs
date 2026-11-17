@@ -8,7 +8,8 @@ export {inspectImageSequence, sequenceMetadata, decodeSequenceFrame};
 import {normalizeResources, computeResourceLayout, addResourceConfig, createResourceRenderer, createVapUnpacker} from './vap-resources.mjs?v=20261111-official-pack';
 import {normalizeGiftFade, giftFadeOpacity, applyGiftFade} from './vap-gift-fade.mjs?v=20261029-gift-fade1';
 import {copyPackedVideo} from './vap-copy-packets.mjs?v=20261111-native-quality';
-import {loadCrfParts,supportsCrfEncoder} from './vap-crf-assets.mjs?v=20261116-prewarm';
+import {loadCrfParts,supportsCrfEncoder} from './vap-crf-assets.mjs?v=20261117-download-progress';
+export {watchCrfDownload as watchVapEncoderDownload} from './vap-crf-assets.mjs?v=20261117-download-progress';
 
 export async function prewarmVapEncoder(){
   if(supportsCrfEncoder())await loadCrfParts({prewarm:true});
@@ -633,7 +634,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
     }
     const target=new M.BufferTarget();output=new M.Output({format:new M.Mp4OutputFormat({fastStart:'in-memory'}),target});
     if(o.crf!==undefined){
-      const {createCrfEncoder}=await import('./vap-crf-encoder.mjs?v=20261116-prewarm');
+      const {createCrfEncoder}=await import('./vap-crf-encoder.mjs?v=20261117-download-progress');
       crfEncoder=await createCrfEncoder({codec:o.videoCodec,crf:o.crf,width:plan.layout.videoW,height:plan.layout.videoH,fps:o.fps,frameCount,signal,onProgress:(fraction,attempt)=>{
         progress({phase:'encoding',progress:.60+.35*fraction,frame:frameCount,totalFrames:frameCount,pass:attempt,reason:attempt>1?'recommendation':undefined});
       }});
@@ -808,7 +809,13 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
     }
     times.wallMs=clock()-started;
     return {qualitySamples:qualitySampler?.samples||[],blob:new Blob([bytes],{type:'video/mp4'}),config,frames:frameCount,audioMode,actualCodec,requestedCodec:plan.codec,bitrate:plan.bitrate,crf:crfResult?.crf,crfAttempts:crfResult?.attempts,nativeGpuFallback,processingPath:directNative?'native-vap-planes':nativePlanes?'native-vap-gpu':workerPool?'matte-workers':sequenceRgba.enabled?'sequence-rgba-canvas':sequence?'sequence-rgba-processor':native.enabled?'native-opaque':'matte-processor',matteWorkerCount:workerPool?.size||0,sequenceDecodeSlots:sequence?iterator.capacity:0,nativeOpaqueFallback:native.reason,times};
-  }catch(error){await output?.cancel().catch(()=>{});if(error instanceof VapError)throw error;if(signal?.aborted)throw new VapError('cancelled','转换已取消。',error);throw new VapError('encode','视频转换失败；原视频已保留，请调整参数重试。',error)}
+  }catch(error){
+    await output?.cancel().catch(()=>{});
+    if(error instanceof VapError)throw error;
+    if(signal?.aborted)throw new VapError('cancelled','转换已取消。',error);
+    if(error?.code==='encoder-download')throw new VapError(error.code,error.message,error);
+    throw new VapError('encode','视频转换失败；原视频已保留，请调整参数重试。',error);
+  }
   finally{signal?.removeEventListener('abort',abort);workerPool?.dispose();try{await crfEncoder?.dispose()}catch(ignored){}await iterator?.return?.().catch(()=>{});try{await processor?.dispose()}catch(ignored){}qualitySampler?.dispose();nativePlanes?.dispose();resourceRenderer?.dispose();unpacker?.dispose();input.dispose();for(const c of images)c.width=c.height=1;}
 }
 

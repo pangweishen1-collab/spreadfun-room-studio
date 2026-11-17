@@ -1,4 +1,4 @@
-import {supportsCrfEncoder} from './vap-crf-assets.mjs?v=20261116-prewarm';
+import {loadCrfParts, supportsCrfEncoder} from './vap-crf-assets.mjs?v=20261117-download-progress';
 
 function crfError(code, message, cause) {
   return Object.assign(new Error(message, {cause}), {code});
@@ -41,6 +41,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
 
   const name = 'fun-vap-crf-' + crypto.randomUUID();
   let root, worker, pending, nextMessage = 0, closed = false, ending, frames = 0, finished = false;
+  let coreReady, rejectCoreWait;
   let encodeAttempt = 1, totalAttempts = 1;
   const cleanup = async () => {
     try { await root?.removeEntry(name, {recursive: true}); } catch (error) {
@@ -56,6 +57,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
     signal?.removeEventListener('abort', abort);
     worker?.terminate();
     pending?.reject(reason);
+    rejectCoreWait?.(reason);
     pending = null;
     ending = cleanup();
     return ending;
@@ -80,7 +82,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
     const folder = await root.getDirectoryHandle(name, {create: true});
     const file = await folder.getFileHandle('packed.i420', {create: true});
     if (signal?.aborted) throw cancelled();
-    worker = new Worker(new URL('./vap-crf-worker.js?v=20261116-prewarm', import.meta.url), {type: 'module'});
+    worker = new Worker(new URL('./vap-crf-worker.js?v=20261117-download-progress', import.meta.url), {type: 'module'});
     worker.onmessage = ({data}) => {
       if (data.progress !== undefined) {
         onProgress?.((encodeAttempt - 1 + data.progress) / totalAttempts, encodeAttempt);
@@ -95,6 +97,16 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
     worker.onerror = () => { void dispose(crfError('encode', '本地 CRF 编码组件未能启动。')); };
     signal?.addEventListener('abort', abort, {once: true});
     await request('init', {file, width, height, fps, codec, frameCount});
+    // Frame staging can run while the shared download finishes. Cancelling
+    // this encode releases its wait and leaves the assets reusable.
+    coreReady = Promise.race([
+      loadCrfParts().then(parts => {
+        if (closed) throw cancelled();
+        worker.postMessage({type: 'core', parts});
+      }),
+      new Promise((_, reject) => { rejectCoreWait = reject; })
+    ]);
+    coreReady.catch(() => {});
   } catch (error) {
     await dispose();
     if (signal?.aborted) throw cancelled();
@@ -111,6 +123,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
     async finish({targetBytes} = {}) {
       if (finished || frames !== frameCount) throw crfError('encode', 'CRF 编码未收到全部视频帧。');
       finished = true;
+      await coreReady;
       totalAttempts = targetBytes > 0 ? recommendedAttempts : 1;
       return encodeToRecommendation(crf, targetBytes, async (value, attempt) => {
         encodeAttempt = attempt;

@@ -32,9 +32,10 @@ class AudioContextMock{
   async close(){this.closes++;this.state='closed'}
 }
 const inspectionRequests=[];
-let prewarmCalls=0,prewarmFailure=false;
+let prewarmCalls=0,prewarmFailure=false,downloadWatcher=null;
 const engine={async inspectVideo(file,options={}){inspectionRequests.push({file,options});if(inspectFailure)throw Error('probe failed');const meta={width:file.width||320,height:file.height||240,duration:file.duration||2,videoDuration:file.videoDuration,fps:file.fps||24,hasAudio:file.hasAudio!==false};if(options.detectSource){meta.sourceDetection=await sandbox.window.__detectSource(file);if(file.inferredVapConfig)meta.inferredVapConfig=file.inferredVapConfig}return meta},async convertVideo(file,options,callbacks){convertCalls++;return conversion(file,options,callbacks)}};
 engine.prewarmVapEncoder=async()=>{prewarmCalls++;if(prewarmFailure)throw Error('encoder preload failed')};
+engine.watchVapEncoderDownload=listener=>{downloadWatcher=listener;listener(null);return ()=>{downloadWatcher=null}};
 engine.inspectImageSequence=async(files,options={})=>{
   sequenceInspections.push({files:Array.from(files),options});
   if(sequenceImportOverride)return sequenceImportOverride(files,options);
@@ -594,6 +595,24 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     assert.equal(settings.options().videoCodec,'hevc');
     assert.equal(get('#vapPackedSize').textContent,'1088 × 1568 px');
     const previousConversion=conversion;
+    conversion=async(_file,_opts,{onProgress})=>{
+      assert.notEqual(get('#vapPhase').textContent,'正在下载编码组件…','a ready encoder leaves ordinary conversion progress visible');
+      downloadWatcher(.25);
+      assert.equal(get('#vapPhase').textContent,'正在下载编码组件…');
+      assert.equal(get('#vapPercent').textContent,'25%');
+      assert.equal(get('#vapProgress').value,.25);
+      onProgress({phase:'encoding',progress:.60});
+      assert.equal(get('#vapPercent').textContent,'25%','frame staging does not replace the visible download percentage');
+      downloadWatcher(.75);
+      assert.equal(get('#vapPercent').textContent,'75%');
+      downloadWatcher(null);
+      assert.equal(get('#vapPhase').textContent,'正在编码视频…');
+      assert.equal(get('#vapPercent').textContent,'60%');
+      return result();
+    };
+    await settings.convert();
+    assert.equal(get('#vapProgressRow').hidden,true);
+    assert.equal(downloadWatcher,null,'conversion releases its progress subscription');
     conversion=async()=>{throw Error('trial failed')};
     await settings.convert();
     assert.equal(settings.options().crf,25,'a failed export leaves the starting recommendation in place');

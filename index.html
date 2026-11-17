@@ -587,7 +587,7 @@ body{min-width:320px}
             <div id="vapMaskRow" class="vap-mask-row" hidden><button id="vapMaskPick" class="vap-button vap-secondary" type="button" data-vap-i18n="chooseMask">选择遮罩图片 / 视频</button><span id="vapMaskName" class="vap-hint" data-vap-i18n="noMask">尚未选择遮罩</span></div>
           </div>
           <div id="vapLegacyOutputOptions" hidden><label class="vap-check"><input id="vapKeepAudio" type="checkbox" checked><span data-vap-i18n="keepAudio">保留原片声音</span></label></div></details>
-        <div class="vap-task-progress" id="vapProgressRow" hidden><div><span id="vapPhase"></span><strong id="vapPercent">0%</strong></div><progress id="vapProgress" max="1" value="0" aria-label="转换进度"></progress></div>
+        <div class="vap-task-progress" id="vapProgressRow" hidden><div><span id="vapPhase" role="status"></span><strong id="vapPercent">0%</strong></div><progress id="vapProgress" max="1" value="0" aria-labelledby="vapPhase"></progress></div>
         <p class="vap-notice" id="vapNotice" role="status" aria-live="polite" hidden></p>
         <div class="vap-actions"><button id="vapConvert" class="vap-button vap-primary ft-motion-sheen" type="button" data-feedback-button disabled data-vap-i18n="convert">开始转换 VAP</button><button id="vapCancel" class="vap-button vap-secondary" type="button" hidden data-vap-i18n="cancel">取消</button></div>
         <div class="vap-result" id="vapResult" hidden><div class="vap-success-heading"><span aria-hidden="true">✓</span><strong data-vap-i18n="generated">VAP v2 已生成</strong></div><p id="vapResultMeta"></p><p id="vapRecommendationResult" class="vap-hint" hidden></p><div class="vap-downloads"><button id="vapDownloadMp4" class="vap-button vap-primary" type="button" data-vap-i18n="downloadMp4">下载 VAP 资源</button><button id="vapDownloadJson" class="vap-button vap-secondary" type="button" data-vap-i18n="downloadJson">配置 JSON</button><button id="vapDownloadZip" class="vap-button vap-secondary" type="button" data-vap-i18n="downloadZip">完整包 ZIP</button></div><p id="vapDownloadReceipt" class="vap-hint" role="status" hidden></p></div>
@@ -1219,7 +1219,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script type="module" src="gift-avatar-preview.mjs?v=20261111-upload-progress"></script>
   <script src="vap-player.js?v=20261111-official-pack"></script>
   <script src="vap-resource-editor.js?v=20261111-upload-progress"></script>
-  <script src="vap-tool.js?v=20261117-sequence-500mb"></script>
+  <script src="vap-tool.js?v=20261117-download-progress"></script>
   <script src="dice-embed.js?v=20261103-dice1"></script>
   <script src="toolkit.js?v=20261111-token1"></script>
   <script type="module" src="token/workspace.mjs?v=20261112-atlas-rotation"></script>

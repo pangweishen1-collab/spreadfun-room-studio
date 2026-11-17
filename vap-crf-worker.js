@@ -1,11 +1,11 @@
-import {loadCrfParts} from './vap-crf-assets.mjs?v=20261116-prewarm';
-
 const vendor = new URL('./vendor/vap-crf/', import.meta.url);
+const coreURL = new URL('ffmpeg-core.mjs', vendor).href;
+const coreModule = import(coreURL);
+coreModule.catch(() => {});
 let job;
 
-async function loadCore() {
-  const coreURL = new URL('ffmpeg-core.mjs', vendor).href;
-  const [{default: createFFmpegCore}, parts] = await Promise.all([import(coreURL), loadCrfParts()]);
+async function loadCore(parts) {
+  const {default: createFFmpegCore} = await coreModule;
   const wasmBinary = new Uint8Array(await new Blob(parts).arrayBuffer());
   const workerURL = new URL('ffmpeg-core.worker.js', vendor).href;
   // The upstream loader reads the worker URL from this fragment. The wasm
@@ -44,11 +44,8 @@ async function init(message) {
     throw Object.assign(new Error('当前浏览器不支持 CRF 编码所需的本地文件存储。'), {code: 'unsupported'});
   }
   const access = await file.createSyncAccessHandle();
-  const coreReady = loadCore();
-  // The first encode observes startup failures after frame staging.
-  coreReady.catch(() => {});
   job = {
-    ...message, access, coreReady, offset: 0,
+    ...message, access, offset: 0,
     rgba: new Uint8Array(width * height * 4), i420: new Uint8Array(width * height * 3 / 2)
   };
 }
@@ -119,6 +116,11 @@ async function encode(crf) {
 
 self.onmessage = async ({data}) => {
   const {id, type} = data;
+  if (type === 'core') {
+    job.coreReady = loadCore(data.parts);
+    job.coreReady.catch(() => {});
+    return;
+  }
   try {
     let result;
     if (type === 'init') await init(data);
