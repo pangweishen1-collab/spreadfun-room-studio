@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.21.1 - 2026-11-17
+
+- Add Yari and 4Fun project cards to Preview Images, in the same order as Banner. Both cards display a pending template state on the vehicle, medal, and gift previews.
+
 ## 1.21.0 - 2026-11-17
 
 - Add Hapi templates for vehicle and medal placement, the medal page, and the gift tray.
