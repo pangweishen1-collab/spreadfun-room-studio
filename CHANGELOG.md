@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.20.1 - 2026-11-17
+
+- Accept image sequences up to 500 MB. The limit applies to loose images in total, the ZIP file, and the total expanded image size.
+- Download encoder assets in the background after import and reuse cached files across reloads. An export can retry a failed download.
+
 ## 1.20.0 - 2026-11-16
 
 - Add four bright, dimensional gold text presets to Custom Avatar Frames. The canvas preview, exported SVGA and first-frame WebP use the selected style.
