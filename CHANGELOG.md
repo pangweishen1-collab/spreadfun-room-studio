@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.21.2 - 2026-11-17
+
+- Keep artwork slots transparent during uploads and show a spinner in the current slot after one second.
+- Enlarge the four large medals in the Hapi medal preview to 280 × 280 px. Use green backgrounds for all four large medal cards in the Hapi Ludo preview.
+- Show the project cards directly below the preview tabs.
+
 ## 1.21.1 - 2026-11-17
 
 - Add Yari and 4Fun project cards to Preview Images, in the same order as Banner. Both cards display a pending template state on the vehicle, medal, and gift previews.
