@@ -478,7 +478,7 @@ html[data-input-modality="keyboard"] #giftPreviewTool .dimension-input:focus-wit
 #giftPreviewTool button:focus-visible,#giftPreviewTool input[type="range"]:focus-visible{outline:2px solid var(--tool-focus);outline-offset:2px}
 #giftPreviewTool :is(.gift-batch-select,.gift-batch-remove):focus-visible{outline-offset:-3px}
 #giftPreviewTool button:disabled,#giftPreviewTool input:disabled{cursor:not-allowed}
-#giftPreviewTool button:disabled{background:#edf0f4;border-color:#d8dce2;color:#647083;box-shadow:none;transform:none;opacity:1;filter:none}
+#giftPreviewTool button:disabled:where(:not(.profile-slot)){background:#edf0f4;border-color:#d8dce2;color:#647083;box-shadow:none;transform:none;opacity:1;filter:none}
 #giftPreviewTool input:disabled{opacity:.5}
 @media(hover:hover) and (pointer:fine){
  #giftPreviewTool .gift-mode:hover:not(:disabled){border-color:#a7d0ff;background:#f7fbff;color:var(--blue)}

@@ -14,13 +14,6 @@
   margin:0 auto 20px;
   container-type:inline-size;
 }
-.profile-project-bar h2 {
-  margin:0 0 12px;
-  color:var(--tool-heading);
-  font-size:16px;
-  line-height:24px;
-  font-weight:650;
-}
 .profile-project-catalog {
   display:grid;
   grid-template-columns:repeat(4,minmax(0,158px));
@@ -204,7 +197,7 @@
   aspect-ratio:720/1754;
   background:#152349;
 }
-.profile-medal-row-mask {
+.profile-background-patch {
   position:absolute;
   pointer-events:none;
   background-repeat:no-repeat;
@@ -260,6 +253,14 @@
   cursor:grab;
 }
 .profile-slot:disabled {cursor:not-allowed}
+.profile-slot-spinner {
+  position:absolute;
+  top:50%;
+  left:50%;
+  translate:-50% -50%;
+  pointer-events:none;
+  filter:drop-shadow(0 1px 2px #071626a0);
+}
 .profile-slot-art {
   display:block;
   width:var(--profile-art-width);

@@ -64,6 +64,7 @@ const projects = [
   {id: '4fun', name: '4Fun', pending: true}
 ];
 const placements = Object.fromEntries(projects.filter(project => !project.pending).map(({id}) => [id, new Map()]));
+const loadingSlots = new Set();
 const defaultMedal = 'assets/profile-preview/medal-default.webp?v=20261111-profile1';
 let medalUploadInProgress = false;
 let currentProject;
@@ -109,7 +110,7 @@ function mountPreview(device, prefix, scenes) {
   const stage = control('Stage');
   const backdrop = stage.querySelector('.profile-stage-background');
   const sharedMedals = scenes['hapi-ludo'].layout.some(item => item.kind === 'medal');
-  let project, scene, mode, mask;
+  let project, scene, mode, backgroundPatches;
   let busy = false;
   let notice = null;
   let pickedSlot = null;
@@ -147,6 +148,10 @@ function mountPreview(device, prefix, scenes) {
     const cue = document.createElement('span');
     cue.className = 'profile-slot-replace';
     cue.setAttribute('aria-hidden', 'true');
+    const spinner = document.createElement('span');
+    spinner.className = 'ft-spinner profile-slot-spinner';
+    spinner.dataset.ftRunning = 'true';
+    spinner.setAttribute('aria-hidden', 'true');
     if (fallback) button.append(fallback);
     button.append(cue);
     button.addEventListener('click', event => {
@@ -164,7 +169,7 @@ function mountPreview(device, prefix, scenes) {
     });
     overlay.append(button);
     buttons.push(button);
-    views.push({slot, x, y, width, height, column, row, size, button, fallback, cue, element: fallback, shownAsset: null});
+    views.push({slot, x, y, width, height, column, row, size, button, fallback, cue, spinner, element: fallback, shownAsset: null});
   }
 
   const active = () => location.hash === '#gift-previews' && !device.hidden && !currentProject?.pending;
@@ -192,7 +197,7 @@ function mountPreview(device, prefix, scenes) {
       button.setAttribute('aria-pressed', String(kind === mode));
     }
     for (const view of views) {
-      const {slot, size, button, cue} = view;
+      const {slot, size, button, cue, spinner} = view;
       const title = strings.seat(strings[slot.kind], slot.number) + (size ? ` · ${strings[size]}` : '');
       button.disabled = blocked;
       button.setAttribute('aria-label', title);
@@ -204,10 +209,14 @@ function mountPreview(device, prefix, scenes) {
         button.replaceChildren(...(view.element ? [view.element, cue] : [cue]));
         button.classList.toggle('has-upload', Boolean(slot.asset));
       }
+      if (loadingSlots.has(slot)) {
+        if (spinner.parentElement !== button) button.append(spinner);
+      } else spinner.remove();
     }
     status.dataset.tone = notice?.tone ?? '';
     const message = strings[notice?.key];
-    status.textContent = typeof message === 'function' ? message(notice.value) : message ?? '';
+    const statusText = typeof message === 'function' ? message(notice.value) : message ?? '';
+    if (status.textContent !== statusText) status.textContent = statusText;
     syncProjectCards();
   }
 
@@ -251,18 +260,26 @@ function mountPreview(device, prefix, scenes) {
       : category;
     const trigger = targetView?.button ?? upload;
     const loadingMedals = mode === 'medal';
+    const syncUpload = loadingMedals ? () => previews.forEach(preview => preview.sync()) : sync;
     if (loadingMedals) medalUploadInProgress = true;
     busy = true;
     notice = {key: 'processing'};
-    if (loadingMedals) previews.forEach(preview => preview.sync());
-    else sync();
-    const progress = window.UploadProgress?.begin(files.length);
+    syncUpload();
     const prepared = [];
-    let activeFile;
+    let activeFile, activeSlot, visibleSlot;
+    function showLoading(slot) {
+      loadingSlots.delete(visibleSlot);
+      loadingSlots.add(slot);
+      visibleSlot = slot;
+      syncUpload();
+    }
+    const progress = window.UploadProgress?.begin(files.length, {onVisible: () => showLoading(activeSlot)});
     try {
       // Prepare the entire batch before replacing existing placements.
-      for (const file of files) {
+      for (const [index, file] of files.entries()) {
         activeFile = file;
+        activeSlot = destinations[index];
+        if (visibleSlot) showLoading(activeSlot);
         const blob = await prepareProfileArtwork(file, outputSides[mode]);
         const url = URL.createObjectURL(blob);
         const image = artwork(url);
@@ -281,10 +298,10 @@ function mountPreview(device, prefix, scenes) {
       notice = {key, value: activeFile.name, tone: 'error'};
     } finally {
       progress?.finish();
+      loadingSlots.delete(visibleSlot);
       busy = false;
       if (loadingMedals) medalUploadInProgress = false;
-      if (loadingMedals) previews.forEach(preview => preview.sync());
-      else sync();
+      syncUpload();
       if (active() && document.activeElement === document.body) trigger.focus({preventScroll: true});
     }
   }
@@ -361,9 +378,8 @@ function mountPreview(device, prefix, scenes) {
       canvas.height = screen.height;
       const context = canvas.getContext('2d');
       context.drawImage(backdrop, 0, 0, screen.width, screen.height);
-      if (mask) {
-        context.drawImage(backdrop, mask.sourceX, mask.y, mask.sourceWidth, mask.height,
-          mask.x, mask.y, mask.width, mask.height);
+      for (const {x, y, width, height, sourceX, sourceWidth = width} of backgroundPatches) {
+        context.drawImage(backdrop, sourceX, y, sourceWidth, height, x, y, width, height);
       }
       context.imageSmoothingQuality = 'high';
       if (clipY < screen.height) {
@@ -454,7 +470,7 @@ function mountPreview(device, prefix, scenes) {
     deactivate();
     project = next;
     scene = scenes[project];
-    const {background, screen, card, layout, columns, sprite, largeMedals, maskSource,
+    const {background, screen, card, layout, columns, sprite, largeMedals, maskSource, cardPatches = [],
       clipY = screen.height} = scene;
     if (!mode || !layout.some(item => item.kind === mode)) mode = layout[0].kind;
     pickedSlot = null;
@@ -470,20 +486,22 @@ function mountPreview(device, prefix, scenes) {
     overlay.style.setProperty('--profile-default-sprite', sprite ? `url("${sprite}")` : 'none');
     overlay.style.setProperty('--profile-slot-clip-bottom', `${(screen.height - clipY) / screen.height * 100}%`);
 
-    mask = null;
+    backgroundPatches = [...cardPatches];
     if (maskSource) {
-      mask = {...maskSource, x: columns[0], y: layout[0].y,
-        width: columns.at(-1) + card.width - columns[0], height: card.height};
+      backgroundPatches.push({...maskSource, x: columns[0], y: layout[0].y,
+        width: columns.at(-1) + card.width - columns[0], height: card.height});
+    }
+    for (const {x, y, width, height, sourceX, sourceWidth = width} of backgroundPatches) {
       const patch = document.createElement('div');
-      patch.className = 'profile-medal-row-mask';
+      patch.className = 'profile-background-patch';
       Object.assign(patch.style, {
-        left: `${mask.x / screen.width * 100}%`,
-        top: `${mask.y / screen.height * 100}%`,
-        width: `${mask.width / screen.width * 100}%`,
-        height: `${mask.height / screen.height * 100}%`,
+        left: `${x / screen.width * 100}%`,
+        top: `${y / screen.height * 100}%`,
+        width: `${width / screen.width * 100}%`,
+        height: `${height / screen.height * 100}%`,
         backgroundImage: `url("${background}")`,
-        backgroundSize: `${screen.width / mask.sourceWidth * 100}% ${screen.height / mask.height * 100}%`,
-        backgroundPosition: `${mask.sourceX / (screen.width - mask.sourceWidth) * 100}% ${mask.y / (screen.height - mask.height) * 100}%`
+        backgroundSize: `${screen.width / sourceWidth * 100}% ${screen.height / height * 100}%`,
+        backgroundPosition: `${sourceX / (screen.width - sourceWidth) * 100}% ${y / (screen.height - height) * 100}%`
       });
       overlay.append(patch);
     }
@@ -500,7 +518,12 @@ function mountPreview(device, prefix, scenes) {
         slots.push(slot);
       });
     });
-    largeMedals?.forEach(({x, y}, index) => addView(slots[index], {x, y, width: 230, height: 230, size: 'largeMedal'}));
+    if (largeMedals) {
+      const {side, centers} = largeMedals;
+      centers.forEach(([x, y], index) => addView(slots[index], {
+        x: x - side / 2, y: y - side / 2, width: side, height: side, size: 'largeMedal'
+      }));
+    }
     sync();
   }
   return {sync, deactivate, isBusy, setProject};
@@ -546,11 +569,15 @@ const previews = [
       card: {width: 112, height: 112},
       columns: [40, 172, 304, 436],
       layout: [{kind: 'medal', y: 246}],
-      largeMedals: [
-        {x: 77, y: 790}, {x: 421, y: 790},
-        {x: 77, y: 1180}, {x: 421, y: 1180}
-      ],
+      largeMedals: {
+        side: 230,
+        centers: [[192, 905], [536, 905], [192, 1295], [536, 1295]]
+      },
       maskSource: {sourceX: 550, sourceWidth: 10},
+      cardPatches: [
+        {x: 26, y: 756, width: 332, height: 382, sourceX: 370},
+        {x: 370, y: 1146, width: 332, height: 382, sourceX: 26}
+      ],
       defaultArtwork: {medal: defaultMedal}
     },
     hapi: {
@@ -559,10 +586,10 @@ const previews = [
       card: {width: 124, height: 124},
       columns: [44, 191, 339, 485],
       layout: [{kind: 'medal', y: 263}],
-      largeMedals: [
-        {x: 95, y: 822}, {x: 477, y: 822},
-        {x: 95, y: 1303}, {x: 477, y: 1303}
-      ],
+      largeMedals: {
+        side: 280,
+        centers: [[210, 937], [592, 937], [210, 1418], [592, 1418]]
+      },
       smallArtwork: 'assets/profile-preview/hapi-medal-plus.webp'
     }
   }),
@@ -664,6 +691,7 @@ tabs.forEach((tab, index) => {
 function syncLanguage() {
   const strings = stringsForPage();
   for (const label of labels) label.textContent = strings[label.dataset.profileText];
+  projectCatalog.setAttribute('aria-label', strings.projects);
   for (const {id, name} of projects) {
     projectCatalog.querySelector(`[data-project="${id}"]`).setAttribute('aria-label', `${strings.select} ${name}`);
   }

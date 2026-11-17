@@ -10,8 +10,8 @@
   if (parentProgress) {
     const uploads = new Set();
     window.UploadProgress = {
-      begin(total) {
-        const upload = parentProgress.begin(total);
+      begin(total, options) {
+        const upload = parentProgress.begin(total, options);
         uploads.add(upload);
         return {
           advance: upload.advance,
@@ -77,13 +77,14 @@
   }
 
   window.UploadProgress = {
-    begin(total) {
+    begin(total, {onVisible} = {}) {
       const upload = {fraction: null};
       let completed = 0;
       let finished = false;
       const timer = setTimeout(() => {
         visible.add(upload);
         render();
+        onVisible?.();
       }, 1000);
       function setProgress(fraction) {
         if (finished || !Number.isFinite(fraction)) return;

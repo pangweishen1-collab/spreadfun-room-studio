@@ -55,15 +55,19 @@ function elapseOneSecond() {
 }
 
 setup(window);
-const fast = window.UploadProgress.begin();
+let visibleNotices = 0;
+const onVisible = () => { visibleNotices++; };
+const fast = window.UploadProgress.begin(undefined, {onVisible});
 fast.finish();
 elapseOneSecond();
 assert.equal(document.body.children.length, 0, 'a finished upload never flashes');
+assert.equal(visibleNotices, 0);
 
-const slow = window.UploadProgress.begin(4);
+const slow = window.UploadProgress.begin(4, {onVisible});
 assert.equal(document.body.children.length, 0, 'wait before showing');
 slow.advance();
 elapseOneSecond();
+assert.equal(visibleNotices, 1);
 const [panel] = document.body.children;
 const [title, percent, bar] = panel.children;
 assert.equal(title.textContent, '正在读取素材…');
@@ -86,8 +90,9 @@ assert.equal(document.body.children.length, 0, 'late progress cannot show a fini
 dialog = element('dialog');
 const frame = {parent: window, addEventListener: (event, listener) => pageEvents.set(event, listener)};
 setup(frame);
-frame.UploadProgress.begin();
+frame.UploadProgress.begin(undefined, {onVisible});
 elapseOneSecond();
+assert.equal(visibleNotices, 2);
 assert.equal(dialog.children[0], panel, 'embedded progress uses the parent and stays above its open dialog');
 pageEvents.get('pagehide')();
 assert.equal(dialog.children.length, 0, 'iframe navigation clears its own progress');
