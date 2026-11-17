@@ -10,6 +10,10 @@
 .project-selector .resource-project[aria-pressed="true"] .resource-project-check{opacity:1}
 .project-selector .resource-project:focus-visible{outline:2px solid var(--tool-focus);outline-offset:2px}
 .project-selector .resource-project:disabled{cursor:not-allowed;opacity:.65}
+.project-selector.project-selector-horizontal .resource-project{flex-direction:row;justify-content:flex-start;gap:10px;min-height:64px;padding:12px 28px 12px 12px;text-align:left}
+.project-selector.project-selector-horizontal .resource-project-art{width:32px;flex:0 0 32px}
+.project-selector.project-selector-horizontal .resource-project-name{justify-content:flex-start;margin:0;text-align:left;font-size:14px;line-height:20px}
+.project-selector.project-selector-horizontal .resource-project-check{top:50%;right:8px;transform:translateY(-50%)}
 @media(max-width:540px){
  .project-selector .resource-project{padding:8px 6px 5px}
  .project-selector .resource-project-art{width:48px}

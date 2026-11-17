@@ -95,10 +95,6 @@ body{padding-bottom:var(--tool-footer-height)}
 /* Banner previews use the shared upload, file and download controls. */
 .banner-preview{min-height:0;container-type:inline-size}
 .banner-project-catalog{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
-#bannerTool .banner-project-catalog .resource-project{flex-direction:row;justify-content:flex-start;gap:10px;min-height:64px;padding:12px 28px 12px 12px;text-align:left}
-#bannerTool .banner-project-catalog .resource-project-art{width:32px;flex:0 0 32px}
-#bannerTool .banner-project-catalog .resource-project-name{justify-content:flex-start;margin:0;text-align:left;font-size:14px;line-height:20px}
-#bannerTool .banner-project-catalog .resource-project-check{top:50%;right:8px;transform:translateY(-50%)}
 .banner-export-project{margin:14px 0 10px;color:var(--tool-heading);font-size:14px;font-weight:600}
 .banner-output-specs{display:grid;gap:10px;margin-bottom:14px}
 .banner-output-spec{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px 12px;padding:14px 12px;border:1px solid var(--line);border-radius:12px;background:var(--tool-bg)}

@@ -4,6 +4,7 @@ import {bindPreviewSlotDrag} from './preview-slot-drag.mjs?v=20261111-profile1';
 const copy = {
   zh: {
     productionTab: '预览图生产', deviceTab: '座驾/勋章预览', medalTab: '勋章预览', giftTab: '礼物预览',
+    projects: '选择项目', select: '选择',
     gift: '礼物', giftReviewExport: '下载礼物栏预览图',
     medalReviewExport: '下载勋章页预览图', smallMedal: '小图', largeMedal: '大图',
     materialsHeading: '展示素材', medal: '勋章', vehicle: '座驾', upload: '批量上传',
@@ -23,6 +24,7 @@ const copy = {
   },
   en: {
     productionTab: 'Create preview', deviceTab: 'Vehicles / Medals', medalTab: 'Medal preview', giftTab: 'Gift preview',
+    projects: 'Choose a project', select: 'Select',
     gift: 'Gifts', giftReviewExport: 'Download gift tray preview',
     medalReviewExport: 'Download medal page preview', smallMedal: 'Small', largeMedal: 'Large',
     materialsHeading: 'Display assets', medal: 'Medals', vehicle: 'Vehicles', upload: 'Bulk upload',
@@ -48,7 +50,10 @@ const tabs = [...byId('profileTabs').querySelectorAll('[role="tab"]')];
 const panels = tabs.map(tab => byId(tab.getAttribute('aria-controls')));
 const labels = root.querySelectorAll('[data-profile-text]');
 const outputSides = {medal: 400, vehicle: 200, gift: 200};
-const medalPlacements = Array.from({length: 4}, (_, index) => ({kind: 'medal', number: index + 1, asset: null}));
+const projectBar = byId('profileProjectBar');
+const projectCatalog = byId('profileProjectCatalog');
+const projects = [{id: 'hapi-ludo', name: 'Hapi Ludo'}, {id: 'hapi', name: 'Hapi'}];
+const placements = Object.fromEntries(projects.map(({id}) => [id, new Map()]));
 const defaultMedal = 'assets/profile-preview/medal-default.webp?v=20261111-profile1';
 let medalUploadInProgress = false;
 const stringsForPage = () => copy[document.documentElement.lang.startsWith('zh') ? 'zh' : 'en'];
@@ -78,10 +83,7 @@ function downloadBlob(blob, filename) {
   }
 }
 
-function mountPreview(device, {
-  prefix, screen, card, layout, columns, defaultArtwork, sprite,
-  clipY = screen.height, largeMedals
-}) {
+function mountPreview(device, prefix, scenes) {
   const control = name => byId(prefix + name);
   const modes = Object.fromEntries(['Medal', 'Vehicle'].filter(name => control(name)).map(name => [name.toLowerCase(), control(name)]));
   const upload = control('Upload');
@@ -92,9 +94,10 @@ function mountPreview(device, {
   const count = control('Count');
   const status = control('Status');
   const overlay = control('Slots');
-  const backdrop = control('Stage').querySelector('.profile-stage-background');
-  const sharedMedals = layout.some(item => item.kind === 'medal');
-  let mode = layout[0].kind;
+  const stage = control('Stage');
+  const backdrop = stage.querySelector('.profile-stage-background');
+  const sharedMedals = scenes['hapi-ludo'].layout.some(item => item.kind === 'medal');
+  let project, scene, mode, mask;
   let busy = false;
   let notice = null;
   let pickedSlot = null;
@@ -102,29 +105,11 @@ function mountPreview(device, {
   let fileDropTarget = null;
   let spriteImage;
   const isBusy = () => busy || (sharedMedals && medalUploadInProgress);
-  if (sprite) {
-    overlay.style.setProperty('--profile-default-sprite', `url("${sprite}")`);
-    overlay.style.setProperty('--profile-slot-clip-bottom', `${(screen.height - clipY) / screen.height * 100}%`);
-  }
-  const mask = largeMedals && {sourceX: 550, sourceWidth: 10, x: columns[0], y: layout[0].y,
-    width: columns.at(-1) + card.width - columns[0], height: card.height};
-  if (mask) {
-    const patch = document.createElement('div');
-    patch.className = 'profile-medal-row-mask';
-    Object.assign(patch.style, {
-      left: `${mask.x / screen.width * 100}%`,
-      top: `${mask.y / screen.height * 100}%`,
-      width: `${mask.width / screen.width * 100}%`,
-      height: `${mask.height / screen.height * 100}%`,
-      backgroundImage: `url("${backdrop.getAttribute('src')}")`,
-      backgroundSize: `${screen.width / mask.sourceWidth * 100}% ${screen.height / mask.height * 100}%`,
-      backgroundPosition: `${mask.sourceX / (screen.width - mask.sourceWidth) * 100}% ${mask.y / (screen.height - mask.height) * 100}%`
-    });
-    overlay.append(patch);
-  }
-
   const views = [];
+  const buttons = [];
+  const slots = [];
   function addView(slot, {x, y, width, height, column, row, size}) {
+    const {screen, largeMedals, sprite, columns, layout, defaultArtwork, smallArtwork} = scene;
     const index = views.length;
     const button = document.createElement('button');
     button.type = 'button';
@@ -137,18 +122,21 @@ function mountPreview(device, {
     button.style.setProperty('--slot-y', `${y / screen.height * 100}%`);
     button.style.setProperty('--slot-w', `${width / screen.width * 100}%`);
     button.style.setProperty('--slot-h', `${height / screen.height * 100}%`);
-    let fallback;
+    let fallback = null;
     if (sprite) {
       fallback = document.createElement('span');
       fallback.className = 'profile-slot-art profile-slot-fallback';
       fallback.style.backgroundPosition = `${column * 100 / (columns.length - 1)}% ${row * 100 / (layout.length - 1)}%`;
     } else {
-      fallback = artwork(defaultArtwork[slot.kind], true);
+      const sources = size === 'smallMedal' && smallArtwork ? smallArtwork : defaultArtwork?.[slot.kind];
+      const src = Array.isArray(sources) ? sources[slot.number - 1] : sources;
+      if (src) fallback = artwork(src, true);
     }
     const cue = document.createElement('span');
     cue.className = 'profile-slot-replace';
     cue.setAttribute('aria-hidden', 'true');
-    button.append(fallback, cue);
+    if (fallback) button.append(fallback);
+    button.append(cue);
     button.addEventListener('click', event => {
       if (slotDrag.consumeClick(event)) return;
       selectMode(slot.kind);
@@ -163,15 +151,9 @@ function mountPreview(device, {
       if (hoveredSlot === index) hoveredSlot = null;
     });
     overlay.append(button);
+    buttons.push(button);
     views.push({slot, x, y, width, height, column, row, size, button, fallback, cue, element: fallback, shownAsset: null});
   }
-  const slots = layout.flatMap(({kind, y}, row) => columns.map((x, column) => {
-    const number = (row - layout.findIndex(item => item.kind === kind)) * columns.length + column + 1;
-    const slot = kind === 'medal' ? medalPlacements[number - 1] : {kind, number, asset: null};
-    addView(slot, {x, y, ...card, column, row, size: largeMedals ? 'smallMedal' : null});
-    return slot;
-  }));
-  largeMedals?.forEach(({x, y}, index) => addView(slots[index], {x, y, width: 230, height: 230, size: 'largeMedal'}));
 
   const active = () => location.hash === '#gift-previews' && !device.hidden;
 
@@ -190,7 +172,7 @@ function mountPreview(device, {
     download.disabled = blocked || placed === 0;
     download.textContent = strings.export(strings[mode]) + (mode === 'gift' ? ' · ZIP' : '');
     reviewDownload.disabled = blocked;
-    reviewDownload.textContent = largeMedals ? strings.medalReviewExport : mode === 'gift' ? strings.giftReviewExport : strings.reviewExport;
+    reviewDownload.textContent = scene.largeMedals ? strings.medalReviewExport : mode === 'gift' ? strings.giftReviewExport : strings.reviewExport;
     exportSize.textContent = strings.outputSize(outputSides[mode]);
     overlay.setAttribute('aria-busy', String(blocked));
     for (const [kind, button] of Object.entries(modes)) {
@@ -207,13 +189,14 @@ function mountPreview(device, {
       if (slot.asset !== view.shownAsset) {
         view.shownAsset = slot.asset;
         view.element = slot.asset?.image.cloneNode() ?? view.fallback;
-        button.replaceChildren(view.element, cue);
+        button.replaceChildren(...(view.element ? [view.element, cue] : [cue]));
         button.classList.toggle('has-upload', Boolean(slot.asset));
       }
     }
     status.dataset.tone = notice?.tone ?? '';
     const message = strings[notice?.key];
     status.textContent = typeof message === 'function' ? message(notice.value) : message ?? '';
+    syncProjectCards();
   }
 
   function selectMode(kind) {
@@ -224,7 +207,7 @@ function mountPreview(device, {
 
   const slotDrag = bindPreviewSlotDrag({
     overlay,
-    buttons: views.map(view => view.button),
+    buttons,
     slotAt,
     assetAt: index => views[index].slot.asset && {element: views[index].element, image: views[index].element},
     isBusy,
@@ -348,12 +331,14 @@ function mountPreview(device, {
     notice = {key: 'renderingReview'};
     sync();
     const canvas = document.createElement('canvas');
+    const {screen, sprite, clipY = screen.height, largeMedals} = scene;
     try {
       // Include the entire screen, even rows below the visible page fold.
       if (sprite && !spriteImage) spriteImage = artwork(sprite);
       const images = views.map(view => view.slot.asset?.image ?? spriteImage ?? view.fallback);
-      for (const image of images) image.loading = 'eager';
-      await Promise.all([backdrop.decode(), ...images.map(image => image.decode())]);
+      const artworkImages = [...new Set(images.filter(Boolean))];
+      for (const image of artworkImages) image.loading = 'eager';
+      await Promise.all([backdrop.decode(), ...artworkImages.map(image => image.decode())]);
       const style = getComputedStyle(overlay);
       const widthRatio = parseFloat(style.getPropertyValue('--profile-art-width')) / 100;
       const heightRatio = parseFloat(style.getPropertyValue('--profile-art-height')) / 100;
@@ -377,6 +362,7 @@ function mountPreview(device, {
       views.forEach((view, index) => {
         const {slot, x, y, width: boxWidth, height: boxHeight, column, row} = view;
         const image = images[index];
+        if (!image) return;
         const artWidth = boxWidth * widthRatio;
         const artHeight = boxHeight * heightRatio;
         context.globalAlpha = slot.asset ? 1 : defaultOpacity;
@@ -392,8 +378,8 @@ function mountPreview(device, {
           y + (boxHeight - height - boxWidth * liftRatio) / 2, width, height);
       });
       const blob = await window.canvasToLosslessWebP(canvas);
-      const scene = largeMedals ? 'medal-page' : mode === 'gift' ? 'gift-tray' : 'profile';
-      downloadBlob(blob, `${scene}-review-${screen.width}x${screen.height}.webp`);
+      const name = largeMedals ? 'medal-page' : mode === 'gift' ? 'gift-tray' : 'profile';
+      downloadBlob(blob, `${project === 'hapi' ? 'hapi-' : ''}${name}-review-${screen.width}x${screen.height}.webp`);
       notice = {key: 'reviewDownloaded'};
       window.Hub?.record('gift', 'generated');
       window.Hub?.record('gift', 'download');
@@ -449,54 +435,167 @@ function mountPreview(device, {
 
   window.addEventListener('hashchange', () => { if (!active()) deactivate(); });
   window.addEventListener('blur', clearFileDrop);
-  window.addEventListener('pagehide', event => {
+  window.addEventListener('pagehide', deactivate);
+
+  function setProject(next) {
     deactivate();
-    if (!event.persisted) {
-      for (const {asset} of slots) if (asset) URL.revokeObjectURL(asset.url);
+    project = next;
+    scene = scenes[project];
+    const {background, screen, card, layout, columns, sprite, largeMedals, maskSource,
+      clipY = screen.height} = scene;
+    if (!mode || !layout.some(item => item.kind === mode)) mode = layout[0].kind;
+    pickedSlot = null;
+    notice = null;
+    spriteImage = null;
+    overlay.replaceChildren();
+    slots.length = views.length = buttons.length = 0;
+    backdrop.src = background;
+    backdrop.width = screen.width;
+    backdrop.height = screen.height;
+    stage.style.aspectRatio = `${screen.width}/${screen.height}`;
+    overlay.dataset.project = project;
+    overlay.style.setProperty('--profile-default-sprite', sprite ? `url("${sprite}")` : 'none');
+    overlay.style.setProperty('--profile-slot-clip-bottom', `${(screen.height - clipY) / screen.height * 100}%`);
+
+    mask = null;
+    if (maskSource) {
+      mask = {...maskSource, x: columns[0], y: layout[0].y,
+        width: columns.at(-1) + card.width - columns[0], height: card.height};
+      const patch = document.createElement('div');
+      patch.className = 'profile-medal-row-mask';
+      Object.assign(patch.style, {
+        left: `${mask.x / screen.width * 100}%`,
+        top: `${mask.y / screen.height * 100}%`,
+        width: `${mask.width / screen.width * 100}%`,
+        height: `${mask.height / screen.height * 100}%`,
+        backgroundImage: `url("${background}")`,
+        backgroundSize: `${screen.width / mask.sourceWidth * 100}% ${screen.height / mask.height * 100}%`,
+        backgroundPosition: `${mask.sourceX / (screen.width - mask.sourceWidth) * 100}% ${mask.y / (screen.height - mask.height) * 100}%`
+      });
+      overlay.append(patch);
     }
-  });
-  return {sync, deactivate};
+
+    const counts = {};
+    layout.forEach(({kind, y, columns: rowColumns = columns, card: rowCard = card}, row) => {
+      rowColumns.forEach((x, column) => {
+        const number = counts[kind] = (counts[kind] ?? 0) + 1;
+        const key = `${kind}-${number}`;
+        const saved = placements[project];
+        if (!saved.has(key)) saved.set(key, {kind, number, asset: null});
+        const slot = saved.get(key);
+        addView(slot, {x, y, ...rowCard, column, row, size: largeMedals ? 'smallMedal' : null});
+        slots.push(slot);
+      });
+    });
+    largeMedals?.forEach(({x, y}, index) => addView(slots[index], {x, y, width: 230, height: 230, size: 'largeMedal'}));
+    sync();
+  }
+  return {sync, deactivate, isBusy, setProject};
 }
 
 const previews = [
-  mountPreview(byId('profileDevice'), {
-    prefix: 'profile',
-    screen: {width: 720, height: 1613},
-    card: {width: 156, height: 171},
-    columns: [30, 198, 366, 534],
-    layout: [
-      {kind: 'medal', y: 430},
-      {kind: 'vehicle', y: 709},
-      {kind: 'vehicle', y: 899},
-      {kind: 'vehicle', y: 1089}
-    ],
-    defaultArtwork: {
-      medal: defaultMedal,
-      vehicle: 'assets/profile-preview/vehicle-default.webp?v=20261111-profile1'
+  mountPreview(byId('profileDevice'), 'profile', {
+    'hapi-ludo': {
+      background: 'assets/profile-preview/profile-main.webp',
+      screen: {width: 720, height: 1613},
+      card: {width: 156, height: 171},
+      columns: [30, 198, 366, 534],
+      layout: [
+        {kind: 'medal', y: 430},
+        {kind: 'vehicle', y: 709},
+        {kind: 'vehicle', y: 899},
+        {kind: 'vehicle', y: 1089}
+      ],
+      defaultArtwork: {
+        medal: defaultMedal,
+        vehicle: 'assets/profile-preview/vehicle-default.webp?v=20261111-profile1'
+      }
+    },
+    hapi: {
+      background: 'assets/profile-preview/hapi-profile.webp',
+      screen: {width: 800, height: 1697},
+      card: {width: 164, height: 164},
+      columns: [28, 223, 411, 607],
+      layout: [
+        {kind: 'medal', y: 1375, columns: [29, 223, 412, 607]},
+        {kind: 'vehicle', y: 483},
+        {kind: 'vehicle', y: 768, columns: [28]}
+      ],
+      defaultArtwork: {
+        medal: ['01', '02', '03', '04'].map(number => `assets/profile-preview/hapi-profile-medal-${number}.webp`)
+      }
     }
   }),
-  mountPreview(byId('profileMedalPage'), {
-    prefix: 'medalPage',
-    screen: {width: 720, height: 1754},
-    card: {width: 112, height: 112},
-    columns: [40, 172, 304, 436],
-    layout: [{kind: 'medal', y: 246}],
-    largeMedals: [
-      {x: 77, y: 790}, {x: 421, y: 790},
-      {x: 77, y: 1180}, {x: 421, y: 1180}
-    ],
-    defaultArtwork: {medal: defaultMedal}
+  mountPreview(byId('profileMedalPage'), 'medalPage', {
+    'hapi-ludo': {
+      background: 'assets/profile-preview/medal-page.webp',
+      screen: {width: 720, height: 1754},
+      card: {width: 112, height: 112},
+      columns: [40, 172, 304, 436],
+      layout: [{kind: 'medal', y: 246}],
+      largeMedals: [
+        {x: 77, y: 790}, {x: 421, y: 790},
+        {x: 77, y: 1180}, {x: 421, y: 1180}
+      ],
+      maskSource: {sourceX: 550, sourceWidth: 10},
+      defaultArtwork: {medal: defaultMedal}
+    },
+    hapi: {
+      background: 'assets/profile-preview/hapi-medal-page.webp',
+      screen: {width: 800, height: 1788},
+      card: {width: 124, height: 124},
+      columns: [44, 191, 339, 485],
+      layout: [{kind: 'medal', y: 263}],
+      largeMedals: [
+        {x: 95, y: 822}, {x: 477, y: 822},
+        {x: 95, y: 1303}, {x: 477, y: 1303}
+      ],
+      smallArtwork: 'assets/profile-preview/hapi-medal-plus.webp'
+    }
   }),
-  mountPreview(byId('profileGift'), {
-    prefix: 'giftTray',
-    screen: {width: 720, height: 1620},
-    card: {width: 130, height: 130},
-    columns: [27, 202, 380, 556],
-    layout: [1000, 1206, 1413].map(y => ({kind: 'gift', y})),
-    sprite: 'assets/profile-preview/gift-defaults.webp',
-    clipY: 1512
+  mountPreview(byId('profileGift'), 'giftTray', {
+    'hapi-ludo': {
+      background: 'assets/profile-preview/gift-tray.webp',
+      screen: {width: 720, height: 1620},
+      card: {width: 130, height: 130},
+      columns: [27, 202, 380, 556],
+      layout: [1000, 1206, 1413].map(y => ({kind: 'gift', y})),
+      sprite: 'assets/profile-preview/gift-defaults.webp',
+      clipY: 1512
+    },
+    hapi: {
+      background: 'assets/profile-preview/hapi-gift-tray.webp',
+      screen: {width: 800, height: 1697},
+      card: {width: 130, height: 130},
+      columns: [48, 238, 429, 625],
+      layout: [1076, 1320].map(y => ({kind: 'gift', y}))
+    }
   })
 ];
+
+let currentProject;
+function syncProjectCards() {
+  const blocked = previews.some(preview => preview.isBusy());
+  for (const button of projectCatalog.children) {
+    button.disabled = blocked;
+    button.setAttribute('aria-pressed', String(button.dataset.project === currentProject));
+  }
+}
+
+function selectProject({id}) {
+  if (id === currentProject || previews.some(preview => preview.isBusy())) return;
+  currentProject = id;
+  for (const preview of previews) preview.setProject(id);
+}
+window.ProjectSelector.render(projectCatalog, projects, {onSelect: selectProject, selectedId: projects[0].id});
+selectProject(projects[0]);
+
+window.addEventListener('pagehide', event => {
+  if (event.persisted) return;
+  for (const project of Object.values(placements)) {
+    for (const {asset} of project.values()) if (asset) URL.revokeObjectURL(asset.url);
+  }
+});
 
 function selectTab(index) {
   tabs.forEach((tab, i) => {
@@ -505,6 +604,7 @@ function selectTab(index) {
     tab.tabIndex = selected ? 0 : -1;
     panels[i].hidden = !selected;
   });
+  projectBar.hidden = index === 0;
   previews.forEach((preview, i) => {
     if (i + 1 === index) preview.sync();
     else preview.deactivate();
@@ -530,6 +630,9 @@ tabs.forEach((tab, index) => {
 function syncLanguage() {
   const strings = stringsForPage();
   for (const label of labels) label.textContent = strings[label.dataset.profileText];
+  for (const {id, name} of projects) {
+    projectCatalog.querySelector(`[data-project="${id}"]`).setAttribute('aria-label', `${strings.select} ${name}`);
+  }
   for (const preview of previews) preview.sync();
 }
 new MutationObserver(syncLanguage).observe(document.documentElement, {attributes: true, attributeFilter: ['lang']});

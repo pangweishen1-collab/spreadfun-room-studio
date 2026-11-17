@@ -9,6 +9,22 @@
   stroke-linecap:round;
   stroke-linejoin:round;
 }
+.profile-project-bar {
+  max-width:1024px;
+  margin:0 auto 20px;
+}
+.profile-project-bar h2 {
+  margin:0 0 12px;
+  color:var(--tool-heading);
+  font-size:16px;
+  line-height:24px;
+  font-weight:650;
+}
+.profile-project-catalog {
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,158px));
+  gap:12px;
+}
 .profile-workspace {
   display:grid;
   grid-template-columns:minmax(0,1fr) minmax(260px,340px);
@@ -173,11 +189,17 @@
   --profile-art-height:100%;
   --profile-art-lift:0%;
 }
+.profile-slots[data-project="hapi"],
 .profile-slots-gift {
   --profile-art-width:100%;
   --profile-art-height:100%;
   --profile-art-lift:0%;
+}
+.profile-slots-gift {
   clip-path:inset(0 0 var(--profile-slot-clip-bottom));
+}
+.profile-slots-medal[data-project="hapi"] {
+  --profile-default-opacity:1;
 }
 .profile-slot-fallback {
   background-image:var(--profile-default-sprite);
