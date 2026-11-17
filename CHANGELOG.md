@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.21.0 - 2026-11-17
+
+- Add Hapi templates for vehicle and medal placement, the medal page, and the gift tray.
+- Use the Banner-style project cards to choose Hapi Ludo or Hapi. The original templates open under Hapi Ludo, and each project keeps its own placed artwork when switching.
+
 ## 1.20.2 - 2026-11-17
 
 - Show encoder download progress when conversion starts before the components are ready. Conversion continues automatically when the download finishes. Cached components go straight to conversion.
