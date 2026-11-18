@@ -92,6 +92,26 @@ function surface(width, height, readback = false) {
   return {canvas, ctx};
 }
 
+export function sampleReviewColor(source, x, y) {
+  const width = source?.videoWidth ?? source?.width, height = source?.videoHeight ?? source?.height;
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 ||
+      !Number.isFinite(x) || !Number.isFinite(y) || x < 0 || x > 1 || y < 0 || y > 1) {
+    throw new Error('Invalid screen sample');
+  }
+  const left = Math.max(0, Math.min(width - 1, Math.floor(x * width)) - 1);
+  const top = Math.max(0, Math.min(height - 1, Math.floor(y * height)) - 1);
+  const w = Math.min(3, width - left), h = Math.min(3, height - top);
+  const {ctx} = surface(w, h, true);
+  ctx.drawImage(source, left, top, w, h, 0, 0, w, h);
+  const {data} = ctx.getImageData(0, 0, w, h);
+  const channels = [[], [], []];
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] > 0) for (let c = 0; c < 3; c++) channels[c].push(data[i + c]);
+  }
+  if (!channels[0].length) throw new Error('Empty screen sample');
+  return channels.map(values => values.sort((a, b) => a - b)[Math.floor(values.length / 2)]);
+}
+
 function cover(ctx, image, tile) {
   const ratio = Math.max(tile.w / image.width, tile.h / image.height);
   const w = image.width * ratio, h = image.height * ratio;
@@ -101,10 +121,13 @@ function cover(ctx, image, tile) {
 function matteOptions(clip, key) {
   const detected = clip.meta.sourceDetection;
   const method = key !== 'auto' ? key : detected?.sourceKind === 'chroma_mp4' ? 'chroma_key' : detected?.matteMethod || 'opaque';
+  const picked = clip.keyColor;
+  const custom = key === 'chroma_key' && Array.isArray(picked) && picked.length === 3 &&
+    picked.every(channel => Number.isInteger(channel) && channel >= 0 && channel <= 255);
   return {
     matteMethod: method,
-    screenColor: detected?.screenColor || 'auto',
-    background: method === 'chroma_key' && detected?.sourceKind === 'chroma_mp4' ? detected.background : undefined,
+    screenColor: custom ? 'custom' : detected?.screenColor || 'auto',
+    background: custom ? picked : method === 'chroma_key' && detected?.sourceKind === 'chroma_mp4' ? detected.background : undefined,
     adaptiveChroma: method === 'chroma_key' && detected?.backgroundVariation === true,
   };
 }
@@ -125,7 +148,8 @@ function paintGift(gift, source, clip, settings, rect, room, pixelScale, frameTi
   }
   const {canvas, ctx} = gift.surface;
   const cacheFrame = frameTime !== undefined;
-  const repaint = !cacheFrame || frameTime !== gift.frameTime || source !== gift.source || settings.key !== gift.key;
+  const key = options?.background ? `${settings.key}:${options.background.join(',')}` : settings.key;
+  const repaint = !cacheFrame || frameTime !== gift.frameTime || source !== gift.source || key !== gift.key;
   if (repaint) {
     if (gift.unpacker) {
       ctx.putImageData(gift.unpacker.process(source), 0, 0);
@@ -140,7 +164,7 @@ function paintGift(gift, source, clip, settings, rect, room, pixelScale, frameTi
     }
     gift.frameTime = frameTime;
     gift.source = cacheFrame ? source : null;
-    gift.key = settings.key;
+    gift.key = key;
     gift.compositeKey = null;
   }
   if (!settings.mask.enabled || (fixedMask && !repaint)) return canvas;

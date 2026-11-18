@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 
 (async () => {
-  const {REVIEW_FPS, reviewLayout, giftRect, defaultReviewSlot, normalizeReviewTemplate, createReviewRenderer} = await import('../vap-review-engine.mjs');
+  const {REVIEW_FPS, reviewLayout, giftRect, defaultReviewSlot, normalizeReviewTemplate, createReviewRenderer, sampleReviewColor} = await import('../vap-review-engine.mjs');
   assert.equal(REVIEW_FPS, 30);
   for (let count = 1; count <= 6; count++) {
     const layout = reviewLayout(count);
@@ -61,15 +61,20 @@ const assert = require('node:assert/strict');
 
   const maskDraws = [], maskPixels = [], sourceDraws = [];
   const source = {};
+  let sourceRgba;
   globalThis.ImageData = class {
     constructor(data) { this.data = data; }
   };
   globalThis.OffscreenCanvas = class {
     getContext() {
       return {
-        clearRect() {}, save() {}, restore() { this.globalCompositeOperation = 'source-over'; },
+        clearRect() {}, fillRect() {}, fillText() {}, save() {}, restore() { this.globalCompositeOperation = 'source-over'; },
         putImageData(image) { maskPixels.push(image.data); },
-        getImageData(x, y, width, height) {return {data: new Uint8ClampedArray(width * height * 4)};},
+        getImageData(x, y, width, height) {
+          const data = new Uint8ClampedArray(width * height * 4);
+          if (sourceRgba) for (let i = 0; i < data.length; i += 4) data.set(sourceRgba, i);
+          return {data};
+        },
         drawImage(image, x, y, width, height) {
           if (image === source) sourceDraws.push(image);
           if (this.globalCompositeOperation === 'destination-in') maskDraws.push({image, y, height});
@@ -133,5 +138,56 @@ const assert = require('node:assert/strict');
   expectAlphas(native, 3.5, [14 / 30], 'the native gift gets the missing fade-out');
   config.funToolkit.giftFade.fadeOut = 1;
   expectAlphas(native, 3.5, [1], 'the native gift keeps its baked fade-out');
-  console.log('vap-review: cached frames, scaled preview, room mask, per-clip fades, 30 FPS and template compatibility passed.');
+  const pickedColor = [210, 25, 80], detectedColor = [18, 213, 16];
+  sourceRgba = [...pickedColor, 255];
+  const pickedClip = {...clip, keyColor: pickedColor, meta: {sourceDetection: {
+    sourceKind: 'chroma_mp4', screenColor: 'green', background: detectedColor
+  }}};
+  const keyed = {...defaultReviewSlot(), key: 'chroma_key', mask: {enabled: false}};
+  const keyedFrame = {clips:[pickedClip], settings:[keyed], sources:[source], labels:['L'], frameTimes:[0]};
+  const smallLayout = reviewLayout(1, 32);
+  const keyedPreview = createReviewRenderer(canvas, smallLayout);
+  keyedPreview.draw(keyedFrame);
+  assert.equal(maskPixels.at(-1)[3], 0, 'the selected color overrides the detected screen');
+  pickedClip.keyColor = detectedColor;
+  keyedPreview.draw(keyedFrame);
+  assert.ok(maskPixels.at(-1)[3] > 200, 'a changed picked color recomputes the matte of the same paused frame');
+  const paintCount = maskPixels.length;
+  pickedClip.keyColor = detectedColor.slice();
+  keyedPreview.draw(keyedFrame);
+  assert.equal(maskPixels.length, paintCount, 'equal RGB values keep the paused matte cached');
+  keyed.key = 'auto';
+  pickedClip.keyColor = pickedColor;
+  keyedPreview.draw(keyedFrame);
+  assert.ok(maskPixels.at(-1)[3] > 200, 'automatic mode keeps the detected screen without the picked override');
+  keyed.key = 'chroma_key';
+  const keyedExport = createReviewRenderer(canvas, smallLayout, {exportBackdrop:{background:null, labels:['L']}});
+  keyedExport.draw(keyedFrame);
+  assert.equal(maskPixels.at(-1)[3], 0, 'export applies the same picked background');
+  keyedPreview.draw({...keyedFrame, clips:[{...pickedClip, config}]});
+  assert.equal(maskPixels.at(-1)[3], pickedColor[0], 'packed sources use their original Alpha plane even with a picked color');
+  keyedExport.dispose();
+  keyedPreview.dispose();
+
+  const sampleDraws = [];
+  const pixels = new Uint8ClampedArray([
+    20, 30, 40, 255, 21, 31, 41, 255, 22, 32, 42, 255,
+    23, 33, 43, 255, 255, 255, 255, 255, 24, 34, 44, 255,
+    25, 35, 45, 255, 26, 36, 46, 255, 0, 0, 0, 0,
+  ]);
+  globalThis.OffscreenCanvas = class {
+    getContext() {
+      return {
+        drawImage(...args) {sampleDraws.push(args);},
+        getImageData() {return {data:pixels};}
+      };
+    }
+  };
+  const rawVideo = {videoWidth:640, videoHeight:480};
+  assert.deepEqual(sampleReviewColor(rawVideo, .5, .25), [24, 34, 44], 'the sample ignores transparent pixels and takes each channel median');
+  assert.deepEqual(sampleDraws.at(-1), [rawVideo, 319, 119, 3, 3, 0, 0, 3, 3]);
+  sampleReviewColor(rawVideo, 1, 1);
+  assert.deepEqual(sampleDraws.at(-1), [rawVideo, 638, 478, 2, 2, 0, 0, 2, 2], 'the sample stays inside the frame at edges');
+  assert.throws(() => sampleReviewColor(rawVideo, -.1, .25), /Invalid screen sample/);
+  console.log('vap-review: cached frames and picked screen colors, scaled preview, room mask, per-clip fades, 30 FPS and template compatibility passed.');
 })().catch(error => {console.error(error); process.exitCode = 1;});

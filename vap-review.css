@@ -9,7 +9,22 @@
 #vapTool .vap-review-frame{position:relative;width:min(100%,calc(min(720px,80vh) * var(--review-ratio,1.344)))}
 #vapReviewCanvas{display:block;width:100%;height:auto;aspect-ratio:var(--review-ratio,1.344)}
 #vapTool .vap-review-editors{position:absolute;inset:0;pointer-events:none}
-#vapTool .vap-review-editor{position:absolute;overflow:hidden}
+#vapTool .vap-review-editor{position:absolute;overflow:hidden;pointer-events:auto}
+#vapTool .vap-review-editor.is-dragging{outline:2px solid var(--review-accent);outline-offset:-2px}
+#vapTool .vap-review-editor-actions{position:absolute;z-index:4;top:6px;right:6px;left:6px;display:flex;justify-content:flex-end;align-items:flex-start;gap:4px;pointer-events:none}
+#vapTool .vap-review-editor-actions button{display:grid;place-items:center;flex:0 0 auto;width:30px;height:30px;min-height:0;padding:0;border:1px solid #627a97;border-radius:7px;background:#142236ec;color:#eef6ff;cursor:pointer;pointer-events:auto}
+#vapTool .vap-review-editor-actions button:is(:hover,:focus-visible,[aria-pressed=true]):not(:disabled){background:#234d74;border-color:var(--review-accent)}
+#vapTool .vap-review-editor-actions button:disabled{opacity:.55;cursor:not-allowed}
+#vapTool .vap-review-editor-actions [data-key-status]{min-width:0;margin-right:auto;padding:6px;border-radius:7px;background:#142236ec;color:#eef6ff;font:600 11px/16px system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#vapTool .vap-review-editor-actions [data-key-status]::before{content:"";display:inline-block;width:7px;height:7px;margin-right:4px;border-radius:50%;background:var(--review-key-color)}
+#vapTool .vap-review-color-sample{position:absolute;inset:0;z-index:3;display:block;width:100%;padding:0;border:2px solid var(--review-accent);border-radius:0;background:#131f32;cursor:crosshair}
+#vapTool .vap-review-color-sample video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;pointer-events:none}
+#vapTool .vap-review-color-sample span{position:absolute;right:6px;bottom:6px;left:6px;padding:6px;border-radius:6px;background:#142236ec;color:#eef6ff;font:600 11px/1.4 system-ui,sans-serif;pointer-events:none}
+@media(max-width:560px){
+  #vapTool .vap-review-editor-actions{top:4px;right:4px;left:4px;gap:3px}
+  #vapTool .vap-review-editor-actions button{width:26px;height:28px}
+  #vapTool .vap-review-editor-actions [data-key-status]{position:absolute;top:32px;right:0;max-width:100%;box-sizing:border-box}
+}
 #vapTool .vap-review-upload{
   --ft-upload-background:radial-gradient(ellipse at 50% 45%,#22334b,#172538 74%);
   --ft-upload-hover-background:radial-gradient(ellipse at 50% 45%,#2a4466,#1b2b41 76%);

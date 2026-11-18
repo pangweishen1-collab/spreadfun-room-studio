@@ -8,6 +8,7 @@ const copy = {
     uploadVideo:'上传{gift} MP4',count:'视频数量',play:'同步播放',pause:'暂停',timeline:'播放时间',slots:'视频调整',
     large:'大礼物',medium:'中礼物',small:'小礼物',gift:'礼物',vehicle:'座驾',replace:'替换',add:'上传',remove:'移除',
     scale:'画面大小',offsetY:'上下位置',editHint:'拖动视频调整位置，拖蓝线上的百分比手柄调整遮罩。',key:'视频底色',auto:'自动识别',opaque:'保留画面',black:'黑底去背景',white:'白底去背景',chroma:'色幕去背景',native:'原生 VAP 透明',
+    replaceVideo:'替换视频',pickColor:'吸管取色',cancelPick:'取消取色',pickHint:'点按视频的幕布取色，按 Esc 取消',pickFailed:'当前画面无法取色，请换一帧重试。',greenScreen:'绿幕',blueScreen:'蓝幕',
     mask:'上下渐变遮罩',enabled:'启用渐变',topStart:'上方透明边界',topEnd:'上方渐变结束',bottomStart:'下方渐变开始',bottomEnd:'下方透明边界',
     templates:'过稿模板',templateName:'模板名称',namePlaceholder:'输入模板名称',sharedHint:'模板及所选背景对全站访客可见。',
     maskPreview:'遮罩调整',maskExample:'示意',maskDrag:'在各自画面中上下拖动渐变线。',giftSettings:'画面设置',
@@ -31,6 +32,7 @@ const copy = {
     uploadVideo:'Upload {gift} MP4',count:'Video count',play:'Play together',pause:'Pause',timeline:'Playback time',slots:'Video adjustments',
     large:'Large gift',medium:'Medium gift',small:'Small gift',gift:'Gift',vehicle:'Vehicle',replace:'Replace',add:'Upload',remove:'Remove',
     scale:'Gift size',offsetY:'Vertical position',editHint:'Drag the video to move it. Drag the percentage handles to adjust the mask.',key:'Video background',auto:'Auto detect',opaque:'Keep picture',black:'Remove black',white:'Remove white',chroma:'Remove color screen',native:'Native VAP alpha',
+    replaceVideo:'Replace video',pickColor:'Pick screen color',cancelPick:'Cancel picker',pickHint:'Click the screen color in the video. Esc cancels.',pickFailed:'Could not sample this frame. Try another frame.',greenScreen:'Green screen',blueScreen:'Blue screen',
     mask:'Vertical feather mask',enabled:'Enable feathering',topStart:'Top transparent edge',topEnd:'Top fade end',bottomStart:'Bottom fade start',bottomEnd:'Bottom transparent edge',
     templates:'Review templates',templateName:'Template name',namePlaceholder:'Name this template',sharedHint:'The template and selected background are visible to all site visitors.',
     maskPreview:'Mask adjustment',maskExample:'Sample',maskDrag:'Drag the guides up or down in each preview.',giftSettings:'Picture settings',
@@ -61,13 +63,19 @@ const state = {
   cloudTemplates: [], localTemplates: [], templateSelection: '', templateName: '', target: null, time: 0, running: false, start: 0,
   busy: '', status: null, result: null, abort: null, renderer: null,
 };
-let initTask, animation, lastFrame = -1, previewLayout, selectedSlot, editorDrag, loadingSlot, fileDropZone, previewWidth = 0;
+let initTask, animation, lastFrame = -1, previewLayout, selectedSlot, pickingSlot, editorDrag, loadingSlot, fileDropZone, previewWidth = 0;
 let templateDraft, templateListTask, backgroundListTask;
 const playbackTileWidth = 192;
 const shown = () => state.slots.slice(0, state.count);
 const duration = () => Math.max(0, ...shown().map(slot => slot.clip?.duration || 0));
 const reviewing = () => state.active && state.tab === 'review';
 const busy = () => !!state.busy;
+const editorIcons = {
+  auto:'<path d="M3 6V3h3m8 0h3v3m0 8v3h-3m-8 0H3v-3M3 10h14"/>',
+  pick:'<path d="m12 3 5 5m-6-4 3-3 5 5-3 3m-4-4-8 8-1 4 4-1 8-8"/>',
+  replace:'<path d="M4 8a6 6 0 0 1 10.3-3L17 8m0-4v4h-4M16 12a6 6 0 0 1-10.3 3L3 12m0 4v-4h4"/>',
+};
+const editorIcon = key => '<svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + editorIcons[key] + '</svg>';
 const report = (key, kind = '', suffix = '') => {
   state.status = key ? {key, kind, suffix} : null;
   syncStatus();
@@ -205,9 +213,11 @@ function renderSlots() {
     card.querySelector('details').open = open.has(slot);
     card.querySelector('[data-open]').addEventListener('click', () => openFiles(index));
     card.querySelector('[data-remove]').addEventListener('click', () => {
+      if (pickingSlot === slot) stopColorPick();
       pause(); disposeClip(slot.clip); slot.clip = null; seek(Math.min(state.time, duration())); changed();
     });
     bindSlotSettings(slot, card, () => {
+      stopColorPick();
       selectedSlot = slot;
       changed();
     });
@@ -256,6 +266,7 @@ function syncMaskGuides(guides, slot, slotLabel, visible, visual = false) {
 }
 function renderEditors() {
   finishEditorDrag();
+  stopColorPick();
   $('Editors').replaceChildren(...shown().map((slot, index) => {
     const tile = previewLayout.tiles[index], room = {...tile, y: tile.y + tile.label};
     const editor = document.createElement('div');
@@ -263,6 +274,11 @@ function renderEditors() {
     editor.dataset.slot = index;
     editor.innerHTML = '<button type="button" class="vap-review-move" data-adjust="offsetY"></button>' +
       guideMarkup() +
+      '<div class="vap-review-editor-actions" hidden><span data-key-status></span>' +
+      '<button type="button" data-review-auto>' + editorIcon('auto') + '</button>' +
+      '<button type="button" data-review-pick>' + editorIcon('pick') + '</button>' +
+      '<button type="button" data-preview-upload="' + index + '">' + editorIcon('replace') + '</button></div>' +
+      '<button type="button" class="vap-review-color-sample" hidden><span></span></button>' +
       '<button type="button" class="vap-review-upload ft-upload-zone upload-ready" data-preview-upload="' + index + '">' +
       '<svg viewBox="38 20 84 84" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
       '<path d="M56 76V29a5 5 0 0 1 5-5h26l17 17v35M87 25v12a4 4 0 0 0 4 4h12"/>' +
@@ -283,6 +299,35 @@ function syncEditors() {
     if (!editor) return;
     const upload = editor.lastElementChild;
     const loading = loadingSlot === slot;
+    const picking = pickingSlot === slot;
+    const actions = editor.querySelector('.vap-review-editor-actions');
+    actions.hidden = !clip;
+    const auto = actions.querySelector('[data-review-auto]'), pick = actions.querySelector('[data-review-pick]'), replace = actions.querySelector('[data-preview-upload]');
+    for (const [button, key] of [[auto, 'auto'], [pick, picking ? 'cancelPick' : 'pickColor'], [replace, 'replaceVideo']]) {
+      button.title = t(key);
+      button.setAttribute('aria-label', label(index) + ' · ' + t(key));
+      button.disabled = busy();
+    }
+    auto.hidden = pick.hidden = !!clip?.config;
+    replace.setAttribute('aria-busy', String(loading));
+    auto.setAttribute('aria-pressed', String(settings.key === 'auto'));
+    pick.setAttribute('aria-pressed', String(picking));
+    const result = actions.querySelector('[data-key-status]');
+    const detected = clip?.meta.sourceDetection;
+    const color = settings.key === 'chroma_key' && clip?.keyColor
+      ? clip.keyColor : ['auto', 'chroma_key'].includes(settings.key) && detected?.sourceKind === 'chroma_mp4' ? detected.background : null;
+    const hex = color ? '#' + color.map(value => value.toString(16).padStart(2, '0')).join('').toUpperCase() : '';
+    const screen = detected?.screenColor;
+    const status = clip?.config ? t('native') : settings.key === 'chroma_key' && clip?.keyColor
+      ? hex : color ? t(screen === 'green' ? 'greenScreen' : screen === 'blue' ? 'blueScreen' : 'chroma') : '';
+    result.hidden = !status;
+    result.textContent = status;
+    result.title = status;
+    result.style.setProperty('--review-key-color', hex || 'transparent');
+    const sample = editor.querySelector('.vap-review-color-sample');
+    sample.hidden = !picking;
+    sample.firstElementChild.textContent = t('pickHint');
+    sample.setAttribute('aria-label', t('pickHint'));
     const uploadLabel = loading ? t('reading') : t('uploadVideo').replace('{gift}', label(index));
     upload.hidden = !!clip;
     upload.disabled = busy();
@@ -291,7 +336,7 @@ function syncEditors() {
     upload.setAttribute('aria-label', loading ? label(index) + ' · ' + uploadLabel : uploadLabel);
     upload.lastElementChild.textContent = uploadLabel;
     const move = editor.firstElementChild;
-    move.hidden = !clip || busy();
+    move.hidden = !clip || busy() || picking;
     const guides = editor.querySelectorAll('.vap-review-guide-line');
     if (move.hidden) {
       for (const guide of guides) guide.hidden = true;
@@ -302,6 +347,45 @@ function syncEditors() {
     move.setAttribute('aria-label', label(index) + ' · ' + t('offsetY') + ' ' + settings.offsetY + '%');
     syncMaskGuides(guides, slot, label(index), selectedSlot === slot && settings.mask.enabled && !state.running);
   });
+}
+function stopColorPick(restoreFocus = false) {
+  if (!pickingSlot) return;
+  const slot = pickingSlot;
+  pickingSlot = null;
+  slot.clip.video.remove();
+  syncEditors();
+  if (restoreFocus) slot.editor.querySelector('[data-review-pick]').focus({preventScroll:true});
+}
+function startColorPick(slot) {
+  if (pickingSlot === slot) {stopColorPick(true);return;}
+  if (busy() || !slot.clip || slot.clip.config) return;
+  stopColorPick();
+  finishEditorDrag(); pause();
+  if (state.time >= slot.clip.duration) seek(0);
+  pickingSlot = selectedSlot = slot;
+  const sample = slot.editor.querySelector('.vap-review-color-sample');
+  slot.clip.video.setAttribute('aria-hidden', 'true');
+  sample.append(slot.clip.video);
+  syncEditors();
+  sample.focus({preventScroll:true});
+}
+function pickScreenColor(event, slot) {
+  const video = slot.clip.video;
+  if (busy() || pickingSlot !== slot || video.readyState < 2 || video.seeking) return;
+  const rect = video.getBoundingClientRect();
+  const scale = Math.min(rect.width / video.videoWidth, rect.height / video.videoHeight);
+  const w = video.videoWidth * scale, h = video.videoHeight * scale;
+  const x = event.detail ? (event.clientX - rect.left - (rect.width - w) / 2) / w : .5;
+  const y = event.detail ? (event.clientY - rect.top - (rect.height - h) / 2) / h : .5;
+  if (!(scale > 0) || x < 0 || y < 0 || x >= 1 || y >= 1) return;
+  try {
+    slot.clip.keyColor = state.engine.sampleReviewColor(video, x, y);
+    slot.settings.key = 'chroma_key';
+    stopColorPick(true);
+    changed();
+  } catch (error) {
+    report('pickFailed', 'error');
+  }
 }
 function finishEditorDrag(event) {
   if (!editorDrag || (event && editorDrag.id !== event.pointerId)) return;
@@ -400,6 +484,7 @@ function tick(now) {
 }
 function play() {
   if (!reviewing() || !duration() || busy()) return;
+  stopColorPick();
   if (state.running) {pause();draw();return;}
   previewWidth = $('Frame').clientWidth || previewWidth;
   if (state.time >= duration() - .02) seek(0);
@@ -442,6 +527,7 @@ async function loadClip(file, index) {
 }
 function openFiles(target) {
   if (busy() || !state.engine) return;
+  stopColorPick();
   state.target = target; $('File').click();
 }
 async function importFiles(files, target = null) {
@@ -454,7 +540,7 @@ async function importFiles(files, target = null) {
   if (!destinations.length) {report('limit','error');return;}
   const initialCount = state.count;
   const restoreFocus = target !== null && previewUploadIndex(document.activeElement) === target;
-  pause();state.busy = 'load';report('reading');sync();
+  stopColorPick();pause();state.busy = 'load';report('reading');sync();
   let loaded = false, failed = files.length !== mp4.length;
   const count = Math.min(destinations.length, mp4.length);
   const uploadProgress = count ? window.UploadProgress?.begin(count) : null;
@@ -465,6 +551,7 @@ async function importFiles(files, target = null) {
       syncEditors();
       try {
         const clip = await loadClip(mp4[i], index);
+        if (slot.clip?.keyColor && slot.settings.key === 'chroma_key') slot.settings.key = 'auto';
         disposeClip(slot.clip); slot.clip = clip; loaded = true;
         state.count = Math.max(state.count, index + 1);
       } catch (error) {failed = true;}
@@ -483,7 +570,7 @@ async function importFiles(files, target = null) {
   sync();draw();
   if (restoreFocus && reviewing() && document.activeElement === document.body) {
     const {editor, clip} = state.slots[target];
-    (clip ? editor.firstElementChild : editor.lastElementChild).focus({preventScroll:true});
+    (clip ? editor.querySelector('[data-preview-upload]') : editor.lastElementChild).focus({preventScroll:true});
   }
 }
 async function readBackground(key, file) {
@@ -811,7 +898,7 @@ async function applyTemplate() {
   if (busy()) return;
   const selection = $('Templates').value;
   if (!selection) {state.templateSelection = '';state.templateName = '';return;}
-  pause(); state.busy = 'template';sync();
+  stopColorPick();pause(); state.busy = 'template';sync();
   try {
     const template = selection.startsWith('cloud:')
       ? await reviewRequest(templateApi + '/' + encodeURIComponent(selection.slice(6)))
@@ -832,7 +919,7 @@ async function applyTemplate() {
 
 async function exportVideo() {
   if (busy() || !duration()) return;
-  pause();
+  stopColorPick();pause();
   state.busy = 'export';state.abort = new AbortController();
   $('Progress').value = 0;report('exporting');sync();
   const slots = shown();
@@ -856,7 +943,7 @@ async function initialize() {
   if (!initTask) initTask = (async () => {
     state.busy = 'init';sync();
     try {
-      state.engine = await import('./vap-review-engine.mjs?v=20261111-vap-faster');
+      state.engine = await import('./vap-review-engine.mjs?v=20261118-review-screen');
       state.slots = Array.from({length: state.engine.MAX_REVIEW_SLOTS}, () => ({settings: state.engine.defaultReviewSlot(), clip: null}));
       state.backgroundImage = await readBackground('ludo');
       renderSlots();updateLayout();
@@ -870,7 +957,7 @@ async function initialize() {
   await initTask;
 }
 function switchTab(tab) {
-  if (state.tab !== tab) {finishEditorDrag();pause();state.abort?.abort();state.tab = tab;}
+  if (state.tab !== tab) {stopColorPick();finishEditorDrag();pause();state.abort?.abort();state.tab = tab;}
   const reviewingTab = tab === 'review';
   if ((!reviewingTab || !state.active) && $('TemplateDialog').open) $('TemplateDialog').close();
   $('Panel').hidden = !reviewingTab;
@@ -885,7 +972,7 @@ function switchTab(tab) {
 }
 function setActive(value) {
   state.active = value;
-  if (!value) {finishEditorDrag();pause();state.abort?.abort();}
+  if (!value) {stopColorPick();finishEditorDrag();pause();state.abort?.abort();}
   switchTab(state.tab);
 }
 function localize() {
@@ -914,7 +1001,7 @@ $('File').addEventListener('change', event => {
   event.target.value = '';state.target = null;void importFiles(files, target);
 });
 $('Count').addEventListener('change', () => {
-  pause();state.count = Number($('Count').value);renderSlots();updateLayout();seek(Math.min(state.time,duration()));changed();
+  stopColorPick();pause();state.count = Number($('Count').value);renderSlots();updateLayout();seek(Math.min(state.time,duration()));changed();
 });
 for (const [prefix, current] of [['', () => state], ['Template', () => templateDraft]]) {
   const field = $(prefix + 'Background'), picker = $(prefix + 'BackgroundFile');
@@ -940,7 +1027,7 @@ $('Timeline').addEventListener('input', event => {
   pause();
   seek(time);
 });
-$('CreateTemplate').addEventListener('click', openTemplateDialog);
+$('CreateTemplate').addEventListener('click', () => {stopColorPick();openTemplateDialog();});
 $('CloseTemplate').addEventListener('click', () => $('TemplateDialog').close());
 $('TemplateDialog').addEventListener('close', () => {
   if ($('TemplateDialog').open || !templateDraft) return;
@@ -986,13 +1073,26 @@ $('Cancel').addEventListener('click', () => state.abort?.abort());
 $('Download').addEventListener('click', () => window.Hub?.record('vap','download'));
 $('Editors').addEventListener('click', event => {
   const index = previewUploadIndex(event.target);
-  if (index !== null) openFiles(index);
+  if (index !== null) {openFiles(index);return;}
+  const slot = state.slots[previewSlotIndex(event.target)];
+  if (!slot?.clip || busy()) return;
+  if (event.target.closest('.vap-review-color-sample')) pickScreenColor(event, slot);
+  else if (event.target.closest('[data-review-pick]')) startColorPick(slot);
+  else if (event.target.closest('[data-review-auto]')) {
+    stopColorPick();
+    delete slot.clip.keyColor;
+    slot.settings.key = 'auto';
+    changed();
+  }
 });
 $('Editors').addEventListener('pointerdown', startEditorDrag);
 $('Editors').addEventListener('pointermove', moveEditorDrag);
 for (const event of ['pointerup', 'pointercancel', 'lostpointercapture'])
   $('Editors').addEventListener(event, finishEditorDrag);
 $('Editors').addEventListener('keydown', adjustWithKeyboard);
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape' && pickingSlot) {event.preventDefault();stopColorPick(true);}
+});
 function showFileDrop(zone) {
   if (zone === fileDropZone) return;
   fileDropZone?.classList.remove('is-dragging');
@@ -1003,10 +1103,14 @@ function previewUploadIndex(node) {
   const upload = node?.closest?.('[data-preview-upload]');
   return upload && !upload.hidden ? Number(upload.dataset.previewUpload) : null;
 }
+function previewSlotIndex(node) {
+  const editor = node?.closest?.('.vap-review-editor[data-slot]');
+  return editor ? Number(editor.dataset.slot) : null;
+}
 $('Stage').addEventListener('dragover', event => {
   if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
   event.preventDefault();
-  if (!busy()) showFileDrop((event.dataTransfer.items?.length <= 1 && event.target.closest('[data-preview-upload]')) || $('Stage'));
+  if (!busy()) showFileDrop((event.dataTransfer.items?.length <= 1 && event.target.closest('.vap-review-editor')) || $('Stage'));
 });
 $('Stage').addEventListener('dragleave', event => {
   if (!event.currentTarget.contains(event.relatedTarget)) showFileDrop(null);
@@ -1014,13 +1118,13 @@ $('Stage').addEventListener('dragleave', event => {
 $('Stage').addEventListener('drop', event => {
   event.preventDefault(); showFileDrop(null);
   const files = Array.from(event.dataTransfer?.files || []);
-  void importFiles(files, files.length === 1 ? previewUploadIndex(event.target) : null);
+  void importFiles(files, files.length === 1 ? previewSlotIndex(event.target) : null);
 });
 window.UploadPaste?.register({
   zone: $('Stage'), isActive: reviewing, isBusy: busy,
-  onFiles: files => importFiles(files, files.length === 1 ? previewUploadIndex(document.activeElement) : null),
+  onFiles: files => importFiles(files, files.length === 1 ? previewSlotIndex(document.activeElement) : null),
 });
-document.addEventListener('visibilitychange', () => {if (document.hidden) {finishEditorDrag();pause();}});
+document.addEventListener('visibilitychange', () => {if (document.hidden) {stopColorPick();finishEditorDrag();pause();}});
 if (typeof ResizeObserver === 'function') {
   new ResizeObserver(([entry]) => {if (entry.contentRect.width > 0) previewWidth = entry.contentRect.width;}).observe($('Frame'));
 }
