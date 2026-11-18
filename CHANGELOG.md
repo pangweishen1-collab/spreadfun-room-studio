@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.22.0 - 2026-11-18
+
+- Add blue and green screen detection, an eyedropper and in-place video replacement to each of the three VAP review slots. The selected key color is used in previews and review exports.
+
 ## 1.21.2 - 2026-11-17
 
 - Keep artwork slots transparent during uploads and show a spinner in the current slot after one second.
