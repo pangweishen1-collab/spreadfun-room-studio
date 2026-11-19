@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.23.0 - 2026-11-19
+
+- Default purple dice to the reviewed 01R reverse roll, shared by the live preview, video and Spine export. Existing 02/05 choices remain readable.
+- Export a single PNG atlas with a 1024-pixel maximum edge and a 300 KB target. Preserve full-resolution clear results and original source PNGs.
+- Match green delivery conventions: Spine 4.2.43, 200 × 200, 30 FPS, twelve spin/standby actions and Android-compatible sound paths.
+
 ## 1.22.0 - 2026-11-18
 
 - Add blue and green screen detection, an eyedropper and in-place video replacement to each of the three VAP review slots. The selected key color is used in previews and review exports.
