@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.24.0 - 2026-11-19
+
+- Click one purple die to replay it independently, or click the surrounding preview to restart all six. Repeated clicks restart immediately, with independent audio and keyboard controls.
+- Reuse identical atlas regions, exact quarter turns and proven single-source transforms instead of storing redundant images. Keep the 01R trajectory, clear faces and delivery specification.
+
 ## 1.23.0 - 2026-11-19
 
 - Default purple dice to the reviewed 01R reverse roll, shared by the live preview, video and Spine export. Existing 02/05 choices remain readable.
