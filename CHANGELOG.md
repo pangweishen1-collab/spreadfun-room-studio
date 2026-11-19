@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.24.3 - 2026-11-19
+
+- Reuse validated PNG dimensions and alpha metadata only after matching the source SHA and slot. New or changed purple files still receive full CRC checks, accelerated with an equivalent slicing-by-8 implementation.
+- Prune impossible region comparisons by dimensions, reuse source rasters within an 8 MiB budget, and check atlas layout before resizing images.
+- Return an indexed PNG directly when it already meets the 300 KB target. Keep the original palette, pixels, motion samples and green production path.
+
 ## 1.24.2 - 2026-11-19
 
 - Encode purple 01R atlas pixels directly in one reusable worker, removing intermediate PNG encoding/decoding and repeated WASM initialization while retaining the same palette and motion samples.
