@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.24.1 - 2026-11-19
+
+- Capture every 60 Hz pose of the purple 01R roll instead of skipping alternate frames. Preview, MP4 and Spine share the smoother timeline, with the same trajectory, landing and sound timing.
+- Use a purple-only atlas layout to fit the additional motion poses in one page. Keep full-resolution clear faces, exact image reuse and the existing green production pipeline.
+
 ## 1.24.0 - 2026-11-19
 
 - Click one purple die to replay it independently, or click the surrounding preview to restart all six. Repeated clicks restart immediately, with independent audio and keyboard controls.
