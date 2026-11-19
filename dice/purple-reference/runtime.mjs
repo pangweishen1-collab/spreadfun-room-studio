@@ -452,7 +452,7 @@ export async function generatePurpleReferenceRuntime(files,{
 }={}) {
   checkAbort(signal);
   if (variant === '01R') {
-    const {generatePurple01RRuntime} = await import('../purple-01r/runtime.mjs?v=20261119-purple-speed');
+    const {generatePurple01RRuntime} = await import('../purple-01r/runtime.mjs?v=20261119-purple-speed2');
     return generatePurple01RRuntime(files,{name,signal,anchorImage,composition,variant});
   }
   const motion=motions.get(variant);

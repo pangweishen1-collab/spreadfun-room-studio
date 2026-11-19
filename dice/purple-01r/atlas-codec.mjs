@@ -2,8 +2,9 @@ const aborted = () => new DOMException('操作已取消','AbortError');
 
 // One short-lived Worker/WASM session for all atlas budget candidates in one
 // generation. Failed codecs return null so the caller can use its frozen path.
-export function createAtlasCodec({signal} = {}) {
+export function createAtlasCodec({signal,targetBytes=0} = {}) {
   let worker = null, disposed = false, failed = false, isAborted = signal?.aborted ?? false, nextId = 0;
+  const limit = Number.isSafeInteger(targetBytes) && targetBytes > 0 ? targetBytes : 0;
   const pending = new Map();
   function settleAll(error) {
     for (const job of pending.values()) {
@@ -51,7 +52,7 @@ export function createAtlasCodec({signal} = {}) {
         try {
           // Transfer a copy. The original page remains readable for fallback.
           const copy = new Uint8Array(rgba);
-          worker.postMessage({id,width,height,rgba:copy.buffer},[copy.buffer]);
+          worker.postMessage({id,width,height,rgba:copy.buffer,targetBytes:limit},[copy.buffer]);
         } catch {
           fail();
         }

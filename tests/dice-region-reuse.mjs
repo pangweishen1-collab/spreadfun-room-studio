@@ -40,6 +40,24 @@ assert.deepEqual(placed.attachments.placed,{...differentlyPlaced.attachment,path
   'Identical pixels may have independent world sizes and positions');
 assert.throws(() => reuseRegions([{...inputs[0],pixels:new Uint8Array(3)}]),/RGBA/);
 
+// A unique shape has no possible full-image or quarter-turn match. It must
+// keep its own pixels without scanning four orientations just to discover it.
+let pixelReads=0;
+const uniqueShapes=[[17,19],[23,29],[31,37]].map(([w,h],index)=>({
+  id:'unique_'+index,w,h,pixels:new Proxy(new Uint8Array(w*h*4),{
+    get(target,key){if(typeof key==='string'&&/^\d+$/.test(key))pixelReads++;return Reflect.get(target,key,target);},
+  }),attachment:{type:'region',path:'unique_'+index,width:w,height:h},
+}));
+assert.equal(reuseRegions(uniqueShapes).packedRegions.length,3);
+assert.equal(pixelReads,0,'Dimensions rule out reuse before reading RGBA values');
+for(const first of [0,1,2,3]){
+  const order=[inputs[first],uniqueShapes[0],...inputs.filter((_,i)=>i!==first)];
+  const result=reuseRegions(order);
+  assert.equal(result.packedRegions.length,2);
+  for(const input of inputs)assert.equal(result.attachments[input.id].path,inputs[first].id,
+    'The earliest exact canonical image survives across shapes and orientations');
+}
+
 const context = {console};
 vm.createContext(context);
 vm.runInContext(await readFile(new URL('../dice/vendor/spine-webgl.js',import.meta.url),'utf8'),context);

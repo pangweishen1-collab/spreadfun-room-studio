@@ -48,18 +48,27 @@ function normalize(image,owned) {
   return out;
 }
 
-function resample(region,factor) {
+function resample(region,factor,cache) {
   if(factor>=1)return region;
-  const input=surface(region.w,region.h),context=input.getContext('2d');
-  const image=context.createImageData(region.w,region.h);image.data.set(region.pixels);context.putImageData(image,0,0);
+  let input=cache.sources.get(region),retained=Boolean(input);
+  if(!input){
+    input=surface(region.w,region.h);cache.owned.push(input);
+    const context=input.getContext('2d'),image=context.createImageData(region.w,region.h);
+    image.data.set(region.pixels);context.putImageData(image,0,0);
+    const bytes=region.w*region.h*4;
+    if(cache.bytes+bytes<=8*1024*1024){cache.sources.set(region,input);cache.bytes+=bytes;retained=true;}
+  }
   const target=surface(Math.max(1,Math.round(region.w*factor)),Math.max(1,Math.round(region.h*factor)));
-  const ctx=target.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingQuality='high';
-  ctx.drawImage(input,0,0,target.width,target.height);
-  const result={...region,w:target.width,h:target.height,pixels:ctx.getImageData(0,0,target.width,target.height).data};
-  input.width=input.height=target.width=target.height=1;
   // Attachment coordinates stay in the original world units. Only the already
   // blurred fast poses lose raster samples; result PNGs retain full resolution.
-  return result;
+  try{
+    const ctx=target.getContext('2d',{willReadFrequently:true});ctx.imageSmoothingQuality='high';
+    ctx.drawImage(input,0,0,target.width,target.height);
+    return {...region,w:target.width,h:target.height,pixels:ctx.getImageData(0,0,target.width,target.height).data};
+  }finally{
+    if(!retained)input.width=input.height=1;
+    target.width=target.height=1;
+  }
 }
 
 export async function generatePurple01RRuntime(files,{name='自定义紫色骰子',composition='faces',anchorImage,signal}={}) {
@@ -68,8 +77,9 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
   if(!['auto','faces','digits'].includes(composition))throw Error('紫色骰子素材类型无效');
   const inputs=Array.from(files||[]).filter(file=>/^sz_[0-6]$/.test(file.slot))
     .map(file=>new File([file.blob],file.slot+'.png',{type:'image/png'}));
-  const codec=createAtlasCodec({signal});
+  const codec=createAtlasCodec({signal,targetBytes});
   const owned=[],angleImages=[];let renderer,decoded;
+  const rasterCache={sources:new Map(),bytes:0,owned};
   try {
     decoded=await decodeFaceFiles(inputs,{signal});
     const warnings=[...decoded.warnings];
@@ -196,15 +206,19 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
     let selected;
     for(const factor of [1,.84,.70,.64,.60]) {
       check();
-      const compact=reuse.packedRegions.map(region=>{
-        if(region.id.startsWith('reveal_'))return resample(region,factor);
-        if(!region.id.startsWith('roll_'))return region;
+      const scales=reuse.packedRegions.map(region=>{
+        if(region.id.startsWith('reveal_'))return factor;
+        if(!region.id.startsWith('roll_'))return 1;
         // Keep the opening and final clear poses full size. The intermediate
         // motion-blurred captures can share the atlas budget with all 60 Hz
         // poses without reducing the authored result images.
         const fast=region.time>=3/60&&region.time<=28/60;
-        return resample(region,fast?factor:1);
+        return fast?factor:1;
       });
+      const layout=reuse.packedRegions.map((region,index)=>({id:region.id,
+        w:Math.max(1,Math.round(region.w*scales[index])),h:Math.max(1,Math.round(region.h*scales[index]))}));
+      if(!packPurple01RRegions(layout,{layoutOnly:true}))continue;
+      const compact=reuse.packedRegions.map((region,index)=>resample(region,scales[index],rasterCache));
       const page=packPurple01RRegions(compact);
       if(!page||Math.max(page.width,page.height)>1024)continue;
       let texture=await codec.encode(page);

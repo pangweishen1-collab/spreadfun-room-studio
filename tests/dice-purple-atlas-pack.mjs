@@ -46,6 +46,12 @@ const before=adversarial.map(r=>({pixels:hash(r.pixels),attachment:{...r.attachm
 assert.equal(oldShelf(adversarial,true,1024),null,'This real-sized case cannot fit the old shelf strategy');
 const improved=packPurple01RRegions(adversarial);
 checkPage(improved,adversarial,1024);
+const layout=packPurple01RRegions(adversarial.map(({id,w,h})=>({id,w,h})),{layoutOnly:true});
+assert.equal(layout.width,improved.width);assert.equal(layout.height,improved.height);
+assert.deepEqual(layout.positions.map(({id,x,y,w,h})=>({id,x,y,w,h})),
+  improved.positions.map(({id,x,y,w,h})=>({id,x,y,w,h})),
+  'Geometry-only preflight uses the exact eventual placement');
+assert.equal(layout.rgba,undefined,'Preflight does not allocate an RGBA page');
 assert.ok(improved.width*improved.height<=804*804);
 const again=packPurple01RRegions(adversarial);
 assert.equal(again.atlas,improved.atlas,'Packing is deterministic');
@@ -60,6 +66,7 @@ for (let test=0;test<16;test++) {
 }
 assert.equal(packPurple01RRegions([]),null);
 assert.equal(packPurple01RRegions([region('too_wide',1023,1)]),null,'Padding counts toward the page limit');
+assert.equal(packPurple01RRegions([{id:'too_wide',w:1023,h:1}],{layoutOnly:true}),null);
 assert.equal(packPurple01RRegions([region('a',9,9),region('b',9,9)],{maxSize:12}),null);
 assert.throws(()=>packPurple01RRegions([region('same',1,1),region('same',1,1)]),/名称/);
 assert.throws(()=>packPurple01RRegions([{...region('broken',1,1),pixels:new Uint8Array(1)}]),/RGBA/);

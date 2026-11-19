@@ -111,6 +111,8 @@ assert.equal(VIDEO_PROFILE,'loop6-v7-60fps-audio-1500kb');
 assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_500_000);
 assert.equal(inspectPNG(new Uint8Array(png(200)),'sz_0').width,200);
 const corrupted=new Uint8Array(png(200));corrupted[40]^=1;assert.throws(()=>inspectPNG(corrupted,'sz_0'));
+assert.throws(()=>inspectPNG(corrupted,'sz_0','sz_0.png',{fastCRC:true}));
+assert.deepEqual(inspectPNG(new Uint8Array(png(200)),'sz_0','sz_0.png',{fastCRC:true}),{width:200,height:200});
 assert.throws(()=>inspectPNG(new Uint8Array(png(240)),'sz_0'));
 assert.match(atlasText(),/sz_6\n  bounds: 410, 410, 200, 200\n  offsets: 0, 0, 200, 200\n  rotate: 0/);
 assert.equal((atlasText().match(/  rotate: 0/g)||[]).length,9);
@@ -502,8 +504,10 @@ checks.push('purple01r_new_upload_default_native_bundle_and_runtime_zip_preserve
 
 const speedBuilds=referenceBuilds;
 const importAgain=name=>referenceAdapter.api('/api/preview/import',{method:'POST',body:{...defaultPayload,name}});
+const fastValidationStart=decodeNames.length;
 const repeated01R=await importAgain('快速重复上传');
 assert.equal(referenceBuilds,speedBuilds,'Same validated source hashes reuse the prepared 01R atlas');
+assert.equal(decodeNames.length,fastValidationStart,'Same SHA and slot reuse successfully validated alpha metadata');
 assert.equal((await referenceStorage.get(repeated01R.id)).runtime.metadata.name,'快速重复上传');
 referenceAdapter.forget(reverseReference.id);
 const repeatedAgain=await importAgain('继续重复上传');
@@ -513,7 +517,7 @@ const rebuiltAfterForget=await importAgain('释放后重新制作');
 assert.equal(referenceBuilds,speedBuilds+1,'Forgetting the current owner releases the prepared atlas');
 const changedSources={...defaultPayload,files:defaultPayload.files.map(file=>file.name==='sz_1.png'
   ?{...file,data:'data:image/png;base64,'+png(200,240).toString('base64')}:file)};
-await referenceAdapter.api('/api/preview/import',{method:'POST',body:changedSources});
+const changedCachedSession=await referenceAdapter.api('/api/preview/import',{method:'POST',body:changedSources});
 assert.equal(referenceBuilds,speedBuilds+2,'Changed source bytes must invalidate preparation');
 const packagePath='/api/preview/'+repeated01R.id;
 const buildsBeforeZip=zipBuilds;
@@ -549,6 +553,21 @@ zipGate={promise:new Promise(resolve=>{releaseZip=resolve;}),started:startZip};
 const forgottenZip=referenceAdapter.api(packagePath+'/bundle');await zipReachedForget;
 referenceAdapter.forget(repeated01R.id);releaseZip();await rejects(()=>forgottenZip,404);zipGate=null;
 checks.push('purple_preparation_hash_cache_owner_release_and_package_deduplication_store_crc_revision_retry_and_forget_races');
+referenceAdapter.forget(changedCachedSession.id);
+const explicitCached=await referenceAdapter.api('/api/preview/import',{method:'POST',body:{...defaultPayload,composition:'faces'}});
+assert((await referenceStorage.get(explicitCached.id)).files.filter(file=>/^sz_[1-6]$/.test(file.slot)).every(file=>file.alphaArea===null));
+const autoScanStart=decodeNames.length,preparedBuildCount=referenceBuilds;
+await importAgain('自动组成首次补充alpha');
+assert.equal(decodeNames.slice(autoScanStart).filter(name=>/^sz_[1-6]\.png$/.test(name)).length,6,
+  'SHA validation does not invent unknown alpha areas when auto detection needs them');
+assert.equal(referenceBuilds,preparedBuildCount,'The detected equivalent composition still shares the prepared atlas');
+const scannedAgain=decodeNames.length;
+await importAgain('自动组成已验证');assert.equal(decodeNames.length,scannedAgain);
+const corruptSource=Buffer.from(png(200));corruptSource[40]^=1;
+await rejects(()=>referenceAdapter.api('/api/preview/import',{method:'POST',body:{...defaultPayload,files:defaultPayload.files.map(file=>file.name==='sz_1.png'
+  ?{...file,data:'data:image/png;base64,'+corruptSource.toString('base64')}:file)}}));
+assert.equal(referenceBuilds,preparedBuildCount,'Changed bytes with invalid CRC fail before using the prepared runtime');
+checks.push('purple_verified_metadata_reuses_only_matching_hash_and_slot_retains_unknown_auto_alpha_and_rejects_new_corruption');
 referenceAdapter.dispose();
 checks.push('purple_variant_switch_rebuilds_the_baked_assets_and_exports_reject_stale_videos_while_background_changes_reuse_the_bake');
 

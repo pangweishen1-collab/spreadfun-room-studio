@@ -4,8 +4,9 @@ import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
-import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261119-purple-speed';
+import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261119-purple-speed2';
 import {optimizeAtlasPng} from './atlas-png-optimizer.mjs';
+import {crc32Png} from './purple-01r/png-crc.mjs';
 export {DEFAULT_PURPLE_VARIANT};
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
 export const GREEN_SLOTS = Array.from({length:6},(_,i)=>`sz_${i+1}`);
@@ -95,7 +96,7 @@ export function validateSettings(payload, previous={name:'骰子预览',grade:'g
 }
 
 const CRC_TABLE=Array.from({length:256},(_,n)=>{for(let i=0;i<8;i++)n=n&1?0xedb88320^(n>>>1):n>>>1;return n>>>0;});
-export function inspectPNG(bytes,slot,name=slot+'.png',{flexible=false}={}) {
+export function inspectPNG(bytes,slot,name=slot+'.png',{flexible=false,fastCRC=false}={}) {
   if (!(bytes instanceof Uint8Array) || !bytes.length || bytes.length>MAX_PNG) throw new PreviewError(`${name}：PNG 大小不合法`);
   if(![137,80,78,71,13,10,26,10].every((v,i)=>bytes[i]===v)) throw new PreviewError(`${name}：需要有效 PNG`);
   const view=new DataView(bytes.buffer,bytes.byteOffset,bytes.byteLength);
@@ -104,9 +105,14 @@ export function inspectPNG(bytes,slot,name=slot+'.png',{flexible=false}={}) {
     const length=view.getUint32(offset), stop=offset+12+length;
     if(stop>bytes.length) throw new PreviewError(`${name}：PNG 数据损坏`);
     const type=String.fromCharCode(...bytes.subarray(offset+4,offset+8));
-    let crc=0xffffffff;
-    for(let i=offset+4;i<offset+8+length;i++) crc=CRC_TABLE[(crc^bytes[i])&255]^(crc>>>8);
-    if(((crc^0xffffffff)>>>0)!==view.getUint32(offset+8+length)) throw new PreviewError(`${name}：PNG 数据损坏`);
+    let checksum;
+    if(fastCRC)checksum=crc32Png(bytes.subarray(offset+4,offset+8+length));
+    else{
+      let crc=0xffffffff;
+      for(let i=offset+4;i<offset+8+length;i++) crc=CRC_TABLE[(crc^bytes[i])&255]^(crc>>>8);
+      checksum=(crc^0xffffffff)>>>0;
+    }
+    if(checksum!==view.getUint32(offset+8+length)) throw new PreviewError(`${name}：PNG 数据损坏`);
     if(offset===8 && (type!=='IHDR'||length!==13)) throw new PreviewError(`${name}：PNG 数据损坏`);
     if(type==='IHDR') {
       if(dimensions) throw new PreviewError(`${name}：PNG 数据损坏`);
@@ -334,6 +340,7 @@ export function createLocalPreview(dependencies={}) {
       files.filter(file=>/^(?:sz_[0-6]|[12]|anchor)$/.test(file.slot))
         .map(file=>[file.slot,file.sha256]).sort((a,b)=>a[0].localeCompare(b[0]))]) : null;
   const copyPrepared=(runtime,name)=>({...runtime,metadata:{...runtime.metadata,name},warnings:[...(runtime.warnings||[])]});
+  const verifiedFiles=files=>files.map(({slot,sha256,width,height,alphaArea})=>({slot,sha256,width,height,alphaArea}));
   function url(key,blob) {if(!urls.has(key))urls.set(key,objectURL(blob));return urls.get(key);}
   const defaultAudioPath=(record,name)=>compactGreenRuntime(record.runtime)
     ? '/dice/assets/green-reference/'+name+'.mp3' : DEFAULT_AUDIO[name];
@@ -358,6 +365,7 @@ export function createLocalPreview(dependencies={}) {
     options.signal?.throwIfAborted();
     if(cacheKey&&preparedPurple?.key===cacheKey){
       preparedPurple.owner=cacheOwner;
+      preparedPurple.files=verifiedFiles(files);
       return copyPrepared(preparedPurple.runtime,options.name);
     }
     const legacy=usesLegacyGyro(options.variant);
@@ -372,7 +380,7 @@ export function createLocalPreview(dependencies={}) {
         throw new PreviewError('紫色动画资源生成不完整');
       }
       if(cacheKey){
-        preparedPurple={key:cacheKey,owner:cacheOwner,runtime:copyPrepared(runtime,options.name)};
+        preparedPurple={key:cacheKey,owner:cacheOwner,runtime:copyPrepared(runtime,options.name),files:verifiedFiles(files)};
         return copyPrepared(runtime,options.name);
       }
       return runtime;
@@ -473,15 +481,22 @@ export function createLocalPreview(dependencies={}) {
       if(!blob.size||blob.size>MAX_PNG)throw new PreviewError(`${entry.name}：PNG 大小不合法`);
       const bytes=new Uint8Array(await blob.arrayBuffer());
       aborted();
-      const dimensions=inspectPNG(bytes,entry.slot,entry.name,{flexible:true});
-      let alphaArea=settings.grade==='purple'&&GREEN_SLOTS.includes(entry.slot)?null:0;
+      const purple=settings.grade==='purple';
+      const digest=purple?await hash(blob,bytes):null;
+      aborted();
+      // A SHA match reuses only successful validation of the same PNG slot.
+      // New or changed bytes still undergo the full chunk CRC and decode.
+      const verified=purple&&preparedPurple?.files?.find(file=>file.slot===entry.slot&&file.sha256===digest);
+      const dimensions=verified?{width:verified.width,height:verified.height}
+        :inspectPNG(bytes,entry.slot,entry.name,{flexible:true,fastCRC:purple});
+      let alphaArea=verified?.alphaArea??(purple&&GREEN_SLOTS.includes(entry.slot)?null:0);
       // Explicit full faces are decoded and validated by the native generator.
       // Only automatic composition with a base needs a second alpha-area read.
-      if(!GREEN_SLOTS.includes(entry.slot)||needsFaceAlpha){
+      if((!GREEN_SLOTS.includes(entry.slot)||needsFaceAlpha)&&!(verified&&Number.isFinite(verified.alphaArea))){
         const image=await decode(blob,entry.name,{allowEmpty:entry.slot==='anchor'});try{alphaArea=image.alphaArea;}finally{image.close?.();}
       }
       aborted();
-      return {name:entry.name,slot:entry.slot,blob,...dimensions,alphaArea,sha256:await hash(blob,bytes)};
+      return {name:entry.name,slot:entry.slot,blob,...dimensions,alphaArea,sha256:digest??await hash(blob,bytes)};
     };
     let totalBytes=0;
     // Keep pending buffers bounded and apply the total size limit in source order.

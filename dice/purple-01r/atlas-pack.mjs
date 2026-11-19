@@ -43,15 +43,16 @@ function place(ordered,width,maxSize) {
   return {width:right,height:bottom,positions};
 }
 
-/** The returned page matches the existing dice.png atlas contract. */
-export function packPurple01RRegions(regions,{maxSize=1024}={}) {
+/** The returned page matches the existing dice.png atlas contract.
+ * layoutOnly tests geometry without reading pixels or allocating page RGBA. */
+export function packPurple01RRegions(regions,{maxSize=1024,layoutOnly=false}={}) {
   if (!Number.isInteger(maxSize) || maxSize<3) throw Error('01R 图集尺寸上限无效');
   if (!Array.isArray(regions) || !regions.length) return null;
   const names=new Set();
   let area=0,minWidth=0;
   for (const {id,w,h,pixels} of regions) {
     if (typeof id!=='string' || !id || /[\r\n]/.test(id) || names.has(id)) throw Error('01R 图集区域名称无效或重复');
-    if (!Number.isInteger(w) || !Number.isInteger(h) || w<1 || h<1 || pixels?.length!==w*h*4) {
+    if (!Number.isInteger(w) || !Number.isInteger(h) || w<1 || h<1 || (!layoutOnly&&pixels?.length!==w*h*4)) {
       throw Error('01R 图集区域需要完整 RGBA 数据：'+id);
     }
     names.add(id);area+=(w+2)*(h+2);minWidth=Math.max(minWidth,w+2);
@@ -71,6 +72,7 @@ export function packPurple01RRegions(regions,{maxSize=1024}={}) {
       candidate.width*candidate.height===selected.width*selected.height && candidate.width<selected.width)) selected=candidate;
   }
   if (!selected) return null;
+  if (layoutOnly) return selected;
   const {width,height,positions}=selected,rgba=new Uint8Array(width*height*4);
   for (const {x,y,w,h,pixels} of positions) for (let row=0;row<h;row++) {
     rgba.set(pixels.subarray(row*w*4,(row+1)*w*4),((y+row)*width+x)*4);

@@ -1,8 +1,11 @@
 import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
 import {encodeAtlasPng} from '../dice/purple-reference/atlas-png.mjs';
 import {quantizeAtlasPng} from '../dice/atlas-png-palette.mjs';
 import {quantizeAtlasRgba} from '../dice/purple-01r/atlas-palette.mjs';
 import {createAtlasCodec} from '../dice/purple-01r/atlas-codec.mjs';
+import UPNG from '../dice/vendor/upng/upng.mjs';
+import initOxi, {optimise} from '../dice/vendor/oxipng/squoosh_oxipng.mjs';
 
 const cases = [
   {width:17,height:13,alpha:i=>i%4===0?0:i%4===1?255:(i*19)%253+1},
@@ -39,6 +42,48 @@ for (const {width,height,alpha} of cases) {
 assert.equal(quantizeAtlasRgba(2,2,new Uint8Array(3)),null);
 assert.equal(quantizeAtlasRgba(1,1,new Uint8Array(4),257),null);
 
+// Exercise the real Worker handler and real bundled lossless codec in Node.
+// Loading WASM bytes explicitly avoids a network/file-URL fetch in this test.
+await initOxi(await readFile(new URL('../dice/vendor/oxipng/squoosh_oxipng_bg.wasm',import.meta.url)));
+const budgetWidth=80,budgetHeight=64,budgetRgba=new Uint8Array(budgetWidth*budgetHeight*4);
+for (let y=0;y<budgetHeight;y++) for (let x=0;x<budgetWidth;x++) {
+  budgetRgba.set([(x*17+y*3)%256,(x*7+y*29)%256,(x*11+y*13)%256,
+    (x+y)%4===0?0:(x+y)%4===1?255:(x*19+y*7)%253+1],(y*budgetWidth+x)*4);
+}
+const rawBudgetPng=seeded(()=>quantizeAtlasRgba(budgetWidth,budgetHeight,budgetRgba));
+const optimizedBudgetPng=optimise(new Uint8Array(rawBudgetPng),1,false,false);
+assert.ok(optimizedBudgetPng.byteLength<rawBudgetPng.byteLength,'The budget shortcut really skips useful but unnecessary lossless work');
+const expectedLegacy=optimizedBudgetPng.byteLength<rawBudgetPng.byteLength?optimizedBudgetPng:new Uint8Array(rawBudgetPng);
+const originalSelf=globalThis.self;
+let realBudgetCases=0;
+try {
+  const messages=[];
+  globalThis.self={postMessage:message=>messages.push(message)};
+  await import('../dice/purple-01r/atlas-codec-worker.mjs?budget-test');
+  async function encodedWith(targetBytes) {
+    const random=Math.random;let state=13611;
+    Math.random=()=>((state=(Math.imul(state,1664525)+1013904223)>>>0)/4294967296);
+    messages.length=0;
+    try { await self.onmessage({data:{id:9,width:budgetWidth,height:budgetHeight,rgba:budgetRgba.buffer,targetBytes}}); }
+    finally { Math.random=random; }
+    assert.equal(messages.length,1);assert.equal(messages[0].id,9);
+    return new Uint8Array(await messages[0].png.arrayBuffer());
+  }
+  const within=await encodedWith(rawBudgetPng.byteLength);
+  assert.deepEqual(within,new Uint8Array(rawBudgetPng),'An already compliant palette PNG returns directly');
+  assert.ok(within.byteLength<=rawBudgetPng.byteLength);
+  assert.deepEqual(new Uint8Array(UPNG.toRGBA8(UPNG.decode(within.buffer))[0]),
+    new Uint8Array(UPNG.toRGBA8(UPNG.decode(expectedLegacy.buffer))[0]),
+    'Skipping lossless compression changes no RGBA pixel, including hidden RGB');
+  realBudgetCases++;
+  for (const limit of [0,undefined,-1,rawBudgetPng.byteLength-1,Number.MAX_SAFE_INTEGER+1]) {
+    assert.deepEqual(await encodedWith(limit),expectedLegacy,'Default, unsafe and unmet limits retain the original OxiPNG path');
+    realBudgetCases++;
+  }
+} finally {
+  if (originalSelf===undefined) delete globalThis.self; else globalThis.self=originalSelf;
+}
+
 const originalWorker = globalThis.Worker;
 const originalSetTimeout = globalThis.setTimeout;
 const originalClearTimeout = globalThis.clearTimeout;
@@ -64,10 +109,17 @@ try {
   assert.equal(FakeWorker.instances.length,1,'All budget candidates use one Worker');
   assert.deepEqual(page.rgba,new Uint8Array(16).fill(73),'Transferred data is a copy');
   assert.deepEqual(new Uint8Array(worker.inputs[0].rgba),page.rgba);
+  assert.equal(worker.inputs[0].targetBytes,0,'The default API retains unconditional lossless optimization');
   worker.reply(1,png);worker.reply(0,png);
   assert.deepEqual(await Promise.all([first,second]),[png,png],'Worker responses match request IDs');
   codec.dispose();codec.dispose();assert.equal(worker.terminated,1);
   assert.equal(await codec.encode(page),null);sessions++;
+
+  for (const [limit,expected] of [[300000,300000],[-1,0],[NaN,0],[1.2,0],[Number.MAX_SAFE_INTEGER+1,0]]) {
+    const limited=createAtlasCodec({targetBytes:limit}),job=limited.encode(page),limitedWorker=FakeWorker.instances.at(-1);
+    assert.equal(limitedWorker.inputs[0].targetBytes,expected,'Only safe positive integer budgets reach the Worker');
+    limitedWorker.reply(0,png);assert.equal(await job,png);limited.dispose();sessions++;
+  }
 
   const early=new AbortController();early.abort();
   const before=FakeWorker.instances.length,aborted=createAtlasCodec({signal:early.signal});
@@ -112,4 +164,5 @@ try {
   globalThis.clearTimeout=originalClearTimeout;
 }
 console.log(JSON.stringify({ok:true,paletteByteIdenticalGoldens:goldens,workerSessionCases:sessions,
+  realWasmBudgetCases:realBudgetCases,budgetShortcutPixelsIdentical:true,
   inputRgbaRetained:true,workerPerGeneration:1,abortRejectsAndCleansUp:true,timeoutAndFailureFallback:true},null,2));

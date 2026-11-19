@@ -52,16 +52,27 @@ function aliasAttachment(attachment, id, turns) {
  *  Anchor keeps its own atlas key because its rig attachment is predefined. */
 export function reuseRegions(regions) {
   const buckets = new Map();
+  const bucketShapes = new Set(), remainingShapes = new Map();
+  for (const {id,w,h,pixels} of regions) {
+    if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || pixels?.length !== w * h * 4) {
+      throw Error('01R 图集复用需要完整 RGBA 区域：' + id);
+    }
+    if (id !== 'anchor') {
+      const shape=w+':'+h;
+      remainingShapes.set(shape,(remainingShapes.get(shape)||0)+1);
+    }
+  }
   const packedRegions = [];
   let reusedCount = 0, rotationReusedCount = 0, sourcePixels = 0, storedPixels = 0;
   const allRegions = regions.map(region => {
     const {id, w, h, pixels} = region;
-    if (!Number.isInteger(w) || !Number.isInteger(h) || w < 1 || h < 1 || pixels?.length !== w * h * 4) {
-      throw Error('01R 图集复用需要完整 RGBA 区域：' + id);
-    }
     sourcePixels += w * h;
+    let directKey;
     if (id !== 'anchor') {
-      const match = buckets.get(signature(region))?.find(({region: candidate, turns}) => identical(region, candidate, turns));
+      const shape=w+':'+h;
+      remainingShapes.set(shape,remainingShapes.get(shape)-1);
+      const match = bucketShapes.has(shape) && buckets.get(directKey=signature(region))
+        ?.find(({region: candidate, turns}) => identical(region, candidate, turns));
       if (match) {
         reusedCount++;
         if (match.turns) rotationReusedCount++;
@@ -71,9 +82,14 @@ export function reuseRegions(regions) {
     packedRegions.push(region);
     storedPixels += w * h;
     if (id !== 'anchor') for (let turns = 0; turns < 4; turns++) {
-      const key = signature(region, turns);
+      // Exact or quarter-turn reuse is impossible if no later image has this
+      // orientation's dimensions. Skip its full RGBA hash, not its pixels.
+      const shape=rotatedShape(region,turns).join(':');
+      if (!remainingShapes.get(shape)) continue;
+      const key = turns===0 && directKey!==undefined ? directKey : signature(region, turns);
       if (!buckets.has(key)) buckets.set(key, []);
       buckets.get(key).push({region, turns});
+      bucketShapes.add(shape);
     }
     return region;
   });
