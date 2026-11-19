@@ -25,7 +25,8 @@ assert(motionAt(16).rotation.some((value,index)=>[2,5,6,7].includes(index)&&Math
 const context={console};vm.createContext(context);
 vm.runInContext(await readFile(new URL('../dice/vendor/spine-webgl.js',import.meta.url),'utf8'),context);
 const S=context.spine;
-const ids=['roll_0','roll_2','roll_31','anchor',...Array.from({length:6},(_,i)=>['sz_'+(i+1),'reveal_'+(i+1)+'_0','reveal_'+(i+1)+'_1']).flat()];
+const rollIds=Array.from({length:32},(_,frame)=>'roll_'+frame);
+const ids=[...rollIds,'anchor',...Array.from({length:6},(_,i)=>['sz_'+(i+1),'reveal_'+(i+1)+'_0','reveal_'+(i+1)+'_1']).flat()];
 const regions=ids.map(id=>({id,attachment:{type:'region',path:id,width:200,height:200}}));
 const atlas=new S.TextureAtlas('dice.png\nsize: 1024,1024\nfilter: Linear,Linear\npma: false\n'+ids.map(id=>id+'\nbounds: 0,0,200,200').join('\n')+'\n');
 const json=buildPurple01RSkeleton(regions);
@@ -39,6 +40,12 @@ let samples=0;
 for(let point=1;point<=6;point++) {
   const spin=data.findAnimation('spin_'+point),standby=data.findAnimation('standby_'+point);
   assert(Math.abs(spin.duration-19/30)<1e-6);assert.equal(standby.duration,0);
+  // Attachment timelines are stepped, even with fps=30 metadata. Every actual
+  // 60 Hz tick must select its own pose rather than hold the preceding frame.
+  for(let frame=0;frame<32;frame++) {
+    spin.apply(skeleton,-1,Math.fround(frame/60),false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
+    assert.equal(skeleton.findSlot('result').getAttachment().path,'roll_'+frame);
+  }
   for(const time of [0,.1,.52,.533334,.55,.566668,.583334,.6,19/30]) {
     spin.apply(skeleton,-1,time,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
     skeleton.updateWorldTransform(S.Physics.update);
@@ -51,4 +58,4 @@ for(let point=1;point<=6;point++) {
   standby.apply(skeleton,-1,0,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
   assert.equal(skeleton.findSlot('result').getAttachment().path,'sz_'+point);
 }
-console.log(JSON.stringify({ok:true,poses,samples,checks:['reverse_undoes_forward_rotation','retains_depth','official_binary_contract','atomic_landing_and_continuous_standby','android_sound_paths']}));
+console.log(JSON.stringify({ok:true,poses,samples,checks:['reverse_undoes_forward_rotation','retains_depth','official_binary_contract','every_60hz_tick_selects_its_pose','atomic_landing_and_continuous_standby','android_sound_paths']}));

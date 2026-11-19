@@ -1,17 +1,20 @@
 import {decodeFaceFiles} from '../six-face/import-faces.mjs';
 import {writeSpineBinary} from '../six-face/spine-binary.mjs';
 import {encodeAtlasPng} from '../purple-reference/atlas-png.mjs';
-import {trimRegion,packRegions,PURPLE_PLAN_01R_MOTION_VERSION} from '../purple-reference/runtime.mjs';
+import {trimRegion,PURPLE_PLAN_01R_MOTION_VERSION} from '../purple-reference/runtime.mjs';
 import {optimizeAtlasPng} from '../atlas-png-optimizer.mjs';
 import {Proxy3DRenderer} from './proxy-3d.mjs';
 import {motionAt,renderSamples,PURPLE_01R} from './motion.mjs';
 import {buildPurple01RSkeleton} from './spine-builder.mjs';
 import {reuseRegions} from './region-reuse.mjs';
+import {packPurple01RRegions} from './atlas-pack.mjs';
 
 const points=[1,2,3,4,5,6];
 const sourceSize=200,captureSize=384,worldSize=384;
 const targetBytes=300_000;
-const frameTimes=[...Array.from({length:16},(_,i)=>i*2),31].map(frame=>({id:'roll_'+frame,time:frame/60,frame}));
+// Capture every display frame of the approved roll. A 60 Hz player cannot
+// interpolate attachment swaps, so skipping odd poses visibly halves cadence.
+const frameTimes=Array.from({length:PURPLE_01R.frontFrame},(_,frame)=>({id:'roll_'+frame,time:frame/PURPLE_01R.fps,frame}));
 const surface=(w,h=w)=>Object.assign(document.createElement('canvas'),{width:w,height:h});
 const smooth=t=>t*t*(3-2*t);
 const pause=()=>new Promise(resolve=>setTimeout(resolve,0));
@@ -189,15 +192,18 @@ export async function generatePurple01RRuntime(files,{name='鑷畾涔夌传鑹查瀛
         width:source.width*scale,height:source.height*scale}};
     })];
     let selected;
-    for(const factor of [1,.84,.70]) {
+    for(const factor of [1,.84,.70,.64,.60]) {
       check();
       const compact=reuse.packedRegions.map(region=>{
         if(region.id.startsWith('reveal_'))return resample(region,factor);
         if(!region.id.startsWith('roll_'))return region;
-        const fast=region.time>=.10&&region.time<=.43;
+        // Keep the opening and final clear poses full size. The intermediate
+        // motion-blurred captures can share the atlas budget with all 60 Hz
+        // poses without reducing the authored result images.
+        const fast=region.time>=3/60&&region.time<=28/60;
         return resample(region,fast?factor:1);
       });
-      const page=packRegions(compact,true,1024);
+      const page=packPurple01RRegions(compact);
       if(!page||Math.max(page.width,page.height)>1024)continue;
       const png=await encodeAtlasPng(page.width,page.height,page.rgba,{signal});
       const texture=await optimizeAtlasPng(png,2,256);check();
@@ -213,7 +219,7 @@ export async function generatePurple01RRuntime(files,{name='鑷畾涔夌传鑹查瀛
       geometry:{sourceSize:200,crop:[0,0,200,200],cropOffset:[0,0]},warnings:[...new Set(warnings)],
       metadata:{name,grade:'purple',variant:'01R',motionVersion:PURPLE_PLAN_01R_MOTION_VERSION,
         resolvedComposition:resolved,cycle:2,rollEnd:31/60,settleEnd:35/60,landAt:.6,
-        captureSize,fps:30,frameTimes:frameTimes.map(({time})=>time),staticImages:selected.packedRegions.length,
+        captureSize,fps:30,motionFps:PURPLE_01R.fps,frameTimes:frameTimes.map(({time})=>time),staticImages:selected.packedRegions.length,
         imageAttachments:allRegions.length,reusedImages:reuse.reusedCount+sourceAliases.length,
         exactPixelReuses:reuse.reusedCount,sourceTransformReuses:sourceAliases.length,rotationReuses:reuse.rotationReusedCount,
         atlas:{width:page.width,height:page.height,pages:1,bytes:texture.size,targetBytes,palette:256},
