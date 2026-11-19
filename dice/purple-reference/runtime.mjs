@@ -8,7 +8,8 @@ import {encodeAtlasPng} from './atlas-png.mjs';
 
 export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-v9-settle-face';
 export const PURPLE_PLAN_02_MOTION_VERSION='purple02-reference-v12-balanced-size';
-export const DEFAULT_PURPLE_VARIANT='02';
+export const PURPLE_PLAN_01R_MOTION_VERSION='purple01r-v1';
+export const DEFAULT_PURPLE_VARIANT='01R';
 const motions = new Map([['01', 'A'], ['02', 'B'], ['05', 'E']]);
 const atlasPage = 'dice.png';
 const points = [1, 2, 3, 4, 5, 6];
@@ -67,7 +68,7 @@ function exposurePixels(renderer, motion, time, frontPoint=0, samples=exposureSa
   return {width, height, data};
 }
 
-function trimRegion(id, image, worldWidth, worldHeight) {
+export function trimRegion(id, image, worldWidth, worldHeight) {
   const {width, height, data} = image;
   // Keep the anchor's complete 30×30 registration even when its source is empty.
   if (id === 'anchor') return {
@@ -113,7 +114,7 @@ function trimRegion(id, image, worldWidth, worldHeight) {
   };
 }
 
-function packRegions(regions, compact) {
+export function packRegions(regions, compact, maxSize=2048) {
   // One shelf-packed page to keep atlas support uniform across renderers.
   const ordered = [...regions].sort((a, b) => b.h - a.h || b.w - a.w);
   const pack = width => {
@@ -128,14 +129,14 @@ function packRegions(regions, compact) {
         shelves.push(shelf);
         height += region.h + 2;
       }
-      if (height > 2048) return null;
+      if (height > maxSize) return null;
       positions.push({...region, x: shelf.x + 1, y: shelf.y + 1});
       shelf.x += region.w + 2;
     }
     return {width:compact?Math.max(...shelves.map(row=>row.x)):width,height,positions};
   };
   const widths=compact?[384,512,640,768,896,1024,1280,1536,1792,2048]:[1024,1536,2048];
-  const page = widths.map(pack).filter(Boolean)
+  const page = widths.filter(width=>width<=maxSize).map(pack).filter(Boolean)
     .sort((a, b) => a.width * a.height - b.width * b.height)[0];
   if (!page) return null;
   const {width, height, positions} = page;
@@ -450,6 +451,10 @@ export async function generatePurpleReferenceRuntime(files,{
   name='自定义紫色骰子', signal, anchorImage, composition='faces', variant=DEFAULT_PURPLE_VARIANT,
 }={}) {
   checkAbort(signal);
+  if (variant === '01R') {
+    const {generatePurple01RRuntime} = await import('../purple-01r/runtime.mjs?v=20261119-purple-01r');
+    return generatePurple01RRuntime(files,{name,signal,anchorImage,composition,variant});
+  }
   const motion=motions.get(variant);
   if (!motion) throw Error('紫色骰子动画方案无效');
   const usePlan02=variant==='02';

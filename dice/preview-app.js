@@ -2,9 +2,9 @@ import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
 import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { DiceAudio } from './audio.mjs';
-import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261113-green-android';
+import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261119-purple-01r';
 import { GameRenderer } from '/dice/renderer.js?v=20261113-green-3d';
-import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261113-green-3d';
+import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261119-purple-01r';
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
@@ -41,7 +41,7 @@ function settingsDirty() {
 }
 function hasRuntimeBundle() {
   return session?.grade === 'purple' && session?.candidate?.kind === 'purple-reference'
-    && session.candidate.purpleVariant === '02';
+    && ['01R','02'].includes(session.candidate.purpleVariant);
 }
 function currentVideo(video = session?.video) {
   const {profile, maxBytes, duration, fps, frameCount, width, height} = VIDEO_SPEC;

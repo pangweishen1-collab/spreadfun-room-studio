@@ -6,7 +6,7 @@ import {deflateSync} from 'node:zlib';
 import {createLocalPreview,validateFiles,validateSettings,inspectPNG,detectComposition,atlasText,SLOTS,VIDEO_PROFILE,resourceName,validatePurpleFiles} from '../dice/local-preview.mjs';
 import {VIDEO_SPEC} from '../dice/video-export.mjs';
 import {nativeRuntimeFixture} from './helpers/purple-fixtures.mjs';
-import {PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION} from '../dice/purple-reference/runtime.mjs';
+import {DEFAULT_PURPLE_VARIANT,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from '../dice/purple-reference/runtime.mjs';
 import {writeSpineBinary} from '../dice/six-face/spine-binary.mjs';
 process.on('uncaughtException',error=>{console.error(error?.message||String(error));process.exitCode=1;});
 
@@ -90,12 +90,15 @@ assert.equal(validateFiles([...files,{...files[0],name:'大骰子.png'}])[0].nam
 assert.throws(()=>validateSettings({...payload,point:true}));assert.throws(()=>validateSettings(null));
 for(const invalid of [{mode:'unknown'},{point:0},{point:7},{point:null}])assert.throws(()=>validateSettings({...payload,...invalid}));
 for(const mode of ['all','single','continuous'])assert.deepEqual(
-  validateSettings({...defaultPayload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',previewGrade:'purple',purpleVariant:'02',mode:'all',point:1,composition:'auto',soundEnabled:true});
+  validateSettings({...defaultPayload,mode,point:6}),{name:'仙人掌旧十图',grade:'purple',previewGrade:'purple',purpleVariant:'01R',mode:'all',point:1,composition:'auto',soundEnabled:true});
+assert.equal(DEFAULT_PURPLE_VARIANT,'01R');
 assert.equal(validateSettings(payload).purpleVariant,'05');
 assert.equal(validateSettings({...payload,previewGrade:'green'}).previewGrade,'green');
 for(const previewGrade of ['unknown',null,true])assert.throws(()=>validateSettings({...payload,previewGrade}));
 assert.equal(validateSettings({...payload,purpleVariant:'02'}).purpleVariant,'02');
-assert.throws(()=>validateSettings({...payload,purpleVariant:'01'}),/02 或 05/);
+assert.equal(validateSettings({...payload,purpleVariant:'01R'}).purpleVariant,'01R');
+assert.equal(validateSettings({...defaultPayload,grade:'green'}).purpleVariant,'05');
+assert.throws(()=>validateSettings({...payload,purpleVariant:'01'}),/01R、02 或 05/);
 assert.equal(VIDEO_PROFILE,'loop6-v7-60fps-audio-1500kb');
 assert.equal(VIDEO_PROFILE,VIDEO_SPEC.profile);assert.equal(VIDEO_SPEC.maxBytes,1_500_000);
 assert.equal(inspectPNG(new Uint8Array(png(200)),'sz_0').width,200);
@@ -376,7 +379,7 @@ const referenceAdapter=createLocalPreview({
       ...fixture, kind:'purple-reference',
       skel:new Blob([writeSpineBinary(fixture.json)],{type:'application/octet-stream'}),
       metadata:{...fixture.metadata,variant:options.variant,
-        motionVersion:options.variant==='02'?PURPLE_PLAN_02_MOTION_VERSION:PURPLE_REFERENCE_MOTION_VERSION},
+        motionVersion:options.variant==='01R'?PURPLE_PLAN_01R_MOTION_VERSION:options.variant==='02'?PURPLE_PLAN_02_MOTION_VERSION:PURPLE_REFERENCE_MOTION_VERSION},
     };
   },
 });
@@ -449,6 +452,45 @@ const returnedReference=await referenceAdapter.api(path+'/settings',{method:'POS
 assert.equal(returnedReference.purpleVariant,'05');
 assert.equal(referenceBuilds,4);
 await rejects(()=>referenceAdapter.api(path+'/bundle/runtime'));
+
+// New uploads choose 01R while old explicit 02/05 sessions stay readable.
+const reverseReference=await referenceAdapter.api('/api/preview/import',{method:'POST',body:defaultPayload});
+assert.equal(reverseReference.purpleVariant,'01R');
+assert.equal(reverseReference.candidate.purpleVariant,'01R');
+const reverseRecord=await referenceStorage.get(reverseReference.id);
+assert.equal(reverseRecord.runtime.metadata.motionVersion,PURPLE_PLAN_01R_MOTION_VERSION);
+const reverseBuilds=referenceBuilds;
+assert.equal((await referenceAdapter.api(`/api/preview/${reverseReference.id}`)).revision,1);
+assert.equal(referenceBuilds,reverseBuilds,'A matching 01R runtime must not rebake on read');
+const WorkerBefore=globalThis.Worker;
+let repeatQuantizations=0;
+globalThis.Worker=class {constructor(){repeatQuantizations++;throw Error('Unexpected second atlas quantization');}};
+let reversePackage,reverseRuntimePackage;
+try {
+ reversePackage=await referenceAdapter.api(`/api/preview/${reverseReference.id}/bundle`);
+ reverseRuntimePackage=await referenceAdapter.api(`/api/preview/${reverseReference.id}/bundle/runtime`);
+} finally {
+ if(WorkerBefore===undefined)delete globalThis.Worker;else globalThis.Worker=WorkerBefore;
+}
+assert.equal(repeatQuantizations,0,'The optimized 01R atlas must be packed unchanged');
+const reverseZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(reversePackage.url).arrayBuffer()));
+const reverseRoot=reversePackage.name+'/';
+assert.deepEqual(await reverseZip.file(reverseRoot+reversePackage.name+'.png').async('uint8array'),
+ new Uint8Array(await reverseRecord.runtime.texture.arrayBuffer()));
+assert.deepEqual(await reverseZip.file(reverseRoot+reversePackage.name+'.skel').async('uint8array'),
+ new Uint8Array(await reverseRecord.runtime.skel.arrayBuffer()));
+const reverseRuntimeZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(reverseRuntimePackage.url).arrayBuffer()));
+const expectedReverseRuntime=[reversePackage.name+'.skel',reversePackage.name+'.atlas',reversePackage.name+'.png',
+ 'res/icon.png','sound/dice_roll.mp3','sound/sound_ui_dice6.mp3'].map(name=>reverseRoot+name).sort();
+assert.deepEqual(Object.keys(reverseRuntimeZip.files).filter(name=>!reverseRuntimeZip.files[name].dir).sort(),expectedReverseRuntime);
+reverseRecord.runtime.metadata.motionVersion='purple01r-old';
+referenceStorage.records.set(reverseRecord.id,reverseRecord);
+const regeneratedReverse=await referenceAdapter.api(`/api/preview/${reverseRecord.id}`);
+assert.equal(regeneratedReverse.revision,2);
+assert.equal(regeneratedReverse.purpleVariant,'01R');
+assert.equal(referenceBuilds,reverseBuilds+1);
+assert.equal((await referenceStorage.get(reverseRecord.id)).runtime.metadata.motionVersion,PURPLE_PLAN_01R_MOTION_VERSION);
+checks.push('purple01r_new_upload_default_native_bundle_and_runtime_zip_preserve_atlas_bytes_and_versioned_cache_rebuilds_only_when_stale');
 referenceAdapter.dispose();
 checks.push('purple_variant_switch_rebuilds_the_baked_assets_and_exports_reject_stale_videos_while_background_changes_reuse_the_bake');
 

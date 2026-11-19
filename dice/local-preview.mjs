@@ -4,7 +4,7 @@ import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
-import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261110-dice-balanced-size';
+import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261119-purple-01r';
 import {optimizeAtlasPng} from './atlas-png-optimizer.mjs';
 export {DEFAULT_PURPLE_VARIANT};
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
@@ -84,7 +84,7 @@ export function validateSettings(payload, previous={name:'骰子预览',grade:'g
   result.name=result.name.trim();
   if(!['green','purple'].includes(result.grade)) throw new PreviewError('请选择绿色或紫色等级背景');
   if(!['green','purple'].includes(result.previewGrade)) throw new PreviewError('请选择绿色或紫色预览背景');
-  if(!['02','05'].includes(result.purpleVariant)) throw new PreviewError('紫色骰子方案需为 02 或 05');
+  if(!['01R','02','05'].includes(result.purpleVariant)) throw new PreviewError('紫色骰子方案需为 01R、02 或 05');
   if(result.grade==='green')result.purpleVariant='05';
   if(!['all','single','continuous'].includes(result.mode)) throw new PreviewError('预览模式需为 all、single 或 continuous');
   if(!Number.isInteger(result.point) || result.point<1 || result.point>6) throw new PreviewError('点数需为 1～6 的整数');
@@ -384,7 +384,7 @@ export function createLocalPreview(dependencies={}) {
     const variant=settingValue(record,'purpleVariant');
     const legacy=usesLegacyGyro(variant);
     const purpleKind=legacy?'purple-gyro':'purple-reference';
-    const purpleVersion=legacy?PURPLE_GYRO_MOTION_VERSION:variant==='02'?PURPLE_PLAN_02_MOTION_VERSION:PURPLE_REFERENCE_MOTION_VERSION;
+    const purpleVersion=legacy?PURPLE_GYRO_MOTION_VERSION:variant==='01R'?PURPLE_PLAN_01R_MOTION_VERSION:variant==='02'?PURPLE_PLAN_02_MOTION_VERSION:PURPLE_REFERENCE_MOTION_VERSION;
     const migrateMotion=record.grade==='purple'
       ?record.runtime.kind!==purpleKind||record.runtime.metadata?.motionVersion!==purpleVersion||
         (referenceRuntime(record.runtime)&&!hasReferenceBinary(record.runtime))
@@ -556,8 +556,8 @@ export function createLocalPreview(dependencies={}) {
   }
   async function bundle(id, runtimeOnly = false) {
     const record = await read(id);
-    if (runtimeOnly && (record.grade !== 'purple' || settingValue(record,'purpleVariant') !== '02' || !referenceRuntime(record.runtime))) {
-      throw new PreviewError('精简包仅适用于紫色 02 双轴抛转');
+    if (runtimeOnly && (record.grade !== 'purple' || !['01R','02'].includes(settingValue(record,'purpleVariant')) || !referenceRuntime(record.runtime))) {
+      throw new PreviewError('精简包仅适用于紫色 01R 或 02');
     }
     const zip=await (dependencies.zipFactory||zipFactory)();
     const name=resourceName(record.name,record.grade);
@@ -585,9 +585,10 @@ export function createLocalPreview(dependencies={}) {
     add(name+'.skel',skeleton instanceof Blob?skeleton:new Blob([skeleton],{type:'application/octet-stream'}));
     add(name+'.atlas',record.runtime.atlasText.replace(/^[^\r\n]+/,name+'.png'));
     const isGreen = record.grade === 'green';
+    const isPlan01R = record.grade === 'purple' && settingValue(record,'purpleVariant') === '01R';
     const losslessLevel = isGreen ? 2 : 3;
-    const paletteLimit = isGreen ? 256 : 192;
-    const texture = compactGreenRuntime(record.runtime) ? record.runtime.texture
+    const paletteLimit = isGreen || isPlan01R ? 256 : 192;
+    const texture = compactGreenRuntime(record.runtime) || isPlan01R ? record.runtime.texture
       : await optimizeAtlasPng(record.runtime.texture, losslessLevel, paletteLimit);
     add(name+'.png',texture);
     for(const sound of SOUND_NAMES)
