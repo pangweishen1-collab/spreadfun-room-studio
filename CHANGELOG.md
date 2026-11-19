@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.24.2 - 2026-11-19
+
+- Encode purple 01R atlas pixels directly in one reusable worker, removing intermediate PNG encoding/decoding and repeated WASM initialization while retaining the same palette and motion samples.
+- Reuse the latest prepared 01R assets when validated source hashes match. Keep each upload's name, warnings and session revision independent.
+- Cache completed purple ZIPs, coalesce concurrent requests, store existing PNGs without redundant deflation, and warm the packager during import. Keep the green production path unchanged.
+
 ## 1.24.1 - 2026-11-19
 
 - Capture every 60 Hz pose of the purple 01R roll instead of skipping alternate frames. Preview, MP4 and Spine share the smoother timeline, with the same trajectory, landing and sound timing.
