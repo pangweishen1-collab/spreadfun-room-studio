@@ -4,7 +4,7 @@ import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
-import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261119-purple-smooth-60';
+import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261119-purple-speed';
 import {optimizeAtlasPng} from './atlas-png-optimizer.mjs';
 export {DEFAULT_PURPLE_VARIANT};
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];
@@ -325,6 +325,15 @@ export function createLocalPreview(dependencies={}) {
   const revoke=dependencies.revokeObjectURL||(url=>URL.revokeObjectURL(url));
   const urls=new Map();
   const defaultAssets=new Map();
+  const pendingBundles=new Map();
+  // Keep only the latest successfully prepared 01R atlas in this page. Blobs
+  // are immutable; session revisions and warnings must remain independent.
+  let preparedPurple=null;
+  const preparedKey=(files,options)=>options.variant==='01R'&&files.every(file=>file.sha256)
+    ?JSON.stringify([PURPLE_PLAN_01R_MOTION_VERSION,options.composition,
+      files.filter(file=>/^(?:sz_[0-6]|[12]|anchor)$/.test(file.slot))
+        .map(file=>[file.slot,file.sha256]).sort((a,b)=>a[0].localeCompare(b[0]))]) : null;
+  const copyPrepared=(runtime,name)=>({...runtime,metadata:{...runtime.metadata,name},warnings:[...(runtime.warnings||[])]});
   function url(key,blob) {if(!urls.has(key))urls.set(key,objectURL(blob));return urls.get(key);}
   const defaultAudioPath=(record,name)=>compactGreenRuntime(record.runtime)
     ? '/dice/assets/green-reference/'+name+'.mp3' : DEFAULT_AUDIO[name];
@@ -344,16 +353,27 @@ export function createLocalPreview(dependencies={}) {
     finally{image.close?.();}
   }
   async function renderPurple(files,options={}){
+    const {reusePrepared,cacheOwner,...renderOptions}=options;
+    const cacheKey=reusePrepared?preparedKey(files,renderOptions):null;
+    options.signal?.throwIfAborted();
+    if(cacheKey&&preparedPurple?.key===cacheKey){
+      preparedPurple.owner=cacheOwner;
+      return copyPrepared(preparedPurple.runtime,options.name);
+    }
     const legacy=usesLegacyGyro(options.variant);
     const renderPurpleRuntime=legacy?dependencies.renderPurpleGyro:renderReference;
     const purpleKind=legacy?'purple-gyro':'purple-reference';
     const anchor=files.find(file=>file.slot==='anchor');
     const image=await decode(anchor?.blob||await defaultAsset(DEFAULT_ANCHOR),'anchor.png',{allowEmpty:true});
     try{
-      const runtime=await renderPurpleRuntime(files,{...options,anchorImage:image.drawable});
+      const runtime=await renderPurpleRuntime(files,{...renderOptions,anchorImage:image.drawable});
       if(runtime?.kind!==purpleKind||!runtime?.texture||!runtime?.atlasText||
           (referenceRuntime(runtime)?!hasReferenceBinary(runtime):!runtime?.json)){
         throw new PreviewError('紫色动画资源生成不完整');
+      }
+      if(cacheKey){
+        preparedPurple={key:cacheKey,owner:cacheOwner,runtime:copyPrepared(runtime,options.name)};
+        return copyPrepared(runtime,options.name);
       }
       return runtime;
     }
@@ -362,7 +382,7 @@ export function createLocalPreview(dependencies={}) {
   async function renderNative(record,options={}){
     if(record.grade!=='purple')return renderGreen(record.files,{name:record.name,...options});
     const runtime=await renderPurple(record.files,{name:record.name,composition:record.resolvedComposition,
-      variant:settingValue(record,'purpleVariant'),...options});
+      variant:settingValue(record,'purpleVariant'),cacheOwner:record.id,...options});
     if(referenceRuntime(runtime))runtime.assetRevision=record.revision;
     return runtime;
   }
@@ -495,7 +515,8 @@ export function createLocalPreview(dependencies={}) {
     }
     const detection=settings.grade==='green'?{resolvedComposition:'faces',compositionDetection:{method:'six_original_flat_faces',detected:'faces'}}:await resolveComposition(files,settings.composition);
     const record={id:uuid(),candidateId:uuid(),revision:1,...settings,...detection,files,audio,anchor:files.find(file=>file.slot==='anchor')||null,video:null,created:Math.floor(Date.now()/1000)};
-    try{record.runtime=await renderNative(record,{signal});}
+    if(record.grade==='purple'&&!dependencies.zipFactory)void zipFactory().catch(()=>{});
+    try{record.runtime=await renderNative(record,{signal,...(record.grade==='purple'?{reusePrepared:true}:{})});}
     catch(error){throw error instanceof PreviewError||error.name==='AbortError'?error:new PreviewError(error.message||'六面资源生成失败');}
     if(!record.runtime?.texture||!record.runtime?.atlasText||
         (binaryRuntime(record.runtime)?!hasReferenceBinary(record.runtime):!record.runtime?.json))throw new PreviewError('六面资源生成不完整');
@@ -559,9 +580,23 @@ export function createLocalPreview(dependencies={}) {
     if (runtimeOnly && (record.grade !== 'purple' || !['01R','02'].includes(settingValue(record,'purpleVariant')) || !referenceRuntime(record.runtime))) {
       throw new PreviewError('精简包仅适用于紫色 01R 或 02');
     }
+    if(record.grade!=='purple')return buildBundle(record,runtimeOnly);
+    const key=id+'/bundle/'+(runtimeOnly?'runtime-v1':'compact-v1')+'/'+record.revision;
+    const name=resourceName(record.name,record.grade)+(runtimeOnly?'-runtime':'');
+    if(urls.has(key))return {name,url:urls.get(key)};
+    const pendingKey=key+'/'+record.candidateId;
+    if(pendingBundles.has(pendingKey))return pendingBundles.get(pendingKey);
+    const pending=buildBundle(record,runtimeOnly);
+    pendingBundles.set(pendingKey,pending);
+    try{return await pending;}
+    finally{if(pendingBundles.get(pendingKey)===pending)pendingBundles.delete(pendingKey);}
+  }
+  async function buildBundle(record,runtimeOnly){
+    const id=record.id;
     const zip=await (dependencies.zipFactory||zipFactory)();
     const name=resourceName(record.name,record.grade);
-    const add=(path,content)=>zip.file(name+'/'+path,content);
+    const add=(path,content)=>record.grade==='purple'&&/\.png$/i.test(path)
+      ?zip.file(name+'/'+path,content,{compression:'STORE'}):zip.file(name+'/'+path,content);
     for (const file of record.files) {
       if (file.slot === '大骰子') add('res/icon.png',file.blob);
       else if (!runtimeOnly && file.slot !== 'anchor' &&
@@ -597,6 +632,9 @@ export function createLocalPreview(dependencies={}) {
     if(latest.revision!==record.revision||latest.candidateId!==record.candidateId)
       throw new PreviewError('打包期间预览已更新，请重新打包',409);
     const format = runtimeOnly ? 'runtime-v1' : 'compact-v1';
+    if(record.grade==='purple')for(const [key,value]of urls){
+      if(key.startsWith(id+'/bundle/'+format+'/')&&key!==id+'/bundle/'+format+'/'+record.revision){revoke(value);urls.delete(key);}
+    }
     return {name:runtimeOnly ? name+'-runtime' : name,url:url(id+'/bundle/'+format+'/'+record.revision,blob)};
   }
   async function api(path,options={}) {
@@ -617,13 +655,15 @@ export function createLocalPreview(dependencies={}) {
   }
   function forget(id) {
     storage.delete?.(id);
+    if(preparedPurple?.owner===id)preparedPurple=null;
+    for(const key of pendingBundles.keys())if(key.startsWith(id+'/'))pendingBundles.delete(key);
     for(const [key,value] of urls) {
       if(!key.startsWith(id+'/'))continue;
       revoke(value);
       urls.delete(key);
     }
   }
-  return {api,forget,dispose(){for(const value of urls.values())revoke(value);urls.clear();}};
+  return {api,forget,dispose(){for(const value of urls.values())revoke(value);urls.clear();preparedPurple=null;pendingBundles.clear();}};
 }
 
 let singleton;

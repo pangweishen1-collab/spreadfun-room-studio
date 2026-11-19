@@ -8,6 +8,7 @@ import {motionAt,renderSamples,PURPLE_01R} from './motion.mjs';
 import {buildPurple01RSkeleton} from './spine-builder.mjs';
 import {reuseRegions} from './region-reuse.mjs';
 import {packPurple01RRegions} from './atlas-pack.mjs';
+import {createAtlasCodec} from './atlas-codec.mjs';
 
 const points=[1,2,3,4,5,6];
 const sourceSize=200,captureSize=384,worldSize=384;
@@ -67,9 +68,10 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
   if(!['auto','faces','digits'].includes(composition))throw Error('紫色骰子素材类型无效');
   const inputs=Array.from(files||[]).filter(file=>/^sz_[0-6]$/.test(file.slot))
     .map(file=>new File([file.blob],file.slot+'.png',{type:'image/png'}));
-  const decoded=await decodeFaceFiles(inputs,{signal});
-  const owned=[],angleImages=[];let renderer;
+  const codec=createAtlasCodec({signal});
+  const owned=[],angleImages=[];let renderer,decoded;
   try {
+    decoded=await decodeFaceFiles(inputs,{signal});
     const warnings=[...decoded.warnings];
     const images=Object.fromEntries(points.map(point=>[point,normalize(decoded.images[point],owned)]));
     let zero=decoded.zero?normalize(decoded.zero,owned):null;
@@ -205,8 +207,12 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
       });
       const page=packPurple01RRegions(compact);
       if(!page||Math.max(page.width,page.height)>1024)continue;
-      const png=await encodeAtlasPng(page.width,page.height,page.rgba,{signal});
-      const texture=await optimizeAtlasPng(png,2,256);check();
+      let texture=await codec.encode(page);
+      if(!texture){
+        const png=await encodeAtlasPng(page.width,page.height,page.rgba,{signal});
+        texture=await optimizeAtlasPng(png,2,256);
+      }
+      check();
       selected={page,texture,regions:allRegions,factor,packedRegions:compact};
       if(texture.size<=targetBytes)break;
     }
@@ -227,7 +233,7 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
         anchor:{slot:'anchor',bone:'root',attachment:'anchor',width:30,height:30,scaleX:6,scaleY:6,opacity:0},
       }};
   } finally {
-    renderer?.dispose();decoded.dispose();
+    codec.dispose();renderer?.dispose();decoded?.dispose();
     for(const image of angleImages)image?.close();
     for(const canvas of owned)canvas.width=canvas.height=1;
   }

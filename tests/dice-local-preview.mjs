@@ -8,7 +8,7 @@ import {VIDEO_SPEC} from '../dice/video-export.mjs';
 import {nativeRuntimeFixture} from './helpers/purple-fixtures.mjs';
 import {DEFAULT_PURPLE_VARIANT,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from '../dice/purple-reference/runtime.mjs';
 import {writeSpineBinary} from '../dice/six-face/spine-binary.mjs';
-process.on('uncaughtException',error=>{console.error(error?.message||String(error));process.exitCode=1;});
+process.on('uncaughtException',error=>{console.error(error?.stack||String(error));process.exitCode=1;});
 
 const checks=[],table=Array.from({length:256},(_,v)=>{for(let i=0;i<8;i++)v=v&1?0xedb88320^(v>>>1):v>>>1;return v>>>0;});
 function chunk(type,data=Buffer.alloc(0)) {
@@ -28,6 +28,7 @@ const defaultPayload={name:'仙人掌旧十图',grade:'purple',mode:'all',point:
 const payload={...defaultPayload,purpleVariant:'05'};
 function memoryStore() {
   const records=new Map();return {records,fail:false,writes:0,
+    delete(id){records.delete(id);},
     async get(id){return structuredClone(records.get(id));},
     async put(record,expected=null){
       if(this.fail)throw new Error('injected quota failure');
@@ -41,8 +42,15 @@ const jszipContext={setTimeout,clearTimeout,setImmediate,clearImmediate,Uint8Arr
 vm.runInNewContext(await readFile(new URL('../vendor/jszip-3.10.1.min.js',import.meta.url),'utf8'),jszipContext);
 const JSZip=jszipContext.JSZip;
 const spineContext={console};vm.runInNewContext(await readFile(new URL('../dice/vendor/spine-webgl.js',import.meta.url),'utf8'),spineContext);const S=spineContext.spine;
+let zipBuilds=0,zipGate=null,failNextZip=false;
 async function zipFactory() {
-  const entries=new Map();return {file(name,data){entries.set(name,data);},async generateAsync(){const zip=new JSZip();for(const [name,data]of entries)zip.file(name,data instanceof Blob?new Uint8Array(await data.arrayBuffer()):data);return new Blob([await zip.generateAsync({type:'uint8array'})],{type:'application/zip'});}};
+  const entries=new Map();return {file(name,data,options){entries.set(name,{data,options});},async generateAsync(options){
+    zipBuilds++;
+    if(failNextZip){failNextZip=false;throw Error('injected ZIP failure');}
+    if(zipGate){const gate=zipGate;gate.started();await gate.promise;}
+    const zip=new JSZip();for(const [name,{data,options}]of entries)zip.file(name,data instanceof Blob?new Uint8Array(await data.arrayBuffer()):data,options);
+    return new Blob([await zip.generateAsync({...options,type:'uint8array'})],{type:'application/zip'});
+  }};
 }
 const storage=memoryStore(),urlBlobs=new Map(),decodeNames=[];let serial=0,renders=0,smallDigits=false,blockVideo=null,preparedSize=null,failPurpleBuild=false;
 const dependencies={storage,uuid:()=>String(++serial).padStart(32,'0'),videoAvailable:true,
@@ -491,6 +499,56 @@ assert.equal(regeneratedReverse.purpleVariant,'01R');
 assert.equal(referenceBuilds,reverseBuilds+1);
 assert.equal((await referenceStorage.get(reverseRecord.id)).runtime.metadata.motionVersion,PURPLE_PLAN_01R_MOTION_VERSION);
 checks.push('purple01r_new_upload_default_native_bundle_and_runtime_zip_preserve_atlas_bytes_and_versioned_cache_rebuilds_only_when_stale');
+
+const speedBuilds=referenceBuilds;
+const importAgain=name=>referenceAdapter.api('/api/preview/import',{method:'POST',body:{...defaultPayload,name}});
+const repeated01R=await importAgain('快速重复上传');
+assert.equal(referenceBuilds,speedBuilds,'Same validated source hashes reuse the prepared 01R atlas');
+assert.equal((await referenceStorage.get(repeated01R.id)).runtime.metadata.name,'快速重复上传');
+referenceAdapter.forget(reverseReference.id);
+const repeatedAgain=await importAgain('继续重复上传');
+assert.equal(referenceBuilds,speedBuilds,'Forgetting the replaced session must retain the current prepared atlas');
+referenceAdapter.forget(repeatedAgain.id);
+const rebuiltAfterForget=await importAgain('释放后重新制作');
+assert.equal(referenceBuilds,speedBuilds+1,'Forgetting the current owner releases the prepared atlas');
+const changedSources={...defaultPayload,files:defaultPayload.files.map(file=>file.name==='sz_1.png'
+  ?{...file,data:'data:image/png;base64,'+png(200,240).toString('base64')}:file)};
+await referenceAdapter.api('/api/preview/import',{method:'POST',body:changedSources});
+assert.equal(referenceBuilds,speedBuilds+2,'Changed source bytes must invalidate preparation');
+const packagePath='/api/preview/'+repeated01R.id;
+const buildsBeforeZip=zipBuilds;
+let releaseZip,startZip;
+const reachedZip=new Promise(resolve=>{startZip=resolve;});
+zipGate={promise:new Promise(resolve=>{releaseZip=resolve;}),started:startZip};
+const firstZip=referenceAdapter.api(packagePath+'/bundle');await reachedZip;
+const secondZip=referenceAdapter.api(packagePath+'/bundle');
+releaseZip();const [oneZip,twoZip]=await Promise.all([firstZip,secondZip]);zipGate=null;
+assert.equal(zipBuilds,buildsBeforeZip+1,'Concurrent requests share one package build');
+assert.equal(oneZip.url,twoZip.url);
+assert.deepEqual(await referenceAdapter.api(packagePath+'/bundle'),oneZip);
+assert.equal(zipBuilds,buildsBeforeZip+1,'Repeated downloads reuse the finished package');
+const storedZip=await JSZip.loadAsync(new Uint8Array(await urlBlobs.get(oneZip.url).arrayBuffer()),{checkCRC32:true});
+for(const entry of Object.values(storedZip.files).filter(file=>/\.png$/.test(file.name)))
+  assert.equal(entry._data.compression.magic,'\x00\x00','Already compressed PNG data is stored without a redundant ZIP deflate');
+const renamedFast=await referenceAdapter.api(packagePath+'/settings',{method:'POST',body:{expectedRevision:1,name:'新包名称'}});
+const nextZip=await referenceAdapter.api(packagePath+'/bundle');
+assert.equal(zipBuilds,buildsBeforeZip+2);assert.notEqual(nextZip.url,oneZip.url);
+assert.equal(urlBlobs.has(oneZip.url),false,'Only the newest completed package of each format is retained');
+assert.equal(nextZip.name,'dice_purple_新包名称');
+failNextZip=true;await assert.rejects(()=>referenceAdapter.api(packagePath+'/bundle/runtime'),/injected ZIP failure/);
+await referenceAdapter.api(packagePath+'/bundle/runtime');
+assert.equal(zipBuilds,buildsBeforeZip+4,'Failed package attempts must be retryable');
+const revisionThree=await referenceAdapter.api(packagePath+'/settings',{method:'POST',body:{expectedRevision:renamedFast.revision,name:'制作中更改'}});
+const zipReachedAgain=new Promise(resolve=>{startZip=resolve;});
+zipGate={promise:new Promise(resolve=>{releaseZip=resolve;}),started:startZip};
+const staleZip=referenceAdapter.api(packagePath+'/bundle');await zipReachedAgain;
+await referenceAdapter.api(packagePath+'/settings',{method:'POST',body:{expectedRevision:revisionThree.revision,name:'最终名称'}});
+releaseZip();await rejects(()=>staleZip,409);zipGate=null;
+const zipReachedForget=new Promise(resolve=>{startZip=resolve;});
+zipGate={promise:new Promise(resolve=>{releaseZip=resolve;}),started:startZip};
+const forgottenZip=referenceAdapter.api(packagePath+'/bundle');await zipReachedForget;
+referenceAdapter.forget(repeated01R.id);releaseZip();await rejects(()=>forgottenZip,404);zipGate=null;
+checks.push('purple_preparation_hash_cache_owner_release_and_package_deduplication_store_crc_revision_retry_and_forget_races');
 referenceAdapter.dispose();
 checks.push('purple_variant_switch_rebuilds_the_baked_assets_and_exports_reject_stale_videos_while_background_changes_reuse_the_bake');
 
