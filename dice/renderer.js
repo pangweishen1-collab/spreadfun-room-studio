@@ -142,7 +142,7 @@ export const loopFrameState = (frame, mode, target) => {
 };
 
 export class GameRenderer {
-  constructor(canvas, onStatus = () => {}) {
+  constructor(canvas, onStatus = () => {}, onPointStatus = () => {}) {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this.layer = document.createElement('canvas');
@@ -162,6 +162,9 @@ export class GameRenderer {
       if (!generatedCandidate(this.candidate)) this.pause();
     });
     this.onStatus = onStatus;
+    this.onPointStatus = onPointStatus;
+    this.pointPlayback = null;
+    this.renderedPoints = [];
     this.mode = 'all';
     this.target = 1;
     this.elapsed = 1.3;
@@ -237,12 +240,13 @@ export class GameRenderer {
       if (id !== this.loadId || presentationId !== this.presentationId) { assets?.dispose(); software?.dispose(); return false; }
       const sizeScale = (generatedCandidate(candidate) ? data.findBone?.('all')?.scaleX : null) || 1;
       const gridLimits = referenceCandidate(candidate) && candidate.purpleVariant === '02' ? plan02GridLimits(data, sizeScale) : null;
-      const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons,gridLimits:this.gridLimits,sizeScale:this.sizeScale};
+      const previous = {assets:this.assets,software:this.software,candidate:this.candidate,background:this.background,icon:this.icon,data:this.data,skeletons:this.skeletons,gridLimits:this.gridLimits,sizeScale:this.sizeScale,pointPlayback:this.pointPlayback};
       Object.assign(this, {assets, software, candidate, background,
         icon:icon && candidate.kind === 'six-face' ? greenPreviewIcon(icon) : icon, data,
-        skeletons:Array.from({length:6}, () => new spine.Skeleton(data)),gridLimits,sizeScale});
+        skeletons:Array.from({length:6}, () => new spine.Skeleton(data)),gridLimits,sizeScale,pointPlayback:null});
       try { this.draw(); }
       catch (error) { Object.assign(this, previous); throw error; }
+      this.clearPointPlayback('clear',previous.pointPlayback);
       previous.assets?.dispose(); previous.software?.dispose();
     } catch (error) { assets?.dispose(); software?.dispose(); throw error; }
 
@@ -270,6 +274,7 @@ export class GameRenderer {
 
   configure(mode, target) {
     if (this.recordingLoop) return false;
+    this.clearPointPlayback();
     this.mode = mode;
     this.target = Number(target);
     this.sequence = 0;
@@ -289,6 +294,7 @@ export class GameRenderer {
   }
 
   clear() {
+    this.clearPointPlayback();
     this.loadId += 1;
     this.presentationId += 1;
     this.playing = false;
@@ -304,6 +310,7 @@ export class GameRenderer {
 
   play() {
     if (!this.data || this.recordingLoop) return false;
+    this.clearPointPlayback();
     this.stopAfterRound = false;
     this.elapsed = 0;
     this.playing = true;
@@ -313,6 +320,12 @@ export class GameRenderer {
   }
   pause() {
     if (this.recordingLoop) return false;
+    if (this.pointPlayback) {
+      for (const slot of this.pointPlayback.slots) {
+        slot.playing=false;
+        this.onPointStatus?.({point:slot.point,playing:false,elapsed:slot.elapsed,reason:'pause'});
+      }
+    }
     if (this.autoLoop) { this.playing = false; this.stopAfterRound = false; }
     else if (this.mode === 'continuous' && this.playing && this.elapsed < 0.64) this.stopAfterRound = true;
     else this.playing = false;
@@ -320,8 +333,51 @@ export class GameRenderer {
   }
   reset() { if (this.recordingLoop) return false; this.sequence = 0; this.stopAfterRound = false; this.play(); }
 
+  pointAt(clientX,clientY) {
+    if (!this.data || this.candidate?.template !== 'purple' || this.mode !== 'all') return null;
+    const bounds=this.canvas.getBoundingClientRect();
+    if (!(bounds.width>0&&bounds.height>0)) return null;
+    const x=(clientX-bounds.left)*720/bounds.width,y=(clientY-bounds.top)*1600/bounds.height;
+    const centers=this.candidate.purpleVariant==='02'?PLAN02_GRID_X:GRID_X;
+    for(let index=0;index<6;index++)if(Math.abs(x-centers[index%3])<=CELL_HALF_WIDTH &&
+      Math.abs(y-(1600-GRID_Y[Math.floor(index/3)]))<=CELL_HALF_HEIGHT)return index+1;
+    return null;
+  }
+
+  clearPointPlayback(reason='clear',state=this.pointPlayback) {
+    if (!state) return;
+    for(const slot of state.slots)this.onPointStatus?.({point:slot.point,playing:false,elapsed:slot.elapsed,reason});
+    if(this.pointPlayback===state)this.pointPlayback=null;
+  }
+
+  playPoint(point) {
+    if (!Number.isInteger(point)||point<1||point>6||!this.data||this.mode!=='all'||
+      this.candidate?.template!=='purple'||this.recording||this.recordingLoop)return false;
+    const entering=!this.pointPlayback;
+    if(entering) {
+      this.pointPlayback={groupElapsed:this.elapsed,groupPlaying:this.playing,
+        endSeconds:this.autoLoop?this.loopSeconds:1.4,
+        slots:Array.from({length:6},(_,index)=>({point:index+1,elapsed:this.elapsed,playing:this.playing,overridden:false,
+          fit:this.renderedPoints?.[index]?.fit??1,shiftX:this.renderedPoints?.[index]?.shiftX??0,
+          sampleTime:this.renderedPoints?.[index]?.sampleTime??null}))};
+      this.playing=false;
+      this.stopAfterRound=false;
+    }
+    const state=this.pointPlayback,slot=state.slots[point-1];
+    const restartGroupAudio=entering || point===6&&!slot.overridden;
+    Object.assign(slot,{elapsed:0,playing:true,overridden:true,sampleTime:null,shiftX:0,startedAt:performance.now()});
+    this.onPointStatus?.({point,playing:true,elapsed:0,reason:'start',restartGroupAudio,
+      groupElapsed:state.groupElapsed,groupPlaying:state.groupPlaying,groupSix:!state.slots[5].overridden});
+    this.draw();
+    this.status();
+    return true;
+  }
+
   status() {
-    this.onStatus({ playing: this.playing, mode: this.mode, target: this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target, elapsed: this.elapsed });
+    const manual=!this.recording&&!this.recordingLoop?this.pointPlayback:null;
+    this.onStatus({ playing: manual?manual.slots.some(slot=>slot.playing):this.playing,
+      mode: this.mode, target: this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target, elapsed: this.elapsed,
+      ...(manual?{scope:'points'}:{}) });
   }
 
   tick(now) {
@@ -339,6 +395,26 @@ export class GameRenderer {
       return;
     }
     if (this.data && this.visible && !document.hidden) {
+      if(this.pointPlayback && !this.recording) {
+        const state=this.pointPlayback;
+        const pointDelta=Math.max(0,delta);
+        state.groupElapsed=Math.min(state.endSeconds,state.groupElapsed+pointDelta);
+        let changed=false,finished=false;
+        for(const slot of state.slots)if(slot.playing) {
+          changed=true;
+          const advance=slot.startedAt===undefined?pointDelta:Math.min(pointDelta,Math.max(0,(now-slot.startedAt)/1000));
+          if(now>=slot.startedAt)delete slot.startedAt;
+          slot.elapsed=Math.min(state.endSeconds,slot.elapsed+advance);
+          if(slot.elapsed>=state.endSeconds) {
+            slot.playing=false;finished=true;
+            this.onPointStatus?.({point:slot.point,playing:false,elapsed:slot.elapsed,reason:'finish'});
+          }
+        }
+        if(changed)this.draw();
+        if(finished)this.status();
+        requestAnimationFrame(this.tick);
+        return;
+      }
       if (this.playing) {
         this.elapsed += delta;
         const roundSeconds = this.autoLoop ? this.loopSeconds : 1.4;
@@ -389,6 +465,7 @@ export class GameRenderer {
     }
 
     const all = this.mode === 'all';
+    const manual=all&&!this.recording&&!this.recordingLoop&&this.candidate.template==='purple'?this.pointPlayback:null;
     const selected = this.mode === 'continuous' ? this.sequence % 6 + 1 : this.target;
     const reference = referenceCandidate(this.candidate);
     // Spine attachment keys are Float32 in the package. Match their precision
@@ -400,6 +477,7 @@ export class GameRenderer {
     const presentationGain = this.candidate.template === 'purple' ? PURPLE_PRESENTATION_SCALE : 1;
     const count = all ? 6 : 1;
     const sizeScale = this.sizeScale ?? 1;
+    const renderedPoints=[];
     let gridFit = all ? gridLimitAt(this.gridLimits,animationTime) : 1;
     let sharedBounds;
     for (let index = 0; index < count; index++) {
@@ -409,7 +487,9 @@ export class GameRenderer {
       const centerY = all ? GRID_Y[Math.floor(index / 3)] : 1600 - 810;
       skeleton.setToSetupPose();
       const animation = this.data.findAnimation('spin_' + point);
-      animation.apply(skeleton, -1, Math.min(animationTime, animation.duration), false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
+      const pointTime=manual ? Math.fround(manual.slots[index].elapsed) : animationTime;
+      const sampleTime=Math.min(pointTime,animation.duration);
+      animation.apply(skeleton, -1, sampleTime, false, null, 1, spine.MixBlend.replace, spine.MixDirection.mixIn);
       skeleton.x = centerX;
       skeleton.y = centerY;
       if (reference) {
@@ -426,9 +506,17 @@ export class GameRenderer {
       // The live bound also covers unsampled attachment switches between keys.
       if (all) {
         const bounds = gridBounds(skeleton, centerX, centerY, this.gridVertices);
-        gridFit = Math.min(gridFit, gridCellFit(bounds, sizeScale, sharedPose));
-        if (sharedPose && index === 0) sharedBounds = bounds;
+        if(manual) {
+          const slot=manual.slots[index];
+          if(slot.overridden||slot.sampleTime!==sampleTime)
+            slot.fit=Math.min(gridLimitAt(this.gridLimits,pointTime),gridCellFit(bounds,sizeScale,false));
+          slot.sampleTime=sampleTime;
+        } else {
+          gridFit = Math.min(gridFit, gridCellFit(bounds, sizeScale, sharedPose));
+          if (sharedPose && index === 0) sharedBounds = bounds;
+        }
       }
+      renderedPoints.push({sampleTime});
     }
 
     let gridShiftX = 0;
@@ -440,18 +528,22 @@ export class GameRenderer {
     if (gpu) this.scene.begin();
     for (let index = 0; index < count; index++) {
       const skeleton = this.skeletons[index];
+      const pointFit=manual?manual.slots[index].fit:gridFit;
+      const pointShift=manual?manual.slots[index].shiftX:gridShiftX;
       // Apply one fit to the whole grid, around each cell's visual center.
-      if (gridFit < 1 || gridShiftX) {
+      if (pointFit < 1 || pointShift) {
         const centerX = gridX[index % 3], centerY = GRID_Y[Math.floor(index / 3)];
-        skeleton.x = centerX + (skeleton.x - centerX) * gridFit + gridShiftX;
-        skeleton.y = centerY + (skeleton.y - centerY) * gridFit;
-        skeleton.scaleX *= gridFit;
-        skeleton.scaleY *= gridFit;
+        skeleton.x = centerX + (skeleton.x - centerX) * pointFit + pointShift;
+        skeleton.y = centerY + (skeleton.y - centerY) * pointFit;
+        skeleton.scaleX *= pointFit;
+        skeleton.scaleY *= pointFit;
         skeleton.updateWorldTransform(spine.Physics.pose);
       }
+      Object.assign(renderedPoints[index],{fit:pointFit,shiftX:pointShift});
       if (gpu) this.scene.drawSkeleton(skeleton, false);
       else this.software?.draw(ctx, skeleton, 1600);
     }
+    if(!this.recording&&!this.recordingLoop)this.renderedPoints=renderedPoints;
     if (gpu) { this.scene.end(); ctx.drawImage(this.layer, 0, 0); }
   }
 

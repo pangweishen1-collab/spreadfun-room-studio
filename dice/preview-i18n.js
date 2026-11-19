@@ -1,6 +1,7 @@
 const STORAGE_KEY = 'dice-studio-language';
 const messages = {
   zh: {
+    purpleCanvasLabel:'紫色骰子预览，按 1 至 6 重播单颗，按回车或空格重播全部',
     purpleVariant:'紫色骰子方案', purpleVariant01R:'01R · 原节奏反转', purpleVariant05:'05 · 倾轴陀螺', purpleVariant02:'02 · 双轴抛转（1.5×）',
     purpleUploadAssets:'拖入大骰子＋六张点数图＋无点数图（sz_0.png）',
     chooseUploadGrade:'请选择绿色或紫色上传区域', greenUpload:'绿色骰子上传', purpleUpload:'紫色骰子上传', greenMotion:'常规翻滚', purpleMotion:'默认 01R · 原节奏反转', previewBackground:'预览背景', uploadFiles:'上传', uploadGreenFiles:'上传绿色骰子素材', uploadPurpleFiles:'上传紫色骰子素材', finishPendingUpload:'请先完成或取消当前上传，再切换上传等级。',
@@ -18,6 +19,7 @@ const messages = {
     selectPng:'请选择 PNG 图片。', unknownFiles:'无法匹配文件名：{files}', duplicateFiles:'同一批次有重复素材：{files}', tooLarge:'{file}：单张 PNG 请小于 12 MB。', invalidPng:'{file}：文件内容不是有效 PNG。', invalidSize:'{file}：尺寸需为 {size}。', noFiles:'请先选择文件。', incompleteFiles:'请上传 sz_1～sz_6 六张点数图。', readFailed:'{file}：文件读取失败。', nameRequired:'请填写 1～80 字的预览名称。', requestFailed:'请求失败，请检查文件后重试。', networkFailed:'本地服务连接失败，请确认服务仍在运行后重试。', rendererFailed:'浏览器未能初始化预览，请使用支持 WebGL 的 Chrome。', previewLoadFailed:'预览加载失败，原有画面已保留。可点击“重试加载预览”。', restoreFailed:'上次预览无法恢复，请重新上传素材。', missing:'缺少：{files}', extra:'多余：{files}', duplicates:'重复：{files}', invalidDownload:'下载地址无效，请重试。', videoMismatch:'视频与当前预览不匹配，请重新生成。',
   },
   en: {
+    purpleCanvasLabel:'Purple dice preview. Press 1 to 6 to replay one die, or Enter or Space to replay all.',
     purpleVariant:'Purple roll style', purpleVariant01R:'01R · Reverse gyro', purpleVariant05:'05 · Tilted gyro', purpleVariant02:'02 · Dual-axis roll (1.5×)',
     purpleUploadAssets:'3D dice + 6 faces + blank face (sz_0.png)',
     chooseUploadGrade:'Choose a green or purple upload area first.', greenUpload:'Green dice', purpleUpload:'Purple dice', greenMotion:'Cube roll', purpleMotion:'Default 01R · Reverse gyro', previewBackground:'Preview background', uploadFiles:'Upload', uploadGreenFiles:'Upload green dice assets', uploadPurpleFiles:'Upload purple dice assets', finishPendingUpload:'Finish or cancel the pending upload before choosing another grade.',

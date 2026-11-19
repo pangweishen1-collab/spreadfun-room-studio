@@ -2,9 +2,10 @@ import { connectEmbedded } from './embed.mjs';
 import { bindDiceUploads, diceFilePath } from './upload-input.mjs';
 import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { DiceAudio } from './audio.mjs';
-import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261119-purple-01r';
-import { GameRenderer } from '/dice/renderer.js?v=20261113-green-3d';
-import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261119-purple-01r';
+import { PurplePreviewAudio } from './purple-preview-audio.mjs?v=20261119-purple-point-playback';
+import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261119-purple-region-reuse';
+import { GameRenderer } from '/dice/renderer.js?v=20261119-purple-point-playback';
+import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261119-purple-point-playback';
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
@@ -12,7 +13,10 @@ let session = null, pending = new Map(), grade = 'green', uploadGrade = null, pr
 let renderer = null, previewReady = false, hasCanvas = false, loadingPreview = false;
 let activity = null, notice = null, currentError = null, toastTimer;
 let embedded = null, audioWarning='', audioSignature='';
-const audio = new DiceAudio();
+const greenAudio = new DiceAudio();
+const purpleAudio = new PurplePreviewAudio();
+let audio = greenAudio;
+const purpleSoundRequests = new Map();
 const requiredSlots = () => GREEN_SLOTS;
 let pendingExtras = [];
 const normalizedName = file => file.name.normalize('NFKC').trim().toLowerCase();
@@ -22,8 +26,69 @@ function greenSlot(file) {
  return /\.png$/i.test(name) && m ? 'sz_'+m[1] : null;
 }
 function syncRound(status) {
+ if(audio===purpleAudio) {
+   if(!renderer?.visible||document.hidden||busy)stopPurpleSounds();
+   else if(status.scope!=='points') {
+     if(!status.playing)stopPurpleSounds('preview');
+     else if(status.elapsed<.1)playPurpleSound({channel:'preview',six:true,elapsed:status.elapsed});
+   }
+   return;
+ }
  if (!status.playing || !renderer?.visible || document.hidden) audio.stop();
  else if (status.elapsed < .1) audio.playRound({six:true});
+}
+
+function stopPurpleSounds(channel) {
+  if(channel===undefined)for(const [key,request] of purpleSoundRequests)purpleSoundRequests.set(key,request+1);
+  else purpleSoundRequests.set(channel,(purpleSoundRequests.get(channel)||0)+1);
+  purpleAudio.stop(channel);
+}
+function stopPlaybackSounds() { greenAudio.stop();stopPurpleSounds(); }
+function playbackAudio(sourceGrade) { return sourceGrade==='purple'?purpleAudio:greenAudio; }
+function selectPlaybackAudio(sourceGrade) {
+  const next=playbackAudio(sourceGrade);
+  if(audio!==next) { audio.stop();stopPurpleSounds();audio=next;audioSignature=''; }
+}
+function setPlaybackSoundEnabled(enabled) {
+  if(audio===purpleAudio&&!enabled)stopPurpleSounds();
+  audio.setEnabled(enabled);
+}
+function playPurpleSound({channel,six,elapsed=0}) {
+  stopPurpleSounds(channel);
+  const request=purpleSoundRequests.get(channel),started=performance.now();
+  if(audio!==purpleAudio||!purpleAudio.enabled||!purpleAudio.ready||busy||document.hidden||!renderer?.visible)return;
+  void purpleAudio.unlock().then(()=>{
+    if(request!==purpleSoundRequests.get(channel)||audio!==purpleAudio||!purpleAudio.enabled||!purpleAudio.ready||busy||document.hidden||!renderer?.visible)return;
+    purpleAudio.playRound({channel,six,elapsed:elapsed+(performance.now()-started)/1000});
+  }).catch(()=>{});
+}
+function syncPoint(status) {
+  if(audio!==purpleAudio||!Number.isInteger(status.point)||status.point<1||status.point>6)return;
+  const channel='point-'+status.point;
+  if(status.reason==='pause'||status.reason==='clear') { stopPurpleSounds(channel);stopPurpleSounds('preview');return; }
+  if(!status.playing||status.reason==='finish') { stopPurpleSounds(channel);return; }
+  if(status.reason!=='start')return;
+  if(status.restartGroupAudio) {
+    stopPurpleSounds('preview');
+    if(status.groupPlaying)playPurpleSound({channel:'preview',six:Boolean(status.groupSix),elapsed:status.groupElapsed||0});
+  }
+  playPurpleSound({channel,six:status.point===6,elapsed:status.elapsed||0});
+}
+function playCanvas(event) {
+  if(busy||!previewReady||pending.size||settingsDirty())return;
+  if(session?.grade==='purple') {
+    const point=renderer.pointAt(event.clientX,event.clientY);
+    if(point!==null)renderer.playPoint(point);
+    else { stopPurpleSounds();renderer.play(); }
+  } else { void audio.unlock().catch(()=>{});renderer.play(); }
+}
+function playCanvasKey(event) {
+  if(session?.grade!=='purple'||busy||!previewReady||pending.size||settingsDirty()||event.altKey||event.ctrlKey||event.metaKey||event.isComposing)return;
+  if(/^[1-6]$/.test(event.key)) {
+    if(renderer.playPoint(Number(event.key))!==false)event.preventDefault();
+  } else if(event.key==='Enter'||event.key===' ') {
+    stopPurpleSounds();if(renderer.play()!==false)event.preventDefault();
+  }
 }
 
 function issue(key, values) { return Object.assign(new Error(key), {key, values}); }
@@ -55,7 +120,7 @@ function fillSettings(value) {
   $('purple-variant').value = (grade === 'purple' && value.purpleVariant) || DEFAULT_PURPLE_VARIANT;
   $('preview-mode').value = 'all';
   $('preview-point').value = '1';
-  $('sound-enabled').checked = value.soundEnabled !== false; audio.setEnabled(value.soundEnabled !== false);
+  $('sound-enabled').checked = value.soundEnabled !== false; setPlaybackSoundEnabled(value.soundEnabled !== false);
 }
 function releasePending(resetTarget = true) {
   pending.forEach(file => { if(file.previewUrl) URL.revokeObjectURL(file.previewUrl); });
@@ -112,6 +177,11 @@ function render() {
   const clip = currentVideo();
   const ready = usable && previewReady && renderer?.candidate?.id === session?.candidate?.id;
   const locked = busy;
+  const keyboardPreview=session?.grade==='purple'&&hasCanvas;
+  $('game-canvas').tabIndex=keyboardPreview?0:-1;
+  $('game-canvas').setAttribute('aria-label',t(keyboardPreview?'purpleCanvasLabel':'canvasLabel'));
+  if(keyboardPreview)$('game-canvas').setAttribute('aria-keyshortcuts','1 2 3 4 5 6 Enter Space');
+  else $('game-canvas').removeAttribute('aria-keyshortcuts');
   $('controls-card').setAttribute('aria-busy', String(locked));
   $('upload-zone').setAttribute('aria-busy', String(locked));
   $('upload-zone').setAttribute('aria-disabled', String(locked));
@@ -181,10 +251,11 @@ function render() {
 }
 async function run(key, operation) {
   if (busy) return;
+  if(audio===purpleAudio)stopPurpleSounds();
   busy = true; currentError = null; notice = null; activity = key ? {key} : null; render();
   try { await operation(); }
   catch (error) { currentError = error; }
-  finally { busy = false; activity = null; render(); }
+  finally { busy = false; activity = null; if(audio===purpleAudio)renderer?.status?.();render(); }
 }
 function runUpload(operation, key = 'readingFiles') {
   return run(key, async () => {
@@ -195,11 +266,12 @@ function runUpload(operation, key = 'readingFiles') {
 }
 async function loadSession(next, reusePresentation = false) {
   if (!next?.id || !next.candidate) throw issue('requestFailed');
-  audioWarning=''; audio.setEnabled(next.soundEnabled !== false);
+  stopPurpleSounds();selectPlaybackAudio(next.grade);
+  audioWarning=''; setPlaybackSoundEnabled(next.soundEnabled !== false);
   const audioKey=JSON.stringify(next.candidate.audio||{});
   if(next.soundEnabled !== false && (audioKey!==audioSignature || !audio.ready)) {
     try { await audio.load(next.candidate.audio); audioSignature=audioKey; }
-    catch(error) { audioWarning=error.message; audio.setEnabled(false); }
+    catch(error) { audioWarning=error.message; setPlaybackSoundEnabled(false); }
   }
   if (reusePresentation && renderer && previewReady && hasCanvas
     && await renderer.patchPresentation(next.candidate)) {
@@ -213,15 +285,16 @@ async function loadSession(next, reusePresentation = false) {
     if (!renderer) throw issue('rendererFailed');
     await renderer.load(next.candidate);
     session = next; fillSettings(next);
-    audio.setEnabled(next.soundEnabled !== false && !audioWarning);
+    setPlaybackSoundEnabled(next.soundEnabled !== false && !audioWarning);
     renderer.configure(next.mode, next.point);
     previewReady = true; hasCanvas = true;
     renderer.play();
   } catch (error) {
-    session = previous; audio.stop(); audioSignature='';
+    session = previous; stopPlaybackSounds(); audioSignature='';
     if (previous) {
+      selectPlaybackAudio(previous.grade);
       fillSettings(previous); previewReady = Boolean(renderer?.data);
-      if (previous.soundEnabled !== false) try { await audio.load(previous.candidate.audio); audioSignature=JSON.stringify(previous.candidate.audio||{}); } catch(soundError) { audioWarning=soundError.message; audio.setEnabled(false); }
+      if (previous.soundEnabled !== false) try { await audio.load(previous.candidate.audio); audioSignature=JSON.stringify(previous.candidate.audio||{}); } catch(soundError) { audioWarning=soundError.message; setPlaybackSoundEnabled(false); }
     }
     if (error.key === 'rendererFailed') throw error;
     throw Object.assign(issue('previewLoadFailed'), {cause:error});
@@ -276,7 +349,7 @@ async function saveSettings() {
   notice = hadVideo && !next.video ? {key:'videoInvalidated'} : null;
 }
 function settingsChanged() {
-  audio.setEnabled($('sound-enabled').checked); if($('sound-enabled').checked) void audio.unlock().catch(()=>{});
+  setPlaybackSoundEnabled($('sound-enabled').checked); if($('sound-enabled').checked) void audio.unlock().catch(()=>{});
   currentError = null; render();
   if (session && !pending.size && settingsDirty()) return run(null, saveSettings);
 }
@@ -289,6 +362,7 @@ async function downloadBundle(runtimeOnly = false) {
 }
 async function exportVideo() {
   if (!session || settingsDirty() || pending.size) return;
+  if(audio===purpleAudio)stopPurpleSounds();
   const clip = currentVideo();
   if (clip) { download(clip.url, '.mp4'); toast('videoReused'); return; }
   if (!previewReady) return;
@@ -325,7 +399,7 @@ function importFiles(value) {
   if (files.length && !uploadGrade) {
     try { selectUploadGrade(session?.grade); } catch(error) { return run(null,()=>{throw error;}); }
   }
-  if (files.length) { void audio.unlock().catch(()=>{}); return runUpload(() => stageFiles(files)); }
+  if (files.length) { void playbackAudio(uploadGrade||session?.grade).unlock().catch(()=>{}); return runUpload(() => stageFiles(files)); }
 }
 function selectUploadGrade(nextGrade) {
   if (!['green','purple'].includes(nextGrade)) throw issue('chooseUploadGrade');
@@ -342,10 +416,10 @@ async function switchBackground(nextGrade) {
   try { await loadSession(next, true); }
   catch (error) {
     // Settings already committed: keep its revision for a safe retry while retaining the last frame.
-    session = next; fillSettings(next); previewReady = false; audio.stop();
+    session = next; fillSettings(next); previewReady = false; stopPlaybackSounds();
     throw error;
   }
-  finally { if (draft) { $('dice-name').value=draft.name; $('sound-enabled').checked=draft.soundEnabled; $('purple-variant').value=draft.purpleVariant; audio.setEnabled(draft.soundEnabled && !audioWarning); } }
+  finally { if (draft) { $('dice-name').value=draft.name; $('sound-enabled').checked=draft.soundEnabled; $('purple-variant').value=draft.purpleVariant; setPlaybackSoundEnabled(draft.soundEnabled && !audioWarning); } }
   notice = hadVideo && !next.video ? {key:'videoInvalidated'} : null;
 }
 async function stageGreen(files) {
@@ -379,7 +453,7 @@ function openDialog(id) { const dialog=$(id); if (!dialog.open) dialog.showModal
 applyTranslations();
 clearLegacyPreviewHistory();
 try {
-  renderer = new GameRenderer($('game-canvas'),syncRound);
+  renderer = new GameRenderer($('game-canvas'),syncRound,syncPoint);
   renderer.setLooping(true, 2);
 }
 catch { currentError = issue('rendererFailed'); }
@@ -400,11 +474,12 @@ $('asset-details').addEventListener('toggle', renderAssets);
 $('import-preview').addEventListener('click', () => runUpload(importPending, 'buildingPreview'));
 $('clear-pending').addEventListener('click', () => { if (busy) return; releasePending(); if (session) fillSettings(session); currentError=null; notice=null; toast('replacementCancelled'); render(); });
 $('reload-preview').addEventListener('click', () => run('loadingPreview', async () => { if (session) await loadSession(await api('/api/preview/' + session.id)); }));
-$('game-canvas').addEventListener('click', () => { if (!busy && previewReady && !pending.size && !settingsDirty()) { void audio.unlock().catch(()=>{}); renderer.play(); } });
+$('game-canvas').addEventListener('click', playCanvas);
+$('game-canvas').addEventListener('keydown', playCanvasKey);
 $('export-video').addEventListener('click', () => run('recording', exportVideo));
 $('download-bundle').addEventListener('click', () => run('bundling', downloadBundle));
 $('download-runtime-bundle').addEventListener('click', () => run('bundling', () => downloadBundle(true)));
-document.addEventListener('visibilitychange',()=>{if(document.hidden)audio.stop();});
-window.addEventListener('beforeunload', () => { audio.dispose(); releasePending(); renderer?.pause(); });
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopPlaybackSounds();});
+window.addEventListener('beforeunload', () => { stopPlaybackSounds();greenAudio.dispose();purpleAudio.dispose();releasePending();renderer?.pause(); });
 embedded = connectEmbedded(renderer, {onFiles:importFiles, isBusy:() => busy});
 render();

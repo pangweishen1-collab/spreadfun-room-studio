@@ -6,6 +6,7 @@ import {optimizeAtlasPng} from '../atlas-png-optimizer.mjs';
 import {Proxy3DRenderer} from './proxy-3d.mjs';
 import {motionAt,renderSamples,PURPLE_01R} from './motion.mjs';
 import {buildPurple01RSkeleton} from './spine-builder.mjs';
+import {reuseRegions} from './region-reuse.mjs';
 
 const points=[1,2,3,4,5,6];
 const sourceSize=200,captureSize=384,worldSize=384;
@@ -108,7 +109,10 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
       captureSize/2+(x-width/2)*pixelScale,captureSize/2+(y-width/2)*pixelScale,width*pixelScale,width*pixelScale);
     const read=()=>ctx.getImageData(0,0,captureSize,captureSize);
     const draw=(image,width,x=0,y=0)=>{ctx.clearRect(0,0,captureSize,captureSize);layer(ctx,image,width,x,y);};
-    const regions=[];
+    const regions=[],sourceAliases=[];
+    // The two flat endpoints use the same original art at different scales.
+    // Keep the full-resolution front once and reuse it for the opening.
+    regions.push({...trimRegion('roll_31',pixels(front,sourceSize),sourceSize,sourceSize),time:31/60});
     for(const key of frameTimes) {
       check();
       const pose=motionAt(key.frame,thinness);
@@ -121,17 +125,30 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
           pose.offset[0]*offsetScale,pose.offset[1]*offsetScale);
       }
       ctx.globalCompositeOperation='source-over';ctx.globalAlpha=1;
-      regions.push({...trimRegion(key.id,read(),worldSize,worldSize),time:key.time});
+      if(key.frame===0)sourceAliases.push({id:key.id,sourceId:'roll_31',scale:baseWidth*pose.zoom/sourceSize,dx:0,dy:0});
+      else if(key.frame!==31)regions.push({...trimRegion(key.id,read(),worldSize,worldSize),time:key.time});
       if(key.frame%4===0)await pause();
     }
     const landing=footprint(read());
     const masks=[surface(captureSize),surface(captureSize)];owned.push(...masks);
+    const rightEdge=context=>{
+      const data=context.getImageData(0,0,captureSize,captureSize).data;
+      let right=0;
+      for(let y=0;y<captureSize;y++)for(let x=0;x<captureSize;x++)
+        if(data[(y*captureSize+x)*4+3])right=Math.max(right,x+1);
+      return right;
+    };
     const reveal=(under,over,progress)=> {
       const boundary=-12+progress*(captureSize+24),feather=4;
+      let overOnly=true;
       for(let index=0;index<2;index++) {
         const context=masks[index].getContext('2d');
         context.clearRect(0,0,captureSize,captureSize);context.globalCompositeOperation='source-over';
         layer(context,...(index?over:under));
+        // If both complete silhouettes are left of the feather, the old art
+        // has fully cleared and the result is just the original face with an
+        // affine transform. Reuse its atlas image rather than rasterize again.
+        overOnly=overOnly&&rightEdge(context)<=boundary-feather;
         const fade=context.createLinearGradient(boundary-feather,0,boundary+feather,0);
         fade.addColorStop(1-index,'#000');fade.addColorStop(index,'transparent');
         context.globalCompositeOperation='destination-in';context.fillStyle=fade;context.fillRect(0,0,captureSize,captureSize);
@@ -139,6 +156,7 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
       ctx.clearRect(0,0,captureSize,captureSize);ctx.globalCompositeOperation='lighter';
       for(const mask of masks)ctx.drawImage(mask,0,0);
       ctx.globalCompositeOperation='source-over';
+      return overOnly;
     };
     for(const point of points) {
       check();
@@ -148,20 +166,32 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
       draw(images[point],sourceSize*match);
       const scaled=footprint(read());
       const shift=[(landing.x-scaled.x)/pixelScale,(landing.y-scaled.y)/pixelScale];
+      const clear=trimRegion('sz_'+point,pixels(images[point],sourceSize),sourceSize,sourceSize);
       for(let index=0;index<2;index++) {
         const remaining=1-smooth(index/2);
-        reveal([front,sourceSize],[images[point],sourceSize*(1+(match-1)*remaining),shift[0]*remaining,shift[1]*remaining],smooth((index+1)/3));
-        regions.push(trimRegion('reveal_'+point+'_'+index,read(),worldSize,worldSize));
+        const scale=1+(match-1)*remaining,dx=shift[0]*remaining,dy=shift[1]*remaining;
+        const pureResult=reveal([front,sourceSize],[images[point],sourceSize*scale,dx,dy],smooth((index+1)/3));
+        const id='reveal_'+point+'_'+index;
+        if(pureResult)sourceAliases.push({id,sourceId:clear.id,scale,dx,dy});
+        else regions.push(trimRegion(id,read(),worldSize,worldSize));
       }
       // These clear results never pass through the motion-raster reducer.
-      regions.push(trimRegion('sz_'+point,pixels(images[point],sourceSize),sourceSize,sourceSize));
+      regions.push(clear);
     }
     regions.push(trimRegion('anchor',pixels(anchorImage,30),30,30));
 
+    // Deduplicate before reducing any motion raster. All timeline IDs keep
+    // their own geometry while their path addresses the shared atlas pixels.
+    const reuse=reuseRegions(regions);
+    const allRegions=[...reuse.allRegions,...sourceAliases.map(({id,sourceId,scale,dx,dy})=>{
+      const source=reuse.attachments[sourceId];
+      return {id,attachment:{...source,x:source.x*scale+dx,y:source.y*scale-dy,
+        width:source.width*scale,height:source.height*scale}};
+    })];
     let selected;
     for(const factor of [1,.84,.70]) {
       check();
-      const compact=regions.map(region=>{
+      const compact=reuse.packedRegions.map(region=>{
         if(region.id.startsWith('reveal_'))return resample(region,factor);
         if(!region.id.startsWith('roll_'))return region;
         const fast=region.time>=.10&&region.time<=.43;
@@ -171,7 +201,7 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
       if(!page||Math.max(page.width,page.height)>1024)continue;
       const png=await encodeAtlasPng(page.width,page.height,page.rgba,{signal});
       const texture=await optimizeAtlasPng(png,2,256);check();
-      selected={page,texture,regions:compact,factor};
+      selected={page,texture,regions:allRegions,factor,packedRegions:compact};
       if(texture.size<=targetBytes)break;
     }
     if(!selected)throw Error('紫色骰子无法装入单张 1024 像素图集，请使用较小的素材');
@@ -183,7 +213,9 @@ export async function generatePurple01RRuntime(files,{name='自定义紫色骰�
       geometry:{sourceSize:200,crop:[0,0,200,200],cropOffset:[0,0]},warnings:[...new Set(warnings)],
       metadata:{name,grade:'purple',variant:'01R',motionVersion:PURPLE_PLAN_01R_MOTION_VERSION,
         resolvedComposition:resolved,cycle:2,rollEnd:31/60,settleEnd:35/60,landAt:.6,
-        captureSize,fps:30,frameTimes:frameTimes.map(({time})=>time),staticImages:selected.regions.length,
+        captureSize,fps:30,frameTimes:frameTimes.map(({time})=>time),staticImages:selected.packedRegions.length,
+        imageAttachments:allRegions.length,reusedImages:reuse.reusedCount+sourceAliases.length,
+        exactPixelReuses:reuse.reusedCount,sourceTransformReuses:sourceAliases.length,rotationReuses:reuse.rotationReusedCount,
         atlas:{width:page.width,height:page.height,pages:1,bytes:texture.size,targetBytes,palette:256},
         body:renderer.metadata,motionRasterFactor:factor,clearFaceSize:200,
         anchor:{slot:'anchor',bone:'root',attachment:'anchor',width:30,height:30,scaleX:6,scaleY:6,opacity:0},

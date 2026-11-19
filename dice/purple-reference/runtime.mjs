@@ -8,7 +8,7 @@ import {encodeAtlasPng} from './atlas-png.mjs';
 
 export const PURPLE_REFERENCE_MOTION_VERSION='purple05-reference-v9-settle-face';
 export const PURPLE_PLAN_02_MOTION_VERSION='purple02-reference-v12-balanced-size';
-export const PURPLE_PLAN_01R_MOTION_VERSION='purple01r-v1';
+export const PURPLE_PLAN_01R_MOTION_VERSION='purple01r-v2-region-reuse';
 export const DEFAULT_PURPLE_VARIANT='01R';
 const motions = new Map([['01', 'A'], ['02', 'B'], ['05', 'E']]);
 const atlasPage = 'dice.png';
@@ -452,7 +452,7 @@ export async function generatePurpleReferenceRuntime(files,{
 }={}) {
   checkAbort(signal);
   if (variant === '01R') {
-    const {generatePurple01RRuntime} = await import('../purple-01r/runtime.mjs?v=20261119-purple-01r');
+    const {generatePurple01RRuntime} = await import('../purple-01r/runtime.mjs?v=20261119-purple-region-reuse');
     return generatePurple01RRuntime(files,{name,signal,anchorImage,composition,variant});
   }
   const motion=motions.get(variant);

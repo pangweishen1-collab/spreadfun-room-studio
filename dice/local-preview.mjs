@@ -4,7 +4,7 @@ import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
-import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261119-purple-01r';
+import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261119-purple-region-reuse';
 import {optimizeAtlasPng} from './atlas-png-optimizer.mjs';
 export {DEFAULT_PURPLE_VARIANT};
 export const SLOTS = ['大骰子', '1', '2', ...Array.from({length:7}, (_, i) => `sz_${i}`)];

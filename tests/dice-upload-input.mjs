@@ -396,6 +396,7 @@ const checks=[];
     DEFAULT_PURPLE_VARIANT:'02',forgetLocalPreview:id=>forgotten.push(id),
     UploadProgress:{begin(total){assert.equal(total,undefined);progressEvents.push('begin');return {finish:()=>progressEvents.push('finish')};}},
     DiceAudio:class {ready=true;setEnabled(value){audioChanges.push(value);}async load(){}async unlock(){}stop(){}},
+    PurplePreviewAudio:class {ready=true;setEnabled(value){audioChanges.push(value);}async load(){}async unlock(){}stop(){}},
     localApi:async(path,options)=>{
       const body=typeof options.body==='string'?JSON.parse(options.body):options.body;calls.push({path,body});
       const previous=app.state().session,isImport=path==='/api/preview/import';
