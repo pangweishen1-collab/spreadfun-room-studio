@@ -87,6 +87,7 @@ const run = source => vm.runInContext(source,sandbox);
   assert.equal(document.querySelector('#previewUploadButton').disabled,false,'room upload restores after import');
   assert.equal(document.querySelector('#previewUploadButton')['aria-busy'],'false');
   assert.equal(run('batchJobs.length'),2);assert.equal(run('generatedOutputs.length'),4);assert.equal(run('exportBusy||importBusy'),false);
+  assert.equal(document.querySelector('#previewStage').dataset.previewCount,'2');assert.equal(document.querySelector('#roomTool .preview').dataset.previewCount,'2');
   assert.match(document.querySelector('#uploadNotice').textContent,/broken.png/);
   assert.equal(run('readLifetimeImages()'),4);
   assert.equal(recorded('generated'),4,'two new backgrounds produce four countable files');assert.equal(recorded('download'),0);
