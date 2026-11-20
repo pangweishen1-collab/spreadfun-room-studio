@@ -4,7 +4,7 @@ import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
 import { DiceAudio } from './audio.mjs';
 import { PurplePreviewAudio } from './purple-preview-audio.mjs?v=20261119-purple-point-playback';
 import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261120-purple-first';
-import { GameRenderer } from '/dice/renderer.js?v=20261119-purple-point-playback';
+import { GameRenderer } from '/dice/renderer.js?v=20261120-demand-background';
 import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261119-purple-point-playback';
 
 const $ = id => document.getElementById(id);

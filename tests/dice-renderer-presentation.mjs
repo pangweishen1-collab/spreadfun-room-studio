@@ -50,7 +50,9 @@ function ready(src, from = 0) { const image = imageRequest(src, from); image.set
 function reject(src, from = 0) { const image = imageRequest(src, from); image.settled = true; image.onerror(); }
 async function initialLoad(GameRenderer, from = 0) {
   const renderer = new GameRenderer(canvas);
+  assert.equal(requests.length,from,'An empty renderer does not preload backgrounds');
   const load = renderer.load(candidate('initial'));
+  await settle();
   ready(green, from); await settle(); ready('stable-hero', from);
   assert.equal(await load, true);
   return renderer;
@@ -59,7 +61,7 @@ async function initialLoad(GameRenderer, from = 0) {
 const {GameRenderer} = await import('../dice/renderer.js?presentation-test');
 const renderer = await initialLoad(GameRenderer);
 assert.equal(requests.filter(image => image.src === green).length, 1);
-assert.equal(requests.filter(image => image.src === purple).length, 1, 'Both backgrounds are preloaded');
+assert.equal(requests.filter(image => image.src === purple).length, 0, 'An unused background stays unloaded');
 const originalAssets = renderer.assets, originalData = renderer.data, originalIcon = renderer.icon, originalSkeletons = renderer.skeletons;
 Object.assign(renderer, {mode: 'continuous', target: 6, elapsed: .8, sequence: 3, playing: true, stopAfterRound: true, wasPlaying: true});
 const before = calls.length, managerCount = managers.length;

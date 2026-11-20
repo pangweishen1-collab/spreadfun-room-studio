@@ -287,8 +287,8 @@ body{min-width:320px}
     <section class="preview card gift-preview-card" aria-labelledby="giftPreviewHeading">
       <div class="preview-head gift-preview-heading"><h2 id="giftPreviewHeading" data-gift-i18n="preview">效果预览</h2><span class="gift-output-meta" id="giftPreviewOutputMeta">200 × 200 px</span></div>
       <div class="gift-mode-row"><fieldset class="gift-modes"><legend class="gift-sr-only" data-gift-i18n="modeLabel">处理方式</legend>
-        <button id="giftPreviewModeFeather" class="gift-mode" type="button" aria-pressed="true"><span class="gift-mode-art" aria-hidden="true"><img src="assets/gift-preview/mode-feather.webp" alt="" width="40" height="40"></span><span data-gift-i18n="modeFeather">场景羽化</span><svg class="gift-mode-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 8 2.5 2.5L12 5"/></svg></button>
-        <button id="giftPreviewModeTransparent" class="gift-mode" type="button" aria-pressed="false"><span class="gift-mode-art" aria-hidden="true"><img src="assets/gift-preview/mode-transparent.webp" alt="" width="40" height="40"></span><span data-gift-i18n="modeTransparent">透明素材</span><svg class="gift-mode-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 8 2.5 2.5L12 5"/></svg></button>
+        <button id="giftPreviewModeFeather" class="gift-mode" type="button" aria-pressed="true"><span class="gift-mode-art" aria-hidden="true"><img loading="lazy" decoding="async" src="assets/gift-preview/mode-feather.webp" alt="" width="40" height="40"></span><span data-gift-i18n="modeFeather">场景羽化</span><svg class="gift-mode-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 8 2.5 2.5L12 5"/></svg></button>
+        <button id="giftPreviewModeTransparent" class="gift-mode" type="button" aria-pressed="false"><span class="gift-mode-art" aria-hidden="true"><img loading="lazy" decoding="async" src="assets/gift-preview/mode-transparent.webp" alt="" width="40" height="40"></span><span data-gift-i18n="modeTransparent">透明素材</span><svg class="gift-mode-check" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 8 2.5 2.5L12 5"/></svg></button>
       </fieldset><button id="giftPreviewRemoveBackground" class="gift-matting-button" type="button" aria-busy="false" data-feedback-button data-ft-activity disabled><svg class="gift-matting-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false"><path d="m2.5 12.5 6.5-6.5 2 2-6.5 6.5-2-2Zm5-5 2 2M11.5 1.5v3M10 3h3M3.5 4v3M2 5.5h3M13 11v3M11.5 12.5h3"/></svg><span data-gift-matting-label>一键抠图</span></button></div>
       <span class="tool-feedback-status" data-feedback-status role="status" aria-live="polite"></span>
       <div class="stage gift-stage upload-ready ft-upload-zone" id="giftPreviewStage" data-background="black" data-feedback-stage role="group" aria-label="点击、拖入或粘贴一张或多张图片">
@@ -1213,7 +1213,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="vendor/svga-2.3.2.min.js?v=20261110-svga-assets"></script>
   <script src="banner-webp.js?v=20261112-webp-clarity"></script>
   <script src="webp-settings.js?v=20261030-webp2"></script>
-  <script src="project-selector.js?v=20261026-projects1"></script>
+  <script src="project-selector.js?v=20261120-defer-images"></script>
   <script src="banner.js?v=20261113-hapi-680"></script>
   <script src="hub.js?v=20261103-footer1"></script>
   <script src="market-icon-png.js?v=20261024-resources-nav1"></script>

@@ -177,7 +177,6 @@ export class GameRenderer {
     this.loadId = 0;
     this.presentationId = 0;
     this.gridVertices = [];
-    for (const previewGrade of ['green', 'purple']) void loadBackground({previewGrade}).catch(() => {});
     this.tick = this.tick.bind(this);
     requestAnimationFrame(this.tick);
     document.addEventListener('visibilitychange', () => { this.last = performance.now(); });

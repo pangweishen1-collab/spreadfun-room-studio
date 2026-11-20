@@ -4,6 +4,7 @@ import path from 'node:path';
 import {createHash} from 'node:crypto';
 import {promisify} from 'node:util';
 import {gzip} from 'node:zlib';
+import {cacheDisplayImages} from './cache-display-images.mjs';
 
 const root=fileURLToPath(new URL('../',import.meta.url));
 const target=path.join(root,'dist');
@@ -35,6 +36,7 @@ for (const file of ['assets/lucida/manifest.json', 'vendor/ort-lucida/asyncify-m
   }
   await writeFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
 }
+const imageHeaders=await cacheDisplayImages(target);
 await writeFile(path.join(target,'_headers'),`/*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
@@ -58,7 +60,7 @@ await writeFile(path.join(target,'_headers'),`/*
   Cache-Control: no-cache
 /
   Cache-Control: no-cache
-`);
+`+imageHeaders);
 // Release metadata comes from package.json so the shipped footer cannot lag behind.
 const {version}=JSON.parse(await readFile(path.join(root,'package.json'),'utf8'));
 const indexPath=path.join(target,'index.html');
