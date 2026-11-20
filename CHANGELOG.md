@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.24.7 - 2026-11-20
+
+- Match the token upload workspace and card dimensions to the dice uploader. Replace generic upload artwork with the existing green and purple token icons.
+- Keep token import, animation, export and dice production unchanged.
+
 ## 1.24.6 - 2026-11-20
 
 - Split token uploads into independent green and purple areas, including grade-specific file picking, drop, paste and keyboard activation.
