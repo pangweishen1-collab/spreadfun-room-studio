@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.24.8 - 2026-11-20
+
+- Enlarge room background previews for batches of two or three and fit the surrounding stage to content. Preserve aspect ratio, encoded pixels and the compact layout for larger batches.
+
 ## 1.24.7 - 2026-11-20
 
 - Match the token upload workspace and card dimensions to the dice uploader. Replace generic upload artwork with the existing green and purple token icons.
