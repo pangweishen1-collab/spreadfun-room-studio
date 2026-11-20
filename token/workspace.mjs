@@ -8,12 +8,11 @@ const copy = {
   zh: {
     drop: '拖入四色棋子 PNG', sizes: '红、绿、蓝、黄各一张 160 × 160 PNG。可加 240 × 240 封面。',
     materials: {green: '绿色棋子素材', purple: '紫色棋子素材'}, choose: '选择 PNG', folder: '选择文件夹',
-    examples: '体验案例', exampleRose: '体验玫瑰', exampleAnubis: '体验阿努比斯',
+    uploadGreen: '绿色棋子上传', uploadPurple: '紫色棋子上传', upload: '上传', paste: '拖入文件或 ⌘V / Ctrl+V 粘贴',
     grade: '棋子等级', gradeGreen: '绿色', gradePurple: '紫色',
     trail: '拖尾素材', trailChoose: '更换拖尾 PNG', trailReset: '恢复默认', trailDefault: '默认火焰',
     trailScope: '替换范围', trailAll: '全部颜色', trailPaste: '点此区域后按 ⌘V / Ctrl+V 粘贴 PNG',
     trailVariants: count => `已替换 ${count} 张拖尾图`, oneTrail: '请选择一张拖尾 PNG。',
-    exampleFailed: '样例加载失败，请重试。',
     assetDetails: '查看已选素材', coverDownload: '下载封面 PNG', name: '资源名称', placeholder: {green: '例如 rose', purple: '例如 anubis'}, color: '棋子颜色',
     action: '棋子动作', jump: '跳跃', kill: '吃子', bekill: '被吃', boom: '被炸',
     red: '红', green: '绿', blue: '蓝', yellow: '黄', cover: '封面',
@@ -27,12 +26,11 @@ const copy = {
   en: {
     drop: 'Drop four token PNGs', sizes: 'One 160 × 160 PNG per color. A 240 × 240 cover is optional.',
     materials: {green: 'Green token assets', purple: 'Purple token assets'}, choose: 'Choose PNGs', folder: 'Choose folder',
-    examples: 'Playable examples', exampleRose: 'Try Rose', exampleAnubis: 'Try Anubis',
+    uploadGreen: 'Green token upload', uploadPurple: 'Purple token upload', upload: 'Upload', paste: 'Drop files or paste with ⌘V / Ctrl+V',
     grade: 'Token grade', gradeGreen: 'Green', gradePurple: 'Purple',
     trail: 'Trail artwork', trailChoose: 'Replace trail PNG', trailReset: 'Restore default', trailDefault: 'Default flames',
     trailScope: 'Apply to', trailAll: 'All colors', trailPaste: 'Focus here and press ⌘V / Ctrl+V to paste a PNG',
     trailVariants: count => `${count} custom trail images`, oneTrail: 'Choose one trail PNG.',
-    exampleFailed: 'Could not load the example. Try again.',
     assetDetails: 'View selected assets', coverDownload: 'Download cover PNG', name: 'Asset name', placeholder: {green: 'e.g. rose', purple: 'e.g. anubis'}, color: 'Token color',
     action: 'Token action', jump: 'Jump', kill: 'Capture', bekill: 'Captured', boom: 'Bombed',
     red: 'Red', green: 'Green', blue: 'Blue', yellow: 'Yellow', cover: 'Cover',
@@ -49,12 +47,10 @@ const $ = name => document.getElementById('token' + name);
 const root = $('Tool');
 const labels = root.querySelectorAll('[data-token-text]');
 const gradeButtons = [...root.querySelectorAll('[data-token-grade]')];
-const exampleButtons = [...root.querySelectorAll('[data-token-sample]')];
+const uploadCards = [...root.querySelectorAll('[data-token-upload-grade]')];
 const colorButtons = [...root.querySelectorAll('[data-token-color]')];
 const actionButtons = [...root.querySelectorAll('[data-token-action]')];
 const colors = colorButtons.map(button => button.dataset.tokenColor);
-const sampleFiles = ['棋子-红.png', '棋子-绿.png', '棋子-蓝.png', '棋子-黄.png', '大图.png'];
-const sampleNames = {green: 'rose', purple: 'anubis'};
 const status = $('Status');
 const nameInput = $('Name');
 const progress = $('ExportProgress');
@@ -63,8 +59,8 @@ const trailScope = $('TrailScope');
 const active = () => location.hash === '#token-preview' && !root.classList.contains('hidden');
 const chinese = () => document.documentElement.lang.startsWith('zh');
 const words = () => chinese() ? copy.zh : copy.en;
-const locked = ['UploadEmpty', 'Upload', 'Folder', 'Name', 'Play', 'Sound', 'TrailScope', 'TrailChoose', 'TrailReset'].map($)
-  .concat(gradeButtons, exampleButtons, colorButtons, actionButtons);
+const locked = ['UploadEmpty', 'UploadPurple', 'Upload', 'Folder', 'Name', 'Play', 'Sound', 'TrailScope', 'TrailChoose', 'TrailReset'].map($)
+  .concat(gradeButtons, colorButtons, actionButtons);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const drafts = new Map();
 let files = new Map();
@@ -100,16 +96,13 @@ function sync() {
   nameInput.placeholder = text.placeholder[grade];
   $('MaterialsTitle').textContent = text.materials[grade];
   $('Grade').setAttribute('aria-label', text.grade);
-  const examples = $('Examples');
-  const exampleHost = token ? $('PreviewExamples') : $('EmptyExamples');
-  if (examples.parentElement !== exampleHost) exampleHost.append(examples);
-  examples.setAttribute('aria-label', text.examples);
   $('Canvas').setAttribute('aria-label', text.preview);
   $('PackageLabel').textContent = tokenPackageName(nameInput.value, grade) + '.zip';
   $('Count').textContent = `${colors.filter(key => files.has(key)).length} / 4 PNG`;
   $('Assets').hidden = !files.size;
   $('Empty').hidden = !!token;
   $('Empty').setAttribute('aria-busy', String(busy));
+  for (const card of uploadCards) { card.setAttribute('aria-disabled', String(busy)); card.tabIndex = busy ? -1 : 0; }
   $('Board').hidden = !token;
   $('Motion').hidden = !token;
   syncTrail();
@@ -249,8 +242,9 @@ function selectFiles(selected) {
   return {mapped};
 }
 
-async function load(getFiles, {example, trailChange, scroll = true} = {}) {
+async function load(getFiles, {uploadGrade, trailChange, scroll = true} = {}) {
   if (busy || !active()) return;
+  if (uploadGrade) changeGrade(uploadGrade);
   stopAnimation();
   busy = true;
   message = {key: 'importing'};
@@ -272,7 +266,7 @@ async function load(getFiles, {example, trailChange, scroll = true} = {}) {
       return;
     }
     const wholeSet = colors.every(key => mapped.has(key));
-    const previous = wholeSet ? [...files].filter(([key]) => !example && TOKEN_TRAIL_KEYS.includes(key)) : files;
+    const previous = wholeSet ? [...files].filter(([key]) => TOKEN_TRAIL_KEYS.includes(key)) : files;
     const merged = new Map([...previous, ...mapped]);
     if (trailChange) {
       for (const key of scopedTrailKeys()) {
@@ -310,7 +304,6 @@ async function load(getFiles, {example, trailChange, scroll = true} = {}) {
     action = 'jump';
     hopTime = 0;
     loopWanted = !reduceMotion.matches;
-    if (example) nameInput.value = example;
     message = {key: 'ready'};
   } catch (error) {
     message = {key: 'failed', detail: chinese() ? error.message : undefined, tone: 'error'};
@@ -370,10 +363,19 @@ async function exportOutput(video) {
   }
 }
 
-for (const button of [$('UploadEmpty'), $('Upload')]) button.addEventListener('click', () => $('Files').click());
-$('Empty').addEventListener('click', event => {
-  if (!busy && !event.target.closest('button')) $('Files').click();
-});
+$('Upload').addEventListener('click', () => $('Files').click());
+for (const card of uploadCards) {
+  const choose = () => {
+    if (busy) return;
+    changeGrade(card.dataset.tokenUploadGrade);
+    sync();
+    $('Files').click();
+  };
+  card.addEventListener('click', choose);
+  card.addEventListener('keydown', event => {
+    if (event.target === card && ['Enter', ' '].includes(event.key)) { event.preventDefault(); choose(); }
+  });
+}
 $('Folder').addEventListener('click', () => $('FolderFiles').click());
 $('TrailScope').addEventListener('change', syncTrail);
 $('TrailChoose').addEventListener('click', () => $('TrailFile').click());
@@ -404,11 +406,14 @@ for (const zone of root.querySelectorAll('.token-upload-zone')) {
     if (!Array.from(event.dataTransfer?.types || []).includes('Files')) return;
     event.preventDefault();
     delete zone.dataset.dragging;
-    const options = zone === trailZone ? {trailChange: 'replace', scroll: false} : undefined;
+    const options = zone === trailZone ? {trailChange: 'replace', scroll: false}
+      : {uploadGrade: zone.dataset.tokenUploadGrade};
     void load(() => readDropFiles(event.dataTransfer), options);
   });
 }
 window.UploadPaste?.register({zone: root, isActive: active, isBusy: () => busy, onFiles: selected => load(() => selected)});
+for (const card of uploadCards) window.UploadPaste?.register({zone: card, isActive: active, isBusy: () => busy,
+  onFiles: selected => load(() => selected, {uploadGrade: card.dataset.tokenUploadGrade})});
 window.UploadPaste?.register({
   zone: trailZone,
   isActive: event => active() && !trailZone.hidden &&
@@ -416,17 +421,6 @@ window.UploadPaste?.register({
   isBusy: () => busy,
   onFiles: replaceTrail,
 });
-function loadExample(next) {
-  if (busy || !active()) return;
-  changeGrade(next);
-  const example = sampleNames[next];
-  void load(() => Promise.all(sampleFiles.map(async name => {
-    const response = await fetch(new URL(`./assets/${example}/${name}`, import.meta.url));
-    if (!response.ok) throw new Error(words().exampleFailed);
-    return new File([await response.blob()], name, {type: 'image/png'});
-  })), {example});
-}
-for (const button of exampleButtons) button.addEventListener('click', () => loadExample(button.dataset.tokenSample));
 nameInput.addEventListener('input', () => { $('PackageLabel').textContent = tokenPackageName(nameInput.value, grade) + '.zip'; });
 function changeGrade(next) {
   if (grade === next) return false;
