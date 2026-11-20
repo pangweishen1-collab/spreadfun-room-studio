@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.24.6 - 2026-11-20
+
+- Split token uploads into independent green and purple areas, including grade-specific file picking, drop, paste and keyboard activation.
+- Remove the Rose and Anubis example controls; retain existing token generation, export and grade drafts.
+
 ## 1.24.5 - 2026-11-20
 
 - Defer hidden project thumbnails and mode illustrations; load dice backgrounds only when a preview needs them.
