@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.24.4 - 2026-11-20
+
+- Accelerate purple 01R's first palette conversion with a small, exact WebAssembly nearest-color kernel. Keep palette discovery, colors, transparency and refinement order unchanged.
+- Retain the same PNG compression, atlas budget, full-resolution results and all 60 Hz motion poses. Use the original codec when the optional kernel is unavailable.
+- Keep green creation, preview and exports unchanged.
+
 ## 1.24.3 - 2026-11-19
 
 - Reuse validated PNG dimensions and alpha metadata only after matching the source SHA and slot. New or changed purple files still receive full CRC checks, accelerated with an equivalent slicing-by-8 implementation.
