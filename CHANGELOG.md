@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.24.9 - 2026-11-20
+
+- Fit two/three room preview containers using the actual batch count. Ship the critical layout with the page and refresh the stylesheet URL so older cached styles cannot retain the fixed empty area.
+
 ## 1.24.8 - 2026-11-20
 
 - Enlarge room background previews for batches of two or three and fit the surrounding stage to content. Preserve aspect ratio, encoded pixels and the compact layout for larger batches.
