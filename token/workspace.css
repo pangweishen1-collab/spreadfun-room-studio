@@ -2,17 +2,19 @@
 #tokenTool [hidden] {display:none!important}
 .token-workspace {
   display:grid;
-  grid-template-columns:minmax(0,1fr) minmax(280px,360px);
+  grid-template-columns:minmax(0,1fr) minmax(340px,420px);
   align-items:start;
   gap:16px;
-  width:min(100%,1024px);
+  width:min(100%,1356px);
   margin-inline:auto;
 }
 .token-preview-card,.token-settings {min-width:0;padding:20px;border-radius:22px}
-.token-empty {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.token-preview-card {padding:25px}
+.token-empty {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;height:558px;padding:12px}
 .token-upload-card {display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;min-width:0;min-height:440px;padding:24px 16px;border:1px solid var(--upload-border);border-radius:16px;background:var(--upload-fill);text-align:center;cursor:pointer}
 .token-upload-card[data-token-upload-grade="green"] {--upload-border:#badac4;--upload-fill:#f0f8f1;--upload-ink:#146740}
 .token-upload-card[data-token-upload-grade="purple"] {--upload-border:#d9c4ec;--upload-fill:#f7f0fc;--upload-ink:#653795}
+.token-upload-card .token-upload-icon {width:96px;height:96px;object-fit:contain}
 .token-upload-card h3 {margin:0;font-size:17px;color:var(--upload-ink)}
 .token-upload-card p {margin:0;max-width:240px;font-size:13px;line-height:1.7;color:var(--tool-muted)}
 .token-upload-card .primary {width:100%;max-width:220px;margin-top:8px}
@@ -20,7 +22,7 @@
 .token-upload-card:focus-visible {outline:2px solid var(--tool-focus);outline-offset:3px}
 .token-upload-card[aria-disabled="true"] {cursor:wait}
 @media (max-width:480px) {
- .token-empty {grid-template-columns:minmax(0,1fr);gap:12px}
+ .token-empty {grid-template-columns:minmax(0,1fr);gap:12px;height:auto;padding:0}
  .token-upload-card {min-height:300px;padding:20px}
 }
 .token-board {
@@ -100,11 +102,14 @@
 @media (min-width:901px) {
   .token-settings {position:sticky;top:100px}
 }
-@media (max-width:760px) {
+@media (max-width:900px) {
   .token-workspace {grid-template-columns:minmax(0,1fr)}
   .token-workspace:has(.token-board:not([hidden])) .token-settings {grid-row:1}
   .token-preview-card,.token-settings {padding:14px}
+  .token-empty {height:478px}
 }
 @media (max-width:365px) {
   .token-colors button,.token-actions button {padding-inline:2px;font-size:12px}
 }
+
+@media (max-width:480px) {.token-empty {height:auto}}
