@@ -3,7 +3,7 @@ import UPNG from '../vendor/upng/upng.mjs';
 // 01R-only raw input path. The alpha classes and palette algorithm below
 // mirror the frozen shared PNG path; that module and Green stay untouched.
 // Generated atlas pages have no color-profile chunks to preserve.
-export function quantizeAtlasRgba(width, height, pixels, colorLimit = 256) {
+export function quantizeAtlasRgba(width, height, pixels, colorLimit = 256, quantize = UPNG.quantize) {
   if (!Number.isInteger(colorLimit) || colorLimit < 8 || colorLimit > 256) return null;
   if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1 || width > 2048 || height > 2048) return null;
   const rgba = ArrayBuffer.isView(pixels)
@@ -49,13 +49,13 @@ export function quantizeAtlasRgba(width, height, pixels, colorLimit = 256) {
   const visibleColors = colorLimit - hiddenColors - (opaqueCount + partialCount < rgba.length / 4 ? 1 : 0);
   const partialColors = opaqueCount ? Math.min(partialCount, Math.floor(visibleColors / 4)) : visibleColors;
   const opaquePalette = opaqueCount
-    ? new Uint8Array(UPNG.quantize(opaque.buffer, visibleColors - partialColors).abuf)
+    ? new Uint8Array(quantize(opaque.buffer, visibleColors - partialColors).abuf)
     : opaque;
   const partialPalette = partialCount
-    ? new Uint8Array(UPNG.quantize(partial.buffer, partialColors).abuf)
+    ? new Uint8Array(quantize(partial.buffer, partialColors).abuf)
     : partial;
   const hiddenPalette = hiddenCount
-    ? new Uint8Array(UPNG.quantize(hidden.buffer, hiddenColors).abuf)
+    ? new Uint8Array(quantize(hidden.buffer, hiddenColors).abuf)
     : hidden;
   const remapped = new Uint8Array(rgba.length);
   opaqueOffset = 0;

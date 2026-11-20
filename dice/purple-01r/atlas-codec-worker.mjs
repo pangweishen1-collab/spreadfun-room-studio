@@ -1,11 +1,14 @@
 import init, {optimise} from '../vendor/oxipng/squoosh_oxipng.mjs';
 import {quantizeAtlasRgba} from './atlas-palette.mjs';
+import {loadQuantizeKernel} from './quantize-kernel.mjs';
+import {createQuantizer} from './quantize.mjs';
 
 // Start once, overlapping the first palette calculation with WASM loading.
 const wasmReady = init().then(() => true, () => false);
+const quantizerReady=loadQuantizeKernel().then(kernel=>kernel?createQuantizer(kernel):undefined,()=>undefined);
 self.onmessage = async ({data:{id,width,height,rgba,targetBytes=0}}) => {
   try {
-    const indexed = quantizeAtlasRgba(width,height,rgba,256);
+    const indexed = quantizeAtlasRgba(width,height,rgba,256,await quantizerReady);
     if (!indexed) { self.postMessage({id,png:null}); return; }
     let output = new Uint8Array(indexed);
     // A palette PNG already within budget needs no further lossless work.

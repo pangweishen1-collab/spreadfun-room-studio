@@ -1,0 +1,111 @@
+;; Derived from Photopea UPNG.js, MIT, Copyright (c) 2017 Photopea.
+;; Pinned revision 88f504b6577b726975f593caa38ba85d327c7c1f.
+;; Full permission and warranty notice: ../vendor/upng/LICENSE.
+(module
+  (memory (export "memory") 1 256)
+  ;; Pinned UPNG integer RGBA squared distance. Sums fit signed i32.
+  (func $rgbaDistance (param $r i32) (param $g i32) (param $b i32) (param $a i32) (param $p i32) (result i32)
+    (local $dr i32) (local $dg i32) (local $db i32) (local $da i32)
+    (local.set $dr (i32.sub (local.get $r) (i32.load8_u (local.get $p))))
+    (local.set $dg (i32.sub (local.get $g) (i32.load8_u offset=1 (local.get $p))))
+    (local.set $db (i32.sub (local.get $b) (i32.load8_u offset=2 (local.get $p))))
+    (local.set $da (i32.sub (local.get $a) (i32.load8_u offset=3 (local.get $p))))
+    (i32.add
+      (i32.add (i32.add (i32.mul (local.get $dr) (local.get $dr)) (i32.mul (local.get $dg) (local.get $dg)))
+        (i32.mul (local.get $db) (local.get $db)))
+      (i32.mul (local.get $da) (local.get $da))))
+  (func (export "findNearest")
+    (param $src i32) (param $inds i32) (param $palette i32) (param $nd i32) (param $n i32) (param $k i32) (result f64)
+    (local $i i32) (local $j i32) (local $p i32) (local $ti i32) (local $te i32) (local $err i32)
+    (local $r i32) (local $g i32) (local $b i32) (local $a i32) (local $terr f64)
+    (block $done
+      (loop $pixels
+        (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
+        (local.set $p (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2))))
+        (local.set $r (i32.load8_u (local.get $p)))
+        (local.set $g (i32.load8_u offset=1 (local.get $p)))
+        (local.set $b (i32.load8_u offset=2 (local.get $p)))
+        (local.set $a (i32.load8_u offset=3 (local.get $p)))
+        (local.set $ti (i32.load8_u (i32.add (local.get $inds) (local.get $i))))
+        (local.set $te (call $rgbaDistance (local.get $r) (local.get $g) (local.get $b) (local.get $a)
+          (i32.add (local.get $palette) (i32.shl (local.get $ti) (i32.const 2)))))
+        (if (f64.gt (f64.convert_i32_u (local.get $te))
+          (f64.load (i32.add (local.get $nd) (i32.shl (local.get $ti) (i32.const 3)))))
+          (then
+            (local.set $j (i32.const 0))
+            (block $colorsDone
+              (loop $colors
+                (br_if $colorsDone (i32.ge_u (local.get $j) (local.get $k)))
+                (local.set $err (call $rgbaDistance (local.get $r) (local.get $g) (local.get $b) (local.get $a)
+                  (i32.add (local.get $palette) (i32.shl (local.get $j) (i32.const 2)))))
+                (if (i32.lt_u (local.get $err) (local.get $te))
+                  (then
+                    (local.set $te (local.get $err))
+                    (local.set $ti (local.get $j))
+                    (br_if $colorsDone (f64.lt (f64.convert_i32_u (local.get $te))
+                      (f64.load (i32.add (local.get $nd) (i32.shl (local.get $j) (i32.const 3))))))))
+                (local.set $j (i32.add (local.get $j) (i32.const 1)))
+                (br $colors)))))
+        (i32.store8 (i32.add (local.get $inds) (local.get $i)) (local.get $ti))
+        (local.set $terr (f64.add (local.get $terr) (f64.convert_i32_u (local.get $te))))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $pixels)))
+    (f64.div (local.get $terr) (f64.convert_i32_u (local.get $n))))
+  ;; The PCA nodes preserve original leaf centers and eigenplanes as float64.
+  ;; Original recursion order and local pruning/ties are retained exactly.
+  (func $pcaNearest
+    (param $node i32) (param $r f64) (param $g f64) (param $b f64) (param $a f64) (result i32 f64)
+    (local $left i32) (local $right i32) (local $n0 i32) (local $n1 i32)
+    (local $first i32) (local $second i32) (local $fd f64) (local $sd f64) (local $pd f64)
+    (local $d0 f64) (local $d1 f64) (local $d2 f64) (local $d3 f64)
+    (local.set $left (i32.load (local.get $node)))
+    (if (i32.eqz (local.get $left))
+      (then
+        (local.set $d0 (f64.sub (local.get $r) (f64.load offset=56 (local.get $node))))
+        (local.set $d1 (f64.sub (local.get $g) (f64.load offset=64 (local.get $node))))
+        (local.set $d2 (f64.sub (local.get $b) (f64.load offset=72 (local.get $node))))
+        (local.set $d3 (f64.sub (local.get $a) (f64.load offset=80 (local.get $node))))
+        (return (local.get $node)
+          (f64.add (f64.add (f64.add (f64.mul (local.get $d0) (local.get $d0))
+            (f64.mul (local.get $d1) (local.get $d1))) (f64.mul (local.get $d2) (local.get $d2)))
+            (f64.mul (local.get $d3) (local.get $d3))))))
+    (local.set $right (i32.load offset=4 (local.get $node)))
+    (local.set $pd
+      (f64.sub
+        (f64.add (f64.add (f64.add
+          (f64.mul (f64.load offset=16 (local.get $node)) (local.get $r))
+          (f64.mul (f64.load offset=24 (local.get $node)) (local.get $g)))
+          (f64.mul (f64.load offset=32 (local.get $node)) (local.get $b)))
+          (f64.mul (f64.load offset=40 (local.get $node)) (local.get $a)))
+        (f64.load offset=48 (local.get $node))))
+    (local.set $n0 (local.get $left))
+    (local.set $n1 (local.get $right))
+    (if (f64.gt (local.get $pd) (f64.const 0))
+      (then (local.set $n0 (local.get $right)) (local.set $n1 (local.get $left))))
+    (call $pcaNearest (local.get $n0) (local.get $r) (local.get $g) (local.get $b) (local.get $a))
+    (local.set $fd) (local.set $first)
+    (if (f64.le (local.get $fd) (f64.mul (local.get $pd) (local.get $pd)))
+      (then (return (local.get $first) (local.get $fd))))
+    (call $pcaNearest (local.get $n1) (local.get $r) (local.get $g) (local.get $b) (local.get $a))
+    (local.set $sd) (local.set $second)
+    (if (f64.lt (local.get $sd) (local.get $fd))
+      (then (return (local.get $second) (local.get $sd))))
+    (local.get $first) (local.get $fd))
+  (func (export "initialPca") (param $src i32) (param $inds i32) (param $mapped i32) (param $root i32) (param $n i32)
+    (local $i i32) (local $p i32) (local $chosen i32) (local $distance f64)
+    (block $done
+      (loop $pixels
+        (br_if $done (i32.ge_u (local.get $i) (local.get $n)))
+        (local.set $p (i32.add (local.get $src) (i32.shl (local.get $i) (i32.const 2))))
+        (call $pcaNearest (local.get $root)
+          (f64.mul (f64.convert_i32_u (i32.load8_u (local.get $p))) (f64.const 0.00392156862745098))
+          (f64.mul (f64.convert_i32_u (i32.load8_u offset=1 (local.get $p))) (f64.const 0.00392156862745098))
+          (f64.mul (f64.convert_i32_u (i32.load8_u offset=2 (local.get $p))) (f64.const 0.00392156862745098))
+          (f64.mul (f64.convert_i32_u (i32.load8_u offset=3 (local.get $p))) (f64.const 0.00392156862745098)))
+        (local.set $distance) (local.set $chosen)
+        (i32.store8 (i32.add (local.get $inds) (local.get $i)) (i32.load offset=8 (local.get $chosen)))
+        (i32.store (i32.add (local.get $mapped) (i32.shl (local.get $i) (i32.const 2)))
+          (i32.load offset=12 (local.get $chosen)))
+        (local.set $i (i32.add (local.get $i) (i32.const 1)))
+        (br $pixels))))
+)
