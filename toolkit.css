@@ -334,3 +334,15 @@ canvas.svga-batch-thumb{display:block;object-fit:contain;background:var(--tool-b
 /* The dice workspace keeps its renderer and browser-local files isolated. */
 #diceTool { padding: 0 0 48px; }
 #dicePreviewFrame { display:block; width:100%; min-height:800px; border:0; background:#F5F5F7; }
+/* Two/three room backgrounds use the available preview space at their
+   original aspect ratio. Larger batches retain the compact scrolling grid. */
+@media (min-width:541px) {
+  #roomTool .preview:has(.preview-grid.count-2:not(.hidden)),
+  #roomTool .preview:has(.preview-grid.count-3:not(.hidden)>:nth-child(3):last-child) {min-height:0}
+  #roomTool .stage:has(.preview-grid.count-2:not(.hidden)),
+  #roomTool .stage:has(.preview-grid.count-3:not(.hidden)>:nth-child(3):last-child) {height:auto;min-height:0}
+  #roomTool .preview-grid.count-2,
+  #roomTool .preview-grid.count-3:has(>:nth-child(3):last-child) {height:auto;padding:12px;gap:12px;align-content:center}
+  #roomTool .preview-grid.count-2 .batch-preview canvas,
+  #roomTool .preview-grid.count-3:has(>:nth-child(3):last-child) .batch-preview canvas {width:min(100%,240px);height:auto;max-height:none}
+}
