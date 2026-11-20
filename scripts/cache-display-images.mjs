@@ -28,5 +28,5 @@ export async function cacheDisplayImages(root){
     if(updated!==original)await writeFile(file,updated);
   }
   for(const relative of used)await copyFile(path.join(root,relative),path.join(root,aliases.get(relative)));
-  return [...used].sort().map(relative=>`/${aliases.get(relative)}\n  Cache-Control: public, max-age=31536000, immutable\n`).join('');
+  return [...used].sort().map(relative=>`/${aliases.get(relative)}\n  ! Cache-Control\n  Cache-Control: public, max-age=31536000, immutable\n`).join('');
 }

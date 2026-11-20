@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.24.5 - 2026-11-20
+
+- Defer hidden project thumbnails and mode illustrations; load dice backgrounds only when a preview needs them.
+- Add content-addressed display WebP copies with immutable caching. Keep the exact original image bytes, source URLs, green creation and exports.
+
 ## 1.24.4 - 2026-11-20
 
 - Accelerate purple 01R's first palette conversion with a small, exact WebAssembly nearest-color kernel. Keep palette discovery, colors, transparency and refinement order unchanged.

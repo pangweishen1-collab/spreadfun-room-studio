@@ -14,7 +14,7 @@ try{
  assert.equal(html.split(alias).length,3);assert(!html.includes('v=old'));
  assert(html.includes('assets/${id}.webp'));assert(html.includes('assets/source.png'));
  assert.deepEqual(await readFile(path.join(root,alias)),await readFile(path.join(root,'assets/a.webp')));
- assert(headers.includes('/'+alias+'\n  Cache-Control: public, max-age=31536000, immutable'));
+ assert(headers.includes('/'+alias+'\n  ! Cache-Control\n  Cache-Control: public, max-age=31536000, immutable'));
  assert.equal((await readdir(path.join(root,'assets'))).length,3);
  await writeFile(path.join(root,'assets/a.webp'),new Uint8Array([3,2,1]));
  await writeFile(path.join(root,'index.html'),'<img src="assets/a.webp">');
