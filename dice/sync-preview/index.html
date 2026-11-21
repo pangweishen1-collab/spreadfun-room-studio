@@ -27,15 +27,15 @@
 <main>
   <h1>骰子同步预览</h1>
   <div class="labels"><span><i style="--color:#71dca3"></i>绿色 · 海龟</span><span><i style="--color:#bc9aff"></i>紫色 01R · 钢铁侠</span></div>
-  <video id="preview" src="comparison.mp4" poster="landing.webp" autoplay loop muted playsinline aria-label="绿色和紫色骰子并排自动循环"></video>
+  <video id="preview" poster="landing.webp" loop muted playsinline aria-label="绿色和紫色骰子并排自动循环"></video>
   <div class="controls">
-    <button id="play" type="button">暂停</button>
-    <button id="slow" type="button" aria-pressed="false">慢放 0.25×</button>
-    <button id="landing" type="button">看落定帧</button>
-    <output id="time" aria-label="当前播放时间">0.00 / 2.00 秒</output>
+    <button id="play" type="button" disabled>播放</button>
+    <button id="slow" type="button" disabled aria-pressed="false">慢放 0.25×</button>
+    <button id="landing" type="button" disabled>看落定帧</button>
+    <output id="time" aria-label="当前播放时间">正在加载视频…</output>
   </div>
   <div class="timeline">
-    <input id="scrub" type="range" min="0" max="119" value="0" aria-label="同步进度">
+    <input id="scrub" type="range" disabled min="0" max="119" value="0" aria-label="同步进度">
     <span class="mark">0.60 秒落定</span>
   </div>
 </main>
@@ -43,6 +43,7 @@
   const video = document.getElementById('preview');
   const play = document.getElementById('play');
   const slow = document.getElementById('slow');
+  const landing = document.getElementById('landing');
   const time = document.getElementById('time');
   const scrub = document.getElementById('scrub');
   function sync(now = video.currentTime) {
@@ -50,7 +51,23 @@
     time.value = now.toFixed(2) + ' / 2.00 秒';
     scrub.value = Math.min(119, Math.floor(now * 60 + .001));
   }
+  async function loadVideo() {
+    play.disabled = true;
+    time.value = '正在加载视频…';
+    try {
+      const response = await fetch('./comparison.mp4');
+      if (!response.ok) throw new Error('Video unavailable');
+      video.src = URL.createObjectURL(await response.blob());
+      await video.play().catch(() => sync());
+    } catch {
+      play.textContent = '重试';
+      time.value = '视频加载失败';
+    } finally {
+      play.disabled = false;
+    }
+  }
   play.addEventListener('click', () => {
+    if (!video.hasAttribute('src')) {void loadVideo(); return;}
     if (video.paused) video.play().catch(() => sync());
     else video.pause();
   });
@@ -63,9 +80,13 @@
     video.pause();
     video.currentTime = frame / 60;
   }
-  document.getElementById('landing').addEventListener('click', () => seek(36));
+  landing.addEventListener('click', () => seek(36));
   scrub.addEventListener('input', () => seek(Number(scrub.value)));
-  for (const event of ['play', 'pause', 'seeked', 'loadeddata']) video.addEventListener(event, () => sync());
+  video.addEventListener('loadeddata', () => {
+    slow.disabled = landing.disabled = scrub.disabled = false;
+    sync();
+  });
+  for (const event of ['play', 'pause', 'seeked']) video.addEventListener(event, () => sync());
   if (video.requestVideoFrameCallback) {
     const render = (_, frame) => {
       sync(frame.mediaTime);
@@ -73,5 +94,5 @@
     };
     video.requestVideoFrameCallback(render);
   } else video.addEventListener('timeupdate', () => sync());
-  video.play().catch(() => sync());
+  void loadVideo();
 </script>
