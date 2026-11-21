@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>骰子同步预览</title>
+<style>
+  :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif;background:#10131c;color:#f5f6fc}
+  *{box-sizing:border-box}
+  body{margin:0;padding:24px 16px 32px}
+  main{max-width:min(100%,1100px,calc((100svh - 200px)*1.43));min-width:0;margin:auto}
+  h1{margin:0 0 14px;font-size:clamp(20px,3vw,28px);line-height:1.2;letter-spacing:-.02em}
+  .labels{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px;font-size:clamp(12px,2vw,15px);font-weight:650}
+  .labels span{display:flex;align-items:center;gap:8px;min-width:0}
+  .labels i{width:8px;height:8px;border-radius:50%;background:var(--color);flex:none}
+  video{display:block;width:100%;height:auto;aspect-ratio:1264/880;object-fit:contain;border:1px solid #31394a;border-radius:14px;background:#0e1625}
+  .controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+  button{min-height:40px;padding:0 12px;border:1px solid #3e4860;border-radius:9px;background:#232b3c;color:inherit;font:inherit;font-size:13px;cursor:pointer}
+  button:hover{background:#313c53}button[aria-pressed="true"]{border-color:#aca7fd;background:#3f3b68}
+  button:focus-visible,input:focus-visible{outline:2px solid #bcb7ff;outline-offset:3px}
+  output{margin-inline-start:auto;font-size:13px;font-variant-numeric:tabular-nums;color:#d5daeb}
+  .timeline{position:relative;margin-top:7px;padding:0 5px 16px}
+  input{width:100%;display:block;height:24px;margin:0;accent-color:#afa8fb;cursor:ew-resize}
+  .mark{position:absolute;left:calc(5px + (100% - 10px)*.3);bottom:0;transform:translateX(-50%);color:#bfc5db;font-size:11px;white-space:nowrap;pointer-events:none}
+  .mark::before{content:"";display:block;width:1px;height:4px;background:#bfc5db;margin:0 auto 1px}
+  @media(max-width:520px){body{padding:16px 10px}main{max-width:100%}.labels{gap:6px}.controls{gap:5px}button{padding:0 8px;min-height:44px}}
+</style>
+<main>
+  <h1>骰子同步预览</h1>
+  <div class="labels"><span><i style="--color:#71dca3"></i>绿色 · 海龟</span><span><i style="--color:#bc9aff"></i>紫色 01R · 钢铁侠</span></div>
+  <video id="preview" src="comparison.mp4" poster="landing.webp" autoplay loop muted playsinline aria-label="绿色和紫色骰子并排自动循环"></video>
+  <div class="controls">
+    <button id="play" type="button">暂停</button>
+    <button id="slow" type="button" aria-pressed="false">慢放 0.25×</button>
+    <button id="landing" type="button">看落定帧</button>
+    <output id="time" aria-label="当前播放时间">0.00 / 2.00 秒</output>
+  </div>
+  <div class="timeline">
+    <input id="scrub" type="range" min="0" max="119" value="0" aria-label="同步进度">
+    <span class="mark">0.60 秒落定</span>
+  </div>
+</main>
+<script>
+  const video = document.getElementById('preview');
+  const play = document.getElementById('play');
+  const slow = document.getElementById('slow');
+  const time = document.getElementById('time');
+  const scrub = document.getElementById('scrub');
+  function sync(now = video.currentTime) {
+    play.textContent = video.paused ? '播放' : '暂停';
+    time.value = now.toFixed(2) + ' / 2.00 秒';
+    scrub.value = Math.min(119, Math.floor(now * 60 + .001));
+  }
+  play.addEventListener('click', () => {
+    if (video.paused) video.play().catch(() => sync());
+    else video.pause();
+  });
+  slow.addEventListener('click', () => {
+    video.playbackRate = video.playbackRate === 1 ? .25 : 1;
+    slow.setAttribute('aria-pressed', String(video.playbackRate === .25));
+    video.play().catch(() => sync());
+  });
+  function seek(frame) {
+    video.pause();
+    video.currentTime = frame / 60;
+  }
+  document.getElementById('landing').addEventListener('click', () => seek(36));
+  scrub.addEventListener('input', () => seek(Number(scrub.value)));
+  for (const event of ['play', 'pause', 'seeked', 'loadeddata']) video.addEventListener(event, () => sync());
+  if (video.requestVideoFrameCallback) {
+    const render = (_, frame) => {
+      sync(frame.mediaTime);
+      video.requestVideoFrameCallback(render);
+    };
+    video.requestVideoFrameCallback(render);
+  } else video.addEventListener('timeupdate', () => sync());
+  video.play().catch(() => sync());
+</script>
