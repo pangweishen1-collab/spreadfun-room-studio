@@ -4,7 +4,7 @@ const canvas = $('Canvas');
 const copy = {
   zh: {
     convertTab:'VAP 工具',reviewTab:'预览功能',title:'房间礼物过稿',
-    settings:'过稿设置',background:'房间背景',ludo:'Hapi Ludo 房间',dark:'深色对比',custom:'自定义背景',uploadBackground:'选择本机背景…',uploadCloudBackground:'添加云端背景…',
+    settings:'过稿设置',background:'房间背景',ludo:'Hapi Ludo 房间',custom:'自定义背景',templateBackground:'模板背景',uploadCloudBackground:'添加云端背景…',
     uploadVideo:'上传{gift} MP4',count:'视频数量',play:'同步播放',pause:'暂停',timeline:'播放时间',slots:'视频调整',
     large:'大礼物',medium:'中礼物',small:'小礼物',gift:'礼物',vehicle:'座驾',replace:'替换',add:'上传',remove:'移除',
     scale:'画面大小',offsetY:'上下位置',editHint:'拖动视频调整位置，拖蓝线上的百分比手柄调整遮罩。',key:'视频底色',auto:'自动识别',opaque:'保留画面',black:'黑底去背景',white:'白底去背景',chroma:'色幕去背景',native:'原生 VAP 透明',
@@ -28,7 +28,7 @@ const copy = {
   },
   en: {
     convertTab:'VAP tool',reviewTab:'Review preview',title:'Room gift review',
-    settings:'Review settings',background:'Room background',ludo:'Hapi Ludo room',dark:'Dark comparison',custom:'Custom background',uploadBackground:'Choose local background…',uploadCloudBackground:'Add cloud background…',
+    settings:'Review settings',background:'Room background',ludo:'Hapi Ludo room',custom:'Custom background',templateBackground:'Template background',uploadCloudBackground:'Add cloud background…',
     uploadVideo:'Upload {gift} MP4',count:'Video count',play:'Play together',pause:'Pause',timeline:'Playback time',slots:'Video adjustments',
     large:'Large gift',medium:'Medium gift',small:'Small gift',gift:'Gift',vehicle:'Vehicle',replace:'Replace',add:'Upload',remove:'Remove',
     scale:'Gift size',offsetY:'Vertical position',editHint:'Drag the video to move it. Drag the percentage handles to adjust the mask.',key:'Video background',auto:'Auto detect',opaque:'Keep picture',black:'Remove black',white:'Remove white',chroma:'Remove color screen',native:'Native VAP alpha',
@@ -52,6 +52,8 @@ const copy = {
   },
 };
 const t = key => copy[document.documentElement.lang.startsWith('zh') ? 'zh' : 'en'][key];
+// Keep existing templates readable when they reference this retired cloud background.
+const retiredBackgroundId = 'e5ae4ec3-562f-4e7d-862c-25fbc8f130e8';
 const maskKeys = ['topStart', 'topEnd', 'bottomStart', 'bottomEnd'];
 function label(index, count = state.count) {
   if (count === 2) return t('vehicle') + '-' + (index + 1);
@@ -59,7 +61,7 @@ function label(index, count = state.count) {
 }
 const state = {
   active: false, tab: 'convert', engine: null, count: 3, slots: [],
-  background: 'ludo', backgroundImage: null, backgroundFile: null, backgroundId: null, localBackgroundFile: null, cloudBackgrounds: [],
+  background: 'ludo', backgroundImage: null, backgroundFile: null, backgroundId: null, cloudBackgrounds: [],
   cloudTemplates: [], localTemplates: [], templateSelection: '', templateName: '', target: null, time: 0, running: false, start: 0,
   busy: '', status: null, result: null, abort: null, renderer: null,
 };
@@ -587,12 +589,12 @@ async function readBackground(key, file) {
 function useBackground(key, file, image, id) {
   state.backgroundImage?.close();
   Object.assign(state, {background:key, backgroundFile:file, backgroundImage:image, backgroundId:id || null});
-  if (key === 'custom' && !id) state.localBackgroundFile = file;
 }
 function syncBackgroundChoice(target) {
-  const [field, local] = target === state ? ['Background', 'BackgroundCustom'] : ['TemplateBackground', 'TemplateCustom'];
-  $(local).hidden = !target.localBackgroundFile;
-  $(field).value = target.backgroundId ? 'cloud:' + target.backgroundId : target.background;
+  const field = $(target === state ? 'Background' : 'TemplateBackground');
+  const choice = target.backgroundId ? 'cloud:' + target.backgroundId : target.background;
+  field.value = choice;
+  if (field.selectedIndex < 0) field.value = 'legacy';
 }
 
 function readLocalTemplates() {
@@ -653,11 +655,12 @@ function renderBackgroundOptions() {
   for (const id of ['Background', 'TemplateBackground']) {
     const field = $(id);
     field.querySelectorAll('[data-cloud-background]').forEach(option => option.remove());
-    const pick = field.querySelector('[value="pick"]');
+    const upload = field.querySelector('[value="upload"]');
     for (const background of state.cloudBackgrounds) {
+      if (background.id === retiredBackgroundId) continue;
       const option = new Option(background.name, 'cloud:' + background.id);
       option.dataset.cloudBackground = '';
-      pick.before(option);
+      upload.before(option);
     }
   }
   syncBackgroundChoice(state);
@@ -766,7 +769,7 @@ function openTemplateDialog() {
   pause();
   templateDraft = {
     background:state.background, backgroundFile:state.backgroundFile, backgroundId:state.backgroundId,
-    localBackgroundFile:state.localBackgroundFile, count:state.count,
+    count:state.count,
     activeSlot:Math.max(0, shown().indexOf(selectedSlot)), previewBackground:state.backgroundImage,
     example:templateExample(),
     slots:state.slots.map((slot, index) => ({index, clip:slot.clip, settings:{...slot.settings, mask:{...slot.settings.mask}}})),
@@ -790,7 +793,7 @@ async function changeBackground(target, choice, file) {
   let image;
   try {
     let id = choice.startsWith('cloud:') ? choice.slice(6) : null;
-    const key = cloud || choice === 'pick' ? 'custom' : choice;
+    const key = cloud ? 'custom' : choice;
     if (uploading) {
       const stem = file.name.replace(/\.[^.]+$/, '').replace(/[\u0000-\u001f\u007f]/g, '').trim().normalize('NFC');
       const name = [...stem].slice(0, 40).join('') || t('custom');
@@ -800,14 +803,13 @@ async function changeBackground(target, choice, file) {
       id = entry.id;
       rememberBackground(entry);
     } else {
-      file = id ? await cloudBackgroundFile(id) : key === 'custom' ? file || target.localBackgroundFile : null;
+      file = id ? await cloudBackgroundFile(id) : null;
       image = await readBackground(key, file);
     }
     if (!isCurrent()) return;
     if (inTemplate) {
       target.ownedBackground?.close();
       Object.assign(target, {background:key, backgroundFile:file, backgroundId:id, ownedBackground:image, previewBackground:image});
-      if (key === 'custom' && !id) target.localBackgroundFile = file;
       image = null;
       target.slots.forEach(drawTemplateMask);
     } else {
@@ -1008,17 +1010,16 @@ for (const [prefix, current] of [['', () => state], ['Template', () => templateD
   field.addEventListener('focus', () => {if (!busy()) void readBackgrounds();});
   field.addEventListener('change', () => {
     const target = current(), choice = field.value;
-    if (!target) return;
-    if (choice === 'pick' || choice === 'upload') {
+    if (!target || !choice || choice === 'legacy') return;
+    if (choice === 'upload') {
       syncBackgroundChoice(target);
-      picker.dataset.choice = choice;
       picker.click();
     } else void changeBackground(target, choice);
   });
   picker.addEventListener('change', () => {
-    const file = picker.files[0], choice = picker.dataset.choice;
-    picker.value = '';delete picker.dataset.choice;
-    if (file && choice) void changeBackground(current(), choice, file);
+    const file = picker.files[0];
+    picker.value = '';
+    if (file) void changeBackground(current(), 'upload', file);
   });
 }
 $('Play').addEventListener('click', play);

@@ -647,9 +647,7 @@ body{min-width:320px}
                 <div class="ft-select">
                   <select id="vapReviewBackground">
                     <option value="ludo" data-review-text="ludo">Hapi Ludo 房间</option>
-                    <option value="dark" data-review-text="dark">深色对比</option>
-                    <option id="vapReviewBackgroundCustom" value="custom" data-review-text="custom" hidden>自定义背景</option>
-                    <option value="pick" data-review-text="uploadBackground">选择本机背景…</option>
+                    <option value="legacy" data-review-text="templateBackground" disabled hidden>模板背景</option>
                     <option value="upload" data-review-text="uploadCloudBackground">添加云端背景…</option>
                   </select>
                   <svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
@@ -708,9 +706,7 @@ body{min-width:320px}
                     <div class="ft-select">
                       <select id="vapReviewTemplateBackground">
                         <option value="ludo" data-review-text="ludo">Hapi Ludo 房间</option>
-                        <option value="dark" data-review-text="dark">深色对比</option>
-                        <option id="vapReviewTemplateCustom" value="custom" data-review-text="custom" hidden>自定义背景</option>
-                        <option value="pick" data-review-text="uploadBackground">选择本机背景…</option>
+                        <option value="legacy" data-review-text="templateBackground" disabled hidden>模板背景</option>
                         <option value="upload" data-review-text="uploadCloudBackground">添加云端背景…</option>
                       </select>
                       <svg class="ft-select-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg>
@@ -1235,6 +1231,6 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="dice-embed.js?v=20261103-dice1"></script>
   <script src="toolkit.js?v=20261111-token1"></script>
   <script type="module" src="token/workspace.mjs?v=20261120-upload-size"></script>
-  <script type="module" src="vap-review.js?v=20261118-review-screen"></script>
+  <script type="module" src="vap-review.js?v=20261121-background-menu"></script>
   <script type="module" src="avatar-custom.js?v=20261116-avatar-memory-gold"></script>
 </body></html>
