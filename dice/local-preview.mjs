@@ -4,7 +4,7 @@ import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
 import {PURPLE_GYRO_MOTION_VERSION} from './purple-gyro/motion.mjs';
-import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261120-purple-first';
+import {DEFAULT_PURPLE_VARIANT,generatePurpleReferenceRuntime,PURPLE_REFERENCE_MOTION_VERSION,PURPLE_PLAN_02_MOTION_VERSION,PURPLE_PLAN_01R_MOTION_VERSION} from './purple-reference/runtime.mjs?v=20261121-purple-landing';
 import {optimizeAtlasPng} from './atlas-png-optimizer.mjs';
 import {crc32Png} from './purple-01r/png-crc.mjs';
 export {DEFAULT_PURPLE_VARIANT};

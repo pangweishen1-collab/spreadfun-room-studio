@@ -39,22 +39,31 @@ const skeleton=new S.Skeleton(data);
 let samples=0;
 for(let point=1;point<=6;point++) {
   const spin=data.findAnimation('spin_'+point),standby=data.findAnimation('standby_'+point);
-  assert(Math.abs(spin.duration-19/30)<1e-6);assert.equal(standby.duration,0);
+  assert(Math.abs(spin.duration-.633333)<1e-6);assert.equal(standby.duration,0);
   // Attachment timelines are stepped, even with fps=30 metadata. Every actual
   // 60 Hz tick must select its own pose rather than hold the preceding frame.
   for(let frame=0;frame<32;frame++) {
     spin.apply(skeleton,-1,Math.fround(frame/60),false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
     assert.equal(skeleton.findSlot('result').getAttachment().path,'roll_'+frame);
   }
-  for(const time of [0,.1,.52,.533334,.55,.566668,.583334,.6,19/30]) {
-    spin.apply(skeleton,-1,time,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
+  const revealKeys = [
+    [32/60, 'reveal_'+point+'_0'], [33/60, 'reveal_'+point+'_0'],
+    [34/60, 'reveal_'+point+'_1'], [35/60, 'reveal_'+point+'_1'],
+    [.6, 'sz_'+point], [.633333, 'sz_'+point],
+  ];
+  for(const [time, expected] of revealKeys) {
+    spin.apply(skeleton,-1,Math.fround(time),false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
     skeleton.updateWorldTransform(S.Physics.update);
     const visible=skeleton.slots.filter(slot=>slot.color.a>0&&slot.getAttachment());
     assert.equal(visible.length,1,'Two representations must never overlap');
     assert.equal(skeleton.findSlot('anchor').color.a,0);
-    if(time>=35/60)assert.equal(visible[0].getAttachment().path,'sz_'+point);
+    assert.equal(visible[0].getAttachment().path,expected);
     samples++;
   }
+  const events=[];
+  spin.apply(skeleton,-1,spin.duration,false,events,1,S.MixBlend.replace,S.MixDirection.mixIn);
+  assert.deepEqual(Array.from(events,e=>[e.data.name,e.time]),
+    [['dice_roll',0],...(point===6?[['sound_ui_dice6',Math.fround(.6)]]:[])]);
   standby.apply(skeleton,-1,0,false,null,1,S.MixBlend.replace,S.MixDirection.mixIn);
   assert.equal(skeleton.findSlot('result').getAttachment().path,'sz_'+point);
 }

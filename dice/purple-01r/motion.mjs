@@ -1,6 +1,8 @@
 import {motionAt as referencePose, exposureSamples, MOTION} from '../purple-reference/motion.mjs';
 
-export const PURPLE_01R = Object.freeze({fps:60, frontFrame:32, settledFrame:35, duration:19/30});
+// Match the green result handoff at .6s. The two existing reveal poses
+// bridge frames 32–35 without adding atlas regions or changing the roll.
+export const PURPLE_01R = Object.freeze({fps:60, frontFrame:32, secondRevealFrame:34, settledFrame:36, duration:.633333});
 const transpose = r => [r[0],r[3],r[6],r[1],r[4],r[7],r[2],r[5],r[8]];
 
 // The approved 01R is the inverse of 01's E trajectory, including its
