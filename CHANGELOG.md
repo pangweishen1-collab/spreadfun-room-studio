@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.25.1 - 2026-11-21
+
+- Buffer the comparison clip before autoplay so both dice are visible through the complete first loop on slower connections.
+
 ## 1.25.0 - 2026-11-21
 
 - Publish the side-by-side green and purple dice comparison with an automatic two-second loop, slow playback, and a jump to the 0.60 s landing frame.
