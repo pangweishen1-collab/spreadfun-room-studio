@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.25.0 - 2026-11-21
+
+- Publish the side-by-side green and purple dice comparison with an automatic two-second loop, slow playback, and a jump to the 0.60 s landing frame.
+- Remove Dark comparison, Choose local background, and Gift display (720p) 02 from both VAP review background menus. Saved templates can still render their original backgrounds.
+
 ## 1.24.10 - 2026-11-21
 
 - Align the default purple 01R result handoff and action end with green dice at 0.600 s and 0.633333 s respectively. The two-second preview cycle and existing atlas poses are retained.
