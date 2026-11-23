@@ -1,5 +1,11 @@
 # 更新记录
 
+## 1.25.2 - 2026-11-23
+
+- Match the hover motion of the green and purple token upload cards to the corresponding dice cards.
+- Title the token controls Upload tokens and show Replace green and Replace purple after a complete upload. Keep the current preview when the chooser is cancelled or a replacement fails.
+- Use equal-width video and ZIP buttons on the dice page to match the token page. Place the runtime ZIP below them when available.
+
 ## 1.25.1 - 2026-11-21
 
 - Buffer the comparison clip before autoplay so both dice are visible through the complete first loop on slower connections.
