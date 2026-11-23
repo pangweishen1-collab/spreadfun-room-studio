@@ -81,12 +81,14 @@
 .inline-status[data-state='error'] { color: var(--color-danger); background: var(--color-danger-soft); }
 .inline-status[data-state='success'] { color: var(--color-success); background: var(--color-success-soft); }
 .inline-status[data-state='warning'] { color: var(--color-warning); background: var(--color-warning-soft); }
-.output-section { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--color-rule); }
+.output-section { margin-top: 12px; padding-top: 14px; border-top: 1px solid var(--color-rule); }
 .output-section h3 { color: var(--color-heading); font-size: 16px; font-weight: 650; line-height: 24px; }
 .output-description { margin-top: 8px; color: var(--color-secondary); font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
-.output-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.output-section > .output-actions { margin-top: 0; }
-.output-actions > .button { flex: 1 1 160px; }
+.output-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.output-actions > .button { min-width: 0; min-height: 44px; padding: 7px 8px; border-radius: 10px; font-size: 13px; font-weight: 600; line-height: 18px; }
+.output-actions > .secondary { border-color: var(--ft-color-surface-blue-line); background: var(--color-accent-soft); color: var(--color-accent); }
+.output-actions > .button:disabled { opacity: .58; }
+#download-runtime-bundle { grid-column: 1 / -1; }
 .video-details { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 12px; margin: 12px 0 0; color: var(--color-secondary); font-size: 12px; line-height: 20px; overflow-wrap: anywhere; }
 .video-details dt { color: var(--color-muted); }
 .video-details dd { margin: 0; min-width: 0; }
@@ -181,8 +183,6 @@
   .field :is(input:not([type='file']), select, textarea) { min-height: 44px; font-size: 16px; line-height: 24px; }
   .grade-option { min-height: 44px; padding-inline: 8px; }
   .preview-controls { gap: 12px; }
-  .output-actions { flex-direction: column; }
-  .output-actions > .button { flex: none; width: 100%; min-height: 44px; }
   .preview-empty, .preview-overlay { padding: 20px 16px; }
   .preview-empty .feedback-image { width: 120px; height: 90px; }
   .session-meta { font-size: 11px; }

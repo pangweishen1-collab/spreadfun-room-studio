@@ -11,7 +11,7 @@
   <link rel="stylesheet" href="/dice/assets/fun-toolkit/motion-patterns.css">
   <link rel="stylesheet" href="/dice/assets/fun-toolkit/feedback-motion.css">
   <link rel="stylesheet" href="/dice/assets/fun-toolkit/tool-page.css">
-  <link rel="stylesheet" href="/dice/preview.css?v=20261110-dice-atlas-compact">
+  <link rel="stylesheet" href="/dice/preview.css?v=20261123-export-buttons">
   <link rel="stylesheet" href="/dice/assets/fun-toolkit/upload-surface.css">
   <link rel="stylesheet" href="/dice/assets/fun-toolkit/select.css">
   <link rel="stylesheet" href="/dice/assets/fun-toolkit/disclosure.css">
@@ -28,8 +28,6 @@
     <symbol id="icon-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7V5Z"/></symbol>
     <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></symbol>
     <symbol id="icon-reset" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 1 7M3 4v6h6"/></symbol>
-    <symbol id="icon-package" viewBox="0 0 24 24"><path d="m12 3 9 4.5v9L12 21l-9-4.5v-9L12 3Z"/><path d="m3 7.5 9 4.5 9-4.5M12 12v9M7.5 5.3l9 4.5"/></symbol>
-    <symbol id="icon-film" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 3v18M17 3v18M3 8h4M3 16h4M17 8h4M17 16h4"/></symbol>
     <symbol id="icon-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7h.01"/></symbol>
   </svg>
   <a class="skip-link" href="#workspace" data-i18n="skip">跳到预览工作台</a>
@@ -79,7 +77,7 @@
           <p id="audio-warning" class="field-hint" role="status" hidden></p>
           <button id="apply-settings" class="button secondary" type="button" data-i18n="retrySettings" hidden>重新应用设置</button>
         </div>
-        <section class="output-section" aria-label="下载文件" data-i18n-aria="outputHeading"><div class="output-actions"><button id="export-video" class="button primary ft-motion-sheen" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-film"/></svg><span data-i18n="exportVideo">生成并下载视频</span></button><button id="download-bundle" class="button secondary" type="button" disabled><svg class="icon" aria-hidden="true"><use href="#icon-package"/></svg><span data-i18n="downloadBundle">打包下载</span></button><button id="download-runtime-bundle" class="button secondary" type="button" data-i18n-title="runtimeBundleHint" title="包含 Spine 动画、图集和音效。已上传的大骰子图也会保留。" disabled hidden><svg class="icon" aria-hidden="true"><use href="#icon-package"/></svg><span data-i18n="downloadRuntimeBundle">下载精简包</span></button></div><p id="video-details" class="video-details" data-i18n="videoEmpty">上传完整素材后可打包，视频为可选项。</p></section>
+        <section class="output-section" aria-label="下载文件" data-i18n-aria="outputHeading"><div class="output-actions"><button id="export-video" class="button primary ft-motion-sheen" type="button" disabled><span data-i18n="exportVideo">生成并下载视频</span></button><button id="download-bundle" class="button secondary" type="button" disabled><span data-i18n="downloadBundle">打包下载 ZIP</span></button><button id="download-runtime-bundle" class="button secondary" type="button" data-i18n-title="runtimeBundleHint" title="包含 Spine 动画、图集和音效。已上传的大骰子图也会保留。" disabled hidden><span data-i18n="downloadRuntimeBundle">下载精简包</span></button></div><p id="video-details" class="video-details" data-i18n="videoEmpty">上传完整素材后可打包，视频为可选项。</p></section>
         <div id="activity-status" class="inline-status" role="status" aria-live="polite" hidden><span class="ft-spinner" aria-hidden="true"></span><span id="activity-message"></span></div><div id="error-message" class="inline-status" data-state="error" role="alert" hidden></div>
       </section>
     </div>
@@ -88,6 +86,6 @@
   <dialog id="help-dialog" class="help-dialog ft-motion-dialog" aria-labelledby="help-title"><div class="dialog-heading"><h2 id="help-title" data-i18n="help">使用说明</h2><button id="close-help" class="button secondary" type="button" data-i18n="close">关闭</button></div><ol class="help-list"><li data-i18n="helpUpload">两种等级均上传大骰子.png（兼容 icon.png）和 sz_1.png～sz_6.png 六张完整点数图。支持选择文件、拖入文件或文件夹，以及粘贴；大图可单独更换。</li><li data-i18n="helpSettings">选择骰子等级并填写名称，预览固定为六面同步投掷。</li><li data-i18n="helpComposition">两种等级自动补齐隐藏锚点及基础音效，也可上传 anchor.png、dice_roll.mp3、sound_ui_dice6.mp3 覆盖。</li><li data-i18n="helpDownload">预览每2秒循环，视频共6秒。资源包包含同名SKEL、图集、PNG、res原图和sound音频；MP4单独下载。</li></ol><p class="dialog-note" data-i18n="helpPreserve">导入失败会保留上一份可用预览。选择新一套素材会创建新的预览会话。</p></dialog>
   <dialog id="author-dialog" class="help-dialog ft-motion-dialog" aria-labelledby="author-title"><div class="dialog-heading"><h2 id="author-title" data-i18n="author">联系作者</h2><button id="close-author" class="button secondary" type="button" data-i18n="close">关闭</button></div><div class="author-profile"><img src="/dice/assets/fun-toolkit/assets/author-profile.webp" width="72" height="72" alt=""><div><strong>庞伟深</strong><p data-i18n="authorDescription">Fun Toolkit UI 规范作者与维护人</p></div></div><p class="dialog-note" data-i18n="resourceNote">本工具复用 Fun Toolkit 的页面、表单与反馈资源。</p><a class="button secondary" href="https://fun-toolkit.pangweishen1.workers.dev/#home" target="_blank" rel="noopener" data-i18n="moreTools">更多工具</a></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
-  <script type="module" src="/dice/preview-app.js?v=20261121-purple-landing"></script>
+  <script type="module" src="/dice/preview-app.js?v=20261123-export-buttons"></script>
 </body>
 </html>

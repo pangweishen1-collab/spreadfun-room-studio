@@ -5,7 +5,7 @@ import { DiceAudio } from './audio.mjs';
 import { PurplePreviewAudio } from './purple-preview-audio.mjs?v=20261119-purple-point-playback';
 import { DEFAULT_PURPLE_VARIANT, clearLegacyPreviewHistory, forgetLocalPreview, localApi } from './local-preview.mjs?v=20261121-purple-landing';
 import { GameRenderer } from '/dice/renderer.js?v=20261120-demand-background';
-import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261119-purple-point-playback';
+import { t, errorText, applyTranslations, toggleLanguage, getLanguage } from '/dice/preview-i18n.js?v=20261123-export-buttons';
 
 const $ = id => document.getElementById(id);
 const GREEN_SLOTS = Array.from({length:6}, (_,i) => 'sz_'+(i+1));
