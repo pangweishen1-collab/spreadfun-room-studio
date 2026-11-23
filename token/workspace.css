@@ -77,15 +77,13 @@
 .token-heading {display:flex;justify-content:space-between;align-items:center;gap:8px}
 .token-heading h2 {margin:0;color:var(--tool-heading);font-size:16px;line-height:24px}
 .token-count {padding:4px 8px;border-radius:20px;background:var(--tool-blue-soft);color:#25598e;font-size:12px;white-space:nowrap}
-.token-upload-buttons,.token-output,.token-play-row {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:8px}
-.token-grades {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
-.token-grades button {display:flex;align-items:center;justify-content:center;gap:6px;color:var(--tool-muted);background:var(--tool-surface);border-color:var(--line)}
-.token-grades button b {font-weight:600}
-.token-grades [data-token-grade="green"] {--grade-ink:#17784a;--grade-wash:#edf7ef;--grade-stroke:#acd8ba}
-.token-grades [data-token-grade="purple"] {--grade-ink:#7950a8;--grade-wash:#f5eefc;--grade-stroke:#d8bdec}
-.token-grades button span {width:8px;height:8px;border-radius:50%;background:var(--grade-ink)}
-.token-grades button[aria-pressed="true"] {color:var(--grade-ink);background:var(--grade-wash);border-color:var(--grade-stroke)}
-.token-upload-buttons {margin-top:12px;border-radius:10px}
+.token-output,.token-play-row {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:center;gap:8px}
+.token-replace {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.token-replace button {display:flex;align-items:center;justify-content:center;gap:6px;color:var(--grade-ink);background:var(--grade-wash);border-color:var(--grade-stroke)}
+.token-replace button b {font-weight:600}
+.token-replace [data-token-upload-grade="green"] {--grade-ink:#17784a;--grade-wash:#edf7ef;--grade-stroke:#acd8ba}
+.token-replace [data-token-upload-grade="purple"] {--grade-ink:#7950a8;--grade-wash:#f5eefc;--grade-stroke:#d8bdec}
+.token-replace button span {width:8px;height:8px;border-radius:50%;background:var(--grade-ink);flex:none}
 .token-upload-zone[data-dragging] {outline:2px solid var(--tool-focus);outline-offset:2px}
 #tokenTool .primary,.token-secondary,.token-colors button,.token-actions button {
   min-height:44px;
@@ -135,7 +133,7 @@
 .token-colors button[aria-pressed="true"],.token-actions button[aria-pressed="true"] {background:var(--tool-blue-soft);border-color:#a8d0ff;color:var(--blue)}
 .token-play-row,.token-output {margin-top:12px}
 .token-play-row label {display:flex;justify-content:center;align-items:center;gap:6px;color:var(--tool-muted);font-size:13px}
-.token-output {padding-top:14px;border-top:1px solid var(--line)}
+.token-output {align-items:stretch;padding-top:14px;border-top:1px solid var(--line)}
 #tokenTool button:disabled {opacity:.58;cursor:not-allowed}
 #tokenTool :is(button,input,select,summary):focus-visible {outline:2px solid var(--tool-focus);outline-offset:2px}
 #tokenExportProgress {width:100%;margin-top:8px;accent-color:var(--blue)}

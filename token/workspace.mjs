@@ -7,9 +7,8 @@ import {
 const copy = {
   zh: {
     drop: '拖入四色棋子 PNG', sizes: '红、绿、蓝、黄各一张 160 × 160 PNG。可加 240 × 240 封面。',
-    materials: {green: '绿色棋子素材', purple: '紫色棋子素材'}, choose: '选择 PNG', folder: '选择文件夹',
+    materials: '上传棋子', replace: '替换棋子', replaceGreen: '替换绿色', replacePurple: '替换紫色',
     uploadGreen: '绿色棋子上传', uploadPurple: '紫色棋子上传', upload: '上传', paste: '拖入文件或 ⌘V / Ctrl+V 粘贴',
-    grade: '棋子等级', gradeGreen: '绿色', gradePurple: '紫色',
     trail: '拖尾素材', trailChoose: '更换拖尾 PNG', trailReset: '恢复默认', trailDefault: '默认火焰',
     trailScope: '替换范围', trailAll: '全部颜色', trailPaste: '点此区域后按 ⌘V / Ctrl+V 粘贴 PNG',
     trailVariants: count => `已替换 ${count} 张拖尾图`, oneTrail: '请选择一张拖尾 PNG。',
@@ -25,9 +24,8 @@ const copy = {
   },
   en: {
     drop: 'Drop four token PNGs', sizes: 'One 160 × 160 PNG per color. A 240 × 240 cover is optional.',
-    materials: {green: 'Green token assets', purple: 'Purple token assets'}, choose: 'Choose PNGs', folder: 'Choose folder',
+    materials: 'Upload tokens', replace: 'Replace tokens', replaceGreen: 'Replace green', replacePurple: 'Replace purple',
     uploadGreen: 'Green token upload', uploadPurple: 'Purple token upload', upload: 'Upload', paste: 'Drop files or paste with ⌘V / Ctrl+V',
-    grade: 'Token grade', gradeGreen: 'Green', gradePurple: 'Purple',
     trail: 'Trail artwork', trailChoose: 'Replace trail PNG', trailReset: 'Restore default', trailDefault: 'Default flames',
     trailScope: 'Apply to', trailAll: 'All colors', trailPaste: 'Focus here and press ⌘V / Ctrl+V to paste a PNG',
     trailVariants: count => `${count} custom trail images`, oneTrail: 'Choose one trail PNG.',
@@ -46,8 +44,9 @@ const copy = {
 const $ = name => document.getElementById('token' + name);
 const root = $('Tool');
 const labels = root.querySelectorAll('[data-token-text]');
-const gradeButtons = [...root.querySelectorAll('[data-token-grade]')];
-const uploadCards = [...root.querySelectorAll('[data-token-upload-grade]')];
+const replace = $('Replace');
+const uploadCards = root.querySelectorAll('.token-upload-card');
+const uploadTargets = root.querySelectorAll('[data-token-upload-grade]');
 const colorButtons = [...root.querySelectorAll('[data-token-color]')];
 const actionButtons = [...root.querySelectorAll('[data-token-action]')];
 const colors = colorButtons.map(button => button.dataset.tokenColor);
@@ -59,8 +58,8 @@ const trailScope = $('TrailScope');
 const active = () => location.hash === '#token-preview' && !root.classList.contains('hidden');
 const chinese = () => document.documentElement.lang.startsWith('zh');
 const words = () => chinese() ? copy.zh : copy.en;
-const locked = ['UploadEmpty', 'UploadPurple', 'Upload', 'Folder', 'Name', 'Play', 'Sound', 'TrailScope', 'TrailChoose', 'TrailReset'].map($)
-  .concat(gradeButtons, colorButtons, actionButtons);
+const locked = ['UploadEmpty', 'UploadPurple', 'Name', 'Play', 'Sound', 'TrailScope', 'TrailChoose', 'TrailReset'].map($)
+  .concat([...replace.querySelectorAll('button')], colorButtons, actionButtons);
 const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const drafts = new Map();
 let files = new Map();
@@ -68,7 +67,7 @@ const assetURLs = new Map();
 const trailNames = new WeakMap();
 const trailSuffix = {red: '-红', green: '', blue: '-蓝', yellow: '-黄'};
 let token = null, renderer = null, busy = false;
-let grade = 'green';
+let grade = 'green', pickerGrade;
 let color = 'green', action = 'jump';
 let message = null, animation = 0, exporting = null;
 let hopTime = 0, loopWanted = false;
@@ -94,8 +93,8 @@ function sync() {
   const text = words();
   for (const label of labels) label.textContent = text[label.dataset.tokenText];
   nameInput.placeholder = text.placeholder[grade];
-  $('MaterialsTitle').textContent = text.materials[grade];
-  $('Grade').setAttribute('aria-label', text.grade);
+  replace.setAttribute('aria-label', text.replace);
+  replace.hidden = !token;
   $('Canvas').setAttribute('aria-label', text.preview);
   $('PackageLabel').textContent = tokenPackageName(nameInput.value, grade) + '.zip';
   $('Count').textContent = `${colors.filter(key => files.has(key)).length} / 4 PNG`;
@@ -110,7 +109,6 @@ function sync() {
   for (const control of locked) control.disabled = busy;
   for (const control of [$('Video'), $('Bundle')]) control.disabled = busy || !token;
   syncPlayback();
-  for (const button of gradeButtons) button.setAttribute('aria-pressed', String(button.dataset.tokenGrade === grade));
   for (const button of colorButtons) button.setAttribute('aria-pressed', String(button.dataset.tokenColor === color));
   for (const button of actionButtons) button.setAttribute('aria-pressed', String(button.dataset.tokenAction === action));
   for (const [file, url] of assetURLs) {
@@ -217,12 +215,12 @@ function play() {
   syncPlayback();
 }
 
-function selectFiles(selected) {
+function selectFiles(selected, uploadGrade) {
   const groups = new Map();
   for (const file of selected) {
     const key = tokenFileKey(file.name);
     const path = diceFilePath(file).split(/[/\\]/).filter(Boolean);
-    if (!key || (grade !== 'purple' && TOKEN_TRAIL_KEYS.includes(key)) ||
+    if (!key || (uploadGrade !== 'purple' && TOKEN_TRAIL_KEYS.includes(key)) ||
         path.some(part => part.startsWith('.') || part === '__MACOSX')) continue;
     if (!groups.has(key)) groups.set(key, []);
     groups.get(key).push(file);
@@ -242,9 +240,10 @@ function selectFiles(selected) {
   return {mapped};
 }
 
-async function load(getFiles, {uploadGrade, trailChange, scroll = true} = {}) {
+async function load(getFiles, {uploadGrade = grade, trailChange, scroll = true} = {}) {
   if (busy || !active()) return;
-  if (uploadGrade) changeGrade(uploadGrade);
+  const draft = drafts.get(uploadGrade);
+  const currentFiles = uploadGrade === grade ? files : draft?.files || new Map();
   stopAnimation();
   busy = true;
   message = {key: 'importing'};
@@ -256,7 +255,7 @@ async function load(getFiles, {uploadGrade, trailChange, scroll = true} = {}) {
       message = {key: 'oneTrail', tone: 'error'};
       return;
     }
-    const {mapped, duplicate} = selectFiles(trailChange ? [] : selected);
+    const {mapped, duplicate} = selectFiles(trailChange ? [] : selected, uploadGrade);
     if (duplicate) {
       message = {key: 'duplicate', color: duplicate, tone: 'error'};
       return;
@@ -266,7 +265,7 @@ async function load(getFiles, {uploadGrade, trailChange, scroll = true} = {}) {
       return;
     }
     const wholeSet = colors.every(key => mapped.has(key));
-    const previous = wholeSet ? [...files].filter(([key]) => TOKEN_TRAIL_KEYS.includes(key)) : files;
+    const previous = wholeSet ? [...currentFiles].filter(([key]) => TOKEN_TRAIL_KEYS.includes(key)) : currentFiles;
     const merged = new Map([...previous, ...mapped]);
     if (trailChange) {
       for (const key of scopedTrailKeys()) {
@@ -282,11 +281,16 @@ async function load(getFiles, {uploadGrade, trailChange, scroll = true} = {}) {
     }
     const missing = colors.filter(key => !merged.has(key));
     if (missing.length) {
-      files = merged;
+      if (token && uploadGrade !== grade) {
+        drafts.set(uploadGrade, {...draft, files: merged});
+      } else {
+        changeGrade(uploadGrade);
+        files = merged;
+      }
       message = {key: 'missing', colors: missing};
       return;
     }
-    const next = await prepareToken([...merged.values()], {grade});
+    const next = await prepareToken([...merged.values()], {grade: uploadGrade});
     const currentCanvas = $('Canvas');
     const canvas = currentCanvas.cloneNode();
     const nextRenderer = await createTokenRenderer(canvas, next);
@@ -296,7 +300,7 @@ async function load(getFiles, {uploadGrade, trailChange, scroll = true} = {}) {
       nextRenderer.dispose();
       throw error;
     }
-    renderer?.dispose();
+    if (!changeGrade(uploadGrade)) renderer?.dispose();
     currentCanvas.replaceWith(canvas);
     renderer = nextRenderer;
     token = next;
@@ -363,20 +367,22 @@ async function exportOutput(video) {
   }
 }
 
-$('Upload').addEventListener('click', () => $('Files').click());
-for (const card of uploadCards) {
-  const choose = () => {
+const picker = $('Files');
+for (const target of uploadTargets) {
+  target.addEventListener('click', () => {
     if (busy) return;
-    changeGrade(card.dataset.tokenUploadGrade);
-    sync();
-    $('Files').click();
-  };
-  card.addEventListener('click', choose);
-  card.addEventListener('keydown', event => {
-    if (event.target === card && ['Enter', ' '].includes(event.key)) { event.preventDefault(); choose(); }
+    pickerGrade = target.dataset.tokenUploadGrade;
+    picker.click();
   });
 }
-$('Folder').addEventListener('click', () => $('FolderFiles').click());
+for (const card of uploadCards) {
+  card.addEventListener('keydown', event => {
+    if (event.target === card && ['Enter', ' '].includes(event.key)) {
+      event.preventDefault();
+      card.click();
+    }
+  });
+}
 $('TrailScope').addEventListener('change', syncTrail);
 $('TrailChoose').addEventListener('click', () => $('TrailFile').click());
 trailZone.addEventListener('click', event => {
@@ -390,10 +396,10 @@ $('TrailFile').addEventListener('change', event => {
   input.value = '';
   if (selected.length) void replaceTrail(selected);
 });
-for (const input of [$('Files'), $('FolderFiles')]) input.addEventListener('change', () => {
-  const selected = Array.from(input.files);
-  input.value = '';
-  if (selected.length) void load(() => selected);
+picker.addEventListener('change', () => {
+  const selected = Array.from(picker.files);
+  picker.value = '';
+  if (selected.length) void load(() => selected, {uploadGrade: pickerGrade});
 });
 for (const zone of root.querySelectorAll('.token-upload-zone')) {
   zone.addEventListener('dragover', event => {
@@ -412,8 +418,8 @@ for (const zone of root.querySelectorAll('.token-upload-zone')) {
   });
 }
 window.UploadPaste?.register({zone: root, isActive: active, isBusy: () => busy, onFiles: selected => load(() => selected)});
-for (const card of uploadCards) window.UploadPaste?.register({zone: card, isActive: active, isBusy: () => busy,
-  onFiles: selected => load(() => selected, {uploadGrade: card.dataset.tokenUploadGrade})});
+for (const target of uploadTargets) window.UploadPaste?.register({zone: target, isActive: active, isBusy: () => busy,
+  onFiles: selected => load(() => selected, {uploadGrade: target.dataset.tokenUploadGrade})});
 window.UploadPaste?.register({
   zone: trailZone,
   isActive: event => active() && !trailZone.hidden &&
@@ -439,11 +445,6 @@ function changeGrade(next) {
   message = null;
   return true;
 }
-for (const button of gradeButtons) button.addEventListener('click', () => {
-  if (busy || !changeGrade(button.dataset.tokenGrade)) return;
-  if (colors.every(key => files.has(key))) void load(() => [...files.values()], {scroll: false});
-  else sync();
-});
 for (const button of colorButtons) button.addEventListener('click', () => {
   stopAnimation();
   color = button.dataset.tokenColor;

@@ -68,7 +68,7 @@ body{min-width:320px}
   <link rel="stylesheet" href="hub.css?v=20261102-soft-dividers1">
   <link rel="stylesheet" href="gift-preview.css?v=20261117-upload-alpha">
   <link rel="stylesheet" href="profile-preview.css?v=20261117-upload-spinner">
-  <link rel="stylesheet" href="token/workspace.css?v=20261123-upload-hover">
+  <link rel="stylesheet" href="token/workspace.css?v=20261123-replace">
   <link rel="stylesheet" href="vap-resources.css?v=20261101-field-labels1">
   <link rel="stylesheet" href="vap-tool.css?v=20261116-crf">
   <link rel="stylesheet" href="vap-review.css?v=20261118-review-screen">
@@ -852,16 +852,12 @@ body{min-width:320px}
     </section>
     <aside class="card token-settings" aria-labelledby="tokenMaterialsTitle">
       <div class="token-heading">
-        <h2 id="tokenMaterialsTitle">绿色棋子素材</h2>
+        <h2 id="tokenMaterialsTitle" data-token-text="materials">上传棋子</h2>
         <span id="tokenCount" class="token-count">0 / 4 PNG</span>
       </div>
-      <div id="tokenGrade" class="token-grades" role="group" aria-label="棋子等级">
-        <button class="token-secondary" type="button" data-token-grade="green" aria-pressed="true"><span aria-hidden="true"></span><b data-token-text="gradeGreen">绿色</b></button>
-        <button class="token-secondary" type="button" data-token-grade="purple" aria-pressed="false"><span aria-hidden="true"></span><b data-token-text="gradePurple">紫色</b></button>
-      </div>
-      <div id="tokenReplace" class="token-upload-zone token-upload-buttons">
-        <button id="tokenUpload" type="button" class="token-secondary" data-token-text="choose">选择 PNG</button>
-        <button id="tokenFolder" type="button" class="token-secondary" data-token-text="folder">选择文件夹</button>
+      <div id="tokenReplace" class="token-replace" role="group" aria-label="替换棋子" hidden>
+        <button class="token-secondary token-upload-zone" type="button" data-token-upload-grade="green"><span aria-hidden="true"></span><b data-token-text="replaceGreen">替换绿色</b></button>
+        <button class="token-secondary token-upload-zone" type="button" data-token-upload-grade="purple"><span aria-hidden="true"></span><b data-token-text="replacePurple">替换紫色</b></button>
       </div>
       <details class="token-assets" id="tokenAssets" hidden>
         <summary data-token-text="assetDetails">查看已选素材</summary>
@@ -923,7 +919,6 @@ body{min-width:320px}
       <progress id="tokenExportProgress" max="1" value="0" hidden></progress>
       <p id="tokenStatus" class="token-status" role="status" aria-live="polite"></p>
       <input id="tokenFiles" type="file" accept="image/png,.png" multiple hidden>
-      <input id="tokenFolderFiles" type="file" webkitdirectory directory multiple hidden>
       <input id="tokenTrailFile" type="file" accept="image/png,.png" hidden>
     </aside>
   </div>
@@ -1230,7 +1225,7 @@ const fgReady=load(fg,fgUrl);fgReady.catch(()=>showDownloadNotice('generationErr
   <script src="vap-tool.js?v=20261117-download-progress"></script>
   <script src="dice-embed.js?v=20261103-dice1"></script>
   <script src="toolkit.js?v=20261111-token1"></script>
-  <script type="module" src="token/workspace.mjs?v=20261120-upload-size"></script>
+  <script type="module" src="token/workspace.mjs?v=20261123-replace"></script>
   <script type="module" src="vap-review.js?v=20261121-background-menu"></script>
   <script type="module" src="avatar-custom.js?v=20261116-avatar-memory-gold"></script>
 </body></html>
