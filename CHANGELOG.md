@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.25.3 - 2026-11-24
+
+- Default VAP exports to H.264. Retry packed-frame reads from the canvas when the browser cannot copy RGBA from a video frame. Report blocked or full temporary storage separately from encoding errors.
+- Add Live gift output and Room background output tabs. Room backgrounds keep the original image, start at CRF 30 with audio off, and omit fades, keying, and avatar or text slots.
+
 ## 1.25.2 - 2026-11-23
 
 - Match the hover motion of the green and purple token upload cards to the corresponding dice cards.
