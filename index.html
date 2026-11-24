@@ -54,12 +54,10 @@ body{min-width:320px}
   <link rel="stylesheet" href="toolkit.css?v=20261120-room-tight">
   <style id="room-batch-layout">
     #roomTool{max-width:none}
-    #roomTool .workspace{grid-template-columns:minmax(0,1fr)}
     #roomTool .preview{min-height:0}
-    #previewStage.upload-ready{height:clamp(540px,calc(100svh - 190px),1040px)}
     #previewStage:not(.upload-ready){height:auto;min-height:0;align-items:start}
     #previewGrid{
-      --room-preview-card-min:220px;
+      --room-preview-card-min:clamp(144px,15vw,220px);
       width:100%;height:auto;padding:12px;gap:12px;overflow:visible;
       grid-template-columns:repeat(auto-fit,minmax(min(100%,var(--room-preview-card-min)),1fr));
       align-content:start;
@@ -70,7 +68,6 @@ body{min-width:320px}
     #roomTool .room-preview-actions{display:flex;align-items:center;gap:8px 14px;flex-wrap:wrap}
     #roomTool .preview-head .add-backgrounds{width:auto;padding-inline:12px}
     @media(max-width:640px){#previewGrid{--room-preview-card-min:132px}}
-    @media(max-width:540px){#previewStage.upload-ready{height:clamp(380px,calc(100svh - 260px),760px)}}
   </style>
   <link rel="stylesheet" href="avatar-fonts.css?v=20261103-metaltext1">
   <link rel="stylesheet" href="avatar-custom.css?v=20261116-avatar-memory-gold">
