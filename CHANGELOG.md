@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.25.5 - 2026-11-24
+
+- Restore the room background tool’s desktop two-column layout, with WebP settings and generated files on the right. Keep the reference upload area size and fit multiple previews on the left.
+
 ## 1.25.4 - 2026-11-24
 
 - Expand the room background preview to the full available width. Fit more images per row on wide displays and show taller previews for small batches.
