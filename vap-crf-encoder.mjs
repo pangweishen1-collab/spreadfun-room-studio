@@ -42,7 +42,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
   const name = 'fun-vap-crf-' + crypto.randomUUID();
   let root, worker, pending, nextMessage = 0, closed = false, ending, frames = 0, finished = false;
   let coreReady, rejectCoreWait;
-  let encodeAttempt = 1, totalAttempts = 1;
+  let encodeAttempt = 1, totalAttempts = 1, useCanvasReadback = false;
   const cleanup = async () => {
     try { await root?.removeEntry(name, {recursive: true}); } catch (error) {
       // A terminated worker may still be releasing its access handle.
@@ -77,12 +77,20 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
     });
   }
 
+  let file;
   try {
     root = await navigator.storage.getDirectory();
     const folder = await root.getDirectoryHandle(name, {create: true});
-    const file = await folder.getFileHandle('packed.i420', {create: true});
+    file = await folder.getFileHandle('packed.i420', {create: true});
+  } catch (cause) {
+    await dispose();
     if (signal?.aborted) throw cancelled();
-    worker = new Worker(new URL('./vap-crf-worker.js?v=20261117-download-progress', import.meta.url), {type: 'module'});
+    throw crfError('storage', '无法打开浏览器的临时视频存储。', cause);
+  }
+
+  try {
+    if (signal?.aborted) throw cancelled();
+    worker = new Worker(new URL('./vap-crf-worker.js?v=20261124-avc-compat', import.meta.url), {type: 'module'});
     worker.onmessage = ({data}) => {
       if (data.progress !== undefined) {
         onProgress?.((encodeAttempt - 1 + data.progress) / totalAttempts, encodeAttempt);
@@ -110,14 +118,25 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
   } catch (error) {
     await dispose();
     if (signal?.aborted) throw cancelled();
-    throw error?.code ? error : crfError('storage', '无法打开浏览器的临时视频存储。', error);
+    throw typeof error?.code === 'string' ? error : crfError('encode', '本地 CRF 编码组件未能启动。', error);
   }
 
   return {
     async add(canvas) {
       if (finished || frames >= frameCount) throw crfError('encode', 'CRF 编码的输入帧数错误。');
-      const frame = new VideoFrame(canvas, {timestamp: Math.round(frames * 1e6 / fps), alpha: 'discard'});
-      try { await request('frame', {frame}, [frame]); } finally { frame.close(); }
+      if (!useCanvasReadback) {
+        const frame = new VideoFrame(canvas, {timestamp: Math.round(frames * 1e6 / fps), alpha: 'discard'});
+        try { await request('frame', {frame}, [frame]); }
+        catch (error) {
+          if (error?.code !== 'frame-copy') throw error;
+          useCanvasReadback = true;
+        } finally { frame.close(); }
+      }
+      // Retry the same packed frame and reuse that path if RGBA copyTo is unavailable.
+      if (useCanvasReadback) {
+        const {data: pixels} = canvas.getContext('2d').getImageData(0, 0, width, height);
+        await request('frame', {pixels}, [pixels.buffer]);
+      }
       frames++;
     },
     async finish({targetBytes} = {}) {

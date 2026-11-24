@@ -111,7 +111,7 @@
 #vapTool .vap-range-row output{font-size:12px;text-align:right;color:var(--tool-muted);font-variant-numeric:tabular-nums}
 #vapTool .vap-volume-heading{display:flex;align-items:center;justify-content:space-between;gap:12px}
 #vapTool .vap-volume-heading output{color:var(--blue);font-size:13px;line-height:20px;font-variant-numeric:tabular-nums}
-#vapTool .vap-volume input{min-height:44px;margin:0;display:block}
+#vapTool .vap-volume input[type=range]{min-height:44px;margin:0;display:block}
 #vapTool .vap-privacy{display:flex;justify-content:center;align-items:center;gap:7px;margin:20px 0 0;padding-top:20px;border-top:1px solid var(--tool-divider,#f0f1f4);font-size:11px;line-height:18px;color:var(--tool-muted);text-align:center}
 #vapTool .vap-privacy i{width:5px;height:5px;background:#6aa78d;border-radius:50%;flex-shrink:0}
 #vapTool .vap-packed-size{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--tool-muted);font-size:12px;line-height:20px}
@@ -193,7 +193,14 @@
 /* Reveal the output comparison only after a valid conversion is committed. */
 #vapTool .vap-preview-comparison{container-type:inline-size;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));align-items:start;min-width:0;gap:8px 16px;--vap-preview-ratio:.4615384615}
 #vapTool .vap-preview-comparison:not(.has-result){grid-template-columns:minmax(0,1fr)}
-#vapTool .vap-preview-heading{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:16px}
+#vapTool .vap-output-mode-tabs{width:min(100%,370px);min-width:0}
+#vapTool .vap-output-mode-tabs button{display:flex;align-items:center;justify-content:center;gap:7px;padding-inline:8px}
+#vapTool .vap-output-mode-tabs button[aria-selected=true]{border-color:#a8d0ff;background:#eaf3ff;color:var(--blue)}
+#vapTool .vap-output-mode-tabs button span{overflow-wrap:anywhere}
+#vapTool .vap-output-mode-tabs svg{width:18px;height:18px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#vapTool .vap-room-audio{align-items:center;width:max-content;max-width:100%;margin:4px 0}
+#vapTool .vap-room-audio input{margin:0}
+@media(max-width:420px){#vapTool .vap-output-mode-tabs button{gap:5px;padding-inline:6px;font-size:12px}#vapTool .vap-output-mode-tabs svg{width:15px;height:15px}}
 #vapTool #vapCompareResultLabel{font-size:13px;font-weight:500;color:var(--tool-muted)}
 #vapTool #vapStage{grid-column:1;grid-row:1}
 #vapTool #vapResultFrame{grid-column:2;grid-row:1}

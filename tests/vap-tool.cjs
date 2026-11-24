@@ -87,7 +87,7 @@ function result(){return {blob:new Blob(['packed-vap'],{type:'video/mp4'}),confi
   assert.equal(get('#vapCrf').value,'28');
   assert.equal(api.options().crf,28);
   assert.equal(get('#vapCrfRecommendation').hidden,true);
-  assert.equal(api.options().videoCodec,'hevc');
+  assert.equal(api.options().videoCodec,'avc');
   assert.equal(api.options({preview:true}).crf,undefined);
   assert.equal(get('#vapLightRecovery').checked,false,'transparent-glow recovery is opt-in');assert.equal(get('#vapLightRecoveryRow').hidden,true,'ordinary-video defaults do not expose chroma-only recovery');assert.equal(api.options().lightRecovery,false);assert.equal(api.options({preview:true}).lightRecovery,false);
   assert.equal(get('#vapMethod').value,'auto','regular MP4 chooses its background method automatically');assert.equal(api.state.detectedMethod,'opaque','uncertain media conservatively retains frame colors');assert.equal(api.options().matteMethod,'opaque');assert.equal(api.options().confirmedOpaque,true,'keep-frame selection authorizes the engine without an extra checkbox');assert.equal(get('#vapKeySettings').hidden,true,'the default keep-frame mode hides unrelated keying controls');
@@ -566,6 +566,33 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     setSwitch('MaskEnabled',false);setSwitch('GiftFadeEnabled',false);const ordinaryOff=snapshot(),savedOff=maskPreferences.get(preferenceKey);await effects.loadFiles([nativeSource('native-from-disabled.mp4')]);setSwitch('MaskEnabled',true);setSwitch('GiftFadeEnabled',true);await effects.loadFiles([file({name:'ordinary-disabled-restored.mp4'})]);assert.equal(snapshot(),ordinaryOff,'ordinary explicit-off preferences survive native opt-in effects');assert.equal(maskPreferences.get(preferenceKey),savedOff);
     vm.runInContext(source,sandbox);assert.equal(sandbox.window.test.state.verticalMask.enabled,false,'page reload still reads the ordinary preference, not native switch edits');
   }
+  {
+    vm.runInContext(source,sandbox);
+    const modes=sandbox.window.test;
+    const green=file({name:'room-green.mp4',detected:{sourceKind:'chroma_mp4',screenColor:'green',background:[10,220,20]}});
+    await modes.loadFiles([green]);
+    assert.equal(modes.options().matteMethod,'chroma_key');
+    get('#vapCrf').value='22';get('#vapCrf').fire('input');
+    click('OutputRoom');
+    assert.equal(get('#vapOutputRoom').getAttribute('aria-selected'),'true');
+    assert.equal(get('#vapRoomAudio').hidden,false);
+    for(const id of ['ResourcePanel','VerticalMask','GiftFade','GiftAdvanced','MaskOverlay'])assert.equal(get('#vap'+id).hidden,true);
+    resourceState.errors=true;
+    try{
+      const room=modes.options();
+      assert.deepEqual([room.crf,room.videoCodec,room.keepAudio,room.matteMethod,room.resources.length],[30,'avc',false,'opaque',0]);
+      assert.equal(room.verticalMask.enabled,false);assert.equal(room.giftFade.enabled,false);
+      assert.equal(room.recommendedBytes,undefined);
+    }finally{resourceState.errors=false;}
+    await modes.loadFiles([green]);
+    assert.equal(modes.options().crf,30,'upload does not replace the room preset');
+    get('#vapKeepAudio').checked=true;get('#vapKeepAudio').fire('change');
+    assert.equal(modes.options().keepAudio,true);
+    get('#vapOutputRoom').fire('keydown',{key:'Home'});
+    assert.equal(modes.options().crf,22);assert.equal(modes.options().keepAudio,true);
+    assert.equal(modes.options().matteMethod,'chroma_key');assert.equal(modes.options().giftFade.enabled,true);
+    assert.equal(get('#vapResourcePanel').hidden,false);assert.equal(get('#vapRoomAudio').hidden,true);
+  }
   console.log('vap-tool: native extra fades default off, transparent view and switch state, explicit opt-in, native replacement reset, ordinary MP4/sequence preference restoration, storage separation and failed/cancelled import atomicity passed.');
   // The fixed RGB geometry and cadence are shared by all export settings.
   {
@@ -592,7 +619,7 @@ get('#vapVerticalMask').open=/\bopen(?:\s|>|=)/.test(templateMarkup.match(/<deta
     assert.equal(settings.options().recommendedBytes,1_500_000);
     assert.equal(settings.options({preview:true}).recommendedBytes,undefined);
     assert.equal(settings.options().alphaScale,.5);
-    assert.equal(settings.options().videoCodec,'hevc');
+    assert.equal(settings.options().videoCodec,'avc');
     assert.equal(get('#vapPackedSize').textContent,'1088 × 1568 px');
     const previousConversion=conversion;
     conversion=async(_file,_opts,{onProgress})=>{

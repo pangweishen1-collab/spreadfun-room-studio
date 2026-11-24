@@ -43,18 +43,28 @@ async function init(message) {
   if (typeof file.createSyncAccessHandle !== 'function') {
     throw Object.assign(new Error('当前浏览器不支持 CRF 编码所需的本地文件存储。'), {code: 'unsupported'});
   }
-  const access = await file.createSyncAccessHandle();
+  let access;
+  try { access = await file.createSyncAccessHandle(); }
+  catch (cause) {
+    throw Object.assign(new Error('无法打开浏览器的临时视频存储。', {cause}), {code: 'storage'});
+  }
   job = {
     ...message, access, offset: 0,
     rgba: new Uint8Array(width * height * 4), i420: new Uint8Array(width * height * 3 / 2)
   };
 }
 
-async function writeFrame(frame) {
+async function writeFrame({frame, pixels}) {
   const {width, height, rgba, i420, access, offset} = job;
-  try {
-    await frame.copyTo(rgba, {format: 'RGBA', layout: [{offset: 0, stride: width * 4}]});
-  } finally { frame.close(); }
+  if (pixels) {
+    rgba.set(pixels);
+  } else {
+    try {
+      await frame.copyTo(rgba, {format: 'RGBA', layout: [{offset: 0, stride: width * 4}]});
+    } catch (cause) {
+      throw Object.assign(new Error('无法读取打包画面的 RGBA 像素。', {cause}), {code: 'frame-copy'});
+    } finally { frame.close(); }
+  }
   toI420(rgba, i420, width, height);
   const written = access.write(i420, {at: offset});
   if (written !== i420.length) {
@@ -124,7 +134,7 @@ self.onmessage = async ({data}) => {
   try {
     let result;
     if (type === 'init') await init(data);
-    if (type === 'frame') await writeFrame(data.frame);
+    if (type === 'frame') await writeFrame(data);
     if (type === 'encode') result = await encode(data.crf);
     postMessage({id, result}, result ? [result.buffer] : []);
   } catch (error) {

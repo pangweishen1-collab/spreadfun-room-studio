@@ -106,7 +106,7 @@ export function normalizeOptions(options={},metadata={}){
   if(o.crf!==undefined){
     integer(o.crf,0,51,'CRF');
     if(o.recommendedBytes!==undefined)integer(o.recommendedBytes,1,Number.MAX_SAFE_INTEGER,'建议体积');
-    o.videoCodec??='hevc';
+    o.videoCodec??='avc';
     if(!['avc','hevc'].includes(o.videoCodec))throw new VapError('invalid','请选择 H.264 或 H.265。');
     delete o.targetBytes;
   }else{
@@ -155,7 +155,7 @@ export function planEncoding(options,metadata){
     resourceConfigBytes=new TextEncoder().encode(JSON.stringify(config)).length;
     if(resourceConfigBytes>1000000)throw new VapError('limits','资源动画配置过大，请缩短视频或减少资源。');
   }
-  if(options.crf!==undefined)return {layout,codec:options.videoCodec??'hevc'};
+  if(options.crf!==undefined)return {layout,codec:options.videoCodec??'avc'};
   // Reserve room for MP4/vapc metadata and the downloadable ZIP/config wrapper.
   const targetBytes=outputBudget(options.targetBytes);
   const byteLimit=targetBytes-Math.min(8192,Math.floor(targetBytes*.02))-(options.packageReserveBytes||0)-resourceConfigBytes;
@@ -634,7 +634,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
     }
     const target=new M.BufferTarget();output=new M.Output({format:new M.Mp4OutputFormat({fastStart:'in-memory'}),target});
     if(o.crf!==undefined){
-      const {createCrfEncoder}=await import('./vap-crf-encoder.mjs?v=20261117-download-progress');
+      const {createCrfEncoder}=await import('./vap-crf-encoder.mjs?v=20261124-avc-compat');
       crfEncoder=await createCrfEncoder({codec:o.videoCodec,crf:o.crf,width:plan.layout.videoW,height:plan.layout.videoH,fps:o.fps,frameCount,signal,onProgress:(fraction,attempt)=>{
         progress({phase:'encoding',progress:.60+.35*fraction,frame:frameCount,totalFrames:frameCount,pass:attempt,reason:attempt>1?'recommendation':undefined});
       }});
@@ -813,7 +813,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
     await output?.cancel().catch(()=>{});
     if(error instanceof VapError)throw error;
     if(signal?.aborted)throw new VapError('cancelled','转换已取消。',error);
-    if(error?.code==='encoder-download')throw new VapError(error.code,error.message,error);
+    if(['encoder-download','storage','unsupported'].includes(error?.code))throw new VapError(error.code,error.message,error);
     throw new VapError('encode','视频转换失败；原视频已保留，请调整参数重试。',error);
   }
   finally{signal?.removeEventListener('abort',abort);workerPool?.dispose();try{await crfEncoder?.dispose()}catch(ignored){}await iterator?.return?.().catch(()=>{});try{await processor?.dispose()}catch(ignored){}qualitySampler?.dispose();nativePlanes?.dispose();resourceRenderer?.dispose();unpacker?.dispose();input.dispose();for(const c of images)c.width=c.height=1;}
