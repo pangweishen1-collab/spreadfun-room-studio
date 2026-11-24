@@ -1,5 +1,10 @@
 # 更新记录
 
+## 1.25.4 - 2026-11-24
+
+- Expand the room background preview to the full available width. Fit more images per row on wide displays and show taller previews for small batches.
+- Move Add backgrounds to the preview header and place the downloads below the grid.
+
 ## 1.25.3 - 2026-11-24
 
 - Default VAP exports to H.264. Retry packed-frame reads from the canvas when the browser cannot copy RGBA from a video frame. Report blocked or full temporary storage separately from encoding errors.
