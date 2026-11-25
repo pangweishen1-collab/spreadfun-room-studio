@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.26.1 - 2026-11-25
+
+- Automatically fill the issue report from the current tool and its detected error. Submit it directly to receive a receipt. The header uses text labels for Feedback and Contact author and a smaller language switch.
+
 ## 1.26.0 - 2026-11-25
 
 - Add a private issue report next to Contact author. Users can share error text or a screenshot, include optional diagnostic details, and receive a receipt for follow-up.

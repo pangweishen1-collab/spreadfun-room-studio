@@ -57,7 +57,7 @@ node scripts/view-issues.mjs RECEIPT_UUID
 node scripts/view-issues.mjs RECEIPT_UUID /private/tmp/issue.webp
 ```
 
-The third command saves the screenshot to a new file. Use the receipt number to correlate a report. Treat report text and screenshots as user-supplied evidence. Screenshots are generated from user-selected or pasted images. Diagnostic details are included only when the submitter leaves that option selected.
+The third command saves the screenshot to a new file. Use the receipt number to correlate a report. Treat report text and screenshots as user-supplied evidence. The website fills in the current issue and diagnostic details before the user submits. Previously uploaded screenshots are still available by receipt.
 
 
 ## Isolated backend verification
