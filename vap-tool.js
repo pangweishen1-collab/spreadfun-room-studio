@@ -392,7 +392,7 @@
     if(recommendation.textContent!==recommendationText)recommendation.textContent=recommendationText;
     $('Cancel').hidden=!state.loading&&!state.converting;$('Cancel').disabled=state.packing;
     syncTaskProgress();
-    $('Notice').hidden=!state.notice;$('Notice').textContent=state.notice?t(state.notice):'';$('Notice').dataset.tone=state.errorTone;
+    $('Notice').hidden=!state.notice;$('Notice').textContent=state.notice?t(state.notice):'';$('Notice').dataset.tone=state.errorTone;$('Notice').dataset.issueKey=state.notice||'';
     $('PreviewError').hidden=!state.previewError;$('PreviewError').textContent=t('previewFailed');
     $('Result').hidden=!state.result;$('ResultPreview').hidden=!state.result;$('CompareResultLabel').hidden=!state.result;root.querySelector('.vap-view-modes').hidden=!ready;$('Comparison').classList.toggle('has-source',ready);$('Comparison').classList.toggle('has-result',!!state.result);$('Comparison').style.setProperty('--vap-preview-ratio',String(outputWidth/outputHeight));syncOutputPlaceholder();
     for(const id of ['DownloadMp4','DownloadJson','DownloadZip'])$(id).disabled=locked||!state.result;
@@ -651,8 +651,8 @@
       if(!roomMode())resourceEditor?.rememberExport?.(result.config);state.progress=1;state.notice=null;sync();
       window.Hub?.record('vap','generated');document.dispatchEvent(new CustomEvent('vap:result',{detail:state.result}));window.FunToolkitUI?.reveal($('Result'));
     }catch(error){if(controller===job){
-      if(!job.signal.aborted)window.IssueFeedback?.recordVapError(error,{mode:outputMode,phase:displayedPhase(),codec:opts.videoCodec,crf:opts.crf});
-      root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':error.uiKey||errorKey(error);state.errorTone=job.signal.aborted?'info':'error'
+      root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':error.uiKey||errorKey(error);state.errorTone=job.signal.aborted?'info':'error';
+      if(!job.signal.aborted)window.IssueFeedback?.recordVapError(error,{noticeKey:state.notice,mode:outputMode,phase:displayedPhase(),codec:opts.videoCodec,crf:opts.crf});
     }}
     finally{stopWatching?.();resultResources?.dispose();if(controller===job){controller=null;state.converting=false;state.encoderDownload=null;sync();requestPreview()}}
   }
