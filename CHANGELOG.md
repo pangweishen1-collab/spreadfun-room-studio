@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.26.0 - 2026-11-25
+
+- Add a private issue report next to Contact author. Users can share error text or a screenshot, include optional diagnostic details, and receive a receipt for follow-up.
+
 ## 1.25.5 - 2026-11-24
 
 - Restore the room background tool’s desktop two-column layout, with WebP settings and generated files on the right. Keep the reference upload area size and fit multiple previews on the left.
