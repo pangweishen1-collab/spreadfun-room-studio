@@ -145,7 +145,7 @@
   let sourceNonce=0,firstFrameCallback=null,firstFramePaint=[],autoplaySource=null;
   const busy=()=>state.loading||state.converting||state.packing||!roomMode()&&!!resourceEditor?.isLoading?.();
   const neutralName=name=>String(name||'').replace(/\u6781\u77ac|\u006a\u0069\u0073\u0068\u0075\u006e/gi,'').replace(/^[_\s-]+|[_\s-]+$/g,'')||'video';
-  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261124-avc-compat').catch(error=>{enginePromise=null;throw error}));
+  const getEngine=()=>enginePromise||(enginePromise=import('./vap-engine.mjs?v=20261125-issue-feedback').catch(error=>{enginePromise=null;throw error}));
   const displayedPhase=()=>state.encoderDownload===null?state.phase:'downloadingEncoder';
   function recommendedExportBytes(){
     const info=state.sourceVapConfig?.info,declared=info?.f/info?.fps;
@@ -614,6 +614,7 @@
     if(busy()||!state.file||state.pickingColor)return;
     if(!roomMode()&&resourceEditor?.finishEditing?.()===false){showNotice('resourceInvalid');return}
     let opts;try{opts=options()}catch(error){showNotice(error.uiKey||errorKey(error));return}
+    window.IssueFeedback?.recordVapError(null);
     pause();cleanupProcessor();state.converting=true;state.notice=null;state.progress=0;state.phase='loading';state.previewError=false;$('DownloadReceipt').hidden=true;
     const revision=state.revision,job=new AbortController();controller=job;sync();
     let resultResources=null,stopWatching,lastProgressSync=0,lastProgressPhase='';
@@ -649,7 +650,10 @@
       }
       if(!roomMode())resourceEditor?.rememberExport?.(result.config);state.progress=1;state.notice=null;sync();
       window.Hub?.record('vap','generated');document.dispatchEvent(new CustomEvent('vap:result',{detail:state.result}));window.FunToolkitUI?.reveal($('Result'));
-    }catch(error){if(controller===job){root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':error.uiKey||errorKey(error);state.errorTone=job.signal.aborted?'info':'error'}}
+    }catch(error){if(controller===job){
+      if(!job.signal.aborted)window.IssueFeedback?.recordVapError(error,{mode:outputMode,phase:displayedPhase(),codec:opts.videoCodec,crf:opts.crf});
+      root.dataset.lastError=String(error?.message||error);state.notice=job.signal.aborted?'cancelled':error.uiKey||errorKey(error);state.errorTone=job.signal.aborted?'info':'error'
+    }}
     finally{stopWatching?.();resultResources?.dispose();if(controller===job){controller=null;state.converting=false;state.encoderDownload=null;sync();requestPreview()}}
   }
   function cancel(){

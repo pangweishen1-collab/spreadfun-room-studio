@@ -90,7 +90,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
 
   try {
     if (signal?.aborted) throw cancelled();
-    worker = new Worker(new URL('./vap-crf-worker.js?v=20261124-avc-compat', import.meta.url), {type: 'module'});
+    worker = new Worker(new URL('./vap-crf-worker.js?v=20261125-issue-feedback', import.meta.url), {type: 'module'});
     worker.onmessage = ({data}) => {
       if (data.progress !== undefined) {
         onProgress?.((encodeAttempt - 1 + data.progress) / totalAttempts, encodeAttempt);
@@ -102,7 +102,7 @@ export async function createCrfEncoder({codec, crf, width, height, fps, frameCou
       if (data.error) reject(crfError(data.code ?? 'encode', data.error));
       else resolve(data.result);
     };
-    worker.onerror = () => { void dispose(crfError('encode', '本地 CRF 编码组件未能启动。')); };
+    worker.onerror = () => { void dispose(crfError('encoder-worker', '本地 CRF 编码组件未能启动。')); };
     signal?.addEventListener('abort', abort, {once: true});
     await request('init', {file, width, height, fps, codec, frameCount});
     // Frame staging can run while the shared download finishes. Cancelling

@@ -47,6 +47,7 @@
     document.querySelectorAll('[data-hub-i18n]').forEach(node=>node.textContent=t(node.dataset.hubI18n));
     document.querySelectorAll('[data-hub-placeholder]').forEach(node=>node.placeholder=t(node.dataset.hubPlaceholder));
     renderStats();renderRequest();
+    window.IssueFeedback?.syncLanguage();
   }
   function openRequest(){const dialog=$('hubRequestDialog');if(dialog&&!dialog.open){dialog.showModal();$('hubRequestTitle').focus()}}
   async function submitRequest(event){

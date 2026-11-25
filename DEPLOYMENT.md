@@ -47,6 +47,19 @@ pnpm exec wrangler d1 execute fun-toolkit-production --remote --command 'SELECT 
 
 Do not publish the result or place database exports in the website/repository. Source images and SVGA files continue to be processed in the visitor's browser.
 
+### Private issue reports
+
+Apply `migrations/0005_issue_reports.sql` to `fun-toolkit-production` before deploying the issue report form. It adds a private table and leaves existing requests and statistics intact. The public endpoint accepts submissions with a description or screenshot and returns a receipt UUID. Look up a report using the owner’s authenticated Wrangler session:
+
+```sh
+node scripts/view-issues.mjs
+node scripts/view-issues.mjs RECEIPT_UUID
+node scripts/view-issues.mjs RECEIPT_UUID /private/tmp/issue.webp
+```
+
+The third command saves the screenshot to a new file. Use the receipt number to correlate a report. Treat report text and screenshots as user-supplied evidence. Screenshots are generated from user-selected or pasted images. Diagnostic details are included only when the submitter leaves that option selected.
+
+
 ## Isolated backend verification
 
 ```sh

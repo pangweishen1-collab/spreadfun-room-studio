@@ -27,6 +27,7 @@ MAX_REVIEW_BODY = 704 * 1024
 MAX_REVIEW_ENTRIES = 100
 TEMPLATES_PATH = "/api/vap-review-templates"
 BACKGROUNDS_PATH = "/api/vap-review-backgrounds"
+ISSUES_PATH = "/api/issue-reports"
 REVIEW_COLLECTIONS = {TEMPLATES_PATH: "template", BACKGROUNDS_PATH: "background"}
 WEBP_DATA = "data:image/webp;base64,"
 STATIC_EXTENSIONS = {
@@ -152,7 +153,7 @@ class Store:
                     contact TEXT NOT NULL, created_at TEXT NOT NULL
                 );
             """)
-            for migration in ("0003_vap_review_templates.sql", "0004_vap_review_backgrounds.sql"):
+            for migration in ("0003_vap_review_templates.sql", "0004_vap_review_backgrounds.sql", "0005_issue_reports.sql"):
                 connection.executescript((SITE_ROOT / "migrations" / migration).read_text())
             timestamp = utc_now()
             with connection:
@@ -213,6 +214,26 @@ class Store:
             return [dict(row) for row in connection.execute(
                 "SELECT id, title, description, contact, created_at AS createdAt FROM requests ORDER BY created_at DESC"
             )]
+
+    def save_issue(self, payload):
+        issue_id, description, context, screenshot = (
+            payload[key] for key in ("id", "description", "context", "screenshot")
+        )
+        created = utc_now()
+        with self.connection() as connection, connection:
+            inserted = connection.execute("""
+                INSERT INTO issue_reports (id, description, context, screenshot, created_at)
+                VALUES (?, ?, ?, ?, ?) ON CONFLICT (id) DO NOTHING
+            """, (issue_id, description, context, screenshot, created)).rowcount
+            if not inserted:
+                prior = connection.execute("""
+                    SELECT created_at FROM issue_reports
+                    WHERE id = ? AND description = ? AND context = ? AND screenshot IS ?
+                """, (issue_id, description, context, screenshot)).fetchone()
+                if not prior:
+                    raise ValueError("issue_conflict")
+                created = prior["created_at"]
+        return (201 if inserted else 200), {"id": issue_id, "createdAt": created}
 
     def review_entries(self, kind, entry_id=None):
         table = "vap_review_templates" if kind == "template" else "vap_review_backgrounds"
@@ -377,6 +398,37 @@ class ToolkitHandler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         endpoint = self.api_path()
+        if endpoint == ISSUES_PATH:
+            payload = self.read_json(MAX_REVIEW_BODY)
+            if payload is None:
+                return
+            try:
+                if set(payload) != {"id", "description", "context", "screenshot"}:
+                    raise ValueError
+                issue_id = payload["id"]
+                if not isinstance(issue_id, str) or str(uuid.UUID(issue_id)) != issue_id.lower():
+                    raise ValueError
+                payload["id"] = issue_id.lower()
+                for key in ("description", "context"):
+                    value = payload[key]
+                    if not isinstance(value, str) or len(value) > 2000 or "\x00" in value:
+                        raise ValueError
+                    value.encode("utf-8")
+                payload["description"] = payload["description"].strip()
+                if payload["screenshot"] is not None:
+                    validate_background_image(payload["screenshot"], "invalid_issue")
+                elif not payload["description"]:
+                    raise ValueError
+            except (ValueError, TypeError):
+                return self.json_response(400, {"error": "invalid_issue"})
+            if not self.server.limiter.allow("requests"):
+                return self.json_response(429, {"error": "rate_limited"})
+            try:
+                return self.json_response(*self.server.store.save_issue(payload))
+            except ValueError:
+                return self.json_response(409, {"error": "issue_conflict"})
+            except sqlite3.Error:
+                return self.json_response(503, {"error": "storage_unavailable"})
         if endpoint in REVIEW_COLLECTIONS:
             kind = REVIEW_COLLECTIONS[endpoint]
             payload = self.read_json(MAX_REVIEW_BODY)

@@ -6,6 +6,7 @@ const MAX_REVIEW_BODY = 704 * 1024;
 const MAX_REVIEW_ENTRIES = 100;
 const TEMPLATES_PATH = '/api/vap-review-templates';
 const BACKGROUNDS_PATH = '/api/vap-review-backgrounds';
+const ISSUES_PATH = '/api/issue-reports';
 const WEBP_DATA = 'data:image/webp;base64,';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -175,6 +176,33 @@ async function saveRequest(db, payload) {
   return json(201, receipt);
 }
 
+function validateIssue(payload) {
+  const invalid = () => { throw new ApiError(400, 'invalid_issue'); };
+  if (!hasFields(payload, 'context,description,id,screenshot') ||
+      typeof payload.id !== 'string' || !UUID.test(payload.id)) invalid();
+  for (const key of ['description', 'context']) {
+    const value = payload[key];
+    if (typeof value !== 'string' || [...value].length > 2000 || value.includes('\0')) invalid();
+  }
+  if (payload.screenshot !== null) validateBackgroundImage(payload.screenshot, invalid);
+  const description = payload.description.trim();
+  if (!description && payload.screenshot === null) invalid();
+  return { ...payload, id: payload.id.toLowerCase(), description };
+}
+
+async function saveIssue(db, { id, description, context, screenshot }) {
+  const inserted = await db.prepare(`
+    INSERT INTO issue_reports (id, description, context, screenshot, created_at) VALUES (?, ?, ?, ?, ?)
+    ON CONFLICT (id) DO NOTHING RETURNING created_at
+  `).bind(id, description, context, screenshot, new Date().toISOString()).first();
+  if (inserted) return json(201, { id, createdAt: inserted.created_at });
+  const prior = await db.prepare(`
+    SELECT created_at FROM issue_reports WHERE id = ? AND description = ? AND context = ? AND screenshot IS ?
+  `).bind(id, description, context, screenshot).first();
+  if (!prior) throw new ApiError(409, 'issue_conflict');
+  return json(200, { id, createdAt: prior.created_at });
+}
+
 function hasFields(value, fields) {
   return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).sort().join(',') === fields;
 }
@@ -293,6 +321,12 @@ export default {
       }
       if (!['GET', 'HEAD', 'POST'].includes(request.method)) {
         throw new ApiError(405, 'method_not_allowed');
+      }
+      if (path === ISSUES_PATH && request.method === 'POST') {
+        const issue = validateIssue(await readJson(request, MAX_REVIEW_BODY));
+        const db = env.DB.withSession('first-primary');
+        await allow(db, 'requests');
+        return await saveIssue(db, issue);
       }
       if (request.method !== 'POST' || !['/api/events', '/api/requests'].includes(path)) {
         throw new ApiError(404, 'not_found');

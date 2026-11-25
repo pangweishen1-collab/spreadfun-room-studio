@@ -634,7 +634,7 @@ async function runPass(file,o,plan,{signal,progress,onPreview,pass,totalPasses,c
     }
     const target=new M.BufferTarget();output=new M.Output({format:new M.Mp4OutputFormat({fastStart:'in-memory'}),target});
     if(o.crf!==undefined){
-      const {createCrfEncoder}=await import('./vap-crf-encoder.mjs?v=20261124-avc-compat');
+      const {createCrfEncoder}=await import('./vap-crf-encoder.mjs?v=20261125-issue-feedback');
       crfEncoder=await createCrfEncoder({codec:o.videoCodec,crf:o.crf,width:plan.layout.videoW,height:plan.layout.videoH,fps:o.fps,frameCount,signal,onProgress:(fraction,attempt)=>{
         progress({phase:'encoding',progress:.60+.35*fraction,frame:frameCount,totalFrames:frameCount,pass:attempt,reason:attempt>1?'recommendation':undefined});
       }});

@@ -8,6 +8,7 @@ The suite writes synthetic events and tool suggestions, including both rate-limi
 """
 
 import argparse
+from base64 import b64encode
 from concurrent.futures import ThreadPoolExecutor
 import http.client
 import json
@@ -179,9 +180,33 @@ class WorkerApiTests(unittest.TestCase):
 
     def test_06_private_files_not_public(self):
         for path in ("/server.py", "/tests/worker_api_test.py", "/worker/index.mjs", "/migrations/0001_initial.sql",
+                     "/migrations/0005_issue_reports.sql", "/scripts/view-issues.mjs",
                      "/.env", "/README.md", "/toolkit.sqlite3", "/GitHub-Pages/"):
             with self.subTest(path=path):
                 self.assertEqual(call("GET", path)[0], 404)
+
+    def test_07_issue_report_screenshot_private_and_retryable(self):
+        path = "/api/issue-reports"
+        before = stats()
+        fixture = Path(__file__).resolve().parents[1] / "assets" / "spreadfun-mark.webp"
+        image = "data:image/webp;base64," + b64encode(fixture.read_bytes()).decode("ascii")
+        payload = {"id": str(uuid.uuid4()), "description": " Synthetic feedback ", "context": "Tool: vap", "screenshot": image}
+        status, headers, receipt = call("POST", path, payload, {"Origin": BASE_URL})
+        self.assertEqual(status, 201)
+        self.assertEqual(receipt["id"], payload["id"])
+        self.assertEqual(headers.get("Cache-Control"), "no-store")
+        self.assertEqual(call("POST", path, payload)[0::2], (200, receipt))
+        self.assertEqual(call("POST", path, {**payload, "description": "Another description"})[0], 409)
+        self.assertEqual(call("POST", path, {**payload, "screenshot": "data:image/svg+xml;base64,AAAA"})[0], 400)
+        self.assertEqual(call("POST", path, payload, {"Origin": "https://other.example"})[0], 403)
+        self.assertEqual(call("GET", path)[0], 404)
+        self.assertEqual(call("GET", path + "/" + receipt["id"])[0], 404)
+        self.assertEqual(stats(), before)
+        if DATABASE:
+            with sqlite3.connect(DATABASE.as_uri() + "?mode=ro", uri=True) as db:
+                rows = db.execute("SELECT description, context, screenshot FROM issue_reports WHERE id = ?",
+                                  (receipt["id"],)).fetchall()
+                self.assertEqual(rows, [("Synthetic feedback", "Tool: vap", image)])
 
     def test_99_atomic_global_fixed_window_caps(self):
         # Exhaust each current fixed window with one repeated event to avoid fixture growth.

@@ -127,7 +127,9 @@ async function encode(crf) {
 self.onmessage = async ({data}) => {
   const {id, type} = data;
   if (type === 'core') {
-    job.coreReady = loadCore(data.parts);
+    job.coreReady = loadCore(data.parts).catch(cause => {
+      throw Object.assign(new Error('本地 CRF 编码内核未能启动。', {cause}), {code: 'encoder-core'});
+    });
     job.coreReady.catch(() => {});
     return;
   }

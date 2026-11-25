@@ -1,0 +1,47 @@
+.topbar-contact-actions{display:flex;align-items:center;gap:14px}
+.topbar .top-actions #issueButton{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;width:auto;min-width:0;
+  min-height:36px;padding:0 3px;background:transparent;color:#626c7c;box-shadow:none;
+  font-size:14px;font-weight:400;white-space:nowrap;
+}
+.topbar .top-actions #issueButton:is(:hover,:focus-visible,:active){
+  color:var(--blue);background:transparent;box-shadow:none;transform:none
+}
+.issue-icon{display:grid;place-items:center;width:16px;height:15px;border:1.5px solid currentColor;border-radius:4px;font:bold 11px/1 system-ui}
+.issue-file-label{margin:15px 0 7px;font-size:var(--tool-field-label-size,12px)}
+.issue-attachment{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;margin-top:10px}
+.issue-attachment img{display:block;max-width:calc(100% - 110px);max-height:140px;object-fit:contain;border:1px solid var(--line);border-radius:8px}
+.issue-file-hint{display:block;margin:7px 0;font-size:12px;color:var(--tool-muted)}
+#issueDialog label.issue-diagnostics{display:flex;margin-top:17px;font-size:13px}
+#issueDialog input[type="checkbox"]{width:16px;height:16px;min-height:0;flex:none;margin:0;accent-color:var(--blue)}
+#issueSubmit{width:100%}
+.issue-receipt{margin-top:12px}
+.issue-receipt p{margin:0 0 6px}
+.issue-receipt code{display:block;margin-bottom:10px;user-select:all}
+#issueDialog [hidden]{display:none}
+@media(min-width:1101px) and (max-width:1179px){
+  .topbar .brand{margin-right:auto}
+  .topbar .top-actions{margin-left:0}
+  .topbar .tool-navigation{order:3;width:100%;margin:0;justify-content:flex-start}
+}
+@media(min-width:1180px) and (max-width:1520px){
+  html:lang(en) .topbar .brand{margin-right:auto}
+  html:lang(en) .topbar .top-actions{margin-left:0}
+  html:lang(en) .topbar .tool-navigation{order:3;width:100%;margin:0;justify-content:flex-start}
+}
+@media(max-width:700px){
+  .topbar .top-actions #issueButton{width:40px;height:44px}
+  .issue-icon{width:19px;height:18px;font-size:13px}
+  #issueButtonText{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+}
+@media(max-width:540px){
+  .topbar{grid-template-columns:minmax(0,1fr) 90px auto;column-gap:6px}
+  .topbar .language-switch{width:90px;min-width:90px}
+  .topbar-contact-actions{grid-area:1/3;gap:0}
+}
+@media(max-width:360px){
+  .topbar{padding-inline:10px;grid-template-columns:minmax(0,1fr) 84px auto}
+  .topbar .language-switch{width:84px;min-width:84px}
+  .topbar .brand{gap:5px}
+  .topbar .brand .brand-name{font-size:16px}
+}
