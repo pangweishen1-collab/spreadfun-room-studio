@@ -1,5 +1,9 @@
 # 更新记录
 
+## 1.26.2 - 2026-11-26
+
+- Export green and purple dice and token review videos as 720 × 1600 MP4 at a constant 60 fps for six seconds, with a 12 Mb/s target bitrate. Remove the dice preview video's 1.5 MB limit and the bitrate reduction it triggered.
+
 ## 1.26.1 - 2026-11-25
 
 - Automatically fill the issue report from the current tool and its detected error. Submit it directly to receive a receipt. The header uses text labels for Feedback and Contact author and a smaller language switch.
