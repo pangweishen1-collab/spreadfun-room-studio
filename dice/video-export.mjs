@@ -7,14 +7,13 @@ export const VIDEO_ROUND_SECONDS = 2;
 export const VIDEO_AVC_CODECS = Object.freeze(['avc1.64002a','avc1.4d002a','avc1.42002a']);
 const fps = 60, duration = 6;
 export const VIDEO_SPEC = Object.freeze({width: 720, height: 1600, fps, frameCount: fps * duration, duration,
-  profile: 'loop6-v7-60fps-audio-1500kb', bitrate: 2_500_000, maxBytes: 1_500_000});
-const MAX_BYTES = 64 * 1024 * 1024;
+  profile: 'loop6-v8-60fps-hd', bitrate: 12_000_000, maxBytes: 64 * 1024 * 1024});
 const fail = message => { throw new Error(message); };
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
 function checkBlob(blob) {
   if (!(blob instanceof Blob) || !blob.size) fail('视频内容为空，请重新导出');
-  if (blob.size > MAX_BYTES) fail('视频文件过大，请重新导出');
+  if (blob.size > VIDEO_SPEC.maxBytes) fail('视频文件超过 64 MiB，请重新导出');
 }
 
 function bitsReader(nal) {
@@ -198,7 +197,7 @@ function matches(info) {
     Math.abs(info.duration - duration) < .0001 && Math.abs(info.fps - fps) < .001 && info.codec === 'avc' && info.constantFrameRate;
 }
 
-async function transcodeFallback(blob, M, bitrate = 1_900_000) {
+async function transcodeFallback(blob, M) {
   const source = await openVideo(blob, M);
   const {width, height, frameCount} = VIDEO_SPEC;
   let output, iterator, canvas;
@@ -207,19 +206,20 @@ async function transcodeFallback(blob, M, bitrate = 1_900_000) {
     const [first, end] = await Promise.all([source.track.getFirstTimestamp(), source.track.computeDuration()]);
     if (!Number.isFinite(end - first) || end - first < 5.5 || end - first > 7) fail('录制视频时长异常，请重新导出 6 秒视频');
     if (!await source.track.canDecode()) fail('当前浏览器无法解码录制视频，请使用最新版 Chrome 或 Edge');
+    const quality = new M.Quality({bitrate: VIDEO_SPEC.bitrate});
     let codec;
     for (const candidate of VIDEO_AVC_CODECS) {
-      if (await M.canEncodeVideo('avc', {width, height, frameRate: fps, fullCodecString: candidate, quality: new M.Quality({bitrate})})) { codec = candidate; break; }
+      if (await M.canEncodeVideo('avc', {width, height, frameRate: fps, fullCodecString: candidate, quality})) { codec = candidate; break; }
     }
     if (!codec) fail('当前浏览器无法生成 H.264 MP4，请使用最新版 Chrome 或 Edge');
     canvas = typeof OffscreenCanvas === 'function' ? new OffscreenCanvas(width, height) : Object.assign(document.createElement('canvas'), {width, height});
     const context = canvas.getContext('2d');
     if (!context) fail('无法创建视频导出画布');
     const targetOutput = makeOutput(M); output = targetOutput.output;
-    const encoded = new M.CanvasSource(canvas, {codec: 'avc', fullCodecString: codec, quality: new M.Quality({bitrate}), latencyMode: 'quality', keyFrameInterval: VIDEO_ROUND_SECONDS});
+    const encoded = new M.CanvasSource(canvas, {codec: 'avc', fullCodecString: codec, quality, latencyMode: 'quality', keyFrameInterval: VIDEO_ROUND_SECONDS});
     output.addVideoTrack(encoded, {frameRate: fps});
     const sink = new M.CanvasSink(source.track, {poolSize: 2, width, height, fit: 'fill'});
-    // Sample inside each frame's interval so even the last exact-CFR frame survives a size retry.
+    // Sample inside each frame's interval to include the last recorded frame.
     iterator = sink.canvasesAtTimestamps(Array.from({length: frameCount}, (_, index) => Math.min(first + (index + .5) / fps, end - .000001)));
     await output.start();
     let previous;
@@ -287,26 +287,17 @@ export async function prepareVideo(blob,options={}) {
     if (mime === 'video/mp4' && matches(recording)) { result = new Blob([blob], {type: 'video/mp4'}); method = 'mp4_passthrough'; }
     else { result = await transcodeFallback(blob, M); method = 'fallback_transcode'; }
   } else fail('不支持的录制视频格式，请重新导出');
-  // Keep the fast packet-copy path for the usual native output. A bounded
-  // retry handles encoders that overshoot their target without scaling frames.
-  const source = mime === 'video/h264' || mime === 'video/avc' ? result : blob;
+  // Keep the encoded pictures when muxing the preview sound.
   const soundEnabled=options.soundEnabled===true;
-  let mixed=null,video=result;
   if(soundEnabled){
     let supported=false;
     try{supported=await M.canEncodeAudio('aac',{numberOfChannels:1,sampleRate:48000,quality:new M.Quality({bitrate:48_000})});}catch{}
     if(!supported)fail('当前浏览器无法生成AAC音轨，请关闭音效后导出');
-    mixed=await mixReviewAudio(options.audio,{soundEnabled:true,six:options.six!==false,sampleRate:48000,...options.audioCapabilities});
-    result=await muxReviewAudio(video,mixed,M);
-  }else if(options.soundEnabled===false&&(await inspectVideo(video)).audio){
-    result=await muxReviewAudio(video,null,M);
+    const mixed=await mixReviewAudio(options.audio,{soundEnabled:true,six:options.six!==false,sampleRate:48000,...options.audioCapabilities});
+    result=await muxReviewAudio(result,mixed,M);
+  }else if(options.soundEnabled===false&&(await inspectVideo(result)).audio){
+    result=await muxReviewAudio(result,null,M);
   }
-  for (const bitrate of [1_780_000, 1_600_000]) {
-    if (result.size <= VIDEO_SPEC.maxBytes) break;
-    video = await transcodeFallback(source, M, bitrate); method = 'size_limited_transcode';
-    result=mixed?await muxReviewAudio(video,mixed,M):video;
-  }
-  if (result.size > VIDEO_SPEC.maxBytes) fail('视频压缩后仍超过 1.5 MB，请重新生成');
   const info = await inspectVideo(result);
   if (!matches(info)) fail('视频规格校验未通过，请重新导出');
   if(soundEnabled&&(!info.audio||info.audio.codec!=='aac'||info.audio.numberOfChannels!==1||info.audio.sampleRate!==48000))fail('AAC音轨校验失败，请关闭音效后导出');

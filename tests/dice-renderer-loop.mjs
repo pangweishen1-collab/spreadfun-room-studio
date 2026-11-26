@@ -127,8 +127,7 @@ function reset(next) {
 }
 
 try {
-  assert.equal(VIDEO_SPEC.maxBytes,1_500_000,'Actual output size is capped at 1.5 MB');
-  assert.equal(VIDEO_SPEC.bitrate,2_500_000,'Allocate more bits for motion detail');
+  assert.equal(VIDEO_SPEC.bitrate,12_000_000,'Use the HD bitrate for motion detail');
   assert.equal(VIDEO_SPEC.fps,60);
   const probe=makeRenderer();
   const config=await probe.loopEncoderConfig();
@@ -136,7 +135,7 @@ try {
   assert.equal(config.framerate,VIDEO_SPEC.fps);
   assert.equal(config.codec,'avc1.64002a','Prefer Level 4.2 High at 720×1600 and 60 fps');
   assert.equal((await probe.loopEncoderConfig(true)).codec,'avc1.42002a','Retry can request Baseline only');
-  checks.push('real_loop_encoder_config_uses_shared_bitrate_high_priority_and_actual_size_gate');
+  checks.push('real_loop_encoder_config_uses_shared_hd_bitrate_and_high_priority');
 
   reset('native');
   const native=makeRenderer();
@@ -159,12 +158,10 @@ try {
 
   reset('oversize');
   const oversize=makeRenderer();
-  assert.equal((await oversize.recordLoop(6)).size,360*5);
-  assert.equal(encoders.length,2,'Overshoot must encode the source exactly one more time');
-  assert.ok(encoders[1].config.bitrate<encoders[0].config.bitrate);
-  assert.deepEqual(encoders[1].inputs,encoders[0].inputs);
+  assert.equal((await oversize.recordLoop(6)).size,360*8500);
+  assert.equal(encoders.length,1,'Crossing the old size budget keeps the first encoded pictures');
   await assertClean(oversize);
-  checks.push('native_overshoot_retries_from_original_frames_at_lower_bitrate');
+  checks.push('native_hd_video_over_the_former_size_budget_is_not_reencoded');
 
   reset('error');
   const failed=makeRenderer();

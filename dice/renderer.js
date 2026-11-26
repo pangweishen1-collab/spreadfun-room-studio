@@ -1,4 +1,4 @@
-import { VIDEO_AVC_CODECS, VIDEO_ROUND_SECONDS, VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
+import { VIDEO_AVC_CODECS, VIDEO_ROUND_SECONDS, VIDEO_SPEC } from './video-export.mjs?v=20261126-hd-preview';
 import { CanvasSpineRenderer } from './six-face/canvas-spine.mjs?v=20261112-atlas-rotation';
 import { removeOuterStroke } from './six-face/outer-stroke.mjs';
 import { PLAN02_FIRST_NUMBERED_FRAME } from './purple-reference/presentation.mjs';
@@ -568,13 +568,13 @@ export class GameRenderer {
     return state;
   }
 
-  async loopEncoderConfig(baselineOnly = false, bitrate = VIDEO_SPEC.bitrate) {
+  async loopEncoderConfig(baselineOnly = false) {
     if (typeof VideoEncoder === 'undefined' || typeof VideoFrame === 'undefined') return null;
     const codecs = baselineOnly ? [BASELINE_AVC] : VIDEO_AVC_CODECS;
     for (const codec of codecs) for (const hardwareAcceleration of ['prefer-hardware', 'no-preference']) {
       const config = {
         codec, width: VIDEO_SPEC.width, height: VIDEO_SPEC.height,
-        framerate: VIDEO_SPEC.fps, bitrate, hardwareAcceleration,
+        framerate: VIDEO_SPEC.fps, bitrate: VIDEO_SPEC.bitrate, hardwareAcceleration,
         // Quality mode preserves every frame; prefer more efficient AVC profiles.
         latencyMode: 'quality', avc: { format: 'annexb' },
       };
@@ -586,11 +586,11 @@ export class GameRenderer {
     return null;
   }
 
-  async recordLoop(seconds = VIDEO_SPEC.duration, baselineOnly = false, bitrate = VIDEO_SPEC.bitrate) {
+  async recordLoop(seconds = VIDEO_SPEC.duration, baselineOnly = false) {
     this.validateRecording(seconds);
     const saved = Object.fromEntries(['mode', 'target', 'elapsed', 'sequence', 'playing', 'stopAfterRound', 'wasPlaying'].map(key => [key, this[key]]));
     const sourceData = this.data, sourceLoad = this.loadId;
-    let encoder, watchdog, abortError, rejectFailure, retryBaseline = false, retryBitrate = 0;
+    let encoder, watchdog, abortError, rejectFailure;
     const failure = new Promise((_, reject) => { rejectFailure = reject; });
     // Error signals can arrive during a synchronous draw batch, before its await.
     failure.catch(() => {});
@@ -618,7 +618,7 @@ export class GameRenderer {
     document.addEventListener('visibilitychange', checkVisibility);
     watchdog = setTimeout(() => abort(new Error('视频录制超时，请重试')), 30_000);
     try {
-      const config = await wait(this.loopEncoderConfig(baselineOnly, bitrate));
+      const config = await wait(this.loopEncoderConfig(baselineOnly));
       check();
       if (!config) {
         this.offlineEncoding = false;
@@ -657,15 +657,9 @@ export class GameRenderer {
       await wait(encoder.flush());
       check();
       if (chunks.length !== frames) throw new Error('视频编码帧数不完整，请重试');
-      const blob = new Blob(chunks, { type: 'video/h264' });
-      // Reserve room for AAC and MP4 metadata. On overshoot, use the original
-      // frames again so the size retry does not compound compression artifacts.
-      const videoBudget = VIDEO_SPEC.maxBytes - 45_000;
-      if (bitrate !== VIDEO_SPEC.bitrate || blob.size <= videoBudget) return blob;
-      retryBitrate = Math.floor(bitrate * (videoBudget / blob.size) * .97);
+      return new Blob(chunks, { type: 'video/h264' });
     } catch (error) {
-      if (!baselineOnly && error?.retryBaseline) retryBaseline = true;
-      else throw error;
+      if (baselineOnly || !error?.retryBaseline) throw error;
     } finally {
       clearTimeout(watchdog);
       document.removeEventListener('visibilitychange', checkVisibility);
@@ -683,8 +677,7 @@ export class GameRenderer {
     }
     // Some implementations reorder High/Main frames. Retry Baseline once only
     // after restoring the preview and releasing the first encoder's resources.
-    if (retryBaseline) return this.recordLoop(seconds, true, bitrate);
-    return this.recordLoop(seconds, baselineOnly, retryBitrate);
+    return this.recordLoop(seconds, true);
   }
 
   async recordRealtime(seconds, loop = false) {

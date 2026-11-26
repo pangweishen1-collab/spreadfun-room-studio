@@ -54,16 +54,15 @@ try {
   const passthrough = await prepareVideo(new Blob([original], {type: 'video/mp4'}));
   assert.equal(passthrough.videoInfo.method, 'mp4_passthrough');
   assert.deepEqual(Buffer.from(await passthrough.arrayBuffer()), original);
-  // A valid MP4 free box reaches the cap without altering video packets.
-  const padding = Buffer.alloc(VIDEO_SPEC.maxBytes - original.length);
-  assert.ok(padding.length >= 8, 'Packet-copy fixture needs room for an MP4 free box');
+  // Cross the old size budget without altering the existing video packets.
+  const padding = Buffer.alloc(Math.max(8, 3_000_000 - original.length));
   padding.writeUInt32BE(padding.length, 0);
   padding.write('free', 4);
-  const atLimit = await prepareVideo(new Blob([original, padding], {type: 'video/mp4'}));
-  assert.equal(atLimit.size, 1_500_000);
-  assert.equal(atLimit.videoInfo.method, 'mp4_passthrough');
-  assert.equal(atLimit.videoInfo.profile, 'loop6-v7-60fps-audio-1500kb');
-  assert.deepEqual(Buffer.from(await atLimit.arrayBuffer()), Buffer.concat([original, padding]));
+  const hd = await prepareVideo(new Blob([original, padding], {type: 'video/mp4'}));
+  assert.equal(hd.size, original.length + padding.length);
+  assert.equal(hd.videoInfo.method, 'mp4_passthrough');
+  assert.equal(hd.videoInfo.profile, 'loop6-v8-60fps-hd');
+  assert.deepEqual(Buffer.from(await hd.arrayBuffer()), Buffer.concat([original, padding]));
   await assert.rejects(prepareVideo(new Blob([], {type: 'video/h264'})), /为空/);
   await assert.rejects(prepareVideo(new Blob([raw], {type: 'image/png'})), /不支持/);
   await assert.rejects(prepareVideo(new Blob([new Uint8Array([1,2,3,4,5])], {type: 'video/h264'})), /Annex B/);

@@ -1,9 +1,9 @@
 import {CanvasSpineRenderer} from '../dice/six-face/canvas-spine.mjs?v=20261112-atlas-rotation';
+import {VIDEO_AVC_CODECS, VIDEO_SPEC} from '../dice/video-export.mjs?v=20261126-hd-preview';
 
 const WIDTH = 720;
 const HEIGHT = 1600;
-const FPS = 30;
-const VIDEO_SECONDS = 6;
+const {fps: FPS, duration: VIDEO_SECONDS} = VIDEO_SPEC;
 export const TOKEN_ROUND_SECONDS = 2;
 export const TOKEN_HOP_SECONDS = .4;
 const TRACK_QUARTER = [
@@ -305,10 +305,10 @@ export async function recordTokenVideo(renderer, {color, action, soundEnabled = 
     import('../vendor/mediabunny/mediabunny.mjs'),
     soundEnabled ? reviewAudio(action) : null,
   ]);
-  const videoQuality = new M.Quality({bitrate: 1_700_000});
+  const videoQuality = new M.Quality({bitrate: VIDEO_SPEC.bitrate});
   const videoOptions = {quality: videoQuality, latencyMode: 'quality', keyFrameInterval: TOKEN_ROUND_SECONDS};
   let codec;
-  for (const fullCodecString of ['avc1.640020', 'avc1.4d0020', 'avc1.420020']) {
+  for (const fullCodecString of VIDEO_AVC_CODECS) {
     signal?.throwIfAborted();
     if (await M.canEncodeVideo('avc', {...videoOptions, width: WIDTH, height: HEIGHT, frameRate: FPS, fullCodecString})) {
       codec = fullCodecString;

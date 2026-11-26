@@ -40,8 +40,8 @@ const messages = {
 const errors = {
   '精简包仅适用于紫色 01R 或 02':'The runtime ZIP is available for purple style 01R or 02.',
   '紫色骰子方案需为 01R、02 或 05':'Choose purple roll style 01R, 02 or 05.',
-  '视频压缩后仍超过 1.5 MB，请重新生成':'The video still exceeds 1.5 MB after compression. Generate it again.',
-  '视频超过 1.5 MB，请重新生成':'The video exceeds 1.5 MB. Generate it again.',
+  '视频为空或超过 64 MiB':'The video is empty or exceeds 64 MiB.',
+  '视频文件超过 64 MiB，请重新导出':'The video exceeds 64 MiB. Export it again.',
   '分离点数素材需要 sz_0.png 底图':'Separate numerals require a sz_0.png base image.',
   '紫色等级需要上传六张完整骰面':'Purple requires six complete dice faces.',
   '请填写 1～80 字的预览名称':'Enter a preview name with 1–80 characters.',

@@ -1,5 +1,5 @@
 // Upload-only browser sessions. Original PNG Blobs are never rewritten or uploaded.
-import { VIDEO_SPEC } from './video-export.mjs?v=20261109-dice-60fps';
+import { VIDEO_SPEC } from './video-export.mjs?v=20261126-hd-preview';
 import {generateSixFaceRuntime, GREEN_PACKING_VERSION} from './six-face/runtime.mjs?v=20261113-green-android';
 import {SIX_FACE_MOTION_VERSION} from './six-face/spine-builder.mjs';
 import {selectFaceFiles} from './six-face/import-faces.mjs';
@@ -575,12 +575,12 @@ export function createLocalPreview(dependencies={}) {
   async function video(id,options) {
     const record=await read(id),headers=new Headers(options.headers),revision=Number(headers.get('X-Preview-Revision'));
     if(!Number.isInteger(revision)||revision!==record.revision||headers.get('X-Candidate-Id')!==record.candidateId)throw new PreviewError('预览已更新，请重新录制当前版本',409);
-    if(!(options.body instanceof Blob)||!options.body.size||options.body.size>90*1024*1024)throw new PreviewError('视频大小不合法');
-    const started=performance.now(),module=dependencies.prepareVideo?null:await import('./video-export.mjs?v=20261109-dice-60fps');
+    const {maxBytes,profile,width,height,duration,fps,frameCount}=VIDEO_SPEC;
+    if(!(options.body instanceof Blob)||!options.body.size||options.body.size>maxBytes)throw new PreviewError('视频为空或超过 64 MiB');
+    const started=performance.now(),module=dependencies.prepareVideo?null:await import('./video-export.mjs?v=20261126-hd-preview');
     const blob=await (dependencies.prepareVideo||module.prepareVideo)(options.body,{audio:audioURLs(record),soundEnabled:record.soundEnabled!==false});
     if(!(blob instanceof Blob)||!blob.size)throw new PreviewError('视频校验失败，请重新导出');
-    const {maxBytes,profile,width,height,duration,fps,frameCount}=VIDEO_SPEC;
-    if(blob.size>maxBytes)throw new PreviewError(`视频超过 ${maxBytes/1_000_000} MB，请重新生成`);
+    if(blob.size>maxBytes)throw new PreviewError('视频文件超过 64 MiB，请重新导出');
     const info=blob.videoInfo||(module?.inspectVideo?await module.inspectVideo(blob):null);
     if(!info||info.width!==width||info.height!==height||Math.abs(info.duration-duration)>.02||Math.abs(info.fps-fps)>.01||info.frameCount!==frameCount)
       throw new PreviewError(`视频规格需为 ${duration} 秒、${fps} 帧/秒、${width}×${height}，共 ${frameCount} 帧`);
